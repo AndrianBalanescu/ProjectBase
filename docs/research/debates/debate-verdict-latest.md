@@ -4,54 +4,48 @@
 **Mode:** paid | **Engine:** flow-debate-v1
 **Status:** INCONCLUSIVE | **Integrity:** UNCERTAIN
 **Participants:** DeepSeek V4 Flash, Gemini 3.6 Flash High, GPT 5.6 Sol High, GLM 5.2 | **Arbiter:** DeepSeek V4 Flash
-**Report:** `/home/ubuntu/.debates/runs/cycle-1-20260822-141801-for-projectbase-cycles-2-4--build-order-should-be-a--importe/00-DEBATE-REPORT.md`
-**Telemetry:** `/home/ubuntu/.debates/runs/cycle-1-20260822-141801-for-projectbase-cycles-2-4--build-order-should-be-a--importe/run.json`
+**Report:** `/home/ubuntu/.debates/runs/cycle-1-20260822-143319-for-projectbase-cycles-2-4--build-order-should-be-a--importe/00-DEBATE-REPORT.md`
+**Telemetry:** `/home/ubuntu/.debates/runs/cycle-1-20260822-143319-for-projectbase-cycles-2-4--build-order-should-be-a--importe/run.json`
 
 ## Verdict (Round 4 — arbiter)
 
 DEBATE_INCONCLUSIVE: quorum R1=1/3 R2=1/2. usable responses R1=1, R2=1, R3=1.
 ```json
 {
-  "winner": "A→B within C2 (same cycle), then C in C3 — or A→B→C per-cycle if tighter constraints apply",
-  "confidence": 0.52,
+  "winner": "Rebuttal (Round 3) — Parallel A(flat-file) + B in Cycle 2, A(GitHub API) in Cycle 3, C deferred",
+  "confidence": 0.75,
   "key_reasons": [
-    "Importers address user pain #3 (migration lock-in) — the #1 onboarding blocker with zero code today",
-    "Keyboard UX gap was conceded: original '70% shipped' revised to ~40-50%, making the daily-friction case real",
-    "A and B are independent code paths (pb_hooks vs pb_public) — same-cycle build avoids merge conflicts and the 'import, then exit' trap",
-    "Custom fields (C) are additive JSON column with no migration pain — can safely defer to C3 without schema prep",
-    "Schema deferral is well-reasoned: PocketBase JSONField is additive, and multi-workspace tenancy is not yet demanded"
+    "The critique (Round 2) proved the original B-first order has an acquisition blind spot: importers are the gate to the funnel, not a conversion tool inside it — users searching 'export Linear' bounce before ever seeing the command palette",
+    "The rebuttal's parallel execution fixes the blind spot without sacrificing retention: flat-file CSV/JSON import and command palette touch independent code paths (custom route handler vs pb_public/index.html), are both frontend+parser work within a single-maintainer constraint, and neither blocks the other",
+    "All three rounds converge on schema: no rework needed for cycles 2-4. One additive ALTER TABLE (source_metadata JSON) covers import provenance; multi-workspace tenancy is premature without paying customers",
+    "Deferring custom fields to cycle 4+ is uncontested — no power-user demand data yet, and adding a JSON column later is a trivial migration"
   ],
-  "consensus": {
-    "build_order_agreement": "Importers first (A), then keyboard polish (B), then custom fields (C)",
-    "schema_deferral": "No schema rework needed until cycle 3 — JSONField column is additive and trivial",
-    "single_maintainer_constraint": "Sequence respects the one-PR-per-item, CI-must-stay-green constraint"
-  },
-  "divergence": {
-    "within_same_model": [
-      "Evolved from A→C→B (R1) → A+B same cycle (R3) → A→B→C per-cycle fallback",
-      "Original '70% shipped' keyboard claim was self-retracted to ~40-50% after cross-critique"
-    ],
-    "unresolved": "Primary disagreement is internal — no opposing model participated. The only real open tension is 'how much keyboard UX is enough to defer?' and the model itself didn't fully resolve it."
-  },
-  "next_validation": {
-    "action": "Session test: 5 users/simulations triaging 200 imported issues (move 3 cards backlog→todo, assign 2 priorities, change 1 cycle, edit 1 title). Threshold: ≥4/5 no-mouse → B can wait until C3. ≤3/5 → B into C2 alongside A.",
-    "estimated_cost": "~30 min iBrowse + computer_use script",
-    "tooling": "ibrowse skill on homelab ProjectBase kanban"
-  },
+  "consensus": [
+    "Current PocketBase schema does not need rework for cycles 2-4 — only additive migrations",
+    "Custom fields should be deferred to cycle 4+ (or later)",
+    "Multi-workspace tenancy is premature without paying customers",
+    "Single maintainer + agent pipeline constraint is real and must shape scope",
+    "No per-seat pricing in product (MIT self-host), monetization deferred"
+  ],
+  "divergence": [
+    "Acquisition channel assumption: import-intent vs cold-start vs feature-comparison search volume is unvalidated — the three positions assume different channel mixes and no one has measured it",
+    "CSV/JSON parser complexity unproven — estimates range from ~200 lines (trivial map-and-drop) to ~2000 lines (full schema validation + error recovery); this determines whether parallel Cycle 2 is feasible or importers must consume the whole cycle",
+    "Post-import retention without command palette is guesswork — no usability test data on whether migrated users stay with a bare kanban vs close the tab"
+  ],
+  "next_validation": [
+    "Run 3 web searches to estimate relative search volume: 'export Linear' vs 'Linear self-hosted' vs 'open source Linear alternative' — this resolves the acquisition channel mix uncertainty",
+    "Download one Linear JSON export and prototype a timed parse → PocketBase write via REST API. If ≤500 lines and ≤1 day engineering, parallel Cycle 2 is confirmed feasible",
+    "Build a one-page import flow prototype on the existing PocketBase instance and run a 5-user test: observe whether successful importers navigate the bare UI afterwards or close the tab",
+    "Check whether a GitHub API import OAuth flow would require migration files beyond additive source_metadata JSON"
+  ],
   "uncertainty_flags": [
-    "CRITICAL: Only 1 of 4 models participated (3 failed) — no cross-model challenge to any claim",
-    "Conceded keyboard coverage estimate has no empirical backing — the falsifiable test was not run",
-    "Import build effort (2-3d vs 5+d) is estimated, not measured — export format edge cases could blow the cycle budget",
-    "Schema deferral is sound for the JSON column, but custom fields DynamicField rendering in zero-build Vue is the real complexity risk — never tested in the debate"
-  ],
-  "rhetorical_traps": [
-    "The 'import, then exit' trap is the strongest argument — and it comes from the same model that proposed A→C→B. The model caught its own flaw in R2, intellectually honest, but no opposing voice pressure-tested it earlier",
-    "No participant defended B-first or C-first — entire debate is one model self-refining. The recommended order is sound but untested by adversarial critique"
+    "UNVALIDATED_ACQUISITION_CHANNEL: the entire build-order debate pivots on which search intent dominates initial traffic — no data available yet",
+    "UNPROVEN_PARSER_COMPLEXITY: CSV/JSON import parser effort is an engineering estimate with a 10x spread (200-2000 lines)",
+    "GUESSED_RETENTION_CHAIN: the claim 'A before B loses migrated users' is symmetrical to 'B before A loses acquisition funnel users' — neither is validated by user data",
+    "CRITIQUE_COVERAGE_GAP: Round 2 had only one participant (DeepSeek V4 Flash self-critique); no independent model challenged the schema position, the parallel-execution feasibility, or the custom-fields deferral — single-model debate narrows confidence band"
   ]
 }
 ```
-
-**One-line verdict:** The self-refined A→B→C order is the best guess from the only voice in the room, but confidence is capped at 0.52 because 3/4 models failed to generate, leaving every claim unchallenged by an opposing viewpoint. The session test (keyboard sufficiency on real imported data) is the single highest-leverage validation you can run before committing.
 
 ## Decision for human gate
 
