@@ -1,20 +1,24 @@
+// ProjectBase demo seed — runs as a migration AFTER schema creation.
+// (Moved from onBootstrap in pb_hooks/10_seed_defaults.pb.js, which fired
+// before migrations created the collections on a fresh boot, throwing
+// 'sql: no rows in result set' and leaving a stranger's first boot empty.)
 // pb_hooks/10_seed_defaults.pb.js
 // Idempotently seeds all core Homelab projects, sprint cycles, and active tasks
 
-onBootstrap((e) => {
-    e.next()
+migrate((app) => {
+    
 
     try {
-        let projectsCol = e.app.findCollectionByNameOrId("projects")
-        let issuesCol = e.app.findCollectionByNameOrId("issues")
-        let cyclesCol = e.app.findCollectionByNameOrId("cycles")
-        let labelsCol = e.app.findCollectionByNameOrId("labels")
-        let milestonesCol = e.app.findCollectionByNameOrId("milestones")
+        let projectsCol = app.findCollectionByNameOrId("projects")
+        let issuesCol = app.findCollectionByNameOrId("issues")
+        let cyclesCol = app.findCollectionByNameOrId("cycles")
+        let labelsCol = app.findCollectionByNameOrId("labels")
+        let milestonesCol = app.findCollectionByNameOrId("milestones")
 
         function getOrCreateProject(data) {
             let found = null
             try {
-                let records = e.app.findRecordsByFilter("projects", `identifier = '${data.identifier}'`, "-created", 1, 0)
+                let records = app.findRecordsByFilter("projects", `identifier = '${data.identifier}'`, "-created", 1, 0)
                 if (records && records.length > 0) found = records[0]
             } catch (err) {}
 
@@ -28,7 +32,7 @@ onBootstrap((e) => {
                 p.set("repo_url", data.repo_url || "")
                 p.set("lead", data.lead || "Agent")
                 p.set("is_favorite", data.is_favorite !== false)
-                e.app.save(p)
+                app.save(p)
                 console.log(">>> [ProjectBase Seed] Created project:", data.name, `[${data.identifier}]`)
                 found = p
             }
@@ -39,7 +43,7 @@ onBootstrap((e) => {
             for (let item of issuesList) {
                 let existing = null
                 try {
-                    let recs = e.app.findRecordsByFilter("issues", `project = '${projectRecord.id}' && title = '${item.title.replace(/'/g, "\\'")}'`, "-created", 1, 0)
+                    let recs = app.findRecordsByFilter("issues", `project = '${projectRecord.id}' && title = '${item.title.replace(/'/g, "\\'")}'`, "-created", 1, 0)
                     if (recs && recs.length > 0) existing = recs[0]
                 } catch (err) {}
 
@@ -56,7 +60,7 @@ onBootstrap((e) => {
                     issueRec.set("subtasks", item.subtasks || [])
                     if (item.cycle) issueRec.set("cycle", item.cycle)
                     issueRec.set("order", Date.now() + Math.random() * 1000)
-                    e.app.save(issueRec)
+                    app.save(issueRec)
                 }
             }
         }
@@ -65,7 +69,7 @@ onBootstrap((e) => {
         function getOrCreateMilestone(projectId, name, desc, targetDate, status) {
             let found = null
             try {
-                let recs = e.app.findRecordsByFilter("milestones", `project = '${projectId}' && name = '${name.replace(/'/g, "\\'")}'`, "-created", 1, 0)
+                let recs = app.findRecordsByFilter("milestones", `project = '${projectId}' && name = '${name.replace(/'/g, "\\'")}'`, "-created", 1, 0)
                 if (recs && recs.length > 0) found = recs[0]
             } catch (err) {}
 
@@ -76,7 +80,7 @@ onBootstrap((e) => {
                 m.set("description", desc || "")
                 m.set("target_date", targetDate || new Date().toISOString())
                 m.set("status", status || "planned")
-                e.app.save(m)
+                app.save(m)
                 found = m
             }
             return found
@@ -85,7 +89,7 @@ onBootstrap((e) => {
         function getOrCreateCycle(projectId, name, desc) {
             let found = null
             try {
-                let recs = e.app.findRecordsByFilter("cycles", `project = '${projectId}' && name = '${name.replace(/'/g, "\\'")}'`, "-created", 1, 0)
+                let recs = app.findRecordsByFilter("cycles", `project = '${projectId}' && name = '${name.replace(/'/g, "\\'")}'`, "-created", 1, 0)
                 if (recs && recs.length > 0) found = recs[0]
             } catch (err) {}
 
@@ -99,7 +103,7 @@ onBootstrap((e) => {
                 end.setDate(end.getDate() + 14)
                 c.set("end_date", end.toISOString())
                 c.set("status", "active")
-                e.app.save(c)
+                app.save(c)
                 found = c
             }
             return found
