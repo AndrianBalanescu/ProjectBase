@@ -1,5 +1,5 @@
 // pb_hooks/30_custom_routes.pb.js
-// Custom endpoints for AI agents and project statistics
+// Custom endpoints for AI agents, statistics, and doc redirects
 
 routerAdd("GET", "/api/projectbase/health", (e) => {
     return e.json(200, {
@@ -8,6 +8,18 @@ routerAdd("GET", "/api/projectbase/health", (e) => {
         engine: "PocketBase + Vue 3",
         time: new Date().toISOString()
     })
+})
+
+routerAdd("GET", "/docs", (e) => {
+    return e.redirect(301, "/docs/")
+})
+
+routerAdd("GET", "/api/docs", (e) => {
+    return e.redirect(301, "/docs/")
+})
+
+routerAdd("GET", "/api/openapi.json", (e) => {
+    return e.redirect(301, "/openapi.json")
 })
 
 routerAdd("GET", "/api/projectbase/stats", (e) => {
@@ -85,7 +97,6 @@ routerAdd("POST", "/api/projectbase/quick-task", (e) => {
         }
 
         if (!targetProject) {
-            // Default to first project
             let all = e.app.findRecordsByFilter("projects", "1=1", "created", 1, 0)
             if (all && all.length > 0) targetProject = all[0]
         }

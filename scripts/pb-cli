@@ -1,0 +1,165 @@
+#!/usr/bin/env python3
+"""
+ProjectBase CLI (pb-cli)
+Ultra-fast command-line tool for managing projects, issues, sprints, and agent actions.
+"""
+
+import sys
+import os
+import json
+import argparse
+import urllib.request
+import urllib.parse
+
+BASE_URL = os.environ.get("PROJECTBASE_URL", "http://127.0.0.1:8120")
+
+def req(endpoint, method="GET", data=None):
+    url = f"{BASE_URL}{endpoint}"
+    req_data = json.dumps(data).encode("utf-8") if data else None
+    headers = {"Content-Type": "application/json"}
+    r = urllib.request.Request(url, data=req_data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(r, timeout=10) as resp:
+            body = resp.read().decode("utf-8")
+            return json.loads(body) if body else {}
+    except urllib.error.HTTPError as e:
+        print(f"Error {e.code}: {e.read().decode('utf-8')}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Connection error to {BASE_URL}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+def find_project_id(key):
+    res = req(f"/api/collections/projects/records?filter=(identifier='{key.upper()}')")
+    if res.get("items"):
+        return res["items"][0]["id"]
+    res_name = req(f"/api/collections/projects/records?filter=(name~'{key}')")
+    if res_name.get("items"):
+        return res_name["items"][0]["id"]
+    print(f"Error: Project '{key}' not found", file=sys.stderr)
+    sys.exit(1)
+
+def find_issue(key):
+    if "-" in key or key.isupper():
+        res = req(f"/api/collections/issues/records?filter=(identifier='{key.upper()}')")
+        if res.get("items"):
+            return res["items"][0]
+    return req(f"/api/collections/issues/records/{key}")
+
+def cmd_projects(args):
+    res = req("/api/collections/projects/records?sort=-is_favorite,-created")
+    items = res.get("items", [])
+    print(f"{'KEY':6} | {'NAME':30} | {'LEAD':15} | {'REPO'}")
+    print("-" * 75)
+    for p in items:
+        icon = p.get("icon", "📁")
+        key = p.get("identifier", "—")
+        name = f"{icon} {p.get('name', '—')}"
+        lead = p.get("lead", "—")
+        repo = p.get("repo_url", "")
+        print(f"{key:6} | {name:30} | {lead:15} | {repo}")
+
+def cmd_list(args):
+    filter_expr = "1=1"
+    if args.project:
+        pid = find_project_id(args.project)
+        filter_expr += f" && project='{pid}'"
+    if args.status:
+        filter_expr += f" && status='{args.status}'"
+    if args.priority:
+        filter_expr += f" && priority='{args.priority}'"
+
+    encoded = urllib.parse.quote(filter_expr)
+    res = req(f"/api/collections/issues/records?filter={encoded}&sort=order,-created")
+    items = res.get("items", [])
+    print(f"{'ID':8} | {'STATUS':12} | {'PRIO':8} | {'PTS':3} | {'TITLE'}")
+    print("-" * 75)
+    for i in items:
+        ident = i.get("identifier", "—")
+        status = i.get("status", "backlog")
+        prio = i.get("priority", "none")
+        pts = str(i.get("estimate") or 0)
+        title = i.get("title", "—")
+        print(f"{ident:8} | {status:12} | {prio:8} | {pts:>3} | {title}")
+
+def cmd_create(args):
+    data = {
+        "project_key": args.project,
+        "title": args.title,
+        "status": args.status or "todo",
+        "priority": args.priority or "medium",
+        "estimate": args.estimate or 0,
+        "assignee": args.assignee or "Agent"
+    }
+    if args.desc:
+        data["description"] = args.desc
+    res = req("/api/projectbase/quick-task", method="POST", data=data)
+    issue = res.get("issue", {})
+    print(f"✓ Created {issue.get('identifier')} [{issue.get('project')}]: {issue.get('title')}")
+
+def cmd_status(args):
+    issue = find_issue(args.id)
+    res = req(f"/api/collections/issues/records/{issue['id']}", method="PATCH", data={"status": args.status})
+    print(f"✓ Updated {res.get('identifier')} status to: {res.get('status')}")
+
+def cmd_comment(args):
+    issue = find_issue(args.id)
+    res = req("/api/collections/comments/records", method="POST", data={
+        "issue": issue["id"],
+        "author": args.author or "Agent",
+        "author_type": "agent",
+        "content": args.message
+    })
+    print(f"✓ Added comment to {issue.get('identifier')} by {res.get('author')}")
+
+def cmd_stats(args):
+    res = req("/api/projectbase/stats")
+    print(json.dumps(res, indent=2))
+
+def main():
+    parser = argparse.ArgumentParser(description="ProjectBase CLI — manage projects and tasks")
+    subparsers = parser.add_subparsers(dest="cmd", required=True)
+
+    # projects
+    subparsers.add_parser("projects", help="List all projects")
+
+    # list
+    p_list = subparsers.add_parser("list", help="List issues")
+    p_list.add_argument("project", nargs="?", help="Project key filter (e.g. LOAD, IBR, PB)")
+    p_list.add_argument("--status", help="Status filter (todo, in_progress, done, etc.)")
+    p_list.add_argument("--priority", help="Priority filter (urgent, high, medium, low)")
+
+    # create
+    p_create = subparsers.add_parser("create", help="Create new issue")
+    p_create.add_argument("project", help="Target project key (e.g. LOAD, IBR, PB)")
+    p_create.add_argument("title", help="Issue title")
+    p_create.add_argument("--desc", help="Detailed description")
+    p_create.add_argument("--status", default="todo", help="Initial status")
+    p_create.add_argument("--priority", default="medium", help="Priority")
+    p_create.add_argument("--estimate", type=int, default=0, help="Story points estimate")
+    p_create.add_argument("--assignee", default="Agent", help="Assignee name")
+
+    # status
+    p_status = subparsers.add_parser("status", help="Change issue status")
+    p_status.add_argument("id", help="Issue identifier (e.g. LOAD-1 or record ID)")
+    p_status.add_argument("status", choices=["backlog", "todo", "in_progress", "in_review", "done", "cancelled"], help="New status")
+
+    # comment
+    p_comm = subparsers.add_parser("comment", help="Add progress comment")
+    p_comm.add_argument("id", help="Issue identifier (e.g. LOAD-1)")
+    p_comm.add_argument("message", help="Comment message")
+    p_comm.add_argument("--author", default="Flomaster Agent", help="Author name")
+
+    # stats
+    subparsers.add_parser("stats", help="Get workspace stats")
+
+    args = parser.parse_args()
+    if args.cmd == "projects": cmd_projects(args)
+    elif args.cmd == "list": cmd_list(args)
+    elif args.cmd == "create": cmd_create(args)
+    elif args.cmd == "status": cmd_status(args)
+    elif args.cmd == "comment": cmd_comment(args)
+    elif args.cmd == "stats": cmd_stats(args)
+
+if __name__ == "__main__":
+    main()

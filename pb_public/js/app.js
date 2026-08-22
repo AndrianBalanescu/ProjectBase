@@ -11,6 +11,7 @@ const App = {
     'cycles-view': CyclesViewComponent,
     'projects-view': ProjectsViewComponent,
     'stats-view': StatsViewComponent,
+    'docs-view': DocsViewComponent,
     'issue-drawer': IssueDrawerComponent,
     'command-palette': CommandPaletteComponent,
     'new-issue-modal': NewIssueModalComponent,
@@ -178,6 +179,8 @@ const App = {
           this.currentView = 'projects';
         } else if (e.key === '5') {
           this.currentView = 'stats';
+        } else if (e.key === '6') {
+          this.currentView = 'docs';
         }
       });
     },

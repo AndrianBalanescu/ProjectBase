@@ -1,213 +1,320 @@
 // pb_hooks/10_seed_defaults.pb.js
-// Seeds starter project, cycles, labels, and issues if database is empty
+// Idempotently seeds all core Homelab projects, sprint cycles, and active tasks
 
 onBootstrap((e) => {
     e.next()
 
     try {
         let projectsCol = e.app.findCollectionByNameOrId("projects")
-        let existingProjects = e.app.findRecordsByFilter("projects", "1=1", "-created", 1, 0)
-        
-        if (existingProjects && existingProjects.length > 0) {
-            return // Database already has projects
-        }
-
-        console.log(">>> [ProjectBase] Seeding initial projects and demo data...")
-
-        // 1. Create Core Project
-        let p1 = new Record(projectsCol)
-        p1.set("name", "ProjectBase Core")
-        p1.set("identifier", "PB")
-        p1.set("description", "High-performance, lightweight Plane & Linear alternative powered by PocketBase and Vue 3.")
-        p1.set("icon", "⚡")
-        p1.set("color", "#6366f1")
-        p1.set("repo_url", "https://github.com/AndrianBalanescu/projectbase")
-        p1.set("lead", "Flomaster Agent")
-        p1.set("is_favorite", true)
-        e.app.save(p1)
-
-        // 2. Create Homelab Project
-        let p2 = new Record(projectsCol)
-        p2.set("name", "Homelab Infrastructure")
-        p2.set("identifier", "HOME")
-        p2.set("description", "Ubuntu homelab operations, AI orchestration, and service monitoring.")
-        p2.set("icon", "🏠")
-        p2.set("color", "#10b981")
-        p2.set("lead", "Andrian")
-        p2.set("is_favorite", true)
-        e.app.save(p2)
-
-        // 3. Create Cycle 1 for PB
-        let cyclesCol = e.app.findCollectionByNameOrId("cycles")
-        let c1 = new Record(cyclesCol)
-        c1.set("project", p1.id)
-        c1.set("name", "Cycle 1 - Architecture & Launch")
-        c1.set("description", "Initial release with zero-build Vue 3, real-time SSE, and Kanban board.")
-        c1.set("start_date", new Date().toISOString())
-        let endDate = new Date()
-        endDate.setDate(endDate.getDate() + 14)
-        c1.set("end_date", endDate.toISOString())
-        c1.set("status", "active")
-        e.app.save(c1)
-
-        // 4. Create Milestone for PB
-        let milestonesCol = e.app.findCollectionByNameOrId("milestones")
-        let m1 = new Record(milestonesCol)
-        m1.set("project", p1.id)
-        m1.set("name", "v1.0 Production Release")
-        m1.set("description", "Feature complete Plane alternative ready for multi-repo agent automation.")
-        m1.set("target_date", endDate.toISOString())
-        m1.set("status", "in_progress")
-        e.app.save(m1)
-
-        // 5. Create Labels
-        let labelsCol = e.app.findCollectionByNameOrId("labels")
-        let defaultLabels = [
-            { name: "feature", color: "#3b82f6" },
-            { name: "bug", color: "#ef4444" },
-            { name: "core", color: "#8b5cf6" },
-            { name: "realtime", color: "#10b981" },
-            { name: "agent", color: "#f59e0b" }
-        ]
-        for (let l of defaultLabels) {
-            let lr = new Record(labelsCol)
-            lr.set("project", p1.id)
-            lr.set("name", l.name)
-            lr.set("color", l.color)
-            e.app.save(lr)
-        }
-
-        // 6. Create Initial Issues for PB
         let issuesCol = e.app.findCollectionByNameOrId("issues")
-        let demoIssues = [
+        let cyclesCol = e.app.findCollectionByNameOrId("cycles")
+        let labelsCol = e.app.findCollectionByNameOrId("labels")
+
+        function getOrCreateProject(data) {
+            let found = null
+            try {
+                let records = e.app.findRecordsByFilter("projects", `identifier = '${data.identifier}'`, "-created", 1, 0)
+                if (records && records.length > 0) found = records[0]
+            } catch (err) {}
+
+            if (!found) {
+                let p = new Record(projectsCol)
+                p.set("name", data.name)
+                p.set("identifier", data.identifier)
+                p.set("description", data.description)
+                p.set("icon", data.icon)
+                p.set("color", data.color)
+                p.set("repo_url", data.repo_url || "")
+                p.set("lead", data.lead || "Agent")
+                p.set("is_favorite", data.is_favorite !== false)
+                e.app.save(p)
+                console.log(">>> [ProjectBase Seed] Created project:", data.name, `[${data.identifier}]`)
+                found = p
+            }
+            return found
+        }
+
+        function createIssuesForProject(projectRecord, issuesList) {
+            for (let item of issuesList) {
+                let existing = null
+                try {
+                    let recs = e.app.findRecordsByFilter("issues", `project = '${projectRecord.id}' && title = '${item.title.replace(/'/g, "\\'")}'`, "-created", 1, 0)
+                    if (recs && recs.length > 0) existing = recs[0]
+                } catch (err) {}
+
+                if (!existing) {
+                    let issueRec = new Record(issuesCol)
+                    issueRec.set("project", projectRecord.id)
+                    issueRec.set("title", item.title)
+                    issueRec.set("description", item.description || "")
+                    issueRec.set("status", item.status || "todo")
+                    issueRec.set("priority", item.priority || "medium")
+                    issueRec.set("estimate", Number(item.estimate) || 0)
+                    issueRec.set("assignee", item.assignee || "Flomaster Agent")
+                    issueRec.set("labels", item.labels || [])
+                    issueRec.set("subtasks", item.subtasks || [])
+                    if (item.cycle) issueRec.set("cycle", item.cycle)
+                    issueRec.set("order", Date.now() + Math.random() * 1000)
+                    e.app.save(issueRec)
+                }
+            }
+        }
+
+        function getOrCreateCycle(projectId, name, desc) {
+            let found = null
+            try {
+                let recs = e.app.findRecordsByFilter("cycles", `project = '${projectId}' && name = '${name.replace(/'/g, "\\'")}'`, "-created", 1, 0)
+                if (recs && recs.length > 0) found = recs[0]
+            } catch (err) {}
+
+            if (!found) {
+                let c = new Record(cyclesCol)
+                c.set("project", projectId)
+                c.set("name", name)
+                c.set("description", desc)
+                c.set("start_date", new Date().toISOString())
+                let end = new Date()
+                end.setDate(end.getDate() + 14)
+                c.set("end_date", end.toISOString())
+                c.set("status", "active")
+                e.app.save(c)
+                found = c
+            }
+            return found
+        }
+
+        // 1. ProjectBase Core (PB)
+        let pPB = getOrCreateProject({
+            name: "ProjectBase Core",
+            identifier: "PB",
+            description: "High-performance Plane & Linear alternative powered by PocketBase + Zero-Build Vue 3.",
+            icon: "⚡",
+            color: "#6366f1",
+            repo_url: "https://github.com/AndrianBalanescu/projectbase",
+            lead: "Flomaster Agent"
+        })
+        let cPB = getOrCreateCycle(pPB.id, "Sprint 1 - Architecture & Launch", "Initial release with zero-build Vue 3, real-time SSE, FastMCP, and OpenAPI Scalar docs.")
+        createIssuesForProject(pPB, [
             {
                 title: "Design zero-build Vue 3 + Tailwind dark UI",
                 description: "Build clean, Raycast/Linear inspired dark theme with reusable components and Lucide icons.",
                 status: "done",
                 priority: "high",
                 estimate: 3,
-                issue_number: 1,
-                identifier: "PB-1",
-                labels: ["core", "feature"],
-                subtasks: [
-                    { id: "1", title: "Setup Tailwind dark color scheme", done: true },
-                    { id: "2", title: "Include Lucide icons bundle", done: true }
-                ]
+                cycle: cPB.id,
+                labels: ["core", "frontend"]
             },
             {
                 title: "Implement fluid drag & drop Kanban board with SortableJS",
-                description: "Support drag-and-drop between Backlog, Todo, In Progress, In Review, Done columns with real-time sync.",
-                status: "in_progress",
+                description: "Support drag-and-drop between columns with real-time SSE sync and celebratory confetti on completion.",
+                status: "done",
                 priority: "urgent",
                 estimate: 5,
-                issue_number: 2,
-                identifier: "PB-2",
-                labels: ["realtime", "feature"],
-                subtasks: [
-                    { id: "1", title: "Bind SortableJS to column DOM elements", done: true },
-                    { id: "2", title: "Sync card reordering to PocketBase", done: false }
-                ]
+                cycle: cPB.id,
+                labels: ["realtime", "frontend"]
             },
             {
-                title: "Real-time SSE event subscriptions for zero-latency multi-client sync",
-                description: "Subscribe to PocketBase collection events so browser tabs and AI agents update concurrently without polling.",
+                title: "OpenAPI 3.1 & Interactive Scalar Reference at /docs",
+                description: "Serve complete OpenAPI specification and modern Scalar UI for interactive API exploration and testing.",
+                status: "done",
+                priority: "high",
+                estimate: 3,
+                cycle: cPB.id,
+                labels: ["docs", "api"]
+            },
+            {
+                title: "Agentic discovery via /llms.txt and /llms-full.txt",
+                description: "Implement LLM discovery standard endpoints to guide autonomous agent actions and schema understanding.",
+                status: "done",
+                priority: "high",
+                estimate: 2,
+                cycle: cPB.id,
+                labels: ["agent", "docs"]
+            },
+            {
+                title: "In-App Interactive Docs & Agent Guide view",
+                description: "Provide embedded API tester, autonomous agent workflow handbook, and copyable snippets (FastMCP, Python, cURL, JS).",
                 status: "in_progress",
                 priority: "high",
                 estimate: 3,
-                issue_number: 3,
-                identifier: "PB-3",
-                labels: ["realtime", "core"]
+                cycle: cPB.id,
+                labels: ["frontend", "docs"]
+            }
+        ])
+
+        // 2. LoadETA (LOAD)
+        let pLOAD = getOrCreateProject({
+            name: "LoadETA",
+            identifier: "LOAD",
+            description: "Real-time freight dispatching, rate calculation, and driver ETA optimization platform.",
+            icon: "🚚",
+            color: "#3b82f6",
+            repo_url: "https://github.com/AndrianBalanescu/loadeta",
+            lead: "Andrian"
+        })
+        let cLOAD = getOrCreateCycle(pLOAD.id, "Sprint 3 - ETA Precision & Dispatch", "Refining distance matrices, live traffic inputs, and multi-stop load routing.")
+        createIssuesForProject(pLOAD, [
+            {
+                title: "Optimize haversine route calculation with matrix caching",
+                description: "Cache frequent freight lanes to reduce latency from 320ms down to <15ms per dispatch lookup.",
+                status: "in_progress",
+                priority: "urgent",
+                estimate: 5,
+                cycle: cLOAD.id,
+                labels: ["backend", "performance"],
+                subtasks: [
+                    { id: "1", title: "Implement Redis lane cache key format", done: true },
+                    { id: "2", title: "Benchmark lookup time across 10k loads", done: false }
+                ]
             },
             {
-                title: "AI Agent REST API helper and MCP integration",
-                description: "Provide endpoints and MCP tools so agents like Flomaster and Hermes can read and mutate tasks autonomously.",
+                title: "Driver live GPS telematics webhook ingestor",
+                description: "Ingest live ELD / GPS pings every 30s and update live ETA tracking cards.",
+                status: "todo",
+                priority: "high",
+                estimate: 3,
+                cycle: cLOAD.id,
+                labels: ["api", "telematics"]
+            },
+            {
+                title: "Automated rate quote PDF generator",
+                description: "Generate branded PDF rate confirmations with dynamic fuel surcharge breakdown.",
+                status: "backlog",
+                priority: "medium",
+                estimate: 2,
+                labels: ["feature"]
+            }
+        ])
+
+        // 3. iBrowse (IBR)
+        let pIBR = getOrCreateProject({
+            name: "iBrowse Server",
+            identifier: "IBR",
+            description: "Homelab headless browser automation, E2E QA audits, console error checks, and web scraping (:3000).",
+            icon: "🌐",
+            color: "#06b6d4",
+            repo_url: "https://github.com/AndrianBalanescu/ibrowse",
+            lead: "Flomaster Agent"
+        })
+        let cIBR = getOrCreateCycle(pIBR.id, "Sprint 2 - Agentic Browser QA", "Enhancing automated audits, DOM snapshotting, and console error detection.")
+        createIssuesForProject(pIBR, [
+            {
+                title: "Add automated visual regression screenshot comparison",
+                description: "Store baseline snapshots and compute pixel diff percentage for critical dashboard pages.",
+                status: "todo",
+                priority: "high",
+                estimate: 5,
+                cycle: cIBR.id,
+                labels: ["qa", "automation"]
+            },
+            {
+                title: "Console error and network 4xx/5xx audit hook",
+                description: "Automatically flag uncaught JavaScript exceptions during agent browser runs.",
+                status: "done",
+                priority: "high",
+                estimate: 3,
+                cycle: cIBR.id,
+                labels: ["core", "qa"]
+            },
+            {
+                title: "FastMCP server for direct agent browser control",
+                description: "Provide MCP tools for page navigation, element clicking, form filling, and DOM evaluation.",
+                status: "in_progress",
+                priority: "urgent",
+                estimate: 3,
+                cycle: cIBR.id,
+                labels: ["agent", "mcp"]
+            }
+        ])
+
+        // 4. OmniRoute (OMNI)
+        let pOMNI = getOrCreateProject({
+            name: "OmniRoute AI Gateway",
+            identifier: "OMNI",
+            description: "Homelab AI model router and multi-provider proxy on :20128 with live fallbacks and token analytics.",
+            icon: "🧠",
+            color: "#ec4899",
+            repo_url: "https://github.com/AndrianBalanescu/omniroute",
+            lead: "Agent"
+        })
+        createIssuesForProject(pOMNI, [
+            {
+                title: "Dynamic latency-based model failover routing",
+                description: "Automatically fall back to backup LLM routes when p95 response latency exceeds 4.5s.",
+                status: "in_progress",
+                priority: "urgent",
+                estimate: 5,
+                labels: ["core", "ai"]
+            },
+            {
+                title: "Per-session token usage and VRAM telemetry exporter",
+                description: "Export real-time token consumption metrics to Prometheus and Grafana dashboards.",
+                status: "done",
+                priority: "medium",
+                estimate: 2,
+                labels: ["observability"]
+            }
+        ])
+
+        // 5. Memrize (MEM)
+        let pMEM = getOrCreateProject({
+            name: "Memrize Memory Layer",
+            identifier: "MEM",
+            description: "Unified cross-session memory, entity graphs, and context indexing for Cursor, Hermes, and Antigravity.",
+            icon: "🔮",
+            color: "#a855f7",
+            repo_url: "https://github.com/AndrianBalanescu/memrize",
+            lead: "Andrian"
+        })
+        createIssuesForProject(pMEM, [
+            {
+                title: "Hybrid dense vector + BM25 sparse recall ranker",
+                description: "Merge FastEmbed embeddings with sqlite-vec and FTS5 ranking for high-precision recall.",
+                status: "in_progress",
+                priority: "high",
+                estimate: 5,
+                labels: ["search", "memory"]
+            },
+            {
+                title: "Cross-agent session state synchronization",
+                description: "Ensure changes in Hermes Kanban reflect instantly in Cursor and Flomaster working context.",
                 status: "todo",
                 priority: "medium",
                 estimate: 3,
-                issue_number: 4,
-                identifier: "PB-4",
-                labels: ["agent", "feature"]
-            },
-            {
-                title: "Sprint Cycles & Burndown chart view",
-                description: "Track timeboxed sprints with start/end dates and completion progress rings.",
-                status: "todo",
-                priority: "medium",
-                estimate: 5,
-                issue_number: 5,
-                identifier: "PB-5",
-                labels: ["feature"]
-            },
-            {
-                title: "Command Palette Omnibar (Cmd/Ctrl + K)",
-                description: "Keyboard-first navigation, global search, and instant task creation modal.",
-                status: "backlog",
-                priority: "low",
-                estimate: 2,
-                issue_number: 6,
-                identifier: "PB-6",
-                labels: ["feature"]
+                labels: ["sync"]
             }
-        ]
+        ])
 
-        for (let item of demoIssues) {
-            let issueRec = new Record(issuesCol)
-            issueRec.set("project", p1.id)
-            issueRec.set("identifier", item.identifier)
-            issueRec.set("issue_number", item.issue_number)
-            issueRec.set("title", item.title)
-            issueRec.set("description", item.description)
-            issueRec.set("status", item.status)
-            issueRec.set("priority", item.priority)
-            issueRec.set("estimate", item.estimate)
-            issueRec.set("labels", item.labels || [])
-            issueRec.set("subtasks", item.subtasks || [])
-            issueRec.set("cycle", c1.id)
-            issueRec.set("milestone", m1.id)
-            issueRec.set("order", Date.now() + item.issue_number * 100)
-            e.app.save(issueRec)
-        }
-
-        // 7. Create Issues for HOME project
-        let homeIssues = [
+        // 6. Homelab Infrastructure (HOME)
+        let pHOME = getOrCreateProject({
+            name: "Homelab Infrastructure",
+            identifier: "HOME",
+            description: "Ubuntu homelab operations, Tailscale mesh, GPU orchestrator (:20900), and monitoring.",
+            icon: "🏠",
+            color: "#10b981",
+            repo_url: "",
+            lead: "Andrian"
+        })
+        createIssuesForProject(pHOME, [
             {
                 title: "Decommission Plane containers to reclaim 2.73 GB RAM",
                 description: "Stop and disable makeplane containers on Homelab to relieve memory pressure and full swap.",
-                status: "todo",
+                status: "done",
                 priority: "urgent",
                 estimate: 1,
-                issue_number: 1,
-                identifier: "HOME-1",
                 labels: ["infra", "core"]
             },
             {
                 title: "Deploy ProjectBase as lightweight systemd service on port 8120",
-                description: "Ensure zero-downtime auto-start on Homelab reboot.",
-                status: "in_progress",
+                description: "Ensure zero-downtime auto-start on Homelab reboot consuming only ~15 MB RAM.",
+                status: "done",
                 priority: "high",
                 estimate: 2,
-                issue_number: 2,
-                identifier: "HOME-2",
                 labels: ["infra"]
             }
-        ]
+        ])
 
-        for (let item of homeIssues) {
-            let issueRec = new Record(issuesCol)
-            issueRec.set("project", p2.id)
-            issueRec.set("identifier", item.identifier)
-            issueRec.set("issue_number", item.issue_number)
-            issueRec.set("title", item.title)
-            issueRec.set("description", item.description)
-            issueRec.set("status", item.status)
-            issueRec.set("priority", item.priority)
-            issueRec.set("estimate", item.estimate)
-            issueRec.set("labels", item.labels || [])
-            issueRec.set("order", Date.now() + item.issue_number * 100)
-            e.app.save(issueRec)
-        }
-
-        console.log(">>> [ProjectBase] Seed data created successfully!")
+        console.log(">>> [ProjectBase Seed] All Homelab projects & tasks verified.")
     } catch (err) {
         console.error(">>> [ProjectBase Seed Error]:", err)
     }
