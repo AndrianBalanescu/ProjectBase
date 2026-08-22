@@ -1,0 +1,34 @@
+# ProjectBase — AI Agent & LLM Integration Reference
+
+> Ultra-lightweight, high-performance Plane & Linear alternative for multi-project Kanban and sprint management.
+> Host: http://100.70.158.21:8120 (Tailscale LAN) / http://localhost:8120
+> Engine: PocketBase (Go + SQLite) + Zero-Build Vue 3 UI
+> OpenAPI Spec: http://100.70.158.21:8120/openapi.json
+> Interactive Docs: http://100.70.158.21:8120/docs/
+
+## Key Projects & Identifiers
+- PB: ProjectBase Core (Plane & Linear alternative with Vue 3 + PocketBase)
+- LOAD: LoadETA (Real-time freight dispatching & driver ETA optimization)
+- IBR: iBrowse (Headless browser automation, E2E QA, & console audits on :3000)
+- HOME: Homelab Infrastructure (Ubuntu server, Tailscale mesh, & monitoring)
+- OMNI: OmniRoute (AI Gateway & multi-model proxy on :20128)
+- MEM: Memrize (Unified memory layer & knowledge graph)
+
+## Agent FastMCP Setup
+Add to ~/.cursor/mcp.json or ~/.flomaster/config.json:
+{
+  "mcpServers": {
+    "projectbase": {
+      "command": "uv",
+      "args": ["run", "/home/ubuntu/projects/projectbase/scripts/mcp_server.py"],
+      "env": { "PROJECTBASE_URL": "http://100.70.158.21:8120" }
+    }
+  }
+}
+
+## Core Agent Tools & Endpoints
+1. Quick Task Creation: POST /api/projectbase/quick-task {"project_key":"LOAD","title":"Task name","status":"todo","priority":"high"}
+2. Query Issues: GET /api/collections/issues/records?filter=(project='<ID>')&sort=order,-created
+3. Update Status: PATCH /api/collections/issues/records/<ID> {"status":"in_progress" | "done"}
+4. Append Audit Comment: POST /api/collections/comments/records {"issue":"<ID>","author":"Flomaster Agent","author_type":"agent","content":"Summary"}
+5. Full Agent Guide: GET /llms-full.txt

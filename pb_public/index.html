@@ -121,6 +121,11 @@
         :projects="projects"
         :cycles="cycles"
       ></stats-view>
+
+      <!-- 6. Docs & API View -->
+      <docs-view 
+        v-else-if="currentView === 'docs'"
+      ></docs-view>
     </main>
 
     <!-- Issue Detail Slide-Over Drawer -->
@@ -204,6 +209,7 @@
   <script src="/js/components/CyclesView.js"></script>
   <script src="/js/components/ProjectsView.js"></script>
   <script src="/js/components/StatsView.js"></script>
+  <script src="/js/components/DocsView.js"></script>
   <script src="/js/components/IssueDrawer.js"></script>
   <script src="/js/components/CommandPalette.js"></script>
   <script src="/js/components/NewIssueModal.js"></script>

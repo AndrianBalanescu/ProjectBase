@@ -147,6 +147,14 @@ const HeaderComponent = {
             <i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i>
             <span>Analytics</span>
           </button>
+          <button 
+            @click="$emit('change-view', 'docs')" 
+            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all font-medium"
+            :class="currentView === 'docs' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'"
+          >
+            <i data-lucide="book-open" class="w-3.5 h-3.5 text-indigo-400"></i>
+            <span>Docs & API</span>
+          </button>
         </div>
       </div>
 

@@ -1,0 +1,303 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ProjectBase API",
+    "version": "1.0.0",
+    "description": "High-performance, ultra-lightweight Plane & Linear alternative for multi-project Kanban, sprint cycles, and autonomous AI agent orchestration.",
+    "contact": {
+      "name": "Andrian Balanescu",
+      "url": "https://github.com/AndrianBalanescu/projectbase"
+    },
+    "license": {
+      "name": "MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api",
+      "description": "ProjectBase REST API base"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Agent Quick Tasks",
+      "description": "Convenience endpoints designed for autonomous AI agents"
+    },
+    {
+      "name": "Projects",
+      "description": "Project and repository workspace management"
+    },
+    {
+      "name": "Issues",
+      "description": "Work items, Kanban tasks, subtasks, and estimates"
+    },
+    {
+      "name": "Cycles",
+      "description": "Timeboxed sprint cycles and burndown velocity"
+    },
+    {
+      "name": "Comments",
+      "description": "Execution audit trail, discussions, and agent progress logs"
+    },
+    {
+      "name": "System",
+      "description": "Health monitoring and workspace velocity analytics"
+    }
+  ],
+  "paths": {
+    "/projectbase/health": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Service Health Check",
+        "responses": {
+          "200": {
+            "description": "Healthy"
+          }
+        }
+      }
+    },
+    "/projectbase/stats": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Workspace Velocity & Statistics",
+        "responses": {
+          "200": {
+            "description": "Statistics"
+          }
+        }
+      }
+    },
+    "/projectbase/quick-task": {
+      "post": {
+        "tags": [
+          "Agent Quick Tasks"
+        ],
+        "summary": "Fast Agent Task Creation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title"
+                ],
+                "properties": {
+                  "project_key": {
+                    "type": "string",
+                    "example": "LOAD"
+                  },
+                  "title": {
+                    "type": "string",
+                    "example": "Dispatch load #402"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "backlog",
+                      "todo",
+                      "in_progress",
+                      "in_review",
+                      "done",
+                      "cancelled"
+                    ],
+                    "default": "todo"
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": [
+                      "urgent",
+                      "high",
+                      "medium",
+                      "low",
+                      "none"
+                    ],
+                    "default": "medium"
+                  },
+                  "estimate": {
+                    "type": "integer",
+                    "example": 3
+                  },
+                  "assignee": {
+                    "type": "string",
+                    "example": "Flomaster Agent"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        }
+      }
+    },
+    "/collections/projects/records": {
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "List Projects",
+        "responses": {
+          "200": {
+            "description": "List"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Create Project",
+        "responses": {
+          "200": {
+            "description": "Created"
+          }
+        }
+      }
+    },
+    "/collections/issues/records": {
+      "get": {
+        "tags": [
+          "Issues"
+        ],
+        "summary": "List Issues / Tasks",
+        "responses": {
+          "200": {
+            "description": "List"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Issues"
+        ],
+        "summary": "Create Issue",
+        "responses": {
+          "200": {
+            "description": "Created"
+          }
+        }
+      }
+    },
+    "/collections/issues/records/{id}": {
+      "get": {
+        "tags": [
+          "Issues"
+        ],
+        "summary": "Get Issue",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Issues"
+        ],
+        "summary": "Update Issue",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Issues"
+        ],
+        "summary": "Delete Issue",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          }
+        }
+      }
+    },
+    "/collections/cycles/records": {
+      "get": {
+        "tags": [
+          "Cycles"
+        ],
+        "summary": "List Cycles",
+        "responses": {
+          "200": {
+            "description": "List"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Cycles"
+        ],
+        "summary": "Create Cycle",
+        "responses": {
+          "200": {
+            "description": "Created"
+          }
+        }
+      }
+    },
+    "/collections/comments/records": {
+      "get": {
+        "tags": [
+          "Comments"
+        ],
+        "summary": "List Comments",
+        "responses": {
+          "200": {
+            "description": "List"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Comments"
+        ],
+        "summary": "Post Comment",
+        "responses": {
+          "200": {
+            "description": "Created"
+          }
+        }
+      }
+    }
+  }
+}
