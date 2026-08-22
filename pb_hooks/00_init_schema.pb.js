@@ -1,5 +1,5 @@
 // pb_hooks/00_init_schema.pb.js
-// Auto-initializes collections schema for ProjectBase
+// Auto-initializes collections schema & upgrades fields for ProjectBase
 
 onBootstrap((e) => {
     e.next()
@@ -30,6 +30,30 @@ onBootstrap((e) => {
             })
             e.app.save(col)
             console.log(">>> [ProjectBase] Created collection: " + name)
+        } else {
+            // Check for attachments field on issues/comments
+            if (name === "issues" || name === "comments") {
+                let hasAttachments = false
+                try {
+                    hasAttachments = col.fields.getByName("attachments") !== null
+                } catch (ex) {}
+
+                if (!hasAttachments) {
+                    try {
+                        let f = new FileField({
+                            name: "attachments",
+                            maxSelect: 10,
+                            maxSize: 10485760,
+                            thumbs: ["100x100", "400x300"]
+                        })
+                        col.fields.add(f)
+                        e.app.save(col)
+                        console.log(`>>> [ProjectBase] Added FileField 'attachments' to '${name}'`)
+                    } catch (err) {
+                        console.warn(`>>> [ProjectBase] FileField add failed on '${name}':`, err)
+                    }
+                }
+            }
         }
         return col
     }
@@ -75,7 +99,7 @@ onBootstrap((e) => {
             { name: "description", type: "text" }
         ])
 
-        // 5. Issues Collection
+        // 5. Issues Collection (with native file attachments & thumbnails)
         let issuesCol = getOrCreateCollection("issues", "base", [
             { name: "project", type: "relation", collectionId: projectsCol.id, cascadeDelete: true, required: true },
             { name: "identifier", type: "text", required: true },
@@ -89,6 +113,7 @@ onBootstrap((e) => {
             { name: "estimate", type: "number" },
             { name: "labels", type: "json" },
             { name: "subtasks", type: "json" },
+            { name: "attachments", type: "file", maxSelect: 10, maxSize: 10485760, thumbs: ["100x100", "400x300"] },
             { name: "cycle", type: "relation", collectionId: cyclesCol.id, cascadeDelete: false },
             { name: "milestone", type: "relation", collectionId: milestonesCol.id, cascadeDelete: false },
             { name: "order", type: "number" }
@@ -99,7 +124,8 @@ onBootstrap((e) => {
             { name: "issue", type: "relation", collectionId: issuesCol.id, cascadeDelete: true, required: true },
             { name: "author", type: "text", required: true },
             { name: "author_type", type: "select", values: ["user", "agent", "system"] },
-            { name: "content", type: "text", required: true }
+            { name: "content", type: "text", required: true },
+            { name: "attachments", type: "file", maxSelect: 5, maxSize: 10485760, thumbs: ["100x100"] }
         ])
 
         // 7. Activity Collection
@@ -112,7 +138,7 @@ onBootstrap((e) => {
             { name: "details", type: "json" }
         ])
 
-        console.log(">>> [ProjectBase] Schema initialization verified with autodate timestamps.")
+        console.log(">>> [ProjectBase] Schema initialization verified with file storage & timestamps.")
     } catch (err) {
         console.error(">>> [ProjectBase Schema Error]:", err)
     }
