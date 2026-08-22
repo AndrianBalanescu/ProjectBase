@@ -1,10 +1,12 @@
 # ProjectBase — Roadmap (synthesized from cycle-1 debate verdict)
 
 > Source: `docs/research/debates/debate-verdict-cycle-1.md` (flow-debate-v1, paid).
-> **Caveat:** only 1 of 4 models completed rounds (quorum R1=1/3) — verdict is
-> INCONCLUSIVE at confidence 0.52. Direction aligns with the cycle-1 teardown
-> (`research/COMPETITORS.md`), so we proceed, but re-validate in cycle 2 with a
-> rerun debate or the falsifiable test below.
+> **Validator: INVALID — status INCONCLUSIVE** (only 1 of 4 models completed
+> rounds; quorum R1=1/3; confidence 0.52). `flow_debate.py --validate` →
+> `valid: false`. Direction aligns with the cycle-1 teardown
+> (`research/COMPETITORS.md`), so we proceed tentatively, but **the debate must
+> be rerun at the start of cycle 2** before this build order is treated as
+> decided, per the pipeline rule (invalid verdict → rerun before gates).
 
 ## Build order (cycles 2-4)
 
