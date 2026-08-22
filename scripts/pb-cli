@@ -12,11 +12,43 @@ import urllib.request
 import urllib.parse
 
 BASE_URL = os.environ.get("PROJECTBASE_URL", "http://127.0.0.1:8120")
+AUTH_TOKEN = os.environ.get("PROJECTBASE_TOKEN", "")
+AUTH_EMAIL = os.environ.get("PROJECTBASE_EMAIL", "")
+AUTH_PASSWORD = os.environ.get("PROJECTBASE_PASSWORD", "")
+
+def get_token():
+    global AUTH_TOKEN
+    if AUTH_TOKEN:
+        return AUTH_TOKEN
+    if AUTH_EMAIL and AUTH_PASSWORD:
+        try:
+            url = f"{BASE_URL}/api/collections/users/auth-with-password"
+            data = json.dumps({"identity": AUTH_EMAIL, "password": AUTH_PASSWORD}).encode("utf-8")
+            req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                res = json.loads(resp.read().decode("utf-8"))
+                AUTH_TOKEN = res.get("token", "")
+                return AUTH_TOKEN
+        except Exception:
+            try:
+                url = f"{BASE_URL}/api/collections/_superusers/auth-with-password"
+                data = json.dumps({"identity": AUTH_EMAIL, "password": AUTH_PASSWORD}).encode("utf-8")
+                req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    res = json.loads(resp.read().decode("utf-8"))
+                    AUTH_TOKEN = res.get("token", "")
+                    return AUTH_TOKEN
+            except Exception:
+                pass
+    return ""
 
 def req(endpoint, method="GET", data=None):
     url = f"{BASE_URL}{endpoint}"
     req_data = json.dumps(data).encode("utf-8") if data else None
     headers = {"Content-Type": "application/json"}
+    token = get_token()
+    if token:
+        headers["Authorization"] = token
     r = urllib.request.Request(url, data=req_data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(r, timeout=10) as resp:

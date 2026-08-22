@@ -399,7 +399,7 @@ const DocsViewComponent = {
             command: "uv",
             args: [
               "run",
-              "/home/ubuntu/projects/projectbase/scripts/mcp_server.py"
+              "/data/projects/projectbase/scripts/mcp_server.py"
             ],
             env: {
               PROJECTBASE_URL: "${PROJECTBASE_URL:-http://localhost:8120}"

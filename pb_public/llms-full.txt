@@ -9,7 +9,7 @@ It provides zero-latency SQLite database backing, instant REST APIs, real-time S
 - PocketBase Admin UI: ${PROJECTBASE_URL:-http://localhost:8120}/_/ (set via ADMIN_EMAIL and ADMIN_PASSWORD)
 - OpenAPI Specification: ${PROJECTBASE_URL:-http://localhost:8120}/openapi.json
 - Interactive Scalar Docs: ${PROJECTBASE_URL:-http://localhost:8120}/docs/
-- FastMCP Script: /home/ubuntu/projects/projectbase/scripts/mcp_server.py
+- FastMCP Script: /data/projects/projectbase/scripts/mcp_server.py
 
 ## 3. Autonomous Agent Operating Loop
 When an agent is assigned to work on a project:

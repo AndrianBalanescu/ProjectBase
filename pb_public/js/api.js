@@ -30,6 +30,14 @@ const API = {
     }).catch(err => console.warn('Comments subscription error:', err));
   },
 
+  unsubscribeAll() {
+    this.subscribers.clear();
+    try { pb.collection('issues').unsubscribe('*'); } catch (e) {}
+    try { pb.collection('projects').unsubscribe('*'); } catch (e) {}
+    try { pb.collection('cycles').unsubscribe('*'); } catch (e) {}
+    try { pb.collection('comments').unsubscribe('*'); } catch (e) {}
+  },
+
   notifySubscribers(collection, event) {
     for (const sub of this.subscribers) {
       try {

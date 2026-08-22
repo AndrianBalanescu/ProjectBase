@@ -78,7 +78,12 @@ const App = {
     async signIn() {
       this.authError = '';
       try {
-        await API.client.collection('users').authWithPassword(this.loginEmail, this.loginPassword);
+        try {
+          await API.client.collection('users').authWithPassword(this.loginEmail, this.loginPassword);
+        } catch (uErr) {
+          // Allow superuser login from the same unified gate
+          await API.client.collection('_superusers').authWithPassword(this.loginEmail, this.loginPassword);
+        }
         this.isAuthenticated = true;
         this.loginPassword = '';
         await this.loadAllData();
@@ -88,11 +93,15 @@ const App = {
       }
     },
     signOut() {
+      API.unsubscribeAll();
       API.client.authStore.clear();
       this.isAuthenticated = false;
       this.projects = [];
       this.issues = [];
+      this.cycles = [];
+      this.labels = [];
       this.currentProject = null;
+      this.selectedIssue = null;
     },
     async loadAllData() {
       try {
