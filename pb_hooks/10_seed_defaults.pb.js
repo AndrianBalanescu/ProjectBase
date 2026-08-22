@@ -9,6 +9,7 @@ onBootstrap((e) => {
         let issuesCol = e.app.findCollectionByNameOrId("issues")
         let cyclesCol = e.app.findCollectionByNameOrId("cycles")
         let labelsCol = e.app.findCollectionByNameOrId("labels")
+        let milestonesCol = e.app.findCollectionByNameOrId("milestones")
 
         function getOrCreateProject(data) {
             let found = null
@@ -60,6 +61,27 @@ onBootstrap((e) => {
             }
         }
 
+        
+        function getOrCreateMilestone(projectId, name, desc, targetDate, status) {
+            let found = null
+            try {
+                let recs = e.app.findRecordsByFilter("milestones", `project = '${projectId}' && name = '${name.replace(/'/g, "\\'")}'`, "-created", 1, 0)
+                if (recs && recs.length > 0) found = recs[0]
+            } catch (err) {}
+
+            if (!found) {
+                let m = new Record(milestonesCol)
+                m.set("project", projectId)
+                m.set("name", name)
+                m.set("description", desc || "")
+                m.set("target_date", targetDate || new Date().toISOString())
+                m.set("status", status || "planned")
+                e.app.save(m)
+                found = m
+            }
+            return found
+        }
+
         function getOrCreateCycle(projectId, name, desc) {
             let found = null
             try {
@@ -91,8 +113,18 @@ onBootstrap((e) => {
             icon: "⚡",
             color: "#6366f1",
             repo_url: "https://github.com/AndrianBalanescu/projectbase",
-            lead: "Flomaster Agent"
+            lead: "Flomaster Agent",
+            settings: {
+                north_star: {
+                    vision: "Build the fastest, zero-friction open-source Linear alternative backed by PocketBase & SQLite.",
+                    objective: "Achieve 100% feature parity with Linear/Plane for agentic teams with sub-20ms latency and zero build steps.",
+                    target_quarter: "Q3-Q4 2026"
+                }
+            }
         })
+        let mPB1 = getOrCreateMilestone(pPB.id, "M1: Zero-Build Foundation & Realtime Sync", "Vue 3 CDN, Tailwind, PocketBase SQLite backend, SSE events, and FastMCP integration.", "2026-08-22", "achieved")
+        let mPB2 = getOrCreateMilestone(pPB.id, "M2: Autonomous Flow Runner & Agentic Engine", "Unified Flow research & builder loop, task claiming, PRD generator, and Windmill dispatch.", "2026-09-01", "in_progress")
+        let mPB3 = getOrCreateMilestone(pPB.id, "M3: Full Linear Parity & Performance Benchmarks", "Custom views, sub-issue hierarchy, keyboard-first navigation, and public demo deployment.", "2026-09-15", "planned")
         let cPB = getOrCreateCycle(pPB.id, "Sprint 1 - Architecture & Launch", "Initial release with zero-build Vue 3, real-time SSE, FastMCP, and OpenAPI Scalar docs.")
         createIssuesForProject(pPB, [
             {

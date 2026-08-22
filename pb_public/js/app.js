@@ -9,6 +9,7 @@ const App = {
     'kanban-board': KanbanBoardComponent,
     'list-view': ListViewComponent,
     'cycles-view': CyclesViewComponent,
+    'milestones-view': MilestonesViewComponent,
     'projects-view': ProjectsViewComponent,
     'stats-view': StatsViewComponent,
     'docs-view': DocsViewComponent,
@@ -31,6 +32,7 @@ const App = {
       projects: [],
       issues: [],
       cycles: [],
+      milestones: [],
       labels: [],
       selectedIssue: null,
       realtimeConnected: true,
@@ -105,16 +107,18 @@ const App = {
     },
     async loadAllData() {
       try {
-        const [projs, iss, cycs, lbls] = await Promise.all([
+        const [projs, iss, cycs, mls, lbls] = await Promise.all([
           API.getProjects(),
           API.getIssues(this.currentProject ? this.currentProject.id : null),
           API.getCycles(this.currentProject ? this.currentProject.id : null),
+          API.getMilestones(this.currentProject ? this.currentProject.id : null),
           API.getLabels(this.currentProject ? this.currentProject.id : null)
         ]);
 
         this.projects = projs;
         this.issues = iss;
         this.cycles = cycs;
+        this.milestones = mls;
         this.labels = lbls;
 
         // Auto-select first favorite project if none selected
@@ -133,6 +137,7 @@ const App = {
       try {
         this.issues = await API.getIssues(this.currentProject ? this.currentProject.id : null);
         this.cycles = await API.getCycles(this.currentProject ? this.currentProject.id : null);
+        this.milestones = await API.getMilestones(this.currentProject ? this.currentProject.id : null);
       } catch (err) {
         console.error('Error loading issues:', err);
       }
@@ -163,7 +168,19 @@ const App = {
               this.selectedIssue = null;
             }
           }
-        } else if (collection === 'projects') {
+        } else 
+        if (collection === 'milestones') {
+          if (action === 'create') {
+            this.milestones.push(record);
+          } else if (action === 'update') {
+            const idx = this.milestones.findIndex(m => m.id === record.id);
+            if (idx !== -1) this.milestones[idx] = record;
+          } else if (action === 'delete') {
+            this.milestones = this.milestones.filter(m => m.id !== record.id);
+          }
+        }
+
+        if (collection === 'projects') {
           if (action === 'create') {
             this.projects.push(record);
           } else if (action === 'update') {
@@ -323,6 +340,42 @@ const App = {
         proj.is_favorite = updated.is_favorite;
       } catch (err) {
         console.error('Toggle favorite failed:', err);
+      }
+    },
+
+    
+    async handleCreateMilestone(milestoneData) {
+      try {
+        const created = await API.createMilestone(milestoneData);
+        this.milestones.push(created);
+        this.showToast(`Milestone created: ${created.name}`, 'success');
+      } catch (err) {
+        console.error('Milestone create error:', err);
+        this.showToast('Failed to create milestone', 'error');
+      }
+    },
+
+    async handleUpdateMilestone(id, data) {
+      try {
+        const updated = await API.updateMilestone(id, data);
+        const idx = this.milestones.findIndex(m => m.id === id);
+        if (idx !== -1) this.milestones[idx] = { ...this.milestones[idx], ...updated };
+        this.showToast('Milestone updated', 'success');
+      } catch (err) {
+        console.error('Milestone update error:', err);
+        this.showToast('Failed to update milestone', 'error');
+      }
+    },
+
+    async handleDeleteMilestone(id) {
+      if (!confirm('Are you sure you want to delete this milestone?')) return;
+      try {
+        await API.deleteMilestone(id);
+        this.milestones = this.milestones.filter(m => m.id !== id);
+        this.showToast('Milestone deleted', 'success');
+      } catch (err) {
+        console.error('Milestone delete error:', err);
+        this.showToast('Failed to delete milestone', 'error');
       }
     },
 

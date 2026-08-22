@@ -132,6 +132,14 @@ const HeaderComponent = {
             <span>Cycles</span>
           </button>
           <button 
+            @click="$emit('change-view', 'milestones')" 
+            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all font-medium"
+            :class="currentView === 'milestones' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'"
+          >
+            <i data-lucide="flag" class="w-3.5 h-3.5"></i>
+            <span>Milestones</span>
+          </button>
+          <button 
             @click="$emit('change-view', 'projects')" 
             class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all font-medium"
             :class="currentView === 'projects' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'"
