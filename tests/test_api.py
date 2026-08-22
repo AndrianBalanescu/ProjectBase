@@ -350,3 +350,67 @@ def test_importer_source_metadata_persisted():
     assert sm.get("importer") == "csv"
     assert sm.get("source_key") == key
 
+
+
+# ---------------------------------------------------------------------------
+# GitHub importer (cycle 3)
+# ---------------------------------------------------------------------------
+
+def _github_import(payload, token=None):
+    return _request(
+        "POST", "/api/projectbase/import/github", payload,
+        headers={"Authorization": token or _superuser_token()})
+
+
+def test_github_requires_authentication():
+    status, _ = _request("POST", "/api/projectbase/import/github",
+                         {"project_id": "x", "repo": "octocat/Hello-World"})
+    assert status == 401
+
+
+def test_github_requires_repo_format():
+    pid = _get_any_project_id()
+    status, _ = _github_import({"project_id": pid, "repo": "no-slash"})
+    assert 400 <= status < 500
+
+
+def test_github_imports_public_issues():
+    """Imports a small public repo and verifies provenance + idempotent re-import."""
+    pid = _get_any_project_id()
+    payload = {"project_id": pid, "repo": "octocat/Hello-World", "state": "all", "max_issues": 3}
+    status, body = _github_import(payload)
+    assert status == 200, f"github import failed: {status} {body}"
+    assert body.get("repo") == "octocat/Hello-World"
+    # At least one issue is present (imported now or already-imported from a
+    # prior run — Hello-World has non-PR issues, so imported+skipped > 0).
+    assert body["imported"] + body["skipped"] > 0
+
+    # Re-import: everything already there by source_key is skipped, nothing errors.
+    status2, second = _github_import(payload)
+    assert status2 == 200, f"reimport failed: {status2} {second}"
+    assert second.get("imported") == 0, f"reimport should not duplicate: {second}"
+    assert not second.get("errors"), f"reimport had errors: {second}"
+
+    # Provenance must be persisted as importer=github with a gh_number.
+    from urllib.parse import quote
+    st, recs = _get_authed("/api/collections/issues/records?perPage=50&sort=-created")
+    assert st == 200
+    found = None
+    for it in recs.get("items", []):
+        sm = it.get("source_metadata") or {}
+        if sm.get("importer") == "github" and str(sm.get("source_key", "")).startswith("gh:"):
+            found = it
+            break
+    assert found, "no GitHub-imported issue found"
+    sm = found.get("source_metadata")
+    assert sm.get("importer") == "github"
+    assert sm.get("gh_number") is not None
+
+
+def test_github_nonexistent_repo_graceful():
+    pid = _get_any_project_id()
+    status, body = _github_import({"project_id": pid, "repo": "definitely/not-a-real-repo-xyz"})
+    assert status == 200, f"should degrade gracefully: {status} {body}"
+    assert body.get("imported") == 0
+    assert body.get("errors"), "expected an error for a missing repo"
+
