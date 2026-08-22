@@ -126,6 +126,11 @@
       <docs-view 
         v-else-if="currentView === 'docs'"
       ></docs-view>
+
+      <!-- 7. Plugin Marketplace View -->
+      <marketplace-view
+        v-else-if="currentView === 'marketplace'"
+      ></marketplace-view>
     </main>
 
     <!-- Issue Detail Slide-Over Drawer -->
@@ -210,6 +215,7 @@
   <script src="/js/components/ProjectsView.js"></script>
   <script src="/js/components/StatsView.js"></script>
   <script src="/js/components/DocsView.js"></script>
+  <script src="/js/components/MarketplaceView.js"></script>
   <script src="/js/components/IssueDrawer.js"></script>
   <script src="/js/components/CommandPalette.js"></script>
   <script src="/js/components/NewIssueModal.js"></script>
