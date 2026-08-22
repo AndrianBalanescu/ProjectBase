@@ -20,7 +20,9 @@ const IssueDrawerComponent = {
       comments: [],
       newCommentContent: '',
       newCommentAuthorType: 'user', // 'user' or 'agent'
-      copiedBadge: false
+      copiedBadge: false,
+      aiLoadingSubtasks: false,
+      aiLoadingDesc: false
     };
   },
   computed: {
@@ -92,6 +94,61 @@ const IssueDrawerComponent = {
         labels: this.editLabels,
         subtasks: this.subtasks
       });
+    },
+    async generateAiSubtasks() {
+      if (!this.editTitle) return;
+      this.aiLoadingSubtasks = true;
+      try {
+        const res = await fetch('/api/projectbase/ai-assist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'generate_subtasks',
+            title: this.editTitle,
+            description: this.editDesc
+          })
+        });
+        const data = await res.json();
+        if (data.subtasks && Array.isArray(data.subtasks)) {
+          for (const s of data.subtasks) {
+            this.subtasks.push({
+              id: 'st_' + Date.now() + Math.random().toString(36).substring(2, 5),
+              title: s,
+              done: false
+            });
+          }
+          this.saveChanges();
+        }
+      } catch (err) {
+        console.error('AI subtask error:', err);
+      } finally {
+        this.aiLoadingSubtasks = false;
+      }
+    },
+    async polishAiDescription() {
+      if (!this.editTitle) return;
+      this.aiLoadingDesc = true;
+      try {
+        const res = await fetch('/api/projectbase/ai-assist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'polish_description',
+            title: this.editTitle,
+            description: this.editDesc
+          })
+        });
+        const data = await res.json();
+        if (data.description) {
+          this.editDesc = data.description;
+          this.descTab = 'preview';
+          this.saveChanges();
+        }
+      } catch (err) {
+        console.error('AI polish error:', err);
+      } finally {
+        this.aiLoadingDesc = false;
+      }
     },
     toggleSubtask(sub) {
       sub.done = !sub.done;
@@ -351,10 +408,22 @@ const IssueDrawerComponent = {
             </div>
           </div>
 
-          <!-- Description Section (Write & Preview Tabs) -->
+          <!-- Description Section (Write & Preview Tabs & AI Polish) -->
           <div class="space-y-2">
             <div class="flex items-center justify-between border-b border-gray-800 pb-1.5">
-              <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Description</label>
+              <div class="flex items-center space-x-2">
+                <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Description</label>
+                <button 
+                  @click="polishAiDescription"
+                  :disabled="aiLoadingDesc"
+                  class="px-2 py-0.5 rounded-md bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 text-purple-300 text-[11px] font-medium flex items-center space-x-1 transition-all"
+                  title="Enhance description into structured PRD with Acceptance Criteria"
+                >
+                  <span v-if="aiLoadingDesc" class="animate-spin text-xs">🌀</span>
+                  <span v-else>✨</span>
+                  <span>{{ aiLoadingDesc ? 'Generating...' : 'AI Enhance PRD' }}</span>
+                </button>
+              </div>
               
               <div class="flex items-center bg-gray-950 p-0.5 rounded-lg border border-gray-800 text-xs">
                 <button 
@@ -398,6 +467,16 @@ const IssueDrawerComponent = {
             <div class="flex items-center justify-between">
               <div class="flex items-center space-x-2">
                 <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Checklist & Subtasks</label>
+                <button 
+                  @click="generateAiSubtasks"
+                  :disabled="aiLoadingSubtasks"
+                  class="px-2 py-0.5 rounded-md bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 text-purple-300 text-[11px] font-medium flex items-center space-x-1 transition-all"
+                  title="Automatically generate sequential checklist steps with AI"
+                >
+                  <span v-if="aiLoadingSubtasks" class="animate-spin text-xs">🌀</span>
+                  <span v-else>✨</span>
+                  <span>{{ aiLoadingSubtasks ? 'Generating...' : 'AI Auto-Breakdown' }}</span>
+                </button>
                 <span v-if="subtaskStats.total > 0" class="text-xs font-mono text-indigo-400">
                   ({{ subtaskStats.completed }}/{{ subtaskStats.total }})
                 </span>
