@@ -103,4 +103,25 @@ repository into a ProjectBase project, additive-only schema, idempotent re-impor
 fields (additive JSONField) and multi-workspace tenancy only on real demand. Keep schema
 additive-only. No new features on request — harden + ship to strangers.
 
+## Cycle-4 status (2026-08-22)
+
+**Goal (roadmap):** harden + ship to strangers; no new feature soup.
+
+**Shipped this cycle (P0 shipping fix):**
+- **Docker image omitted `pb_migrations`.** The `onBootstrap` seed hook only reads (never
+  creates) collections, so a stranger running `docker compose up` booted an empty schema —
+  a broken blank workspace. Fixed in `Dockerfile` (COPY `pb_migrations`, add
+  `--migrationsDir`) and `docker-compose.yml` (mount `pb_migrations`).
+- Verified with a fresh empty-volume container run: health 200, `projects` collection 200,
+  seed data loaded. Local dev server unaffected (healthy, suite green).
+
+**Validation (crime-scene audit):** `pytest -v` **34 passed / 1 skipped**,
+`flow.frontend_guard` clean, iBrowse visual QA **SUCCEEDED** (no console errors / no click
+blockers). Commits pushed to origin/main.
+
+**Cycle 5 (next):** keep shipping to strangers. Possible next blockers to check:
+stranger signup UX (disable public registration is documented, but a real first-timer flow
+needs a clear signup/onboarding path), CI docker-build job, or a public demo deployment
+script per the demo guidance. Custom fields / multi-tenancy only on real demand.
+
 
