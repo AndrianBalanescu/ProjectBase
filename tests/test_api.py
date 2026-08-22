@@ -580,3 +580,34 @@ def test_signup_short_password_rejected():
         "email": email, "password": "short", "passwordConfirm": "short"})
     assert st in (400, 422), f"short password must be rejected, got {st}"
     _delete_user_by_email(email)
+
+
+def test_member_cannot_self_escalate_role_via_update():
+    """A member must NOT be able to PATCH their own role to admin (P0 security).
+
+    The users.updateRule allows a user to edit their own record. The
+    onRecordUpdateRequest hook must coerce any self-service role escalation
+    back to 'member' so a stranger can never gain admin by signing up then
+    promoting themselves."""
+    email = f"esc+{_uid()}@flow.test"
+    pw = "Str0ngEscalation-123!"
+    # Sign up as member.
+    st, _ = _create_user_signup({
+        "email": email, "password": pw, "passwordConfirm": pw, "name": "Escalation Test"})
+    assert st == 200
+    # Auth as member.
+    st2, auth = _request(
+        "POST", "/api/collections/users/auth-with-password",
+        {"identity": email, "password": pw})
+    assert st2 == 200
+    uid = auth.get("record", {}).get("id") or auth.get("id")
+    mtoken = auth["token"]
+    # Attempt to promote self to admin via update.
+    st3, body = _request(
+        "PATCH", f"/api/collections/users/records/{uid}",
+        {"role": "admin"},
+        headers={"Authorization": mtoken})
+    assert st3 == 200, f"member self-update failed: {st3} {body}"
+    assert body.get("role") == "member", (
+        f"member must be coerced to member, got {body.get('role')}")
+    _delete_user_by_email(email)
