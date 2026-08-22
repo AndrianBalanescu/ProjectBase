@@ -68,6 +68,32 @@ def _get_authed(path):
     return _request("GET", path, headers={"Authorization": _superuser_token()})
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _cleanup_importer_artifacts():
+    """After the whole session, delete any issues the importer tests created so
+    they don't pollute the demo database. Keyed off source_metadata.importer."""
+    yield
+    try:
+        hdr = {"Authorization": _superuser_token()}
+        # Walk all pages so >200 artifacts are also removed (deletes shift pages).
+        for page in range(1, 40):
+            st, body = _request(
+                "GET",
+                f"/api/collections/issues/records?perPage=200&sort=-created&page={page}",
+                headers=hdr)
+            items = body.get("items", []) if st == 200 else []
+            if not items:
+                break
+            for it in items:
+                sm = it.get("source_metadata") or {}
+                if sm.get("importer") in ("csv", "github"):
+                    _request("DELETE", f"/api/collections/issues/records/{it['id']}",
+                             headers=hdr)
+    except Exception:
+        # Cleanup is best-effort; never fail the suite for it.
+        pass
+
+
 # ---------------------------------------------------------------------------
 # Core service endpoints
 # ---------------------------------------------------------------------------
@@ -381,6 +407,9 @@ def test_github_imports_public_issues():
     status, body = _github_import(payload)
     assert status == 200, f"github import failed: {status} {body}"
     assert body.get("repo") == "octocat/Hello-World"
+    # If GitHub rate-limited us, assert graceful degradation (no 500) and skip.
+    if any("403" in str(e.get("error", "")) for e in body.get("errors", [])):
+        pytest.skip("GitHub unauthenticated rate limit hit; skipping live import assertions")
     # At least one issue is present (imported now or already-imported from a
     # prior run — Hello-World has non-PR issues, so imported+skipped > 0).
     assert body["imported"] + body["skipped"] > 0
@@ -413,4 +442,29 @@ def test_github_nonexistent_repo_graceful():
     assert status == 200, f"should degrade gracefully: {status} {body}"
     assert body.get("imported") == 0
     assert body.get("errors"), "expected an error for a missing repo"
+
+
+def test_github_long_description_truncated():
+    """Bodies over the 5000-char description field limit must be truncated, not
+    dropped as errors. Uses a high-issue repo so a >5000-char body is likely, but
+    the guard (no errors + <=5000) holds regardless of which issues are returned."""
+    pid = _get_any_project_id()
+    status, body = _github_import(
+        {"project_id": pid, "repo": "facebook/react", "state": "all", "max_issues": 80})
+    assert status == 200, f"react import failed: {status} {body}"
+    if any("403" in str(e.get("error", "")) for e in body.get("errors", [])):
+        pytest.skip("GitHub unauthenticated rate limit hit; skipping truncation assertions")
+    # No per-row errors caused by field-length overflows.
+    length_errors = [e for e in body.get("errors", []) if "5000" in str(e.get("error", ""))]
+    assert not length_errors, f"description overflow errors: {length_errors}"
+    # Every imported issue's description must respect the field limit.
+    st, recs = _get_authed("/api/collections/issues/records?perPage=100&sort=-created")
+    assert st == 200
+    for it in recs.get("items", []):
+        sm = it.get("source_metadata") or {}
+        if sm.get("importer") == "github" and sm.get("source_key", "").startswith("gh:"):
+            desc = it.get("description") or ""
+            assert len(desc) <= 5000, (
+                f"description over 5000 chars on {it.get('identifier')}: {len(desc)}")
+
 
