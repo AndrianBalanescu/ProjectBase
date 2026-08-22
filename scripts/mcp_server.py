@@ -1,4 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
+# /// script
+# dependencies = [
+#   "fastmcp>=0.1.0"
+# ]
+# ///
 """
 ProjectBase FastMCP Server
 Model Context Protocol integration for ProjectBase.
@@ -10,14 +15,11 @@ import json
 import urllib.request
 import urllib.parse
 from typing import Optional, List, Dict, Any
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 BASE_URL = os.environ.get("PROJECTBASE_URL", "http://127.0.0.1:8120")
 
-mcp = FastMCP(
-    "ProjectBase",
-    description="Lightweight Plane & Linear alternative for multi-project Kanban and sprint management"
-)
+mcp = FastMCP("ProjectBase")
 
 def _request(endpoint: str, method: str = "GET", data: Optional[Dict] = None) -> Any:
     url = f"{BASE_URL}{endpoint}"
