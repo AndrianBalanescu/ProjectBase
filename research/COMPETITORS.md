@@ -34,3 +34,17 @@
 - Cycles/sprints + roadmap views (have: cycles; roadmap partial).
 - Importers (Linear/Plane/GitHub CSV/JSON) to attack migration pain #3 — currently missing.
 - Real-time multi-user SSE (have) must stay correct under drag-drop races.
+
+---
+
+## Debate engine note (cycle 1)
+
+Paid 4-model debate (`flow-debate-run.sh --paid`) is currently degraded:
+3 of 4 default models — `antigravity/gemini-3.6-flash-high`,
+`codex/gpt-5.6-sol-high`, `glm/glm-5.2` — fail with
+`[ERROR: Hermes model call failed ... transient]` (exit 1, ~5s), so quorum is
+never met and verdicts are INCONCLUSIVE/invalid. Only `deepseek/deepseek-v4-flash`
+resolves on the Hermes→OmniRoute backend. The build-order recommendation in
+ROADMAP.md is therefore TENTATIVE (grounded in the teardown, not a valid verdict).
+Next action for the engine owner: fix Hermes routing for those 3 models or swap
+the paid profile to reachable providers before treating any gate verdict as binding.
