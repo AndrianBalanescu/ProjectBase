@@ -1,0 +1,280 @@
+#!/usr/bin/env python3
+"""
+Flow CLI (flow)
+The autonomous pipeline commander for ProjectBase, Homelab, and Agent Swarms.
+
+Commands:
+  flow status [PROJECT]       Show North Star, active milestone, daemon status & tasks
+  flow cycle [PROJECT]        Execute an immediate autonomous Research -> Build cycle
+  flow start [PROJECT]        Start the background autonomous daemon service
+  flow stop                   Stop the autonomous daemon service
+  flow restart                Restart the autonomous daemon service
+  flow logs [-f] [-n LINES]   Inspect live daemon execution logs
+  flow research "<topic>"     Run deep technical research via OmniRoute/LLM
+  flow milestones [PROJECT]   Display roadmap, milestones, and task completion rates
+"""
+
+import os
+import sys
+import json
+import argparse
+import subprocess
+import urllib.request
+from datetime import datetime
+
+# ANSI Colors
+BOLD = "\033[1m"
+DIM = "\033[2m"
+CYAN = "\033[36m"
+BLUE = "\033[34m"
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+RED = "\033[31m"
+MAGENTA = "\033[35m"
+RESET = "\033[0m"
+
+PROJECTBASE_DIR = "/data/projects/projectbase"
+RUNNER_SCRIPT = os.path.join(PROJECTBASE_DIR, "scripts", "flow_runner.py")
+DB_PATH = os.path.join(PROJECTBASE_DIR, "pb_data", "data.db")
+
+def run_sqlite(query: str) -> str:
+    try:
+        out = subprocess.check_output(["sqlite3", DB_PATH, query], stderr=subprocess.DEVNULL)
+        return out.decode("utf-8").strip()
+    except Exception:
+        return ""
+
+def get_project_data(key: str = "PB"):
+    out = run_sqlite(f"SELECT json_object('id', id, 'name', name, 'identifier', identifier, 'settings', settings) FROM projects WHERE identifier='{key.upper()}';")
+    return json.loads(out) if out else None
+
+def get_milestones_data(project_id: str):
+    out = run_sqlite(f"SELECT json_group_array(json_object('id', id, 'name', name, 'description', description, 'status', status, 'target_date', target_date)) FROM milestones WHERE project='{project_id}' OR project='';")
+    return json.loads(out) if out else []
+
+def get_issues_data(project_id: str):
+    out = run_sqlite(f"SELECT json_group_array(json_object('id', id, 'identifier', identifier, 'title', title, 'status', status, 'priority', priority, 'milestone', milestone)) FROM issues WHERE project='{project_id}' ORDER BY created ASC;")
+    return json.loads(out) if out else []
+
+def get_service_status():
+    try:
+        out = subprocess.check_output(["systemctl", "--user", "is-active", "projectbase-flow.service"], stderr=subprocess.DEVNULL).decode("utf-8").strip()
+        return out
+    except Exception:
+        return "inactive"
+
+def cmd_status(args):
+    key = (args.project or "PB").upper()
+    proj = get_project_data(key)
+    if not proj:
+        print(f"{RED}Error: Project '{key}' not found.{RESET}")
+        sys.exit(1)
+
+    proj_id = proj.get("id")
+    milestones = get_milestones_data(proj_id)
+    issues = get_issues_data(proj_id)
+    srv_status = get_service_status()
+
+    # Parse settings & North Star
+    settings = proj.get("settings") or {}
+    if isinstance(settings, str):
+        try:
+            settings = json.loads(settings) or {}
+        except Exception:
+            settings = {}
+    if not isinstance(settings, dict):
+        settings = {}
+    north_star = settings.get("north_star") or {}
+
+    status_badge = f"{GREEN}● ACTIVE (RUNNING){RESET}" if srv_status == "active" else f"{RED}○ STOPPED{RESET}"
+
+    print(f"\n{BOLD}{CYAN}⚡ Flow Autonomous Engine — Project [{key}] {proj.get('name')}{RESET}")
+    print(f"{DIM}Daemon Service:{RESET} {status_badge}  |  {DIM}Base URL:{RESET} http://127.0.0.1:8120")
+    print(f"{DIM}─" * 65 + f"{RESET}")
+
+    if north_star:
+        print(f"{BOLD}🎯 North Star Vision:{RESET} {north_star.get('vision', 'N/A')}")
+        print(f"{DIM}   Objective:{RESET} {north_star.get('objective', 'N/A')}")
+        print(f"{DIM}   Target Horizon:{RESET} {YELLOW}{north_star.get('target_quarter', 'Q3-Q4 2026')}{RESET}")
+        print(f"{DIM}─" * 65 + f"{RESET}")
+
+    # Active Milestone
+    active_m = next((m for m in milestones if m.get("status") == "in_progress"), None)
+    if active_m:
+        m_issues = [i for i in issues if i.get("milestone") == active_m.get("id")]
+        done_count = sum(1 for i in m_issues if i.get("status") == "done")
+        total_count = len(m_issues)
+        pct = int((done_count / total_count * 100)) if total_count > 0 else 0
+        bar = "█" * (pct // 5) + "░" * (20 - (pct // 5))
+        print(f"{BOLD}🚩 Active Milestone:{RESET} {YELLOW}{active_m.get('name')}{RESET}")
+        print(f"   Progress: [{GREEN}{bar}{RESET}] {BOLD}{pct}%{RESET} ({done_count}/{total_count} tasks done)")
+    else:
+        print(f"{BOLD}🚩 Active Milestone:{RESET} {DIM}None in progress (all planned or achieved){RESET}")
+
+    # Issues breakdown
+    in_prog = [i for i in issues if i.get("status") == "in_progress"]
+    todo = [i for i in issues if i.get("status") == "todo"]
+    done = [i for i in issues if i.get("status") == "done"]
+
+    print(f"\n{BOLD}📋 Tasks Breakdown ({len(issues)} total):{RESET}")
+    print(f"   {GREEN}Done: {len(done)}{RESET}  |  {YELLOW}In Progress: {len(in_prog)}{RESET}  |  {BLUE}Todo: {len(todo)}{RESET}")
+
+    if in_prog:
+        print(f"\n{BOLD}🔥 Current In-Progress Execution:{RESET}")
+        for i in in_prog:
+            print(f"   {YELLOW}[{i.get('identifier')}]{RESET} {i.get('title')}")
+
+    if todo and not in_prog:
+        print(f"\n{BOLD}⏳ Next Up in Queue:{RESET}")
+        for i in todo[:3]:
+            print(f"   {BLUE}[{i.get('identifier')}]{RESET} {i.get('title')}")
+
+    print("")
+
+def cmd_cycle(args):
+    key = (args.project or "PB").upper()
+    print(f"{CYAN}⚡ Executing single autonomous Flow Cycle for [{key}]...{RESET}")
+    cmd = [sys.executable, RUNNER_SCRIPT, "--project", key, "--once"]
+    if args.dry_run:
+        cmd.append("--dry-run")
+    subprocess.run(cmd)
+
+def cmd_start(args):
+    key = (args.project or "PB").upper()
+    print(f"{GREEN}🚀 Starting Flow Autonomous Daemon for [{key}]...{RESET}")
+    subprocess.run(["systemctl", "--user", "start", "projectbase-flow.service"])
+    subprocess.run(["systemctl", "--user", "status", "projectbase-flow.service", "--no-pager"])
+
+def cmd_stop(args):
+    print(f"{YELLOW}⏹ Stopping Flow Autonomous Daemon...{RESET}")
+    subprocess.run(["systemctl", "--user", "stop", "projectbase-flow.service"])
+    print(f"{GREEN}✓ Service stopped.{RESET}")
+
+def cmd_restart(args):
+    print(f"{CYAN}🔄 Restarting Flow Autonomous Daemon...{RESET}")
+    subprocess.run(["systemctl", "--user", "restart", "projectbase-flow.service"])
+    subprocess.run(["systemctl", "--user", "status", "projectbase-flow.service", "--no-pager"])
+
+def cmd_logs(args):
+    cmd = ["journalctl", "--user", "-u", "projectbase-flow.service", "-n", str(args.lines)]
+    if args.follow:
+        cmd.append("-f")
+    try:
+        subprocess.run(cmd)
+    except KeyboardInterrupt:
+        pass
+
+def cmd_research(args):
+    topic = args.topic
+    print(f"\n{BOLD}{CYAN}🧠 Flow Research Agent — Querying OmniRoute / LLM for:{RESET} {BOLD}{topic}{RESET}\n")
+    try:
+        payload = {
+            "model": "rc/claude-sonnet-4-5",
+            "messages": [
+                {"role": "system", "content": "You are Flow Autonomous Architect. Provide crisp, ultra-actionable technical teardown, competitive features, and implementation plan."},
+                {"role": "user", "content": f"Deep research and execution plan for: {topic}"}
+            ],
+            "temperature": 0.3
+        }
+        req = urllib.request.Request(
+            "http://127.0.0.1:20128/v1/chat/completions",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json", "Authorization": "Bearer omniroute"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            print(data["choices"][0]["message"]["content"])
+    except Exception as e:
+        print(f"{RED}Research error ({e}):{RESET} Ensure OmniRoute is active on port 20128.")
+
+def cmd_milestones(args):
+    key = (args.project or "PB").upper()
+    proj = get_project_data(key)
+    if not proj:
+        print(f"{RED}Error: Project '{key}' not found.{RESET}")
+        sys.exit(1)
+    milestones = get_milestones_data(proj.get("id"))
+    issues = get_issues_data(proj.get("id"))
+
+    print(f"\n{BOLD}{CYAN}🚩 Milestones & Strategic Roadmap — [{key}] {proj.get('name')}{RESET}\n")
+    for m in milestones:
+        m_issues = [i for i in issues if i.get("milestone") == m.get("id")]
+        done = sum(1 for i in m_issues if i.get("status") == "done")
+        total = len(m_issues)
+        pct = int((done / total * 100)) if total > 0 else (100 if m.get("status") == "achieved" else 0)
+        status_color = GREEN if m.get("status") == "achieved" else (YELLOW if m.get("status") == "in_progress" else BLUE)
+        bar = "█" * (pct // 5) + "░" * (20 - (pct // 5))
+
+        print(f"{status_color}● [{m.get('status').upper()}]{RESET} {BOLD}{m.get('name')}{RESET}")
+        print(f"  {DIM}{m.get('description', '')}{RESET}")
+        print(f"  Target: {DIM}{m.get('target_date', 'N/A')}{RESET} | Progress: [{GREEN}{bar}{RESET}] {BOLD}{pct}%{RESET} ({done}/{total} tasks)")
+        print("")
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="flow",
+        description="Flow Autonomous Pipeline Commander",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
+
+    # flow status
+    p_status = subparsers.add_parser("status", help="Show project North Star, active milestone, daemon & tasks")
+    p_status.add_argument("project", nargs="?", default="PB", help="Project identifier (default: PB)")
+
+    # flow cycle
+    p_cycle = subparsers.add_parser("cycle", help="Execute an immediate autonomous Research -> Build cycle")
+    p_cycle.add_argument("project", nargs="?", default="PB", help="Project identifier (default: PB)")
+    p_cycle.add_argument("--dry-run", action="store_true", help="Simulate without applying changes")
+
+    # flow start
+    p_start = subparsers.add_parser("start", help="Start the background autonomous daemon service")
+    p_start.add_argument("project", nargs="?", default="PB", help="Project identifier (default: PB)")
+
+    # flow stop
+    subparsers.add_parser("stop", help="Stop the autonomous daemon service")
+
+    # flow restart
+    subparsers.add_parser("restart", help="Restart the autonomous daemon service")
+
+    # flow logs
+    p_logs = subparsers.add_parser("logs", help="Inspect live daemon execution logs")
+    p_logs.add_argument("-f", "--follow", action="store_true", help="Follow log output")
+    p_logs.add_argument("-n", "--lines", type=int, default=30, help="Number of lines to show (default: 30)")
+
+    # flow research
+    p_research = subparsers.add_parser("research", help="Run deep technical research via OmniRoute")
+    p_research.add_argument("topic", help="Research topic or feature description")
+
+    # flow milestones
+    p_m = subparsers.add_parser("milestones", help="List project milestones and completion rates")
+    p_m.add_argument("project", nargs="?", default="PB", help="Project identifier (default: PB)")
+
+    args = parser.parse_args()
+
+    if not args.command:
+        # Default to status if no command provided
+        args.project = "PB"
+        cmd_status(args)
+        return
+
+    commands = {
+        "status": cmd_status,
+        "cycle": cmd_cycle,
+        "start": cmd_start,
+        "stop": cmd_stop,
+        "restart": cmd_restart,
+        "logs": cmd_logs,
+        "research": cmd_research,
+        "milestones": cmd_milestones
+    }
+
+    cmd_fn = commands.get(args.command)
+    if cmd_fn:
+        cmd_fn(args)
+    else:
+        parser.print_help()
+
+if __name__ == "__main__":
+    main()
