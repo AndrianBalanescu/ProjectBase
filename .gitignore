@@ -1,0 +1,6 @@
+pb_data/
+pocketbase
+*.log
+__pycache__/
+*.pyc
+.DS_Store
