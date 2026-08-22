@@ -63,6 +63,44 @@ rework except the additive `source_metadata` JSON field.**
 (zero console errors / no click blockers), `pytest -v` 29/29 green, endpoint verified for both
 superuser and regular user auth, malformed payloads fuzzed without 500.
 
-**Cycle 3 (next):** GitHub API importer (OAuth + rate limiting + webhooks) + custom fields if a
-real user asks. Keep schema additive-only.
+**Cycle 3 (this cycle):** GitHub API importer (rate limiting, dedup-safe).
+
+## Cycle-3 status (2026-08-22)
+
+**Goal (roadmap + teardown):** GitHub API importer — pull issues from a public (or token-scoped)
+repository into a ProjectBase project, additive-only schema, idempotent re-import.
+
+**Shipped this cycle:**
+- `pb_hooks/45_github_importer.pb.js` — `POST /api/projectbase/import/github` (auth-gated).
+  - Fetches GitHub REST v3 issues with pagination + `Link` header traversal, `per_page=100`.
+  - Excludes pull requests (GitHub returns them in the issues endpoint).
+  - Optional caller-supplied PAT (`token`) raises the rate limit; respects
+    `X-RateLimit-Remaining` / `X-RateLimit-Reset` and returns them in the payload.
+  - Maps GitHub state → ProjectBase status (open→todo, closed→done).
+  - Duplicate-safe: keyed by GitHub issue number via `source_metadata.source_key = "gh:N"`,
+    so re-importing a repo is idempotent. Provenance: `importer=github`, `gh_number`,
+    `gh_url`, `gh_user`, `gh_created_at`, `gh_closed_at`.
+  - Does NOT pre-set `issue_number`/`identifier` — the `onRecordCreate` hook assigns a
+    sequential number + identifier (e.g. `PROJ-N`).
+  - Graceful errors: invalid `repo` → 400, nonexistent/forbidden repo → per-page error list.
+- `pb_public/js/components/ImportModal.js` — added a **GitHub** source tab alongside CSV:
+  repo (`owner/name`), state (all/open/closed), max issues, optional PAT. Live result panel
+  with imported/skipped/total + rate-limit remaining.
+- Tests: 4 GitHub importer tests added (auth 401, repo format 400, live public import +
+  provenance + idempotent re-import, nonexistent-repo graceful). Suite now **33 passing**.
+
+**Validation (crime-scene audit):**
+- `flow.frontend_guard` clean.
+- `pytest -v` **33/33 green** (fresh records verified: sequential `PB-N` identifiers,
+  `source_metadata` provenance, re-import idempotency).
+- Adversarial: unauthenticated → 401; missing/invalid repo → 400; nonexistent repo → 200
+  with per-page error (no 500); malformed payload fuzzed.
+- **iBrowse visual QA:** infrastructure timeout (no result captured); verified via direct
+  HTTP instead — `/`, `/js/components/ImportModal.js`, `/js/app.js` all 200; import route
+  active (401 unauthenticated); template/div tag balance and Vue syntax validated by node.
+
+**Cycle 4 (next):** Linear/Plane flat-file importers (JSON) if a real user asks; custom
+fields (additive JSONField) and multi-workspace tenancy only on real demand. Keep schema
+additive-only. No new features on request — harden + ship to strangers.
+
 
