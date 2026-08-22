@@ -181,6 +181,16 @@ for non-privileged actors, while an authenticated admin/manager/superuser can st
 promote users legitimately. Regression test `test_member_cannot_self_escalate_role_via_update`
 added. Suite now **41/41 green**.
 
+### Cycle-5 P0-fix refinement (role preservation on self-edit)
+
+A second bug surfaced during further deep validation: the initial update guard
+coerced **every** self-update to `member`, so a manager or admin editing their own
+name got silently demoted to member. Fixed by changing `onRecordUpdateRequest` to
+**freeze** the role to its current stored value on any self-service update (blocking
+self-promotion while preserving role on legitimate profile edits), instead of
+coercing to `member`. Regression tests `test_admin_self_edit_preserves_role` and
+`test_manager_self_edit_preserves_role` added. Suite now **43/43 green**.
+
 
 
 

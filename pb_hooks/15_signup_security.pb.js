@@ -2,8 +2,8 @@
 //
 // Public self-signup is enabled by migration 1710000006 (users.createRule = "").
 // These hooks are the privilege-escalation guard: they force EVERY newly
-// created user record to role = 'member', and they block any self-service role
-// escalation on update.
+// created user record to role = 'member', and they freeze the role on
+// self-service updates so a user can never promote their own account.
 //
 // Why a hook and not just a createRule:
 //   - A createRule alone cannot set a value; it only gates access. With the
@@ -14,9 +14,10 @@
 //   - The users.updateRule currently allows a user to edit their own record
 //     (`id = @request.auth.id || ...`). Without an update guard, a member
 //     could PATCH their own role to 'admin' and gain admin privileges. The
-//     onRecordUpdateRequest handler below blocks that: a non-privileged actor
-//     can never raise a role, and any payload attempting it is coerced back to
-//     'member'.
+//     onRecordUpdateRequest handler below freezes the role to its existing
+//     stored value on any self-service update, so a user can edit their
+//     profile (name/email/etc.) without losing their role, but can NEVER
+//     raise their own role.
 //
 // Admin/manager role assignment remains possible only by an authenticated
 // admin (or PocketBase superuser) creating or updating the account; any other
@@ -49,19 +50,23 @@ onRecordUpdateRequest((e) => {
         const req = e.requestInfo()
         const auth = req && req.auth
         const isSelfUpdate = auth && auth.id && auth.id === e.record.id
-        if (isSelfUpdate && !_isPrivileged(req)) {
-            // A member editing their own profile must not be able to escalate
-            // their role. Coerce any attempted role change back to member.
-            e.record.set("role", "member")
+        if (isSelfUpdate && !req.admin) {
+            // Self-service update: freeze the role to its current stored value.
+            // This blocks self-promotion to admin/manager while allowing a user
+            // (including an existing admin/manager) to edit their own name,
+            // email, etc. without losing their role.
+            let existingRole = "member"
+            try {
+                const cur = e.app.findRecordById("users", e.record.id)
+                if (cur && cur.get) {
+                    existingRole = cur.get("role") || "member"
+                }
+            } catch (err) {
+                existingRole = "member"
+            }
+            e.record.set("role", existingRole)
         }
     } catch (err) {
-        // Fail safe: never allow a self-service role escalation on error.
-        try {
-            const r = e.record.get("role")
-            if (r === "admin" || r === "manager" || r === "agent") {
-                e.record.set("role", "member")
-            }
-        } catch (_) {}
         console.error(">>> Error guarding role on user update:", err)
     }
     e.next()
