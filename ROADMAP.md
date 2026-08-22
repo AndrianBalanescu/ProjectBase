@@ -170,5 +170,17 @@ so a stranger literally could not create an account, and the login gate had no s
 or onboarding polish for the freshly signable first-timer flow. Custom fields / multi-tenancy
 only on real demand.
 
+### Cycle-5 P0 security fix (self-service role escalation)
+
+During deep validation of the cycle-5 signup feature, a P0 was found and fixed:
+`users.updateRule` is `id = @request.auth.id || ...`, so a member could PATCH their
+own `role` to `admin` (the create-only hook didn't cover update), then delete any
+project. Fix: `pb_hooks/15_signup_security.pb.js` now also registers
+`onRecordUpdateRequest` which coerces any self-service role change back to `member`
+for non-privileged actors, while an authenticated admin/manager/superuser can still
+promote users legitimately. Regression test `test_member_cannot_self_escalate_role_via_update`
+added. Suite now **41/41 green**.
+
+
 
 
