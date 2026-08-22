@@ -169,7 +169,9 @@ routerAdd("POST", "/api/projectbase/import/github", (e) => {
                     const rec = new Record(issuesCol)
                     rec.set("project", projectId)
                     rec.set("title", title)
-                    rec.set("description", it.body ? String(it.body) : "")
+                    // GitHub bodies can exceed the 5000-char description limit; truncate.
+                    const body = it.body ? String(it.body) : ""
+                    rec.set("description", body.length > 5000 ? body.slice(0, 5000) : body)
                     rec.set("status", normStatus(it.state))
                     rec.set("priority", "none")
                     // assignee: prefer first assignee login
