@@ -611,3 +611,69 @@ def test_member_cannot_self_escalate_role_via_update():
     assert body.get("role") == "member", (
         f"member must be coerced to member, got {body.get('role')}")
     _delete_user_by_email(email)
+
+
+def test_admin_self_edit_preserves_role():
+    """An admin editing their own name must keep the admin role.
+
+    Regression for the P0-fix over-coercion bug: the update guard must freeze
+    the role (blocking escalation) but NOT strip a privileged user's role on a
+    legitimate self-edit."""
+    email = f"adm+{_uid()}@flow.test"
+    pw = "Str0ngAdmin-123!"
+    # Create a user and promote to admin via superuser.
+    st, body = _create_user_signup({
+        "email": email, "password": pw, "passwordConfirm": pw, "name": "AdmBefore"})
+    assert st == 200
+    uid = body["id"]
+    st2, _ = _request(
+        "PATCH", f"/api/collections/users/records/{uid}",
+        {"role": "admin"},
+        headers={"Authorization": _superuser_token()})
+    assert st2 == 200
+    # Auth as the admin.
+    st3, auth = _request(
+        "POST", "/api/collections/users/auth-with-password",
+        {"identity": email, "password": pw})
+    assert st3 == 200
+    atoken = auth["token"]
+    # Admin edits own name.
+    st4, upd = _request(
+        "PATCH", f"/api/collections/users/records/{uid}",
+        {"name": "AdmAfter"},
+        headers={"Authorization": atoken})
+    assert st4 == 200, f"admin self-edit failed: {st4} {upd}"
+    assert upd.get("name") == "AdmAfter"
+    assert upd.get("role") == "admin", (
+        f"admin self-edit must preserve role, got {upd.get('role')}")
+    _delete_user_by_email(email)
+
+
+def test_manager_self_edit_preserves_role():
+    """A manager editing their own name must keep the manager role.
+
+    Direct regression for the over-coercion bug found during deep validation:
+    the first update guard forced every self-update to 'member', silently
+    demoting manager/admin accounts on a routine profile edit."""
+    email = f"mgr+{_uid()}@flow.test"
+    pw = "Str0ngManager-123!"
+    st, body = _create_user_signup({
+        "email": email, "password": pw, "passwordConfirm": pw, "name": "MgrBefore"})
+    assert st == 200
+    uid = body["id"]
+    _request("PATCH", f"/api/collections/users/records/{uid}",
+             {"role": "manager"}, headers={"Authorization": _superuser_token()})
+    st3, auth = _request(
+        "POST", "/api/collections/users/auth-with-password",
+        {"identity": email, "password": pw})
+    assert st3 == 200
+    mtoken = auth["token"]
+    st4, upd = _request(
+        "PATCH", f"/api/collections/users/records/{uid}",
+        {"name": "MgrAfter"},
+        headers={"Authorization": mtoken})
+    assert st4 == 200
+    assert upd.get("name") == "MgrAfter"
+    assert upd.get("role") == "manager", (
+        f"manager self-edit must preserve role, got {upd.get('role')}")
+    _delete_user_by_email(email)
