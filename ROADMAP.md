@@ -194,3 +194,16 @@ coercing to `member`. Regression tests `test_admin_self_edit_preserves_role` and
 
 
 
+
+### Cycle-5 cross-tenant isolation & privacy tests (deep validation)
+
+Further probing added two regression tests locking in tenant isolation:
+- `test_member_cannot_update_other_user` — a member cannot update or delete
+  another user's record (updateRule own|admin, deleteRule admin → 404).
+- `test_member_cannot_list_or_view_other_users` — users listRule is
+  admin/manager-only and viewRule is own/admin/manager, so a member sees no
+  peers and cannot fetch one by id.
+
+Also verified manually (no code change needed): a logged-in member creating a
+new user with `role:admin` is coerced to member; the `agent` role is preserved
+on self-edit and coerced to member on anonymous create. Suite now **45/45 green**.
