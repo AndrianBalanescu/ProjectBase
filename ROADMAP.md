@@ -207,3 +207,12 @@ Further probing added two regression tests locking in tenant isolation:
 Also verified manually (no code change needed): a logged-in member creating a
 new user with `role:admin` is coerced to member; the `agent` role is preserved
 on self-edit and coerced to member on anonymous create. Suite now **45/45 green**.
+### Cycle-5 create-path privilege-minting test (deep validation)
+
+Probed and confirmed: with `users.createRule` public, NO actor can mint a
+privileged account through the create endpoint. A manager or regular admin
+attempting to create a new user with `role:admin`/`role:manager` is always
+coerced to `member` by the create hook (the `_isPrivileged` check recognizes
+only the PocketBase superuser on the create path, so every create is member).
+Only the update path (superuser/admin) can legitimately promote. Locked in as
+`test_manager_admin_cannot_mint_privileged_user_via_create`. Suite now **46/46 green**.
