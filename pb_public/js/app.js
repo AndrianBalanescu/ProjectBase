@@ -12,6 +12,7 @@ const App = {
     'projects-view': ProjectsViewComponent,
     'stats-view': StatsViewComponent,
     'docs-view': DocsViewComponent,
+    'marketplace-view': MarketplaceViewComponent,
     'issue-drawer': IssueDrawerComponent,
     'command-palette': CommandPaletteComponent,
     'new-issue-modal': NewIssueModalComponent,
@@ -181,6 +182,8 @@ const App = {
           this.currentView = 'stats';
         } else if (e.key === '6') {
           this.currentView = 'docs';
+        } else if (e.key === '7') {
+          this.currentView = 'marketplace';
         }
       });
     },
