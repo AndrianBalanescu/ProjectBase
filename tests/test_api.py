@@ -485,3 +485,98 @@ def test_github_long_description_truncated():
                 f"description over 5000 chars on {it.get('identifier')}: {len(desc)}")
 
 
+
+
+# ---------------------------------------------------------------------------
+# Public self-signup (cycle 5)
+# ---------------------------------------------------------------------------
+
+def _create_user(payload):
+    """POST to users/records anonymously (public self-signup)."""
+    return _request("POST", "/api/collections/users/records", payload)
+
+
+def _create_user_signup(payload):
+    """Alias for _create_user (public self-signup)."""
+    return _create_user(payload)
+
+
+def _delete_user_by_email(email):
+    """Best-effort cleanup: delete a user by email using the superuser token."""
+    from urllib.parse import quote
+    q = "/api/collections/users/records?filter=" + quote(f"email='{email}'")
+    st, body = _get_authed(q)
+    if st != 200 or not body.get("items"):
+        return
+    for it in body["items"]:
+        _request("DELETE", f"/api/collections/users/records/{it['id']}",
+                 headers={"Authorization": _superuser_token()})
+
+
+def test_public_signup_creates_member_user():
+    """A stranger can self-register and always lands as role=member."""
+    email = f"stranger+{_uid()}@flow.test"
+    pw = "Str0ng-Pass-123!"
+    st, body = _create_user_signup({
+        "email": email, "password": pw, "passwordConfirm": pw,
+        "name": "Stranger Test",
+        "role": "admin",  # attempted escalation must be overridden to member
+    })
+    assert st == 200, f"public signup failed: {st} {body}"
+    # PocketBase returns the created record flattened at the top level.
+    assert body.get("role") == "member", (
+        f"role must be forced to member, got {body.get('role')}")
+    _delete_user_by_email(email)
+
+
+def test_signup_user_can_authenticate_and_list_own_projects():
+    """A self-registered member can sign in and view projects (listRule auth-gated)."""
+    email = f"member+{_uid()}@flow.test"
+    pw = "Str0ngTestPass-123!"
+    st, body = _create_user_signup({
+        "email": email, "password": pw, "passwordConfirm": pw, "name": "Member Test"})
+    assert st == 200, f"signup failed: {st} {body}"
+    # Sign in as the new member.
+    st2, auth = _request(
+        "POST", "/api/collections/users/auth-with-password",
+        {"identity": email, "password": pw})
+    assert st2 == 200, f"member auth failed: {st2} {auth}"
+    token = auth.get("token", "")
+    assert token.count(".") == 2
+    # Member can list projects.
+    st3, projects = _request(
+        "GET", "/api/collections/projects/records?perPage=5",
+        headers={"Authorization": token})
+    assert st3 == 200, f"member project list failed: {st3} {projects}"
+    _delete_user_by_email(email)
+
+
+def test_signup_duplicate_email_rejected():
+    """Registering the same email twice must be rejected (unique email)."""
+    email = f"dup+{_uid()}@flow.test"
+    pw = "Str0ngPass-123!"
+    st1, _ = _create_user_signup({
+        "email": email, "password": pw, "passwordConfirm": pw, "name": "Dup One"})
+    assert st1 == 200
+    st2, body2 = _create_user_signup({
+        "email": email, "password": pw, "passwordConfirm": pw, "name": "Dup Two"})
+    assert st2 in (400, 422), f"duplicate email must be rejected, got {st2}"
+    _delete_user_by_email(email)
+
+
+def test_signup_password_mismatch_rejected():
+    """passwordConfirm != password must be rejected client/server side."""
+    email = f"pw+{_uid()}@flow.test"
+    st, body = _create_user_signup({
+        "email": email, "password": "Str0ngPass-123!", "passwordConfirm": "Different-456!"})
+    assert st in (400, 422), f"password mismatch must be rejected, got {st}"
+    _delete_user_by_email(email)
+
+
+def test_signup_short_password_rejected():
+    """PocketBase enforces min password length (>=8)."""
+    email = f"short+{_uid()}@flow.test"
+    st, _ = _create_user_signup({
+        "email": email, "password": "short", "passwordConfirm": "short"})
+    assert st in (400, 422), f"short password must be rejected, got {st}"
+    _delete_user_by_email(email)
