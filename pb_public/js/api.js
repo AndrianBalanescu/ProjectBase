@@ -25,6 +25,10 @@ const API = {
       this.notifySubscribers('cycles', e);
     }).catch(err => console.warn('Cycles subscription error:', err));
 
+    pb.collection('milestones').subscribe('*', (e) => {
+      this.notifySubscribers('milestones', e);
+    }).catch(err => console.warn('Milestones subscription error:', err));
+
     pb.collection('comments').subscribe('*', (e) => {
       this.notifySubscribers('comments', e);
     }).catch(err => console.warn('Comments subscription error:', err));
@@ -35,6 +39,7 @@ const API = {
     try { pb.collection('issues').unsubscribe('*'); } catch (e) {}
     try { pb.collection('projects').unsubscribe('*'); } catch (e) {}
     try { pb.collection('cycles').unsubscribe('*'); } catch (e) {}
+    try { pb.collection('milestones').unsubscribe('*'); } catch (e) {}
     try { pb.collection('comments').unsubscribe('*'); } catch (e) {}
   },
 
@@ -119,8 +124,21 @@ const API = {
     const filter = projectId ? `project = "${projectId}"` : '1=1';
     return await pb.collection('milestones').getFullList({
       filter,
-      sort: 'target_date'
+      sort: '-status,target_date',
+      expand: 'project'
     });
+  },
+
+  async createMilestone(data) {
+    return await pb.collection('milestones').create(data);
+  },
+
+  async updateMilestone(id, data) {
+    return await pb.collection('milestones').update(id, data);
+  },
+
+  async deleteMilestone(id) {
+    return await pb.collection('milestones').delete(id);
   },
 
   // Labels
