@@ -9,6 +9,9 @@
   <!-- Tailwind CSS Play CDN (offline fallback ready) -->
   <script src="/vendor/tailwindcss.js"></script>
   <script>
+    // Guard: only apply config if the Tailwind runtime actually loaded
+    // (protects against vendor script failure and headless VM checks).
+    if (typeof tailwind !== 'undefined') {
     tailwind.config = {
       darkMode: 'class',
       theme: {
@@ -25,6 +28,7 @@
           }
         }
       }
+    }
     }
   </script>
 

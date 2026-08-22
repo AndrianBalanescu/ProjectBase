@@ -176,10 +176,26 @@ def cmd_research(args):
             ],
             "temperature": 0.3
         }
+        def _omniroute_key() -> str:
+            key = os.environ.get("OMNIROUTE_API_KEY") or os.environ.get("AI_API_KEY")
+            if key:
+                return key
+            import glob
+            for conf in sorted(glob.glob(os.path.expanduser("~/.flow-fleet/*/flow.conf"))):
+                try:
+                    with open(conf, "r", encoding="utf-8") as fh:
+                        for line in fh:
+                            if line.strip().startswith("OMNIROUTE_API_KEY="):
+                                return line.strip().split("=", 1)[1].strip().strip('"')
+                except OSError:
+                    continue
+            return ""
+
+        api_key = _omniroute_key()
         req = urllib.request.Request(
             "http://127.0.0.1:20128/v1/chat/completions",
             data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json", "Authorization": "Bearer omniroute"},
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
             method="POST"
         )
         with urllib.request.urlopen(req, timeout=30) as resp:

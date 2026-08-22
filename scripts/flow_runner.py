@@ -24,7 +24,30 @@ from typing import Dict, List, Any, Optional
 
 PROJECTBASE_URL = os.environ.get("PROJECTBASE_URL", "http://127.0.0.1:8120")
 AI_BASE_URL = os.environ.get("AI_API_BASE", "http://127.0.0.1:20128/v1/chat/completions")
-AI_API_KEY = os.environ.get("AI_API_KEY", "omniroute")
+
+
+def _resolve_ai_key() -> str:
+    """Resolve the OmniRoute key from env, then workspace flow.conf files.
+
+    Never hardcode secrets in the repo: the daemon may run without exported
+    env vars, so fall back to the Flow workspace config outside the repo tree.
+    """
+    key = os.environ.get("AI_API_KEY") or os.environ.get("OMNIROUTE_API_KEY")
+    if key:
+        return key
+    import glob
+    for conf in sorted(glob.glob(os.path.expanduser("~/.flow-fleet/*/flow.conf"))):
+        try:
+            with open(conf, "r", encoding="utf-8") as fh:
+                for line in fh:
+                    if line.strip().startswith("OMNIROUTE_API_KEY="):
+                        return line.strip().split("=", 1)[1].strip().strip('"')
+        except OSError:
+            continue
+    return ""
+
+
+AI_API_KEY = _resolve_ai_key()
 AI_MODEL = os.environ.get("AI_MODEL", "rc/claude-sonnet-4-5")
 REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
