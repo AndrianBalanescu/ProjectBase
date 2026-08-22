@@ -95,6 +95,23 @@ const IssueDrawerComponent = {
         subtasks: this.subtasks
       });
     },
+    async dispatchAgent(target = 'flomaster') {
+      if (!this.issue) return;
+      try {
+        const res = await fetch('/api/projectbase/dispatch-agent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ issue_id: this.issue.id, agent_target: target })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || 'Dispatch failed');
+        this.editStatus = 'in_progress';
+        this.editAssignee = data.issue.assignee;
+        await this.loadComments();
+      } catch (err) {
+        console.error('Agent dispatch failed:', err);
+      }
+    },
     async generateAiSubtasks() {
       if (!this.editTitle) return;
       this.aiLoadingSubtasks = true;
@@ -250,6 +267,23 @@ const IssueDrawerComponent = {
           </div>
 
           <div class="flex items-center space-x-2">
+            <!-- Agent Dispatch Controls -->
+            <div class="relative group">
+              <button 
+                class="px-2 py-1 rounded-md text-[11px] font-mono text-purple-300 hover:text-white bg-purple-950/60 hover:bg-purple-900/70 border border-purple-800/40 transition-colors flex items-center space-x-1"
+                title="Dispatch this issue to an autonomous agent"
+              >
+                <i data-lucide="bot" class="w-3 h-3"></i>
+                <span>Trigger Agent</span>
+                <i data-lucide="chevron-down" class="w-3 h-3"></i>
+              </button>
+              <div class="hidden group-hover:block absolute right-0 top-full mt-1 w-44 p-1 rounded-lg bg-gray-900 border border-gray-700 shadow-xl z-20">
+                <button @click="dispatchAgent('flomaster')" class="w-full text-left px-2 py-1.5 text-xs text-gray-300 hover:bg-gray-800 rounded">⚡ Flomaster</button>
+                <button @click="dispatchAgent('hermes')" class="w-full text-left px-2 py-1.5 text-xs text-gray-300 hover:bg-gray-800 rounded">🪽 Hermes</button>
+                <button @click="dispatchAgent('windmill')" class="w-full text-left px-2 py-1.5 text-xs text-gray-300 hover:bg-gray-800 rounded">🌬️ Windmill Flow</button>
+              </div>
+            </div>
+
             <!-- Agent cURL Helper -->
             <button 
               @click="copyAgentCurl"

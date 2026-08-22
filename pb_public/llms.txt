@@ -1,10 +1,10 @@
 # ProjectBase — AI Agent & LLM Integration Reference
 
 > Ultra-lightweight, high-performance Plane & Linear alternative for multi-project Kanban and sprint management.
-> Host: http://100.70.158.21:8120 (Tailscale LAN) / http://localhost:8120
+> Host: ${PROJECTBASE_URL:-http://localhost:8120} (Tailscale LAN) / http://localhost:8120
 > Engine: PocketBase (Go + SQLite) + Zero-Build Vue 3 UI
-> OpenAPI Spec: http://100.70.158.21:8120/openapi.json
-> Interactive Docs: http://100.70.158.21:8120/docs/
+> OpenAPI Spec: ${PROJECTBASE_URL:-http://localhost:8120}/openapi.json
+> Interactive Docs: ${PROJECTBASE_URL:-http://localhost:8120}/docs/
 
 ## Key Projects & Identifiers
 - PB: ProjectBase Core (Plane & Linear alternative with Vue 3 + PocketBase)
@@ -21,7 +21,7 @@ Add to ~/.cursor/mcp.json or ~/.flomaster/config.json:
     "projectbase": {
       "command": "uv",
       "args": ["run", "/home/ubuntu/projects/projectbase/scripts/mcp_server.py"],
-      "env": { "PROJECTBASE_URL": "http://100.70.158.21:8120" }
+      "env": { "PROJECTBASE_URL": "${PROJECTBASE_URL:-http://localhost:8120}" }
     }
   }
 }

@@ -22,6 +22,11 @@ const App = {
   data() {
     return {
       currentView: 'board', // 'board', 'list', 'cycles', 'projects', 'stats'
+      authReady: false,
+      isAuthenticated: false,
+      loginEmail: '',
+      loginPassword: '',
+      authError: '',
       currentProject: null,
       projects: [],
       issues: [],
@@ -52,8 +57,12 @@ const App = {
     }
   },
   async mounted() {
-    await this.loadAllData();
-    this.setupRealtime();
+    this.isAuthenticated = !!API.client.authStore.isValid;
+    this.authReady = true;
+    if (this.isAuthenticated) {
+      await this.loadAllData();
+      this.setupRealtime();
+    }
     this.setupKeyboardShortcuts();
 
     nextTick(() => {
@@ -66,6 +75,25 @@ const App = {
     });
   },
   methods: {
+    async signIn() {
+      this.authError = '';
+      try {
+        await API.client.collection('users').authWithPassword(this.loginEmail, this.loginPassword);
+        this.isAuthenticated = true;
+        this.loginPassword = '';
+        await this.loadAllData();
+        this.setupRealtime();
+      } catch (err) {
+        this.authError = err?.response?.message || 'Unable to sign in with those credentials.';
+      }
+    },
+    signOut() {
+      API.client.authStore.clear();
+      this.isAuthenticated = false;
+      this.projects = [];
+      this.issues = [];
+      this.currentProject = null;
+    },
     async loadAllData() {
       try {
         const [projs, iss, cycs, lbls] = await Promise.all([
