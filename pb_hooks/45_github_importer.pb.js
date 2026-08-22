@@ -80,11 +80,20 @@ routerAdd("POST", "/api/projectbase/import/github", (e) => {
 
         const issuesCol = e.app.findCollectionByNameOrId("issues")
 
-        // Read a possibly-array header value.
+        // Read a possibly-array header value, case-insensitive. GitHub returns
+        // rate-limit headers as X-Ratelimit-* (lowercase 'l'), while some clients
+        // use X-RateLimit-*; match on a normalized key.
         const headerVal = (headers, name) => {
-            let v = headers ? headers[name] : null
-            if (Array.isArray(v)) v = v.length ? v[0] : ""
-            return v != null ? String(v) : ""
+            if (!headers) return ""
+            const want = name.toLowerCase()
+            for (const k in headers) {
+                if (k.toLowerCase() === want) {
+                    let v = headers[k]
+                    if (Array.isArray(v)) v = v.length ? v[0] : ""
+                    return v != null ? String(v) : ""
+                }
+            }
+            return ""
         }
 
         let rateLimitRemaining = null
