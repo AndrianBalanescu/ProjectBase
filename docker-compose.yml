@@ -9,6 +9,7 @@ services:
       - ./pb_data:/app/pb_data
       - ./pb_public:/app/pb_public
       - ./pb_hooks:/app/pb_hooks
+      - ./pb_migrations:/app/pb_migrations
     environment:
       - PROJECTBASE_PORT=8120
       - PROJECTBASE_HOST=0.0.0.0
