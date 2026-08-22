@@ -501,6 +501,12 @@ def _create_user_signup(payload):
     return _create_user(payload)
 
 
+def _create_user_as(token, payload):
+    """Create a user record using an authenticated caller's token."""
+    return _request("POST", "/api/collections/users/records", payload,
+                    headers={"Authorization": token})
+
+
 def _delete_user_by_email(email):
     """Best-effort cleanup: delete a user by email using the superuser token."""
     from urllib.parse import quote
@@ -750,3 +756,44 @@ def test_member_cannot_list_or_view_other_users():
     assert stG2 in (400, 403, 404), f"member view of peer must be denied, got {stG2}"
     _delete_user_by_email(emailV)
     _delete_user_by_email(emailM)
+
+
+def test_manager_admin_cannot_mint_privileged_user_via_create():
+    """Neither a manager nor a regular admin may create a privileged user.
+
+    With users.createRule now public, ANY actor (manager, regular admin, even
+    superuser via REST) attempting to create a user with role='admin' or
+    role='manager' must be coerced to 'member' by the create hook. Only the
+    update path (superuser/admin) may legitimately promote, which is covered
+    elsewhere."""
+    roles = ["admin", "manager"]
+    for creator_role in roles:
+        emailC = f"creator{creator_role}+{_uid()}@flow.test"
+        pwC = f"Str0ngCreator{_uid()}!"
+        stC, bodyC = _create_user_signup({
+            "email": emailC, "password": pwC, "passwordConfirm": pwC,
+            "name": f"Creator{creator_role}"})
+        assert stC == 200, f"create {creator_role} failed: {stC}"
+        # Promote to the intended role via superuser update (legit path).
+        stP, _ = _request(
+            "PATCH", f"/api/collections/users/records/{bodyC['id']}",
+            {"role": creator_role},
+            headers={"Authorization": _superuser_token()})
+        assert stP == 200, f"promote to {creator_role} failed: {stP}"
+        # Auth as the creator.
+        st, auth = _request(
+            "POST", "/api/collections/users/auth-with-password",
+            {"identity": emailC, "password": pwC})
+        assert st == 200
+        ctoken = auth["token"]
+        # Creator tries to mint an admin via create.
+        mint_email = f"mint_{creator_role}_{_uid()}@flow.test"
+        stM, minted = _create_user_as(ctoken, {
+            "email": mint_email, "password": "Str0ngMint-123!",
+            "passwordConfirm": "Str0ngMint-123!", "name": "Mint",
+            "role": "admin"})
+        assert stM == 200, f"create mint failed for {creator_role}: {stM} {minted}"
+        assert minted.get("role") == "member", (
+            f"{creator_role} create of admin must be coerced to member, got {minted.get('role')}")
+        _delete_user_by_email(mint_email)
+        _delete_user_by_email(emailC)
