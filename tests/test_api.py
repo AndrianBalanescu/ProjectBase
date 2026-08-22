@@ -677,3 +677,76 @@ def test_manager_self_edit_preserves_role():
     assert upd.get("role") == "manager", (
         f"manager self-edit must preserve role, got {upd.get('role')}")
     _delete_user_by_email(email)
+
+
+def test_member_cannot_update_other_user():
+    """A member must NOT be able to update or delete ANOTHER user's record.
+
+    updateRule = 'id = @request.auth.id || role = admin' and
+    deleteRule = 'role = admin', so a member editing a different user's record
+    must be rejected (cross-tenant isolation)."""
+    # Create two members.
+    emailA = f"alice+{_uid()}@flow.test"
+    pwA = "Str0ngAlice-123!"
+    stA, bodyA = _create_user_signup({
+        "email": emailA, "password": pwA, "passwordConfirm": pwA, "name": "Alice"})
+    assert stA == 200
+    uidA = bodyA["id"]
+    emailB = f"bob+{_uid()}@flow.test"
+    pwB = "Str0ngBob-123!"
+    stB, bodyB = _create_user_signup({
+        "email": emailB, "password": pwB, "passwordConfirm": pwB, "name": "Bob"})
+    assert stB == 200
+    uidB = bodyB["id"]
+    # Auth as Alice.
+    st, auth = _request(
+        "POST", "/api/collections/users/auth-with-password",
+        {"identity": emailA, "password": pwA})
+    assert st == 200
+    atoken = auth["token"]
+    # Alice tries to update Bob.
+    stUpd, _ = _request(
+        "PATCH", f"/api/collections/users/records/{uidB}",
+        {"name": "Bob Hacked"},
+        headers={"Authorization": atoken})
+    assert stUpd in (400, 403, 404), f"cross-user update must be denied, got {stUpd}"
+    # Alice tries to delete Bob.
+    stDel, _ = _request(
+        "DELETE", f"/api/collections/users/records/{uidB}",
+        headers={"Authorization": atoken})
+    assert stDel in (400, 403, 404), f"cross-user delete must be denied, got {stDel}"
+    # Cleanup both.
+    _delete_user_by_email(emailA)
+    _delete_user_by_email(emailB)
+
+
+def test_member_cannot_list_or_view_other_users():
+    """users listRule is admin/manager-only and viewRule is own/admin/manager:
+    a member must see no other users and cannot fetch a peer's record."""
+    emailV = f"victim{_uid()}@flow.test"
+    pwV = "Str0ngVictim-123!"
+    stV, bodyV = _create_user_signup({
+        "email": emailV, "password": pwV, "passwordConfirm": pwV, "name": "Victim"})
+    assert stV == 200
+    emailM = f"viewer{_uid()}@flow.test"
+    pwM = "Str0ngViewer-123!"
+    stM, bodyM = _create_user_signup({
+        "email": emailM, "password": pwM, "passwordConfirm": pwM, "name": "Viewer"})
+    assert stM == 200
+    st, auth = _request(
+        "POST", "/api/collections/users/auth-with-password",
+        {"identity": emailM, "password": pwM})
+    assert st == 200
+    mtoken = auth["token"]
+    # Member listing users must not expose peers.
+    stL, lst = _request("GET", "/api/collections/users/records?perPage=50",
+                        headers={"Authorization": mtoken})
+    assert stL in (200, 403)
+    if stL == 200:
+        assert lst.get("totalItems", 0) == 0, "member must not list other users"
+    # Member fetching a peer by id must be denied.
+    stG2, _ = _request("GET", f"/api/collections/users/records/{bodyV['id']}",
+                       headers={"Authorization": mtoken})
+    assert stG2 in (400, 403, 404), f"member view of peer must be denied, got {stG2}"
+    _delete_user_by_email(emailV)
+    _delete_user_by_email(emailM)
