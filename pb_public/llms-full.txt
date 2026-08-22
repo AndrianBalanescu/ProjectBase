@@ -5,10 +5,10 @@ ProjectBase is the central project management, Kanban, and sprint execution engi
 It provides zero-latency SQLite database backing, instant REST APIs, real-time Server-Sent Events (SSE), and direct FastMCP integration for AI agents (Cursor, Flomaster, Hermes, Claude, and Windmill).
 
 ## 2. Server Architecture
-- Base URL: http://100.70.158.21:8120
-- PocketBase Admin UI: http://100.70.158.21:8120/_/ (admin@projectbase.local / projectbase123456)
-- OpenAPI Specification: http://100.70.158.21:8120/openapi.json
-- Interactive Scalar Docs: http://100.70.158.21:8120/docs/
+- Base URL: ${PROJECTBASE_URL:-http://localhost:8120}
+- PocketBase Admin UI: ${PROJECTBASE_URL:-http://localhost:8120}/_/ (set via ADMIN_EMAIL and ADMIN_PASSWORD)
+- OpenAPI Specification: ${PROJECTBASE_URL:-http://localhost:8120}/openapi.json
+- Interactive Scalar Docs: ${PROJECTBASE_URL:-http://localhost:8120}/docs/
 - FastMCP Script: /home/ubuntu/projects/projectbase/scripts/mcp_server.py
 
 ## 3. Autonomous Agent Operating Loop
@@ -65,16 +65,16 @@ When an agent is assigned to work on a project:
 
 ## 5. cURL Snippets for Non-MCP Agents
 ### Create Task:
-curl -s -X POST http://100.70.158.21:8120/api/projectbase/quick-task \
+curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/quick-task \
   -H "Content-Type: application/json" \
   -d '{"project_key":"LOAD","title":"Add GPS tracker webhook","priority":"high","status":"todo","estimate":3}'
 
 ### Transition Status:
-curl -s -X PATCH http://100.70.158.21:8120/api/collections/issues/records/<ISSUE_ID> \
+curl -s -X PATCH ${PROJECTBASE_URL:-http://localhost:8120}/api/collections/issues/records/<ISSUE_ID> \
   -H "Content-Type: application/json" \
   -d '{"status":"done"}'
 
 ### Append Execution Log:
-curl -s -X POST http://100.70.158.21:8120/api/collections/comments/records \
+curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/collections/comments/records \
   -H "Content-Type: application/json" \
   -d '{"issue":"<ISSUE_ID>","author":"Flomaster Agent","author_type":"agent","content":"E2E browser QA passed with zero errors."}'

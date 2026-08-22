@@ -402,7 +402,7 @@ const DocsViewComponent = {
               "/home/ubuntu/projects/projectbase/scripts/mcp_server.py"
             ],
             env: {
-              PROJECTBASE_URL: "http://100.70.158.21:8120"
+              PROJECTBASE_URL: "${PROJECTBASE_URL:-http://localhost:8120}"
             }
           }
         }

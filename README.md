@@ -78,7 +78,7 @@
    - Web App & Live Kanban: [http://localhost:8120](http://localhost:8120)
    - Interactive Scalar Docs: [http://localhost:8120/docs/](http://localhost:8120/docs/)
    - PocketBase Admin Panel: [http://localhost:8120/_/](http://localhost:8120/_/)
-     - Default Admin: `admin@projectbase.local` / `projectbase123456`
+     - Default Admin: `your configured admin credentials`
 
 ---
 
@@ -87,6 +87,24 @@
 ```bash
 docker compose up -d
 ```
+
+---
+
+### Admin and User Accounts
+
+`bootstrap.sh` intentionally requires explicit credentials. It never ships a usable public password:
+
+```bash
+ADMIN_EMAIL=you@example.com \
+ADMIN_PASSWORD='generate-a-long-random-password' \
+./scripts/bootstrap.sh
+```
+
+The admin account is for PocketBase administration only. Daily users belong to the `users` auth collection and sign in through the ProjectBase UI. Roles are `admin`, `manager`, `member`, and `agent`. Public deployments should put the app behind HTTPS, disable public registration unless intentionally enabled, and create normal user accounts rather than sharing the superuser.
+
+## Demo Deployment Guidance
+
+GitHub Pages can host a static project website, but it cannot run PocketBase, SQLite, SSE, or containers. Run the live demo on a small VPS/container with a persistent volume and HTTPS via Caddy or a managed reverse proxy. Keep the demo database isolated and resettable. Do not publish Homelab URLs, admin credentials, or private webhook endpoints.
 
 ---
 
