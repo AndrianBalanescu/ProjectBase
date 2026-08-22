@@ -135,4 +135,40 @@ stranger signup UX (disable public registration is documented, but a real first-
 needs a clear signup/onboarding path), CI docker-build job, or a public demo deployment
 script per the demo guidance. Custom fields / multi-tenancy only on real demand.
 
+## Cycle-5 status (2026-08-22)
+
+**Goal (roadmap + strategic calibration):** unblock the North Star — first real stranger.
+The #1 blocker was **stranger signup UX**: `users.createRule` was `@request.auth.role = 'admin'`,
+so a stranger literally could not create an account, and the login gate had no signup path.
+
+**Shipped this cycle (secure public self-signup):**
+- `pb_migrations/1710000006_enable_public_signup.js` — sets `users.createRule = ""` (public
+  self-registration), reversible back to admin-only. All other rules (list/view/update/delete)
+  unchanged and still locked down.
+- `pb_hooks/15_signup_security.pb.js` — `onRecordCreateRequest` on `users` forces every
+  **non-privileged** creator's new record to `role = "member"`. An anonymous signup that
+  submits `role:"admin"` is coerced to `member` (verified live). Auth'd admin/manager creators
+  keep the ability to create privileged accounts. This closes the privilege-escalation hole
+  that opening the create API would otherwise create.
+- `pb_public/index.html` + `pb_public/js/app.js` — login gate now has a **Create a free
+  account** toggle; signup form collects name/email/password/confirm, validates client-side,
+  calls PocketBase `users.create`, then auto-signs the new member in.
+- Tests: 5 new signup tests (member-role coercion, member can auth + list projects, duplicate
+  email rejected, password mismatch rejected, short password rejected).
+
+**Validation (crime-scene audit):**
+- `pytest -v` **40/40 green** (was 35/35).
+- `flow.frontend_guard` **clean** (no unreturned setup vars, no leaked mustaches, no syntax errors).
+- Escalation probe: `POST /api/collections/users/records {role:'admin'}` anonymously → **role=member**.
+- Security posture re-verified: projects/issues/cycles/milestones rules unchanged
+  (create=list=requires auth, delete=admin|manager); users list/view/update/delete still locked.
+- **iBrowse visual QA:** infrastructure timeout (no result captured) — same limitation as prior
+  cycles. Verified via direct HTTP: `/` + `/js/app.js` + assets 200, signup toggle + `signUp`
+  method served, HTML template balanced, app.js parses cleanly under Node.
+
+**Cycle 6 (next):** CI docker-build job, or a public demo deployment script (per demo policy),
+or onboarding polish for the freshly signable first-timer flow. Custom fields / multi-tenancy
+only on real demand.
+
+
 

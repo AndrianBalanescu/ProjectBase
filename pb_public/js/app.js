@@ -26,8 +26,12 @@ const App = {
       currentView: 'board', // 'board', 'list', 'cycles', 'projects', 'stats'
       authReady: false,
       isAuthenticated: false,
+      authMode: 'login', // 'login' | 'signup'
       loginEmail: '',
       loginPassword: '',
+      signupName: '',
+      signupPasswordConfirm: '',
+      signingUp: false,
       authError: '',
       currentProject: null,
       projects: [],
@@ -94,6 +98,36 @@ const App = {
         this.setupRealtime();
       } catch (err) {
         this.authError = err?.response?.message || 'Unable to sign in with those credentials.';
+      }
+    },
+    async signUp() {
+      this.authError = '';
+      if (this.loginPassword !== this.signupPasswordConfirm) {
+        this.authError = 'Passwords do not match.';
+        return;
+      }
+      this.signingUp = true;
+      try {
+        await API.client.collection('users').create({
+          email: this.loginEmail,
+          password: this.loginPassword,
+          passwordConfirm: this.signupPasswordConfirm,
+          name: this.signupName || '',
+        });
+        // Auto sign-in the freshly created account.
+        await API.client.collection('users').authWithPassword(this.loginEmail, this.loginPassword);
+        this.isAuthenticated = true;
+        this.loginPassword = '';
+        this.signupPasswordConfirm = '';
+        await this.loadAllData();
+        this.setupRealtime();
+      } catch (err) {
+        this.authError = err?.response?.data?.email?.message
+          || err?.response?.data?.password?.message
+          || err?.response?.message
+          || 'Unable to create account.';
+      } finally {
+        this.signingUp = false;
       }
     },
     signOut() {
