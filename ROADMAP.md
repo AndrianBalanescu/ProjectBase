@@ -115,7 +115,18 @@ additive-only. No new features on request — harden + ship to strangers.
 - Verified with a fresh empty-volume container run: health 200, `projects` collection 200,
   seed data loaded. Local dev server unaffected (healthy, suite green).
 
-**Validation (crime-scene audit):** `pytest -v` **34 passed / 1 skipped**,
+**Deep-validation follow-up (fresh-boot seed bug):**
+- Further validation with a **truly empty** volume exposed a second first-boot bug: the demo
+  seed lived in `pb_hooks/10_seed_defaults.pb.js` as an `onBootstrap` hook, which PocketBase
+  fires **before** migrations create the collections. A stranger's very first boot threw
+  `sql: no rows in result set` and showed an empty board; the 6 projects / 17 issues only
+  appeared after a restart.
+- **Fix:** moved the seed into `pb_migrations/1710000005_seed_defaults.js` (runs after schema
+  migrations). Verified on a truly empty volume: first boot now seeds all 6 projects + 17
+  issues with no error, and is idempotent on restart (no duplicates).
+
+**Validation (crime-scene audit):** `pytest -v` **32 passed / 3 skipped** (GitHub live tests
+skip under rate-limit),
 `flow.frontend_guard` clean, iBrowse visual QA **SUCCEEDED** (no console errors / no click
 blockers). Commits pushed to origin/main.
 
