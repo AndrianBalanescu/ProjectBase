@@ -14,18 +14,36 @@ migrate((app) => {
 
     const ensure = (name, type, fields, rules = {}) => {
         let collection
+        let existed = true
         try { collection = app.findCollectionByNameOrId(name) } catch (err) {}
         if (!collection) {
+            existed = false
             collection = new Collection({
                 name,
                 type,
-                fields,
                 listRule: rules.listRule ?? null,
                 viewRule: rules.viewRule ?? null,
                 createRule: rules.createRule ?? null,
                 updateRule: rules.updateRule ?? null,
                 deleteRule: rules.deleteRule ?? null,
             })
+        }
+        // NOTE: the Collection constructor silently drops field class instances
+        // on PocketBase 0.39 — fields must be attached via fields.add().
+        // The backfill below also repairs installs created before this fix.
+                const hasField = (col, fieldName) => {
+            // getByName returns falsy (does not throw) when the field is absent.
+            const found = col.fields.getByName(fieldName)
+            return !!(found && found.name)
+        }
+        let added = false
+        for (const field of fields) {
+            if (!hasField(collection, field.name)) {
+                collection.fields.add(field)
+                added = true
+            }
+        }
+        if (!existed || added) {
             app.save(collection)
         }
         return collection

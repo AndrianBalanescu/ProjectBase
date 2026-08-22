@@ -19,29 +19,27 @@ jobs:
       with:
         python-version: '3.11'
 
+    - name: Install test runner
+      run: python -m pip install pytest
+
     - name: Install PocketBase Binary
       run: |
         chmod +x scripts/install.sh
         ./scripts/install.sh
+
+    - name: Seed protocol superuser
+      run: |
+        ./pocketbase superuser upsert \
+          "${PB_SUPERUSER_EMAIL:-f@flow.com}" \
+          "${PB_SUPERUSER_PASSWORD:-superdev123}" \
+          --dir ./pb_data
 
     - name: Start ProjectBase Service in Background
       run: |
         ./scripts/start.sh &
         sleep 3
 
-    - name: Verify Health & Stats Endpoints
-      run: |
-        curl -s http://127.0.0.1:8120/api/projectbase/health | grep "healthy"
-        curl -s http://127.0.0.1:8120/api/projectbase/stats | grep "total_projects"
-        curl -s http://127.0.0.1:8120/openapi.json | grep "openapi"
-        curl -s http://127.0.0.1:8120/llms.txt | grep "ProjectBase"
-
-    - name: Test AI Copilot Endpoint
-      run: |
-        python3 -c "
-        import urllib.request, json
-        req = urllib.request.Request('http://127.0.0.1:8120/api/projectbase/ai-assist', headers={'Content-Type':'application/json'}, data=json.dumps({'action':'generate_subtasks','title':'Test CI Task'}).encode())
-        res = json.loads(urllib.request.urlopen(req).read())
-        assert res['success'] == True
-        print('CI AI Copilot Test Passed!')
-        "
+    - name: Run mechanical proof test suite
+      env:
+        PROJECTBASE_URL: http://127.0.0.1:8120
+      run: python -m pytest -v tests/
