@@ -145,7 +145,11 @@ const ImportModalComponent = {
       this.error = '';
       this.result = null;
       try {
-        const token = window.API && API.client && API.client.authStore ? API.client.authStore.token : '';
+        // API is a top-level `const` in a classic script (global lexical scope),
+        // NOT a window property — so reference it bare like the other components.
+        const token = (typeof API !== 'undefined' && API.client && API.client.authStore)
+          ? API.client.authStore.token
+          : '';
         const resp = await fetch('/api/projectbase/import/csv', {
           method: 'POST',
           headers: {
