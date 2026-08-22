@@ -444,6 +444,23 @@ def test_github_nonexistent_repo_graceful():
     assert body.get("errors"), "expected an error for a missing repo"
 
 
+def test_github_rate_limit_populated():
+    """The import response must surface GitHub's rate-limit remaining/reset so the
+    UI can warn the user. Regression: the hook looked up X-RateLimit-Remaining
+    (capital L) but GitHub returns X-Ratelimit-Remaining (lowercase l), so the
+    value was always null."""
+    pid = _get_any_project_id()
+    status, body = _github_import(
+        {"project_id": pid, "repo": "octocat/Hello-World", "state": "all", "max_issues": 3})
+    assert status == 200, f"import failed: {status} {body}"
+    if any("403" in str(e.get("error", "")) for e in body.get("errors", [])):
+        pytest.skip("GitHub unauthenticated rate limit hit; skipping header assertion")
+    rl = body.get("rate_limit") or {}
+    # Remaining should be a real number when we got a 200 (headers parsed).
+    assert rl.get("remaining") is not None, f"rate_limit.remaining is null: {rl}"
+    assert rl.get("remaining") >= 0
+
+
 def test_github_long_description_truncated():
     """Bodies over the 5000-char description field limit must be truncated, not
     dropped as errors. Uses a high-issue repo so a >5000-char body is likely, but
