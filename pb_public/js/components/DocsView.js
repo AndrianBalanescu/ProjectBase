@@ -88,11 +88,18 @@ const DocsViewComponent = {
             🤖 Agent Operating Loop
           </button>
           <button 
+            @click="activeTab = 'pb_features'"
+            class="px-3 py-1.5 rounded-lg font-medium transition-all"
+            :class="activeTab === 'pb_features' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60'"
+          >
+            ⚡ PocketBase Superpowers
+          </button>
+          <button 
             @click="activeTab = 'mcp'"
             class="px-3 py-1.5 rounded-lg font-medium transition-all"
             :class="activeTab === 'mcp' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60'"
           >
-            ⚡ FastMCP Setup
+            🔌 FastMCP Setup
           </button>
           <button 
             @click="activeTab = 'tester'"
@@ -164,6 +171,70 @@ const DocsViewComponent = {
                 <h4 class="text-xs font-semibold text-white">Mark Complete</h4>
                 <p class="text-[11px] text-gray-400 leading-relaxed">Updates status to <code class="text-emerald-300">done</code>. Triggers live SSE on web boards.</p>
                 <code class="block text-[10px] text-emerald-300 font-mono bg-gray-900 p-1.5 rounded">update_issue(id="LOAD-1", status="done")</code>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 1.5 PocketBase Superpowers Tab -->
+        <div v-show="activeTab === 'pb_features'" class="space-y-6 animate-in fade-in duration-150">
+          <div class="p-6 rounded-2xl bg-gray-900/70 border border-gray-800 shadow-xl space-y-6">
+            <div>
+              <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                <span>PocketBase Native Capabilities & Superpowers</span>
+              </h3>
+              <p class="text-xs text-gray-400 mt-1">
+                Zero-boilerplate features built directly into PocketBase's Go core: filter query expressions, relation traversal, live SSE, file attachments, and built-in cron.
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <!-- Filter Engine -->
+              <div class="p-4 rounded-xl bg-gray-950/80 border border-gray-800 space-y-2">
+                <div class="flex items-center space-x-2 text-indigo-400 font-bold">
+                  <i data-lucide="filter" class="w-4 h-4"></i>
+                  <span>1. SQL-Like Filter Expressions</span>
+                </div>
+                <p class="text-gray-300 text-[11px] leading-relaxed">
+                  Query with operators <code class="text-indigo-300">=, !=, >, <, ~, !~, ?=</code> and boolean logic. Traverses relations automatically without manual SQL joins.
+                </p>
+                <pre class="p-2.5 rounded-lg bg-gray-900 text-indigo-200 font-mono text-[10px] overflow-x-auto"><code>GET /api/collections/issues/records?filter=(project.identifier='LOAD' && (status='todo' || priority='urgent'))</code></pre>
+              </div>
+
+              <!-- Relation & Back-Relation Expansion -->
+              <div class="p-4 rounded-xl bg-gray-950/80 border border-gray-800 space-y-2">
+                <div class="flex items-center space-x-2 text-blue-400 font-bold">
+                  <i data-lucide="git-branch" class="w-4 h-4"></i>
+                  <span>2. Multi-Level Relation & Back-Relations</span>
+                </div>
+                <p class="text-gray-300 text-[11px] leading-relaxed">
+                  Expand foreign keys forward and backward (e.g. fetch an issue and all its comments in 1 single HTTP request).
+                </p>
+                <pre class="p-2.5 rounded-lg bg-gray-900 text-blue-200 font-mono text-[10px] overflow-x-auto"><code>GET /api/collections/issues/records?expand=project,cycle,comments_via_issue</code></pre>
+              </div>
+
+              <!-- File Storage & Thumbnails -->
+              <div class="p-4 rounded-xl bg-gray-950/80 border border-gray-800 space-y-2">
+                <div class="flex items-center space-x-2 text-emerald-400 font-bold">
+                  <i data-lucide="image" class="w-4 h-4"></i>
+                  <span>3. File Storage & Dynamic Thumbnails</span>
+                </div>
+                <p class="text-gray-300 text-[11px] leading-relaxed">
+                  Attach screenshots, test artifacts, or logs. PocketBase resizes and crops image thumbnails on the fly.
+                </p>
+                <pre class="p-2.5 rounded-lg bg-gray-900 text-emerald-200 font-mono text-[10px] overflow-x-auto"><code>GET /api/files/issues/RECORD_ID/screenshot.png?thumb=100x100</code></pre>
+              </div>
+
+              <!-- Built-in Cron Scheduler -->
+              <div class="p-4 rounded-xl bg-gray-950/80 border border-gray-800 space-y-2">
+                <div class="flex items-center space-x-2 text-purple-400 font-bold">
+                  <i data-lucide="clock" class="w-4 h-4"></i>
+                  <span>4. Built-in Background Cron Engine</span>
+                </div>
+                <p class="text-gray-300 text-[11px] leading-relaxed">
+                  Runs background tasks (sprint rollover, automated agent checks, velocity heartbeat) natively inside the binary.
+                </p>
+                <pre class="p-2.5 rounded-lg bg-gray-900 text-purple-200 font-mono text-[10px] overflow-x-auto"><code>cronAdd("daily_rollover", "0 0 * * *", (e) => { ... })</code></pre>
               </div>
             </div>
           </div>
