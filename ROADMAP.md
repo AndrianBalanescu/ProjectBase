@@ -125,8 +125,8 @@ additive-only. No new features on request — harden + ship to strangers.
   migrations). Verified on a truly empty volume: first boot now seeds all 6 projects + 17
   issues with no error, and is idempotent on restart (no duplicates).
 
-**Validation (crime-scene audit):** `pytest -v` **32 passed / 3 skipped** (GitHub live tests
-skip under rate-limit),
+**Validation (crime-scene audit):** `pytest -v` **35/35 pass** against the live restarted
+server (GitHub live tests pass when rate-limit allows),
 `flow.frontend_guard` clean, iBrowse visual QA **SUCCEEDED** (no console errors / no click
 blockers). Commits pushed to origin/main.
 
