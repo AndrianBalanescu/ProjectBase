@@ -3,6 +3,10 @@
 
 routerAdd("POST", "/api/projectbase/dispatch-agent", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
+
         let body = e.requestInfo().body || {}
         let issueId = body.issue_id
         let agentTarget = body.agent_target || "flomaster" // 'flomaster', 'hermes', 'windmill', 'custom'

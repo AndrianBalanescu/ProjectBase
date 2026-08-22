@@ -3,6 +3,9 @@
 
 routerAdd("POST", "/api/projectbase/ai-assist", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let body = e.requestInfo().body || {}
         let action = body.action || "generate_subtasks"
         let title = body.title || ""
