@@ -17,6 +17,7 @@ const App = {
     'issue-drawer': IssueDrawerComponent,
     'command-palette': CommandPaletteComponent,
     'new-issue-modal': NewIssueModalComponent,
+    'import-modal': ImportModalComponent,
     'project-modal': ProjectModalComponent,
     'cycle-modal': CycleModalComponent
   },
@@ -40,6 +41,7 @@ const App = {
       // Modals
       isOmnibarOpen: false,
       isNewIssueOpen: false,
+      isImportOpen: false,
       isProjectModalOpen: false,
       editingProject: null,
       isCycleModalOpen: false,
@@ -224,6 +226,9 @@ const App = {
         if (e.key === 'c' || e.key === 'C') {
           e.preventDefault();
           this.isNewIssueOpen = true;
+        } else if (e.key === 'i' || e.key === 'I') {
+          e.preventDefault();
+          this.isImportOpen = true;
         } else if (e.key === '1') {
           this.currentView = 'board';
         } else if (e.key === '2') {
@@ -268,6 +273,13 @@ const App = {
         console.error('Issue create failed:', err);
         this.showToast('Failed to create issue', 'error');
       }
+    },
+
+    async handleImportComplete(result) {
+      // After a CSV import, refresh the issue list so new records appear.
+      await this.loadIssues();
+      this.showToast(`Imported ${result.imported} issue(s)`, 'success');
+      this.isImportOpen = false;
     },
 
     async handleUpdateIssue(updateData) {

@@ -38,3 +38,31 @@ Estimated cost: ~30 min iBrowse scripting.
 - 20-test mechanical proof suite in CI (health, security rules, fuzzing, auth).
 - Security: no secrets in repo; superuser seeded per protocol.
 - Teardown artifacts: `research/COMPETITORS.md`, `research/FEATURE_MATRIX.md`.
+
+## Cycle-2 status (2026-08-22)
+
+**Debate rerun** (`debate-verdict-cycle-2.md`): INCONCLUSIVE (same engine degradation as
+cycle 1 — only 1/4 models completed rounds), but the arbiter signal is clear and aligns
+with the roadmap teardown: **CSV-only importer + command palette polish ship in C2,
+JSON + GitHub importer defer to C3, custom fields defer indefinitely (C4+), schema no
+rework except the additive `source_metadata` JSON field.**
+
+**Shipped this cycle:**
+- `pb_migrations/1710000004_add_source_metadata.js` — idempotent, purely additive.
+- `pb_hooks/40_importers.pb.js` — `POST /api/projectbase/import/csv` (auth-gated, 5000-row cap,
+  duplicate-safe by title + source_key, status/priority normalization, per-row error isolation,
+  `source_metadata` provenance, byte-array JSON read handling for PB 0.39 Goja).
+- `pb_public/js/components/ImportModal.js` — paste-or-upload CSV, live parse preview, target
+  project picker, import result (imported/skipped/errors).
+- Wiring: header/`index.html` modal, `ImportModal` registration + `I` shortcut + palette
+  "Import Issues from CSV" command.
+- Tests: 9 importer tests added to `tests/test_api.py` (auth, dedup title, dedup source_key,
+  normalization, malformed fuzz, source_metadata persistence). Suite now **29 passing**.
+
+**Validation (crime-scene audit):** `flow.frontend_guard` clean, iBrowse visual audit PASSED
+(zero console errors / no click blockers), `pytest -v` 29/29 green, endpoint verified for both
+superuser and regular user auth, malformed payloads fuzzed without 500.
+
+**Cycle 3 (next):** GitHub API importer (OAuth + rate limiting + webhooks) + custom fields if a
+real user asks. Keep schema additive-only.
+

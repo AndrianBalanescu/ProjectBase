@@ -176,6 +176,7 @@
       @select-project="selectProject"
       @change-view="changeView"
       @open-new-issue="isNewIssueOpen = true"
+      @open-import="isImportOpen = true"
     ></command-palette>
 
     <!-- New Issue Modal -->
@@ -188,6 +189,15 @@
       @close="isNewIssueOpen = false"
       @create-issue="handleCreateIssue"
     ></new-issue-modal>
+
+    <!-- Import Issues Modal -->
+    <import-modal
+      :is-open="isImportOpen"
+      :projects="projects"
+      :current-project="currentProject"
+      @close="isImportOpen = false"
+      @imported="handleImportComplete"
+    ></import-modal>
 
     <!-- Project Create/Edit Modal -->
     <project-modal 
@@ -243,6 +253,7 @@
   <script src="/js/components/IssueDrawer.js"></script>
   <script src="/js/components/CommandPalette.js"></script>
   <script src="/js/components/NewIssueModal.js"></script>
+  <script src="/js/components/ImportModal.js"></script>
   <script src="/js/components/ProjectModal.js"></script>
   <script src="/js/components/CycleModal.js"></script>
   <script src="/js/app.js"></script>

@@ -13,6 +13,7 @@ Usage:
 
 import json
 import os
+import uuid
 import urllib.error
 import urllib.request
 
@@ -219,3 +220,133 @@ def test_ai_assist_generate_subtasks():
         headers={"Authorization": _superuser_token()}, timeout=60)
     assert status == 200
     assert body.get("success") is True
+
+
+# ---------------------------------------------------------------------------
+# CSV importer (cycle 2)
+# ---------------------------------------------------------------------------
+
+def test_importer_requires_authentication():
+    status, _ = _request("POST", "/api/projectbase/import/csv",
+                         {"project_id": "x", "rows": [{"title": "y"}]})
+    assert status == 401
+
+
+def test_importer_missing_project():
+    status, _ = _request("POST", "/api/projectbase/import/csv",
+                         {"rows": [{"title": "y"}]},
+                         headers={"Authorization": _superuser_token()})
+    assert 400 <= status < 500
+
+
+def _get_any_project_id():
+    status, body = _get_authed("/api/collections/projects/records?perPage=1")
+    assert status == 200, f"could not list projects: {status} {body}"
+    items = body.get("items", [])
+    assert items, "no seeded projects found for importer test"
+    return items[0]["id"]
+
+
+def _uid():
+    return uuid.uuid4().hex[:10]
+
+
+def test_importer_creates_issue():
+    pid = _get_any_project_id()
+    status, body = _request(
+        "POST", "/api/projectbase/import/csv",
+        {"project_id": pid, "rows": [{"title": f"Importer Test Issue {_uid()}",
+                                      "description": "created by pytest",
+                                      "status": "todo", "priority": "high"}]},
+        headers={"Authorization": _superuser_token()})
+    assert status == 200, f"import failed: {status} {body}"
+    assert body["imported"] == 1
+    assert body["skipped"] == 0
+
+
+def test_importer_dedup_title_skips():
+    """Same (project, title) imported twice => second is skipped."""
+    pid = _get_any_project_id()
+    title = f"Importer Dedup Title {_uid()}"
+    payload = {"project_id": pid, "rows": [{"title": title}]}
+    hdr = {"Authorization": _superuser_token()}
+    status, body = _request("POST", "/api/projectbase/import/csv", payload, headers=hdr)
+    assert status == 200 and body["imported"] == 1
+    # second import: same title, must be skipped
+    status2, body2 = _request("POST", "/api/projectbase/import/csv", payload, headers=hdr)
+    assert status2 == 200
+    assert body2["imported"] == 0
+    assert body2["skipped"] == 1
+
+
+def test_importer_source_key_dedup_cross_request():
+    """A source_key seen in a prior import skips even if the title changes."""
+    pid = _get_any_project_id()
+    hdr = {"Authorization": _superuser_token()}
+    key = f"k-{_uid()}"
+    payload1 = {"project_id": pid, "rows": [{"title": f"Keyed A {_uid()}", "source_key": key}]}
+    status, body = _request("POST", "/api/projectbase/import/csv", payload1, headers=hdr)
+    assert status == 200 and body["imported"] == 1
+    # different title, same source_key => skipped
+    payload2 = {"project_id": pid, "rows": [{"title": f"Keyed B {_uid()}", "source_key": key}]}
+    status2, body2 = _request("POST", "/api/projectbase/import/csv", payload2, headers=hdr)
+    assert status2 == 200
+    assert body2["imported"] == 0
+    assert body2["skipped"] == 1
+
+
+def test_importer_normalizes_status_and_priority():
+    pid = _get_any_project_id()
+    status, body = _request(
+        "POST", "/api/projectbase/import/csv",
+        {"project_id": pid, "rows": [{"title": f"Norm Check {_uid()}",
+                                           "status": "In Progress", "priority": "P1"}]},
+        headers={"Authorization": _superuser_token()})
+    assert status == 200 and body["imported"] == 1
+
+
+def test_importer_missing_title_reports_error():
+    pid = _get_any_project_id()
+    status, body = _request(
+        "POST", "/api/projectbase/import/csv",
+        {"project_id": pid, "rows": [{"title": " "}]},
+        headers={"Authorization": _superuser_token()})
+    assert status == 200
+    assert body["imported"] == 0
+    assert body["errors"]
+
+
+def test_importer_fuzz_malformed_rows():
+    pid = _get_any_project_id()
+    # mixed: valid + malformed should not 500; valid row commits
+    status, body = _request(
+        "POST", "/api/projectbase/import/csv",
+        {"project_id": pid, "rows": [{"title": f"Fuzz Good {_uid()}"},
+                                          "not-an-object",
+                                          {"no_title": 1}]},
+        headers={"Authorization": _superuser_token()})
+    assert status == 200, f"importer fuzz crashed: {status} {body}"
+    assert body["imported"] == 1
+
+
+def test_importer_source_metadata_persisted():
+    """Imported issues must carry source_metadata provenance JSON."""
+    pid = _get_any_project_id()
+    title = f"Importer Metadata Check {_uid()}"
+    key = f"md-{_uid()}"
+    status, _ = _request(
+        "POST", "/api/projectbase/import/csv",
+        {"project_id": pid, "rows": [{"title": title, "source_key": key}]},
+        headers={"Authorization": _superuser_token()})
+    assert status == 200
+    # fetch the record back and assert source_metadata
+    from urllib.parse import quote
+    q = "/api/collections/issues/records?filter=" + quote(f"(title='{title}')") + "&perPage=5"
+    st, recs = _get_authed(q)
+    assert st == 200
+    assert recs.get("items"), "imported issue not found"
+    sm = recs["items"][0].get("source_metadata")
+    assert sm, "source_metadata not persisted"
+    assert sm.get("importer") == "csv"
+    assert sm.get("source_key") == key
+
