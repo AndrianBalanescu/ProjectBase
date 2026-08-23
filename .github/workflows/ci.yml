@@ -29,10 +29,14 @@ jobs:
 
     - name: Seed protocol superuser
       run: |
+        # scripts/start.sh serves the app from ./app with --dir pb_data (i.e.
+        # ./app/pb_data). Seed into the SAME data dir the app reads, or the
+        # superuser auth fails with 400 and most tests go red.
+        mkdir -p app/pb_data
         ./pocketbase superuser upsert \
           "${PB_SUPERUSER_EMAIL:-f@flow.com}" \
           "${PB_SUPERUSER_PASSWORD:-superdev123}" \
-          --dir ./pb_data
+          --dir ./app/pb_data
 
     - name: Start ProjectBase Service in Background
       run: |
@@ -60,10 +64,12 @@ jobs:
 
       - name: Seed protocol superuser
         run: |
+          # The container serves --dir /app/app/pb_data (see Dockerfile). Seed
+          # into the SAME data dir the app reads so superuser auth succeeds.
           docker compose exec -T projectbase /app/pocketbase superuser upsert \
             "${PB_SUPERUSER_EMAIL:-f@flow.com}" \
             "${PB_SUPERUSER_PASSWORD:-superdev123}" \
-            --dir /app/pb_data
+            --dir /app/app/pb_data
 
       - name: Health + fresh-boot seed check
         env:
