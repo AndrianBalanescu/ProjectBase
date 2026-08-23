@@ -1503,6 +1503,58 @@ def test_notifications_status_priority_change_notifies_assignee():
         _delete_user_by_email(email)
 
 
+def test_notifications_actor_attribution_and_self_suppression():
+    """A third-party status change records the real actor; the assignee's own
+    change does not self-notify. Regression for the auth-capture gap: auth is
+    unavailable in onRecordAfter*Success hooks, so the actor must be captured
+    via $app.store() in the request phase, or every change looks like 'Agent'
+    and the self-suppression never fires."""
+    # Assignee user A + third-party user B.
+    email_a, pw_a, name_a, uid_a = _create_notif_user("NotifActorA")
+    email_b, pw_b, name_b, uid_b = _create_notif_user("NotifActorB")
+    token_a = _user_token(email_a, pw_a)
+    token_b = _user_token(email_b, pw_b)
+    pid = _first_project_id()
+
+    title = f"Notif Actor {_uid()}"
+    # A creates an issue assigned to themselves (superuser token for the
+    # create, so the created row is owned cleanly).
+    st, issue = _authed_json("POST", "/api/collections/issues/records",
+                             {"project": pid, "title": title,
+                              "status": "todo", "priority": "low",
+                              "assignee": name_a})
+    assert st == 200, f"issue create failed: {st} {issue}"
+    iid = issue["id"]
+    try:
+        # B moves the issue -> A gets a status notification whose actor is B.
+        st_b, body_b = _request(
+            "PATCH", f"/api/collections/issues/records/{iid}",
+            {"status": "in_progress"}, headers={"Authorization": token_b})
+        assert st_b == 200, f"B status change failed: {st_b} {body_b}"
+        notifs = _list_notifs(token_a)
+        status_notifs = [n for n in notifs if n.get("type") == "status"]
+        assert status_notifs, f"expected B->A status notification, got {notifs}"
+        assert status_notifs[0].get("actor") == name_b, \
+            f"expected actor {name_b!r}, got {status_notifs[0].get('actor')!r}"
+        assert status_notifs[0].get("actor_type") == "user"
+
+        # A moves their own issue -> no new status notification for A.
+        count_before = len(status_notifs)
+        st_a, body_a = _request(
+            "PATCH", f"/api/collections/issues/records/{iid}",
+            {"status": "in_review"}, headers={"Authorization": token_a})
+        assert st_a == 200, f"A status change failed: {st_a} {body_a}"
+        notifs_after = _list_notifs(token_a)
+        status_after = [n for n in notifs_after if n.get("type") == "status"]
+        assert len(status_after) == count_before, \
+            f"A self-change must not self-notify: {status_after}"
+    finally:
+        _request("DELETE", f"/api/collections/issues/records/{iid}",
+                 headers={"Authorization": _superuser_token()})
+        _delete_user_by_email(email_a)
+        _delete_user_by_email(email_b)
+
+
 def test_notifications_mention_notifies_mentioned_user():
     """A comment with @Name mention notifies the mentioned registered user."""
     email, pw, name, _uid_rec = _create_notif_user()

@@ -18,6 +18,48 @@
 // bug class as the cycle-5 P0 fix in 15_signup_security.pb.js. ALL logic is
 // therefore inlined directly inside each callback. Every path is wrapped in
 // try/catch so a broken notification never breaks the core write path.
+//
+// ACTOR NOTE (critical): `e.httpContext.authRecord` / `e.requestInfo().auth`
+// are EMPTY inside onRecordAfter*Success hooks in this PocketBase JSVM, and no
+// state (not even module-level globalThis) survives between hook callbacks —
+// each callback runs in its own sandbox. Auth is only resolvable in the
+// onRecord*Request phase, so we capture the acting user into `$app.store()`
+// (PocketBase's shared KV store) in the request hooks and consume it in the
+// after hooks. Without this, actorName always falls back to "Agent" and the
+// "skip when the actor is the assignee" suppression never works.
+
+
+// Capture the acting user during the request phase (auth available here only)
+// into $app.store() so the after-success hooks (separate sandbox) can read it.
+onRecordCreateRequest((e) => {
+    try {
+        const req = e.requestInfo()
+        const auth = req ? req.auth : null
+        if (auth && auth.get) {
+            try { $app.store().set("pbNotifActorName", auth.get("name") || "") } catch (x) {}
+            try { $app.store().set("pbNotifActorType", "user") } catch (x) {}
+        } else {
+            try { $app.store().set("pbNotifActorName", "") } catch (x) {}
+            try { $app.store().set("pbNotifActorType", "") } catch (x) {}
+        }
+    } catch (err) {}
+    e.next()
+}, "issues")
+
+onRecordUpdateRequest((e) => {
+    try {
+        const req = e.requestInfo()
+        const auth = req ? req.auth : null
+        if (auth && auth.get) {
+            try { $app.store().set("pbNotifActorName", auth.get("name") || "") } catch (x) {}
+            try { $app.store().set("pbNotifActorType", "user") } catch (x) {}
+        } else {
+            try { $app.store().set("pbNotifActorName", "") } catch (x) {}
+            try { $app.store().set("pbNotifActorType", "") } catch (x) {}
+        }
+    } catch (err) {}
+    e.next()
+}, "issues")
 
 // 1 + 2 + 3. Issue created / updated: notify on assignment / status / priority.
 onRecordAfterCreateSuccess((e) => {
@@ -26,10 +68,10 @@ onRecordAfterCreateSuccess((e) => {
         const assignee = issue.get("assignee") || ""
         if (!assignee) return
 
-        const httpCtx = e.httpContext || {}
-        const authRec = httpCtx.authRecord || null
-        const actorName = (authRec && authRec.get ? authRec.get("name") : "") || "Agent"
-        const actorType = authRec ? "user" : "system"
+        let actorName = "Agent"
+        let actorType = "system"
+        try { actorName = $app.store().get("pbNotifActorName") || "Agent" } catch (x) {}
+        try { actorType = $app.store().get("pbNotifActorType") || "system" } catch (x) {}
         const identifier = issue.get("identifier") || "task"
         const title = issue.get("title") || ""
 
@@ -67,10 +109,10 @@ onRecordAfterUpdateSuccess((e) => {
         const assignee = issue.get("assignee") || ""
         const prevAssignee = original ? (original.get("assignee") || "") : ""
 
-        const httpCtx = e.httpContext || {}
-        const authRec = httpCtx.authRecord || null
-        const actorName = (authRec && authRec.get ? authRec.get("name") : "") || "Agent"
-        const actorType = authRec ? "user" : "system"
+        let actorName = "Agent"
+        let actorType = "system"
+        try { actorName = $app.store().get("pbNotifActorName") || "Agent" } catch (x) {}
+        try { actorType = $app.store().get("pbNotifActorType") || "system" } catch (x) {}
         const identifier = issue.get("identifier") || "task"
         const title = issue.get("title") || ""
 

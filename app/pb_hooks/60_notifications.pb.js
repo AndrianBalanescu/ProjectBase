@@ -88,8 +88,10 @@ onRecordAfterCreateSuccess((e) => {
 // 2. Hook on Issue Status / Priority Updated
 onRecordAfterUpdateSuccess((e) => {
     try {
-        let oldStatus = e.record.originalCopy().get("status")
-        let newStatus = e.record.get("status")
+        // NOTE: this PocketBase JSVM has no `originalCopy()`; use `original()`.
+        const original = e.record.original()
+        let oldStatus = original ? (original.get("status") || "") : ""
+        let newStatus = e.record.get("status") || ""
         let identifier = e.record.get("identifier")
         let title = e.record.get("title")
         let assignee = e.record.get("assignee") || "Unassigned"
