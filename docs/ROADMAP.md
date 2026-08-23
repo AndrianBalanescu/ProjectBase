@@ -263,3 +263,29 @@ should rerun before the public launch.
 **Cycle 7 (next):** point deploy-demo.sh at a real domain (needs human: domain + VPS),
 or continue launch blockers: public demo announcement assets, landing-page demo link,
 lead capture.
+
+## Cycle-17 status (2026-08-23)
+
+**Goal:** close the last remaining must-have gap in the feature matrix — **Roadmap view** was
+marked `partial` because milestones existed but there was no way to link issues to them.
+
+**Shipped this cycle (milestone assignment on issues):**
+- `NewIssueModal` — new **Milestone** select (filtered to the selected project, shows status) sent
+  through `handleCreateIssue` → `milestone` relation.
+- `IssueDrawer` — new searchable **Milestone** selector (`milestoneOptions`, same UX as Sprint
+  Cycle) persisted via `saveChanges` → `updateIssue`; issues can be linked/unlinked from the
+  edit drawer.
+- `index.html` — wired `:milestones="milestones"` into both `issue-drawer` and `new-issue-modal`
+  from the root app state (already SSE-subscribed in app.js).
+- Backend tests: `test_issue_milestone_assignment_roundtrip` (create milestone → assign → read
+  back → clear) and `test_milestone_progress_computed_from_linked_issues` (2 linked issues read
+  back by milestone filter).
+- `docs/research/FEATURE_MATRIX.md` — Roadmap view moved from `partial` to `shipped`.
+
+**Validation:** `pytest -v` **59/59 green** (was 57/57; +2 milestone tests). All Vue component
+files pass `node --check`. iBrowse visual QA **SUCCEEDED** (no console errors / no click
+blockers). Commits pushed to origin/main.
+
+With every must-have row in the feature matrix now green, the next milestone is North Star
+delivery (cycle-7 next-items): point `deploy-demo.sh` at a real domain and run first-stranger
+onboarding / lead capture.
