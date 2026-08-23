@@ -146,7 +146,7 @@ const CommandPaletteComponent = {
             </div>
 
             <div class="flex items-center space-x-1.5 text-xs text-gray-500 flex-shrink-0">
-              <span class="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-gray-800/80">{{ item.type }}</span>
+              <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-gray-800/80">{{ item.type }}</span>
             </div>
           </div>
 

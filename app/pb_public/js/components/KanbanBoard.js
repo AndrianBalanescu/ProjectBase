@@ -367,7 +367,7 @@ const KanbanBoardComponent = {
                   </div>
 
                   <div class="flex items-center space-x-1.5">
-                    <span v-if="issue.estimate" class="px-1.5 py-0.2 rounded bg-gray-800/80 text-[10px] font-mono text-gray-400 border border-gray-700/50">
+                    <span v-if="issue.estimate" class="px-1.5 py-0.5 rounded bg-gray-800/80 text-[10px] font-mono text-gray-400 border border-gray-700/50">
                       {{ issue.estimate }}
                     </span>
 

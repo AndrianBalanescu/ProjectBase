@@ -55,7 +55,7 @@ const ProjectsViewComponent = {
                     <h3 class="text-sm font-bold text-white group-hover:text-indigo-300 transition-colors flex items-center space-x-2">
                       <span>{{ p.name }}</span>
                     </h3>
-                    <span class="text-[10px] px-1.5 py-0.2 rounded bg-gray-800 text-gray-400 font-mono font-medium">
+                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 font-mono font-medium">
                       {{ p.identifier }}
                     </span>
                   </div>

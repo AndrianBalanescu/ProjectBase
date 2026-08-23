@@ -177,7 +177,7 @@ const ListViewComponent = {
                   <div class="flex items-center space-x-2">
                     <span class="truncate">{{ issue.title }}</span>
                     <!-- Subtask count badge -->
-                    <span v-if="issue.subtasks && issue.subtasks.length > 0" class="px-1.5 py-0.2 rounded bg-gray-800 text-[10px] text-gray-400 font-mono flex-shrink-0">
+                    <span v-if="issue.subtasks && issue.subtasks.length > 0" class="px-1.5 py-0.5 rounded bg-gray-800 text-[10px] text-gray-400 font-mono flex-shrink-0">
                       {{ issue.subtasks.filter(s => s.done).length }}/{{ issue.subtasks.length }}
                     </span>
                   </div>

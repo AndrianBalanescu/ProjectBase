@@ -825,7 +825,7 @@ const IssueDrawerComponent = {
                 <div class="flex items-center justify-between">
                   <div class="flex items-center space-x-2">
                     <span 
-                      class="px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold uppercase"
+                      class="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold uppercase"
                       :class="c.author_type === 'agent' ? 'bg-purple-950 text-purple-300 border border-purple-800/40' : 'bg-blue-950 text-blue-300 border border-blue-800/40'"
                     >
                       {{ c.author_type }}
