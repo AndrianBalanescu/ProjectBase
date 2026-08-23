@@ -7,7 +7,7 @@ ProjectBase = ultra-lightweight open-source Plane/Linear alternative. **MIT, 100
 - **Backend:** PocketBase **0.39.11** single binary `./pocketbase` at repo root. Serve with `./pocketbase serve --dir pb_data --hooksDir app/pb_hooks --migrationsDir app/pb_migrations --http 127.0.0.1:8120`. Note: PB data dir is `pb_data/` at root for local run, but Docker mounts `./app/pb_data` — keep both consistent.
 - **Frontend:** Zero-build **Vue 3 UMD** + static Tailwind. All served straight from `app/pb_public/`. No `node_modules`, no bundler.
 - **Styling:** Tailwind is **compiled to static CSS** via `scripts/build_css.sh` → `app/pb_public/css/style.css`. After editing templates/classes, rerun it. Do NOT add a runtime Tailwind CDN.
-- **Tests:** `pytest tests/` (pytest binary at `~/.local/bin/pytest`; NOT in repo venv). Tests run against the live instance (default `PROJECTBASE_URL=http://127.0.0.1:8120`, superuser `f@flow.com` / `superdev123`). 118 tests across 4 files.
+- **Tests:** `pytest tests/` (pytest binary at `~/.local/bin/pytest`; NOT in repo venv). Tests run against the live instance (default `PROJECTBASE_URL=http://127.0.0.1:8120`, superuser `f@flow.com` / `superdev123`). 125 tests across 5 files.
 - **Docker:** `docker compose up` — builds `Dockerfile`, mounts `app/` subdirs, exposes 8120.
 - **Deploy:** `deploy/projectbase.service` (systemd) + `deploy/Caddyfile`. Helper scripts: `scripts/install-systemd.sh`, `scripts/backup.sh`, `scripts/restore.sh`, `scripts/deploy-demo.sh`, `scripts/reset-demo.sh`.
 
@@ -46,7 +46,7 @@ docs/                  <- research, ROADMAP, TODO, architecture, COMPETITORS, FE
 scripts/               <- start.sh, build_css.sh, backup.sh, restore.sh, install-systemd.sh, deploy-demo.sh,
                           reset-demo.sh, bump_version.sh, flow-cli (CLI wrapper), pb-cli, mcp_server.py,
                           flow_runner.py, flow-daemon.sh, flow-cli, install.sh
-tests/                 <- test_api.py, test_selfhosting.py, test_flow_runner_sync.py, test_foss_schema.py
+tests/                 <- test_api.py, test_selfhosting.py, test_flow_runner_sync.py, test_foss_schema.py, test_css_sync.py (CSS/template drift guard)
 deploy/                <- projectbase.service, Caddyfile
 .github/workflows/ci.yml  <- CI (seeds superuser, runs tests)
 ```
@@ -70,7 +70,7 @@ deploy/                <- projectbase.service, Caddyfile
 - **Before editing:** inspect `git status`; read relevant README/docs; preserve unrelated work.
 - **Frontend:** keep zero-build PocketBase serving; vendor browser-ready FOSS bundles under `app/pb_public/vendor/`; preserve Markdown descriptions; rerun `build_css.sh` after template/class edits.
 - **Backend:** enforce validation/authorization in hooks/migrations. Additive migrations only. Never commit secrets or local data (`pb_data/`).
-- **Validate:** run `python ~/.local/bin/pytest tests/` (or `uv run --with pytest pytest tests/`), run iBrowse QA for UI/frontend changes (`bash /home/ubuntu/flow/scripts/qa/flow-ibrowse.sh http://127.0.0.1:8120/`), verify zero console errors, check health `http://127.0.0.1:8120`, inspect diff/status/root layout.
+- **Validate:** run `python ~/.local/bin/pytest tests/` (or `uv run --with pytest pytest tests/`), run iBrowse QA for UI/frontend changes (`bash /home/ubuntu/flow/scripts/qa/flow-ibrowse.sh http://127.0.0.1:8120/`); if the iBrowse host is unreachable, fall back to `scripts/qa/qa-render.sh` (headless render + computed-style assertions), verify zero console errors, check health `http://127.0.0.1:8120`, inspect diff/status/root layout.
 - **Docs:** research and plans in `docs/`; no loose root artifacts.
 - **Kanban & MCP:** use `mcp__projectbase__*` or API (`:8120`) to pick active issues, move to `in_progress`, mark `done` with audit comments.
 - **Commit & push:** ONE commit per work session, consolidating code + tests + docs + .gitignore together. Never open a new commit for a follow-up tweak/wording fix/doc note — fold it into the in-progress commit. If you already made several small commits, `git reset --soft` back and re-commit as one. **Push to origin at the end of the cycle when the work is real** (added/changed code or tests) and all checks pass. Do NOT push if the cycle produced only doc/roadmap/TODO/feature-matrix/.gitignore churn — fold that in with real work or leave it uncommitted. Never push broken/red work.
