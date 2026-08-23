@@ -204,7 +204,10 @@ const IssueDrawerComponent = {
         await this.loadRelations();
         this.$emit('relations-changed', {
           id: this.issue.id,
-          relations: Array.isArray(data.relations) ? data.relations : []
+          relations: Array.isArray(data.relations) ? data.relations : [],
+          targetId,
+          mirrorType: this.mirrorType(this.relationType),
+          action: 'add'
         });
       } catch (err) {
         this.relationError = err.message || 'Failed to add relationship';
@@ -221,12 +224,20 @@ const IssueDrawerComponent = {
         await this.loadRelations();
         this.$emit('relations-changed', {
           id: this.issue.id,
-          relations: this.relationOutgoing.map(r => ({ issue: r.issue, type: r.type }))
+          relations: this.relationOutgoing.map(r => ({ issue: r.issue, type: r.type })),
+          targetId,
+          mirrorType: this.mirrorType(type),
+          action: 'remove'
         });
       } catch (err) {
         this.relationError = err.message || 'Failed to remove relationship';
         console.error('Remove relation error:', err);
       }
+    },
+    mirrorType(type) {
+      if (type === 'blocks') return 'blocked_by';
+      if (type === 'blocked_by') return 'blocks';
+      return 'related';
     },
     saveChanges() {
       if (!this.issue) return;

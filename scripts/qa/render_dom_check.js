@@ -190,8 +190,18 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
         return !!drawer && (drawer.textContent || '').includes(title);
       }, tmpTitle);
       // 6. The kanban card for the temp issue must show the blocked lock badge.
-      // Reload first: programmatic mirror saves don't broadcast SSE, so the
-      // temp issue's relations need a fresh fetch from the server.
+      // First WITHOUT a reload: the reciprocal mirror save should arrive via
+      // SSE (PB broadcasts app.save() in hooks/routes), proving the real-time
+      // loop from API route -> SSE -> Vue reactivity -> card badge.
+      await page.evaluate(() => { location.hash = '#/pb/board'; });
+      await page.waitForTimeout(2500);
+      relations.kanbanLockNoReload = await page.evaluate((title) => {
+        const card = Array.from(document.querySelectorAll('.kanban-card-drag-handle'))
+          .find((c) => (c.textContent || '').includes(title));
+        if (!card) return false;
+        return !!(card.querySelector('i[data-lucide="lock"]') || card.querySelector('.text-red-400'));
+      }, tmpTitle);
+      // Then reload as the server-persistence baseline (fresh fetch path).
       await page.reload({ waitUntil: 'domcontentloaded' });
       await page.waitForTimeout(3000);
       await page.evaluate(() => { location.hash = '#/pb/board'; });
@@ -258,7 +268,8 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     if (relations.sectionRendered === false) failures.push('Relationships section did not render in drawer');
     if (!relations.pickerPicked) failures.push('relation picker could not pick the temp issue');
     if (relations.rowShown === false) failures.push('added relation row did not appear in drawer');
-    if (relations.kanbanLockShown === false) failures.push('blocked kanban card did not show lock badge');
+    if (relations.kanbanLockNoReload === false) failures.push('blocked kanban card did not show lock badge via SSE (no reload)');
+    if (relations.kanbanLockShown === false) failures.push('blocked kanban card did not show lock badge after reload');
   }
   if (routing.checked && !routing.issueOpened) failures.push('real issue deep link did not open the drawer');
   if (routing.checked && routing.staleDrawerOnPlainView) failures.push('stale drawer left open on plain view hash');

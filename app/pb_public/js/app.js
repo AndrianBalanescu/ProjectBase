@@ -434,7 +434,7 @@ const App = {
       }
     },
 
-    handleRelationsChanged({ id, relations }) {
+    handleRelationsChanged({ id, relations, targetId, mirrorType, action }) {
       // Relations were mutated through the custom API routes (which maintain
       // reciprocal mirrors); reflect the change locally so the board's blocked
       // indicators and the open drawer stay in sync without waiting for SSE.
@@ -443,6 +443,25 @@ const App = {
       if (idx !== -1) this.issues[idx] = { ...this.issues[idx], relations: rel };
       if (this.selectedIssue && this.selectedIssue.id === id) {
         this.selectedIssue = { ...this.selectedIssue, relations: rel };
+      }
+      // The custom route also saved the reciprocal mirror edge on the target
+      // issue. The mirror save does not reliably broadcast via SSE, so update
+      // the target's local relations here to keep its kanban blocked badge in
+      // sync without a reload.
+      if (targetId && mirrorType) {
+        const tIdx = this.issues.findIndex(i => i.id === targetId);
+        if (tIdx !== -1) {
+          const tRel = Array.isArray(this.issues[tIdx].relations) ? this.issues[tIdx].relations : [];
+          const mirror = { issue: id, type: mirrorType };
+          const hasMirror = tRel.some(r => r && r.issue === id && r.type === mirrorType);
+          let next;
+          if (action === 'remove') {
+            next = hasMirror ? tRel.filter(r => !(r && r.issue === id && r.type === mirrorType)) : tRel;
+          } else {
+            next = hasMirror ? tRel : [...tRel, mirror];
+          }
+          this.issues[tIdx] = { ...this.issues[tIdx], relations: next };
+        }
       }
     },
 
