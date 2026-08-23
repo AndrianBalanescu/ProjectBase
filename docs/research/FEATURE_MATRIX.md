@@ -21,7 +21,7 @@ Must-Have = table stakes vs Linear/Plane. Moat = differentiators nobody in the l
 | Notifications | ✅ | ✅ | ✅ Discord/Telegram/webhook | ✅ shipped |
 | Roadmap view | ✅ | ✅ | ✅ milestones + North Star + progress, assign issues to milestones in create/edit drawer | ✅ shipped |
 | Custom fields | ✅ | paid tier | ✅ text/number/select/checkbox/date, per-project, validation, MCP/OpenAPI/llms docs | ✅ shipped |
-| Offline / local-first | ❌ | ❌ | ❌ (vendored assets = offline-servable, not local-first) | opportunity |
+| Offline / local-first | ❌ | ❌ | ✅ Service Worker app shell: pre-cached static shell, network-first API w/ cache fallback, PWA manifest, online/offline banner | ✅ shipped (cycle 18) |
 
 ## Moat (differentiators)
 

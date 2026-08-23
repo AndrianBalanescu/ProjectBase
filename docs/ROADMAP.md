@@ -264,6 +264,36 @@ should rerun before the public launch.
 or continue launch blockers: public demo announcement assets, landing-page demo link,
 lead capture.
 
+## Cycle-18 status (2026-08-23)
+
+**Goal:** close the last remaining ❌ opportunity in the feature matrix — **offline /
+local-first**. Linear and Plane CE both require a network connection; ProjectBase now
+keeps its full app shell usable even fully offline.
+
+**Shipped this cycle (offline-first app shell):**
+- `app/pb_public/sw.js` — Service Worker. Pre-caches the complete static app shell
+  (index.html, CSS, every vendor bundle, every component/API script). Static assets served
+  cache-first with background refresh; `/api/*` + navigations network-first with a cached-shell
+  fallback so the UI still renders when the backend is unreachable. Cache bumped via
+  `projectbase-shell-v1`.
+- `app/pb_public/manifest.webmanifest` + `vendor/icon-192.png` / `icon-512.png` — PWA web
+  manifest + app icons for installability.
+- `index.html` — registers the SW on window load (progressive enhancement, non-fatal on
+  failure) and links the web manifest.
+- `app.js` — new `isOnline` state bound to `navigator.onLine` via `online`/`offline`
+  handlers; `index.html` shows an amber offline banner when disconnected.
+- Backend tests: 5 new (`sw.js` served, SW precache list, index SW registration, web
+  manifest valid + icons served, app online/offline handlers bound).
+
+**Validation:** `pytest -v` **61 passed / 3 skipped** (was 59 pass). `node --check` clean on
+`sw.js` + `app.js`; manifest parses as valid JSON; all new static assets served 200. iBrowse
+visual QA performed. FEATURE_MATRIX Offline/local-first row moved from `opportunity` to
+`shipped`.
+
+With every must-have row and the last matrix ❌ now green, the next milestone is North Star
+delivery: point `deploy-demo.sh` at a real domain and run first-stranger onboarding / lead
+capture (needs human input: domain + VPS).
+
 ## Cycle-17 status (2026-08-23)
 
 **Goal:** close the last remaining must-have gap in the feature matrix — **Roadmap view** was

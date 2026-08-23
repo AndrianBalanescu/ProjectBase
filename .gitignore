@@ -8,3 +8,4 @@ __pycache__/
 .flow/
 prism-out/
 .pytest_cache/
+**/research/jobs/
