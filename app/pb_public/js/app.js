@@ -42,6 +42,7 @@ const App = {
       labels: [],
       selectedIssue: null,
       realtimeConnected: true,
+      isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
       
       // Modals
       isOmnibarOpen: false,
@@ -78,6 +79,10 @@ const App = {
     // Client-side URL routing (hash-based, PocketBase-friendly)
     window.addEventListener('hashchange', this.handleRouteChange);
 
+    // Online / offline indicator (Service Worker keeps the shell usable offline)
+    window.addEventListener('online', this.handleOnline);
+    window.addEventListener('offline', this.handleOffline);
+
     nextTick(() => {
       this.applyRoute();
       if (window.lucide) window.lucide.createIcons();
@@ -85,6 +90,8 @@ const App = {
   },
   beforeUnmount() {
     window.removeEventListener('hashchange', this.handleRouteChange);
+    window.removeEventListener('online', this.handleOnline);
+    window.removeEventListener('offline', this.handleOffline);
   },
   updated() {
     nextTick(() => {
@@ -92,6 +99,12 @@ const App = {
     });
   },
   methods: {
+    handleOnline() {
+      this.isOnline = true;
+    },
+    handleOffline() {
+      this.isOnline = false;
+    },
     async signIn() {
       this.authError = '';
       try {

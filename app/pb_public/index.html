@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ProjectBase — Ultra-lightweight Project & Kanban Management</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22 width=%2232%22 height=%2232%22><text y=%2226%22 font-size=%2226%22>⚡</text></svg>" />
+  <link rel="manifest" href="/manifest.webmanifest" />
   
   <!-- Static Compiled Tailwind CSS (Tree-shaken & minified) -->
   <link rel="stylesheet" href="/css/style.css" />
@@ -75,6 +76,12 @@
       @open-new-project="editingProject = null; isProjectModalOpen = true;"
       @open-custom-fields="isCustomFieldsOpen = true"
     ></header-bar>
+
+    <!-- Offline indicator (Service Worker app shell stays usable offline) -->
+    <div v-if="!isOnline" class="flex items-center justify-center gap-2 px-4 py-1.5 bg-amber-500/10 text-amber-300 border-b border-amber-500/20 text-xs font-medium">
+      <i data-lucide="wifi-off" class="w-3.5 h-3.5"></i>
+      Offline — showing cached data. Edits need a connection; they are not queued.
+    </div>
 
     <!-- Main View Switcher Area -->
     <main class="flex-1 overflow-hidden relative">
@@ -269,6 +276,16 @@
   <script src="/js/components/ProjectModal.js"></script>
   <script src="/js/components/CycleModal.js"></script>
   <script src="/js/components/CustomFieldsModal.js"></script>
+  <script>
+    // Offline-first app shell: register the Service Worker (progressive enhancement).
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js').catch(function (err) {
+          console.warn('ProjectBase SW registration failed (non-fatal):', err);
+        });
+      });
+    }
+  </script>
   <script src="/js/app.js"></script>
 </body>
 </html>
