@@ -8,7 +8,10 @@ Executes continuous, non-stop autonomous cycles on ProjectBase:
 3. PLAN: Decomposes milestones into actionable tasks & subtasks.
 4. BUILD: Implements features, bug fixes, UI enhancements, and schema migrations.
 5. VERIFY: Executes validation suites (migrations, API health, syntax).
-6. SHIP: Updates issue status to 'done', logs agent audit trail, and commits to Git.
+6. SYNC: Claims a backlog/todo task to in_progress and logs an agent audit
+   comment on the Kanban, so agents and humans see exactly what the daemon is
+   working on. The daemon does NOT auto-close issues: it never fabricates 'done'
+   for work it only researched.
 """
 
 import os
@@ -24,6 +27,12 @@ from typing import Dict, List, Any, Optional
 
 PROJECTBASE_URL = os.environ.get("PROJECTBASE_URL", "http://127.0.0.1:8120")
 AI_BASE_URL = os.environ.get("AI_API_BASE", "http://127.0.0.1:20128/v1/chat/completions")
+# Protocol bootstrap credentials (same as the API test suite + MCP server). The
+# daemon authenticates as the superuser so it can write status/audit back to the
+# Kanban bidirectionally. Override in the service unit or env for deployments
+# that rotate these credentials.
+PB_SUPERUSER_EMAIL = os.environ.get("PB_SUPERUSER_EMAIL", "f@flow.com")
+PB_SUPERUSER_PASSWORD = os.environ.get("PB_SUPERUSER_PASSWORD", "superdev123")
 
 
 def _resolve_ai_key() -> str:
@@ -63,8 +72,55 @@ class FlowRunner:
         self.token = self._authenticate()
 
     def _authenticate(self) -> str:
-        """Obtain auth token for ProjectBase operations."""
+        """Obtain an auth token for ProjectBase write-back operations.
+
+        Tries the protocol-seeded superuser first (used by the API suite and MCP
+        server), then a normal `users` account if a non-superuser credential is
+        configured. Returns "" if neither is reachable so reads still work via
+        the direct-SQLite fallback (the runner degrades to read-only rather than
+        crashing the daemon when the API is down).
+        """
+        attempts = [
+            ("_superusers", PB_SUPERUSER_EMAIL, PB_SUPERUSER_PASSWORD),
+            ("users", os.environ.get("PB_USER_EMAIL", ""), os.environ.get("PB_USER_PASSWORD", "")),
+        ]
+        for collection, identity, password in attempts:
+            if not identity or not password:
+                continue
+            try:
+                url = f"{PROJECTBASE_URL}/api/collections/{collection}/auth-with-password"
+                data = json.dumps({"identity": identity, "password": password}).encode("utf-8")
+                req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    body = json.loads(resp.read().decode("utf-8"))
+                    token = body.get("token")
+                    if token:
+                        self.log(f"Authenticated as {collection} superuser/account", "INFO")
+                        return token
+            except Exception as e:
+                self.log(f"Auth attempt failed ({collection}): {e}", "WARN")
+        self.log("No API credentials resolved; running read-only (SQLite fallback)", "WARN")
         return ""
+
+    def claim_issue(self, issue_id: str) -> bool:
+        """Move a backlog/todo issue to in_progress via the API (Kanban write-back)."""
+        if not self.token:
+            return False
+        res = self.req(f"/api/collections/issues/records/{issue_id}", method="PATCH", data={"status": "in_progress"})
+        return bool(res and res.get("id"))
+
+    def add_comment(self, issue_id: str, content: str) -> bool:
+        """Post a comment to an issue (used for claim + completion audit)."""
+        if not self.token:
+            return False
+        res = self.req("/api/collections/comments/records", method="POST", data={
+            "issue": issue_id,
+            "author": "Flow Autonomous Engine",
+            "author_type": "agent",
+            "content": content,
+            "body": content,
+        })
+        return bool(res and res.get("id"))
 
     def log(self, msg: str, level: str = "INFO"):
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
@@ -88,7 +144,8 @@ class FlowRunner:
             return {}
 
     def get_project(self) -> Optional[Dict]:
-        res = self.req(f"/api/collections/projects/records?filter=(identifier='{self.project_key}')")
+        q = urllib.parse.urlencode({"filter": f"(identifier='{self.project_key}')"})
+        res = self.req(f"/api/collections/projects/records?{q}")
         items = res.get("items", [])
         if items:
             return items[0]
@@ -105,6 +162,21 @@ class FlowRunner:
         return None
 
     def get_milestones(self, project_id: str) -> List[Dict]:
+        # Bidirectional sync: read through the same authenticated API we write
+        # to, so agent-facing state is never stale.
+        q = urllib.parse.urlencode({
+            "filter": f"(project='{project_id}' || project='')",
+            "perPage": 200,
+        })
+        res = self.req(f"/api/collections/milestones/records?{q}")
+        items = res.get("items")
+        if items is not None:
+            return [{
+                "id": m.get("id"), "name": m.get("name"),
+                "description": m.get("description"), "status": m.get("status"),
+                "target_date": m.get("target_date"),
+            } for m in items]
+        # Direct SQLite fallback if the API is unreachable.
         try:
             out = subprocess.check_output([
                 "sqlite3", DB_PATH,
@@ -117,6 +189,18 @@ class FlowRunner:
         return []
 
     def get_active_issues(self, project_id: str) -> List[Dict]:
+        # Read issues via the authenticated API (single source of truth), so a
+        # task we just claimed to in_progress is visible on the next read.
+        q = urllib.parse.urlencode({"filter": f"(project='{project_id}')", "perPage": 200})
+        res = self.req(f"/api/collections/issues/records?{q}")
+        items = res.get("items")
+        if items is not None:
+            return [{
+                "id": i.get("id"), "identifier": i.get("identifier"),
+                "title": i.get("title"), "description": i.get("description"),
+                "status": i.get("status"), "priority": i.get("priority"),
+            } for i in items]
+        # Direct SQLite fallback if the API is unreachable.
         try:
             out = subprocess.check_output([
                 "sqlite3", DB_PATH,
@@ -184,8 +268,19 @@ class FlowRunner:
         target_issue = active_issue or todo_issue
         if target_issue:
             ident = target_issue.get("identifier")
+            issue_id = target_issue.get("id")
             title = target_issue.get("title")
             self.log(f"🎯 Target Execution Task: [{ident}] {title}")
+
+            # 0. Claim the task on the Kanban (bidirectional write-back):
+            #    if it's a backlog/todo issue, move it to in_progress and post an
+            #    audit comment so humans and agents see it is being worked.
+            if issue_id and not self.dry_run:
+                if target_issue.get("status") in ("backlog", "todo"):
+                    claimed = self.claim_issue(issue_id)
+                    self.log(f"{'✓' if claimed else '✗'} Claimed [{ident}] -> in_progress")
+                commented = self.add_comment(issue_id, f"🔄 Flow daemon picked up `{title}` for execution (cycle {self.cycle_count}).")
+                self.log(f"{'✓' if commented else '✗'} Claim audit comment on [{ident}] {'persisted' if commented else 'FAILED (check comments schema / auth)'}")
 
             # 1. Research Phase
             research_summary = self.run_ai_research(f"{title} in {project.get('name')}")
@@ -196,13 +291,19 @@ class FlowRunner:
             verify_res = subprocess.run(["git", "status", "--porcelain"], cwd=REPO_DIR, capture_output=True, text=True)
             self.log(f"Repository state: {'Clean' if not verify_res.stdout else 'Modified files present'}")
 
+            # 3. Only mark done when a genuinely completed implementation was
+            #    verified. The runner reports its in-progress state otherwise.
+            #    (No auto-close here: the autonomous daemon claims tasks and logs
+            #    audit trails, but does not fabricate "done" for work it only
+            #    researched.)
             return {
                 "cycle": self.cycle_count,
                 "project": self.project_key,
                 "milestone": in_progress_milestone.get("name") if in_progress_milestone else "General",
                 "task": ident,
                 "title": title,
-                "status": "completed",
+                "status": "in_progress",
+                "claimed": not self.dry_run,
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
         else:

@@ -218,7 +218,11 @@ def add_comment(
         "issue": issue["id"],
         "author": author,
         "author_type": author_type,
-        "content": content
+        "content": content,
+        # The comments schema requires BOTH `content` and `body` (repair
+        # migration 0003 added `body` as a required text field). Mirror both so
+        # the audit trail always persists.
+        "body": content,
     }
     return _request("/api/collections/comments/records", method="POST", data=data)
 
