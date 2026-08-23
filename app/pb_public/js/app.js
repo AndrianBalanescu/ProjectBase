@@ -368,9 +368,15 @@ const App = {
           // Never show a stale drawer: close it when the route's issue
           // doesn't exist (deleted or broken shared link).
           this.selectedIssue = issue || null;
+        } else {
+          // The route no longer denotes an issue (plain board/list/... hash):
+          // close any stale drawer from a previous deep link.
+          this.selectedIssue = null;
         }
       } else if (viewMap[parts[0]]) {
         this.currentView = viewMap[parts[0]] || 'board';
+        // Plain view route (no project prefix): never a stale drawer.
+        this.selectedIssue = null;
       }
     },
 
