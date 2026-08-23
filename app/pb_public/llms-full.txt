@@ -47,6 +47,7 @@ When an agent is assigned to work on a project:
 - labels (json array of string tags)
 - order (number timestamp for drag-and-drop sort)
 - custom_fields (json object keyed by project custom-field key, e.g. {"client":"Acme","gate":"P1"})
+- relations (json array of {issue, type} edges: blocks | blocked_by | related; reciprocal edges auto-mirrored via /api/projectbase/issues/<ID>/relations)
 
 ### cycles (sprints)
 - id (15 char text)
@@ -105,6 +106,19 @@ curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/projec
 curl -s -X PATCH ${PROJECTBASE_URL:-http://localhost:8120}/api/collections/issues/records/<ISSUE_ID> \
   -H "Content-Type: application/json" \
   -d '{"custom_fields":{"client":"Acme","gate":"P1","effort":5}}'
+
+### Issue relationships (blocks / blocked_by / related):
+# List resolved relations (outgoing + incoming) for an issue:
+curl -s ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/issues/<ISSUE_ID>/relations \
+  -H "Authorization: <USER_TOKEN>"
+# Add a relation (reciprocal edge is mirrored automatically):
+curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/issues/<ISSUE_ID>/relations \
+  -H "Content-Type: application/json" -H "Authorization: <USER_TOKEN>" \
+  -d '{"issue":"<TARGET_ISSUE_ID>","type":"blocks"}'
+# Remove a relation (and its mirror):
+curl -s -X DELETE ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/issues/<ISSUE_ID>/relations \
+  -H "Content-Type: application/json" -H "Authorization: <USER_TOKEN>" \
+  -d '{"issue":"<TARGET_ISSUE_ID>","type":"blocks"}'
 
 ### In-app notifications inbox:
 # List my notifications (only your own rows are visible):

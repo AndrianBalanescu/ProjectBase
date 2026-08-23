@@ -223,6 +223,43 @@ def add_comment(
     return _request("/api/collections/comments/records", method="POST", data=data)
 
 @mcp.tool()
+def add_issue_relation(
+    identifier_or_id: str,
+    target_identifier_or_id: str,
+    type: str
+) -> Dict[str, Any]:
+    """Link two issues with a relationship. Type is one of 'blocks', 'blocked_by', or 'related'.
+
+    The reciprocal edge is mirrored automatically (A blocks B <=> B blocked_by A;
+    related <=> related)."""
+    issue = _find_issue(identifier_or_id)
+    target = _find_issue(target_identifier_or_id)
+    if type not in ("blocks", "blocked_by", "related"):
+        raise ValueError("type must be one of: blocks, blocked_by, related")
+    return _request(
+        f"/api/projectbase/issues/{issue['id']}/relations",
+        method="POST",
+        data={"issue": target["id"], "type": type},
+    )
+
+@mcp.tool()
+def remove_issue_relation(
+    identifier_or_id: str,
+    target_identifier_or_id: str,
+    type: str
+) -> Dict[str, Any]:
+    """Remove a relationship edge between two issues (and its reciprocal mirror)."""
+    issue = _find_issue(identifier_or_id)
+    target = _find_issue(target_identifier_or_id)
+    if type not in ("blocks", "blocked_by", "related"):
+        raise ValueError("type must be one of: blocks, blocked_by, related")
+    return _request(
+        f"/api/projectbase/issues/{issue['id']}/relations",
+        method="DELETE",
+        data={"issue": target["id"], "type": type},
+    )
+
+@mcp.tool()
 def get_stats() -> Dict[str, Any]:
     """Get high-level workspace statistics, completion rates, and status breakdowns."""
     return _request("/api/projectbase/stats")
