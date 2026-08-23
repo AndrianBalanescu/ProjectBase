@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "research-cycle-6-20260822-191806",
+  "kind": "research",
+  "cycle": 6,
+  "project_dir": "/data/projects/projectbase",
+  "status": "complete",
+  "pid": 4124748,
+  "started_at": "2026-08-23T00:18:06.704375+00:00",
+  "updated_at": "2026-08-23T00:21:59.082824+00:00",
+  "finished_at": "2026-08-23T00:21:59.082824+00:00",
+  "exit_code": 0,
+  "log_file": "/data/projects/projectbase/docs/research/jobs/research-cycle-6-20260822-191806/stdout.log",
+  "exit_file": "/data/projects/projectbase/docs/research/jobs/research-cycle-6-20260822-191806/exit.code",
+  "cmd": [
+    "bash",
+    "/home/ubuntu/flow/scripts/research/flow-research-run.sh",
+    "/data/projects/projectbase",
+    "6",
+    "PocketBase self-host demo deployment 2026 best practices reverse proxy TLS docker compose single VPS small RAM",
+    "Linear Plane demo sandbox public trial deployment strategy self-hosted project management 2026",
+    "PocketBase docker healthcheck migrations superuser env PB_SUPERUSER_EMAIL production compose example"
+  ],
+  "meta": {
+    "queries": [
+      "PocketBase self-host demo deployment 2026 best practices reverse proxy TLS docker compose single VPS small RAM",
+      "Linear Plane demo sandbox public trial deployment strategy self-hosted project management 2026",
+      "PocketBase docker healthcheck migrations superuser env PB_SUPERUSER_EMAIL production compose example"
+    ]
+  }
+}
