@@ -2,9 +2,10 @@
 
 const IssueDrawerComponent = {
   components: {
-    'milkdown-editor': window.MilkdownEditorComponent || MilkdownEditorComponent
+    'milkdown-editor': window.MilkdownEditorComponent || MilkdownEditorComponent,
+    'searchable-select': window.SearchableSelectComponent || SearchableSelectComponent
   },
-  props: ['issue', 'projects', 'cycles', 'labels', 'fieldDefs'],
+  props: ['issue', 'projects', 'cycles', 'labels', 'fieldDefs', 'milestones'],
   emits: ['close', 'update-issue', 'delete-issue'],
   data() {
     return {
@@ -15,16 +16,18 @@ const IssueDrawerComponent = {
       editEstimate: 0,
       editDueDate: '',
       editCycle: '',
+      editMilestone: '',
       editAssignee: '',
       editLabels: [],
       subtasks: [],
       editCustomFields: {},
       newSubtaskTitle: '',
-      descTab: 'write', // 'write' or 'preview'
+      descTab: 'rich', // 'rich', 'raw', or 'preview'
       comments: [],
       newCommentContent: '',
       newCommentAuthorType: 'user', // 'user' or 'agent'
       copiedBadge: false,
+      isAgentDropdownOpen: false,
       aiLoadingSubtasks: false,
       aiLoadingDesc: false
     };
@@ -47,6 +50,55 @@ const IssueDrawerComponent = {
       let defs = this.fieldDefs;
       if (typeof defs === 'string') { try { defs = JSON.parse(defs); } catch (e) { defs = []; } }
       return Array.isArray(defs) ? defs : [];
+    },
+    projectMilestones() {
+      const list = Array.isArray(this.milestones) ? this.milestones : [];
+      const proj = this.issue && this.issue.project ? this.issue.project : null;
+      if (!proj) return list;
+      return list.filter(m => !m.project || m.project === proj);
+    },
+    statusOptions() {
+      return [
+        { value: 'backlog', label: 'Backlog', icon: '📥' },
+        { value: 'todo', label: 'Todo', icon: '📋' },
+        { value: 'in_progress', label: 'In Progress', icon: '⚡' },
+        { value: 'in_review', label: 'In Review', icon: '👀' },
+        { value: 'done', label: 'Done', icon: '✅' },
+        { value: 'cancelled', label: 'Cancelled', icon: '🚫' }
+      ];
+    },
+    priorityOptions() {
+      return [
+        { value: 'urgent', label: 'Urgent', icon: '🔴', color: '#ef4444' },
+        { value: 'high', label: 'High', icon: '🟠', color: '#f97316' },
+        { value: 'medium', label: 'Medium', icon: '🟡', color: '#eab308' },
+        { value: 'low', label: 'Low', icon: '🔵', color: '#3b82f6' },
+        { value: 'none', label: 'None', icon: '⚪', color: '#6b7280' }
+      ];
+    },
+    cycleOptions() {
+      const opts = [{ value: '', label: 'No Cycle', icon: '⭕' }];
+      (this.cycles || []).forEach(c => {
+        opts.push({
+          value: c.id,
+          label: c.name || `Cycle ${c.number}`,
+          icon: '🔄',
+          badge: c.status ? c.status.toUpperCase() : null
+        });
+      });
+      return opts;
+    },
+    milestoneOptions() {
+      const opts = [{ value: '', label: 'No Milestone', icon: '⚬' }];
+      (this.projectMilestones || []).forEach(m => {
+        opts.push({
+          value: m.id,
+          label: m.name || 'Milestone',
+          icon: '🎯',
+          badge: m.status ? m.status.toUpperCase() : null
+        });
+      });
+      return opts;
     }
   },
   watch: {
@@ -61,6 +113,7 @@ const IssueDrawerComponent = {
           this.editEstimate = newVal.estimate || 0;
           this.editDueDate = newVal.due_date ? newVal.due_date.substring(0, 10) : '';
           this.editCycle = newVal.cycle || '';
+          this.editMilestone = newVal.milestone || '';
           this.editAssignee = newVal.assignee || '';
           this.editLabels = Array.isArray(newVal.labels) ? [...newVal.labels] : [];
           this.subtasks = Array.isArray(newVal.subtasks) ? JSON.parse(JSON.stringify(newVal.subtasks)) : [];
@@ -102,6 +155,7 @@ const IssueDrawerComponent = {
         estimate: Number(this.editEstimate) || 0,
         due_date: this.editDueDate ? new Date(this.editDueDate).toISOString() : null,
         cycle: this.editCycle || null,
+        milestone: this.editMilestone || null,
         assignee: this.editAssignee,
         labels: this.editLabels,
         subtasks: this.subtasks,
@@ -281,19 +335,55 @@ const IssueDrawerComponent = {
 
           <div class="flex items-center space-x-2">
             <!-- Agent Dispatch Controls -->
-            <div class="relative group">
-              <button 
-                class="px-2 py-1 rounded-md text-[11px] font-mono text-purple-300 hover:text-white bg-purple-950/60 hover:bg-purple-900/70 border border-purple-800/40 transition-colors flex items-center space-x-1"
+            <div class="relative">
+              <button
+                type="button"
+                @click="isAgentDropdownOpen = !isAgentDropdownOpen"
+                class="px-2.5 py-1 rounded-md text-[11px] font-mono text-purple-300 hover:text-white bg-purple-950/60 hover:bg-purple-900/70 border border-purple-800/40 transition-colors flex items-center space-x-1.5 shadow-sm select-none"
                 title="Dispatch this issue to an autonomous agent"
               >
                 <i data-lucide="bot" class="w-3 h-3"></i>
                 <span>Trigger Agent</span>
-                <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                <span class="text-[9px] transition-transform duration-150" :class="{ 'rotate-180': isAgentDropdownOpen }">▼</span>
               </button>
-              <div class="hidden group-hover:block absolute right-0 top-full mt-1 w-44 p-1 rounded-lg bg-gray-900 border border-gray-700 shadow-xl z-20">
-                <button @click="dispatchAgent('flomaster')" class="w-full text-left px-2 py-1.5 text-xs text-gray-300 hover:bg-gray-800 rounded">⚡ Flomaster</button>
-                <button @click="dispatchAgent('hermes')" class="w-full text-left px-2 py-1.5 text-xs text-gray-300 hover:bg-gray-800 rounded">🪽 Hermes</button>
-                <button @click="dispatchAgent('windmill')" class="w-full text-left px-2 py-1.5 text-xs text-gray-300 hover:bg-gray-800 rounded">🌬️ Windmill Flow</button>
+              <div
+                v-show="isAgentDropdownOpen"
+                class="absolute right-0 top-full mt-1.5 w-48 p-1.5 rounded-xl bg-gray-900/95 border border-gray-700 shadow-2xl backdrop-blur-md z-30 space-y-0.5"
+                @click.stop
+              >
+                <div class="px-2 py-1 text-[10px] text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-800/80 mb-1">
+                  Autonomous Dispatch
+                </div>
+                <button
+                  @click="dispatchAgent('flomaster'); isAgentDropdownOpen = false;"
+                  class="w-full flex items-center space-x-2 text-left px-2 py-1.5 text-xs text-gray-200 hover:bg-purple-950/60 hover:text-purple-300 rounded-lg transition-colors"
+                >
+                  <span class="text-sm">⚡</span>
+                  <div>
+                    <div class="font-medium">Flomaster</div>
+                    <div class="text-[10px] text-gray-500">Autonomous loop</div>
+                  </div>
+                </button>
+                <button
+                  @click="dispatchAgent('hermes'); isAgentDropdownOpen = false;"
+                  class="w-full flex items-center space-x-2 text-left px-2 py-1.5 text-xs text-gray-200 hover:bg-purple-950/60 hover:text-purple-300 rounded-lg transition-colors"
+                >
+                  <span class="text-sm">🪽</span>
+                  <div>
+                    <div class="font-medium">Hermes</div>
+                    <div class="text-[10px] text-gray-500">Subtask solver</div>
+                  </div>
+                </button>
+                <button
+                  @click="dispatchAgent('windmill'); isAgentDropdownOpen = false;"
+                  class="w-full flex items-center space-x-2 text-left px-2 py-1.5 text-xs text-gray-200 hover:bg-purple-950/60 hover:text-purple-300 rounded-lg transition-colors"
+                >
+                  <span class="text-sm">🌬️</span>
+                  <div>
+                    <div class="font-medium">Windmill Flow</div>
+                    <div class="text-[10px] text-gray-500">Scheduled worker</div>
+                  </div>
+                </button>
               </div>
             </div>
 
@@ -345,42 +435,33 @@ const IssueDrawerComponent = {
             <!-- Status -->
             <div class="space-y-1">
               <label class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Status</label>
-              <select 
-                v-model="editStatus" 
+              <searchable-select
+                v-model="editStatus"
+                :options="statusOptions"
+                placeholder="Select Status"
+                :searchable="false"
                 @change="saveChanges"
-                class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              >
-                <option value="backlog">Backlog</option>
-                <option value="todo">Todo</option>
-                <option value="in_progress">In Progress</option>
-                <option value="in_review">In Review</option>
-                <option value="done">Done</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
+              ></searchable-select>
             </div>
 
             <!-- Priority -->
             <div class="space-y-1">
               <label class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Priority</label>
-              <select 
-                v-model="editPriority" 
+              <searchable-select
+                v-model="editPriority"
+                :options="priorityOptions"
+                placeholder="Select Priority"
+                :searchable="false"
                 @change="saveChanges"
-                class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              >
-                <option value="urgent">🔥 Urgent</option>
-                <option value="high">🔺 High</option>
-                <option value="medium">🔸 Medium</option>
-                <option value="low">🔹 Low</option>
-                <option value="none">⚪ None</option>
-              </select>
+              ></searchable-select>
             </div>
 
             <!-- Estimate -->
             <div class="space-y-1">
               <label class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Estimate (Pts)</label>
-              <input 
-                type="number" 
-                v-model.number="editEstimate" 
+              <input
+                type="number"
+                v-model.number="editEstimate"
                 @blur="saveChanges"
                 min="0"
                 max="100"
@@ -391,9 +472,9 @@ const IssueDrawerComponent = {
             <!-- Due Date -->
             <div class="space-y-1">
               <label class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Due Date</label>
-              <input 
-                type="date" 
-                v-model="editDueDate" 
+              <input
+                type="date"
+                v-model="editDueDate"
                 @change="saveChanges"
                 class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
@@ -402,21 +483,32 @@ const IssueDrawerComponent = {
             <!-- Cycle / Sprint -->
             <div class="space-y-1 sm:col-span-2">
               <label class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Sprint Cycle</label>
-              <select 
-                v-model="editCycle" 
+              <searchable-select
+                v-model="editCycle"
+                :options="cycleOptions"
+                placeholder="Select Sprint Cycle"
+                search-placeholder="Filter cycles..."
                 @change="saveChanges"
-                class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              >
-                <option value="">No Cycle (Backlog)</option>
-                <option v-for="c in cycles" :key="c.id" :value="c.id">{{ c.name }} ({{ c.status }})</option>
-              </select>
+              ></searchable-select>
+            </div>
+
+            <!-- Milestone -->
+            <div class="space-y-1 sm:col-span-2">
+              <label class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Milestone</label>
+              <searchable-select
+                v-model="editMilestone"
+                :options="milestoneOptions"
+                placeholder="Select Milestone"
+                search-placeholder="Filter milestones..."
+                @change="saveChanges"
+              ></searchable-select>
             </div>
 
             <!-- Assignee -->
             <div class="space-y-1 sm:col-span-2">
               <label class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Assignee</label>
-              <input 
-                v-model="editAssignee" 
+              <input
+                v-model="editAssignee"
                 @blur="saveChanges"
                 placeholder="Assign to agent or user..."
                 class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"

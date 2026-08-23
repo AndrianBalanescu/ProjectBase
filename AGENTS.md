@@ -7,5 +7,6 @@
 - **Backend:** enforce validation/authorization in PocketBase hooks and migrations. Never commit secrets or local data.
 - **Validate:** run `pytest -v tests/`, run iBrowse QA for UI/frontend changes (`bash /home/ubuntu/flow/scripts/qa/flow-ibrowse.sh http://127.0.0.1:8120/`), verify zero console errors, check health at `http://127.0.0.1:8120`, then inspect diff/status/root layout.
 - **Docs:** research and plans go in `docs/`; no loose root artifacts.
+- **Kanban & MCP:** use ProjectBase MCP (`mcp__projectbase__*`) or API (`:8120`) to pick active issues, move to `in_progress`, and mark `done` with audit comments.
 - **Commit:** small coherent commits; do not push unless explicitly requested. Stop before destructive data changes, credentials, external publishing, or ambiguous product decisions.
 - **Done:** report implementation, tests, security impact, documentation, and known limitations honestly.

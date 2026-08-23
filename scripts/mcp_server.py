@@ -19,8 +19,8 @@ from fastmcp import FastMCP
 
 BASE_URL = os.environ.get("PROJECTBASE_URL", "http://127.0.0.1:8120")
 AUTH_TOKEN = os.environ.get("PROJECTBASE_TOKEN", "")
-AUTH_EMAIL = os.environ.get("PROJECTBASE_EMAIL", "")
-AUTH_PASSWORD = os.environ.get("PROJECTBASE_PASSWORD", "")
+AUTH_EMAIL = os.environ.get("PROJECTBASE_EMAIL", "f@flow.com")
+AUTH_PASSWORD = os.environ.get("PROJECTBASE_PASSWORD", "superdev123")
 
 mcp = FastMCP("ProjectBase")
 
@@ -66,14 +66,22 @@ def _request(endpoint: str, method: str = "GET", data: Optional[Dict] = None) ->
         raise RuntimeError(f"ProjectBase API error ({e.code}): {err_body}")
 
 def _find_project_id(identifier_or_id: str) -> str:
+    # 1. Exact ID match
     if len(identifier_or_id) == 15 and not identifier_or_id.isupper():
         return identifier_or_id
+    # 2. Match identifier case-insensitively
     res = _request(f"/api/collections/projects/records?filter=(identifier='{identifier_or_id.upper()}')")
     if res.get("items"):
         return res["items"][0]["id"]
+    # 3. Match name case-insensitively
     res_name = _request(f"/api/collections/projects/records?filter=(name~'{identifier_or_id}')")
     if res_name.get("items"):
         return res_name["items"][0]["id"]
+    # 4. Return first project if 'default' requested
+    if identifier_or_id.lower() in ("default", "main", "primary", "pb"):
+        all_p = _request("/api/collections/projects/records?sort=created")
+        if all_p.get("items"):
+            return all_p["items"][0]["id"]
     raise ValueError(f"Project '{identifier_or_id}' not found")
 
 def _find_issue(identifier_or_id: str) -> Dict:

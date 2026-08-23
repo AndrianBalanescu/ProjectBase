@@ -1,7 +1,7 @@
 // pb_public/js/components/NewIssueModal.js
 
 const NewIssueModalComponent = {
-  props: ['isOpen', 'projects', 'currentProject', 'cycles', 'labels'],
+  props: ['isOpen', 'projects', 'currentProject', 'cycles', 'labels', 'milestones'],
   emits: ['close', 'create-issue'],
   data() {
     return {
@@ -13,6 +13,7 @@ const NewIssueModalComponent = {
       estimate: 0,
       dueDate: '',
       cycleId: '',
+      milestoneId: '',
       assignee: '',
       selectedLabels: []
     };
@@ -28,6 +29,7 @@ const NewIssueModalComponent = {
         this.estimate = 0;
         this.dueDate = '';
         this.cycleId = '';
+        this.milestoneId = '';
         this.assignee = '';
         this.selectedLabels = [];
 
@@ -37,6 +39,13 @@ const NewIssueModalComponent = {
           if (window.lucide) window.lucide.createIcons();
         });
       }
+    }
+  },
+  computed: {
+    projectMilestones() {
+      const list = Array.isArray(this.milestones) ? this.milestones : [];
+      if (!this.projectId) return list;
+      return list.filter(m => !m.project || m.project === this.projectId);
     }
   },
   methods: {
@@ -66,6 +75,7 @@ const NewIssueModalComponent = {
         estimate: Number(this.estimate) || 0,
         due_date: this.dueDate ? new Date(this.dueDate).toISOString() : null,
         cycle: this.cycleId || null,
+        milestone: this.milestoneId || null,
         assignee: this.assignee.trim(),
         labels: this.selectedLabels
       });
@@ -187,8 +197,8 @@ const NewIssueModalComponent = {
             </div>
           </div>
 
-          <!-- Assignee & Cycle -->
-          <div class="grid grid-cols-2 gap-3">
+          <!-- Assignee, Cycle & Milestone -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div class="space-y-1">
               <label class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Assignee</label>
               <input 
@@ -206,6 +216,17 @@ const NewIssueModalComponent = {
               >
                 <option value="">No Cycle (Backlog)</option>
                 <option v-for="c in cycles" :key="c.id" :value="c.id">{{ c.name }}</option>
+              </select>
+            </div>
+
+            <div class="space-y-1">
+              <label class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Milestone</label>
+              <select
+                v-model="milestoneId"
+                class="w-full px-3 py-1.5 rounded-xl bg-gray-950/80 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              >
+                <option value="">No Milestone</option>
+                <option v-for="m in projectMilestones" :key="m.id" :value="m.id">{{ m.name }} ({{ m.status }})</option>
               </select>
             </div>
           </div>
