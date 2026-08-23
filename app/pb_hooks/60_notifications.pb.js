@@ -81,7 +81,9 @@ onRecordAfterCreateSuccess((e) => {
                 `⚡ *New Task in ProjectBase*\n*ID:* \`${identifier}\`\n*Title:* ${title}\n*Priority:* ${priority}\n*Assignee:* ${assignee}`
             )
         }
-    } catch (err) {}
+    } catch (err) {
+        console.warn(">>> [ProjectBase] create-channel notification failed:", err)
+    }
     e.next()
 }, "issues")
 
@@ -140,6 +142,8 @@ onRecordAfterUpdateSuccess((e) => {
                 })
             }
         }
-    } catch (err) {}
+    } catch (err) {
+        console.warn(">>> [ProjectBase] status-change webhook failed:", err)
+    }
     e.next()
 }, "issues")
