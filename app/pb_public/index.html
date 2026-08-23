@@ -73,6 +73,7 @@
       @open-new-issue="isNewIssueOpen = true"
       @open-omnibar="isOmnibarOpen = true"
       @open-new-project="editingProject = null; isProjectModalOpen = true;"
+      @open-custom-fields="isCustomFieldsOpen = true"
     ></header-bar>
 
     <!-- Main View Switcher Area -->
@@ -158,6 +159,7 @@
       :projects="projects"
       :cycles="cycles"
       :labels="labels"
+      :field-defs="currentProject ? currentProject.custom_field_defs : []"
       @close="closeIssueDrawer"
       @update-issue="handleUpdateIssue"
       @delete-issue="handleDeleteIssue"

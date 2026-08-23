@@ -2,7 +2,7 @@
 
 const HeaderComponent = {
   props: ['projects', 'currentProject', 'currentView', 'realtimeConnected'],
-  emits: ['select-project', 'change-view', 'open-new-issue', 'open-omnibar', 'open-new-project'],
+  emits: ['select-project', 'change-view', 'open-new-issue', 'open-omnibar', 'open-new-project', 'open-custom-fields'],
   data() {
     return {
       dropdownOpen: false
@@ -191,6 +191,17 @@ const HeaderComponent = {
           <i data-lucide="search" class="w-3.5 h-3.5"></i>
           <span class="hidden sm:inline">Search...</span>
           <kbd class="hidden sm:inline-block px-1.5 py-0.5 rounded bg-gray-800/80 text-[10px] text-gray-400 font-mono border border-gray-700/60">⌘K</kbd>
+        </button>
+
+        <!-- Custom Fields Manager -->
+        <button
+          v-if="currentProject"
+          @click="$emit('open-custom-fields')"
+          class="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-gray-950/80 hover:bg-gray-800 border border-gray-800 text-gray-400 hover:text-gray-200 text-xs transition-all"
+          title="Manage custom fields for this project"
+        >
+          <i data-lucide="settings-2" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Fields</span>
         </button>
 
         <!-- New Issue Button -->
