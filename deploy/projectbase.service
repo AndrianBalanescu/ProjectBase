@@ -1,0 +1,30 @@
+[Unit]
+Description=ProjectBase — self-hosted issue tracker (PocketBase)
+Documentation=https://github.com/AndrianBalanescu/projectbase
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__PB_USER__
+Group=__PB_GROUP__
+WorkingDirectory=__APP_DIR__
+ExecStart=__PB_BIN__ --dir pb_data serve --publicDir pb_public --hooksDir pb_hooks --migrationsDir pb_migrations --http __PB_HOST__:__PB_PORT__
+Restart=on-failure
+RestartSec=3
+
+# --- Hardening ---
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+ReadWritePaths=__APP_DIR__/pb_data __APP_DIR__/pb_migrations
+
+[Install]
+WantedBy=multi-user.target
