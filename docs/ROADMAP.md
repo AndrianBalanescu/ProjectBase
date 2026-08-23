@@ -424,7 +424,7 @@ though every issue already carries a `relations` array in the API.
 - `app/pb_public/js/components/ListView.js` — added `isBlocked()` (same logic as
   `KanbanBoard`), a lock badge beside the title for issues with a `blocked_by`
   edge, and a red left-border row highlight (`border-l-2` + `border-red-900/70`)
-  that toggles to transparent for unblocked rows. Reuses the exact utility
+  that is applied only to blocked rows (empty string otherwise). Reuses the exact utility
   classes already compiled into `style.css`, so no CSS rebuild was required
   (verified via `tests/test_css_sync.py`, which passed).
 - `scripts/qa/render_dom_check.js` — added a `listLockShown` assertion that
@@ -435,3 +435,12 @@ though every issue already carries a `relations` array in the API.
 changed JS files. Headless render QA (`scripts/qa/qa-render.sh`) → **PASS** with
 `listLockShown: true` (and `kanbanLockShown: true` / `kanbanLockNoReload: true`
 still green). Pushed to `origin/main` (`710413e`).
+
+**Post-ship correction (`44be8d0`):** a deeper computed-style E2E probe revealed
+the initial border approach applied `border-l-2` statically, giving every
+unblocked row a 2px gray left edge (the tbody `divide-gray-800/60` rule at
+0,3,0 specificity overrode `border-transparent` at 0,1,0). Fixed by applying
+`border-l-2 border-red-900/70` only when `isBlocked(issue)` is true (empty string
+otherwise). Re-verified via computed-style E2E: blocked rows 2px red
+`rgba(127,29,29,.7)` edge, unblocked rows `border-left-width:0`, badge 22x22 with
+12x12 lock svg not clipped; suite 140/140, render QA PASS.
