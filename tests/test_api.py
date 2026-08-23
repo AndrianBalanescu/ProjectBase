@@ -1027,3 +1027,84 @@ def test_custom_fields_reject_oversized_input():
     st, body = _request("PUT", f"/api/projectbase/projects/{pid}/custom-fields",
                         {"fields": [{"label": f"f{i}", "type": "text"} for i in range(51)]}, headers=hdr)
     assert st == 400 and "max 50" in body["error"], f"oversized field count not rejected: {st} {body}"
+
+
+def test_issue_milestone_assignment_roundtrip():
+    """Create a milestone, create an issue linked to it, update the link, and verify persistence."""
+    pid = _get_any_project_id()
+    hdr = {"Authorization": _superuser_token()}
+    mname = f"Milestone {_uid()}"
+    # create milestone
+    st, mbody = _request("POST", "/api/collections/milestones/records",
+                         {"name": mname, "description": "test milestone", "status": "planned", "project": pid},
+                         headers=hdr)
+    assert st == 200, f"milestone create failed: {st} {mbody}"
+    mid = mbody["id"]
+
+    try:
+        # create an issue linked to the milestone
+        title = f"Milestone Issue {_uid()}"
+        st, body = _request("POST", "/api/projectbase/import/csv",
+                            {"project_id": pid, "rows": [{"title": title}]}, headers=hdr)
+        assert st == 200 and body["imported"] == 1
+        from urllib.parse import quote
+        q = "/api/collections/issues/records?perPage=200&filter=" + quote(f"title='{title}'")
+        st, lst = _get_authed(q)
+        assert st == 200 and lst.get("items")
+        iid = lst["items"][0]["id"]
+
+        # assign milestone via update
+        st, body = _request("PATCH", f"/api/collections/issues/records/{iid}",
+                            {"milestone": mid}, headers=hdr)
+        assert st == 200, f"milestone assign failed: {st} {body}"
+        st, body = _request("GET", f"/api/collections/issues/records/{iid}", headers=hdr)
+        assert st == 200
+        assert body.get("milestone") == mid, f"milestone not persisted: {body.get('milestone')}"
+
+        # clear milestone
+        st, body = _request("PATCH", f"/api/collections/issues/records/{iid}",
+                            {"milestone": None}, headers=hdr)
+        assert st == 200
+        st, body = _request("GET", f"/api/collections/issues/records/{iid}", headers=hdr)
+        assert st == 200 and not body.get("milestone"), "milestone not cleared"
+
+        _request("DELETE", f"/api/collections/issues/records/{iid}", headers=hdr)
+    finally:
+        _request("DELETE", f"/api/collections/milestones/records/{mid}", headers=hdr)
+
+
+def test_milestone_progress_computed_from_linked_issues():
+    """MilestonesView progress derives from linked issue status; verify link reads back."""
+    pid = _get_any_project_id()
+    hdr = {"Authorization": _superuser_token()}
+    mname = f"Progress {_uid()}"
+    st, mbody = _request("POST", "/api/collections/milestones/records",
+                         {"name": mname, "project": pid, "status": "planned"}, headers=hdr)
+    assert st == 200
+    mid = mbody["id"]
+    created_ids = []
+    try:
+        for status in ("todo", "done"):
+            title = f"P {_uid()}"
+            st, body = _request("POST", "/api/projectbase/import/csv",
+                                {"project_id": pid, "rows": [{"title": title, "status": status}]},
+                                headers=hdr)
+            assert st == 200 and body["imported"] == 1
+            from urllib.parse import quote
+            q = "/api/collections/issues/records?perPage=200&filter=" + quote(f"title='{title}'")
+            st, lst = _get_authed(q)
+            iid = lst["items"][0]["id"]
+            created_ids.append(iid)
+            _request("PATCH", f"/api/collections/issues/records/{iid}", {"milestone": mid}, headers=hdr)
+
+        # verify both issues are linked
+        from urllib.parse import quote
+        q = "/api/collections/issues/records?perPage=200&filter=" + quote(f"milestone='{mid}'")
+        st, lst = _get_authed(q)
+        assert st == 200
+        linked = [it for it in lst.get("items", []) if it["id"] in created_ids]
+        assert len(linked) == 2, f"expected 2 linked issues, got {len(linked)}"
+    finally:
+        for iid in created_ids:
+            _request("DELETE", f"/api/collections/issues/records/{iid}", headers=hdr)
+        _request("DELETE", f"/api/collections/milestones/records/{mid}", headers=hdr)

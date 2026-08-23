@@ -1,0 +1,14 @@
+{
+  "servers": {
+    "projectbase": {
+      "command": "uv",
+      "args": ["run", "/data/projects/projectbase/scripts/mcp_server.py"],
+      "env": {
+        "PROJECTBASE_URL": "http://127.0.0.1:8120",
+        "PROJECTBASE_EMAIL": "f@flow.com",
+        "PROJECTBASE_PASSWORD": "superdev123"
+      },
+      "shared": true
+    }
+  }
+}
