@@ -74,7 +74,9 @@ fi
 
 # --- Superuser -------------------------------------------------------------
 log "Seeding superuser (${EMAIL}) ..."
-docker compose exec -T projectbase /app/pocketbase superuser upsert "$EMAIL" "$PASSWORD" --dir /app/pb_data
+# The container serves --dir /app/app/pb_data (see Dockerfile). Seed into the
+# SAME data dir the app reads so superuser auth succeeds post-deploy.
+docker compose exec -T projectbase /app/pocketbase superuser upsert "$EMAIL" "$PASSWORD" --dir /app/app/pb_data
 
 # --- Health + seed verification --------------------------------------------
 log "Waiting for /api/health ..."
