@@ -89,7 +89,8 @@ routerAdd("GET", "/api/projectbase/stats", (e) => {
             priority_breakdown: priorityCounts
         })
     } catch (err) {
-        return e.json(500, { error: err.message })
+        console.log(">>> [ProjectBase] route error:", JSON.stringify(String((err && err.message) || err)))
+        return e.json(500, { error: "Internal server error" })
     }
 })
 
@@ -98,22 +99,52 @@ routerAdd("POST", "/api/projectbase/quick-task", (e) => {
         if (!e.auth || !e.auth.id) {
             return e.unauthorizedError("Authentication required")
         }
-        let body = e.requestInfo().body
-        if (!body.title) {
+        let body
+        try {
+            body = e.requestInfo().body || {}
+        } catch (bErr) {
+            return e.json(400, { error: "Invalid JSON body" })
+        }
+        if (typeof body.title !== "string" || body.title.trim().length === 0) {
             return e.json(400, { error: "Missing required 'title' field" })
+        }
+        if (body.title.length > 512) {
+            return e.json(400, { error: "'title' must be at most 512 characters" })
+        }
+        if (body.description && (typeof body.description !== "string" || body.description.length > 65536)) {
+            return e.json(400, { error: "'description' must be a string of at most 65536 characters" })
         }
 
         let projectCol = e.app.findCollectionByNameOrId("projects")
         let issuesCol = e.app.findCollectionByNameOrId("issues")
 
         let targetProject = null
+        let projectRefProvided = false
         if (body.project_id) {
-            targetProject = e.app.findRecordById("projects", body.project_id)
+            projectRefProvided = true
+            if (typeof body.project_id !== "string" || !/^[a-zA-Z0-9]{10,20}$/.test(body.project_id)) {
+                return e.json(400, { error: "Invalid 'project_id' format" })
+            }
+            try {
+                targetProject = e.app.findRecordById("projects", body.project_id)
+            } catch (pErr) {
+                targetProject = null
+            }
         } else if (body.project_key) {
+            projectRefProvided = true
+            if (typeof body.project_key !== "string" || !/^[A-Za-z0-9_-]{1,32}$/.test(body.project_key)) {
+                return e.json(400, { error: "Invalid 'project_key' format" })
+            }
             let found = e.app.findRecordsByFilter("projects", `identifier = '${body.project_key.toUpperCase()}'`, "-created", 1, 0)
             if (found && found.length > 0) targetProject = found[0]
         }
+        if (projectRefProvided && !targetProject) {
+            return e.json(404, { error: "Project not found" })
+        }
 
+        // Fallback to the oldest project ONLY when the caller provided no
+        // project reference at all. A provided-but-unresolvable reference is
+        // rejected above so tasks are never silently filed in the wrong project.
         if (!targetProject) {
             let all = e.app.findRecordsByFilter("projects", "1=1", "created", 1, 0)
             if (all && all.length > 0) targetProject = all[0]
@@ -146,6 +177,7 @@ routerAdd("POST", "/api/projectbase/quick-task", (e) => {
             }
         })
     } catch (err) {
-        return e.json(500, { error: err.message })
+        console.log(">>> [ProjectBase] route error:", JSON.stringify(String((err && err.message) || err)))
+        return e.json(500, { error: "Internal server error" })
     }
 })

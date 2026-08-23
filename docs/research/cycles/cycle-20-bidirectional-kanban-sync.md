@@ -21,7 +21,7 @@ closed that one-way gap.
 | `scripts/flow_runner.py` read path | `get_milestones` / `get_active_issues` now read through the **same authenticated API** it writes to (single source of truth), so a task it just claimed is visible on the next read. SQLite remains a fallback when the API is down. |
 | `scripts/flow_runner.py` write-back | On each cycle the daemon **claims** a backlog/todo task to `in_progress` and posts an **agent audit comment** (`🔄 Flow daemon picked up ...`). `--dry-run` reports but never writes. |
 | `scripts/flow_runner.py` URL encoding | Filter queries in the API reads are now URL-encoded, fixing a `URL can't contain control characters` error from the un-encoded `project = '...'` filter. |
-| `scripts/mcp_server.py` `add_comment` | **Bug fix:** the comments schema requires BOTH `content` and `body` (repair migration 0003 added `body` as a required text field). The tool sent only `content`, so every agent audit comment POST failed with a 400. Now mirrors both. |
+| `scripts/mcp_server.py` `add_comment` | **Bug fix:** the comments schema required both `content` and a legacy `body` (repair migration 0003 re-added `body` as a required field). The tool sent only `content`, so every agent audit comment POST failed with a 400. The `body` drift was later removed by migration 1710000011, so the canonical schema now requires only `content`; writers send `content` alone. |
 | Tests | New `tests/test_flow_runner_sync.py` drives `flow_runner.py --once` against a scratch PocketBase instance and asserts auth, claim→`in_progress`, agent comment persistence, and that `--dry-run` never writes. |
 
 ## Verification

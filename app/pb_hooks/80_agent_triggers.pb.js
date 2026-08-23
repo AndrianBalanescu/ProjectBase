@@ -7,22 +7,37 @@ routerAdd("POST", "/api/projectbase/dispatch-agent", (e) => {
             return e.unauthorizedError("Authentication required")
         }
 
-        let body = e.requestInfo().body || {}
+        let body
+        try {
+            body = e.requestInfo().body || {}
+        } catch (bErr) {
+            return e.json(400, { error: "Invalid JSON body" })
+        }
         let issueId = body.issue_id
         let agentTarget = body.agent_target || "flomaster" // 'flomaster', 'hermes', 'windmill', 'custom'
         let customPrompt = body.prompt || ""
 
-        if (!issueId) {
-            return e.badRequestError("Missing required 'issue_id'")
+        const allowedTargets = ["flomaster", "hermes", "windmill", "custom"]
+        if (typeof issueId !== "string" || !/^[a-zA-Z0-9]{10,20}$/.test(issueId)) {
+            return e.json(400, { error: "Missing or invalid 'issue_id'" })
+        }
+        if (typeof agentTarget !== "string" || !allowedTargets.includes(agentTarget)) {
+            return e.json(400, { error: "Invalid 'agent_target' (expected one of: " + allowedTargets.join(", ") + ")" })
+        }
+        if (typeof customPrompt !== "string" || customPrompt.length > 8000) {
+            return e.json(400, { error: "Invalid 'prompt' (must be a string of at most 8000 characters)" })
         }
 
         let issuesCol = e.app.findCollectionByNameOrId("issues")
         let commentsCol = e.app.findCollectionByNameOrId("comments")
-        let issue = e.app.findRecordById("issues", issueId)
+        let issue
+        try {
+            issue = e.app.findRecordById("issues", issueId)
+        } catch (nfErr) {
+            return e.json(404, { error: "Issue not found" })
+        }
 
         let identifier = issue.get("identifier")
-        let title = issue.get("title")
-        let desc = issue.get("description")
 
         // 1. Update task to in_progress and assign to agent
         issue.set("status", "in_progress")
@@ -98,6 +113,7 @@ routerAdd("POST", "/api/projectbase/dispatch-agent", (e) => {
             dispatched_external: dispatchedExternal
         })
     } catch (err) {
-        return e.json(500, { error: err.message })
+        console.log(">>> [ProjectBase Agent] dispatch-agent error:", JSON.stringify(err && err.message ? err.message : err))
+        return e.json(500, { error: "Internal server error" })
     }
 })

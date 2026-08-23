@@ -22,7 +22,8 @@ routerAdd("POST", "/api/projectbase/import/csv", (e) => {
             return e.unauthorizedError("Authentication required")
         }
 
-        let body = e.requestInfo().body || {}
+        let body
+        try { body = e.requestInfo().body || {} } catch (bErr) { return e.json(400, { error: "Invalid JSON body" }) }
         let projectId = body.project_id
         let rows = Array.isArray(body.rows) ? body.rows : []
 
@@ -146,6 +147,7 @@ routerAdd("POST", "/api/projectbase/import/csv", (e) => {
             project: { id: project.id, name: project.get("name") }
         })
     } catch (err) {
-        return e.json(500, { error: String((err && err.message) || err) })
+        console.log(">>> [ProjectBase] import error:", JSON.stringify(String((err && err.message) || err)))
+        return e.json(500, { error: "Internal server error" })
     }
 })

@@ -1189,3 +1189,171 @@ def test_service_worker_excludes_pocketbase_admin_ui():
     st, body = _get("/sw.js")
     assert st == 200
     assert "startsWith('/_/')" in body, "SW missing PocketBase admin UI exclusion"
+
+# ---------------------------------------------------------------------------
+# Route hardening regression tests (cycle 24)
+# ---------------------------------------------------------------------------
+
+def _authed_json(method, path, payload, headers=None):
+    """POST/PUT a raw-ish JSON body with the superuser token; returns (status, body)."""
+    hdr = {"Authorization": _superuser_token()}
+    if headers:
+        hdr.update(headers)
+    return _request(method, path, payload, headers=hdr)
+
+
+def _first_issue_id():
+    status, body = _get_authed("/api/collections/issues/records?perPage=1&sort=-created")
+    assert status == 200
+    assert body.get("items"), "no issues to reference"
+    return body["items"][0]["id"]
+
+
+def _first_project_id():
+    status, body = _get_authed("/api/collections/projects/records?perPage=1")
+    assert status == 200
+    assert body.get("items"), "no projects to reference"
+    return body["items"][0]["id"]
+
+
+def test_dispatch_agent_rejects_corrupted_json():
+    """Malformed JSON must be a 400, not a 500 leaking internals."""
+    status, body = _request(
+        "POST", "/api/projectbase/dispatch-agent", b"{broken",
+        headers={"Authorization": _superuser_token()})
+    assert status == 400, f"corrupted JSON should be 400, got {status} {body}"
+
+
+def test_dispatch_agent_missing_issue_404():
+    """A nonexistent issue id must yield 404, never a raw SQL leak."""
+    status, body = _authed_json("POST", "/api/projectbase/dispatch-agent",
+                                {"issue_id": "zzzzzzzzzzzzzz"})
+    assert status == 404
+    assert "not found" in str(body).lower() or "not found" in str(body.get("error", "")).lower()
+
+
+def test_dispatch_agent_rejects_unknown_target():
+    """agent_target must be allowlisted; arbitrary strings are rejected."""
+    iid = _first_issue_id()
+    status, body = _authed_json("POST", "/api/projectbase/dispatch-agent",
+                                {"issue_id": iid, "agent_target": "evil"})
+    assert status == 400
+    assert "agent_target" in str(body)
+
+
+def test_dispatch_agent_rejects_oversized_prompt():
+    iid = _first_issue_id()
+    status, body = _authed_json("POST", "/api/projectbase/dispatch-agent",
+                                {"issue_id": iid, "prompt": "A" * 9000})
+    assert status == 400
+
+
+def test_dispatch_agent_happy_path():
+    """A valid dispatch must succeed (P1 regression: audit comment creation
+    previously failed on required comments.body, breaking dispatch)."""
+    # Dispatch on a throwaway issue so demo data is never mutated; deleting
+    # the issue cascades its audit comment away too.
+    pid = _first_project_id()
+    status, created = _authed_json(
+        "POST", "/api/collections/issues/records",
+        {"title": "cycle24 dispatch regression", "project": pid, "status": "todo"})
+    assert status == 200, f"failed to create throwaway issue: {status} {created}"
+    iid = created["id"]
+    try:
+        status, body = _authed_json("POST", "/api/projectbase/dispatch-agent",
+                                    {"issue_id": iid, "agent_target": "flomaster"})
+        assert status == 200, f"dispatch should succeed after schema fix: {status} {body}"
+        assert body.get("success") is True
+    finally:
+        _request("DELETE", f"/api/collections/issues/records/{iid}",
+                 headers={"Authorization": _superuser_token()})
+
+
+def test_quick_task_corrupted_json_400():
+    status, body = _request("POST", "/api/projectbase/quick-task", b"{bad",
+                            headers={"Authorization": _superuser_token()})
+    assert status == 400
+
+
+def test_quick_task_nonexistent_project_404():
+    """A provided-but-unresolvable project must 404, not silently create in
+    the wrong project (P1 fix)."""
+    status, body = _authed_json("POST", "/api/projectbase/quick-task",
+                                {"title": "probe", "project_id": "doesnotexist123"})
+    assert status == 404
+    assert "not found" in str(body).lower()
+
+
+def test_quick_task_unknown_project_key_404():
+    status, body = _authed_json("POST", "/api/projectbase/quick-task",
+                                {"title": "probe", "project_key": "ZZZZ"})
+    assert status == 404
+
+
+def test_quick_task_injection_key_400():
+    """A filter injection attempt in project_key must be rejected, not 500."""
+    status, body = _authed_json("POST", "/api/projectbase/quick-task",
+                                {"title": "probe", "project_key": "a' OR 1=1--"})
+    assert status == 400
+
+
+def test_quick_task_oversized_title_400():
+    status, body = _authed_json("POST", "/api/projectbase/quick-task",
+                                {"title": "T" * 6000})
+    assert status == 400
+
+
+def test_quick_task_valid_key_creates_and_cleans():
+    """Happy path: a valid project_key creates an issue, then we clean it up."""
+    pid = _first_project_id()
+    # resolve the identifier of that project
+    status, proj = _get_authed(f"/api/collections/projects/records/{pid}")
+    key = proj["identifier"].lower()
+    status, body = _authed_json("POST", "/api/projectbase/quick-task",
+                                {"title": "cycle24-regression", "project_key": key})
+    assert status == 201
+    issue_id = body["issue"]["id"]
+    _request("DELETE", f"/api/collections/issues/records/{issue_id}",
+             headers={"Authorization": _superuser_token()})
+
+
+def test_ai_assist_corrupted_json_400():
+    status, body = _request("POST", "/api/projectbase/ai-assist", b"{bad",
+                            headers={"Authorization": _superuser_token()})
+    assert status == 400
+
+
+def test_import_csv_corrupted_json_400():
+    status, body = _request("POST", "/api/projectbase/import/csv", b"{bad",
+                            headers={"Authorization": _superuser_token()})
+    assert status == 400
+
+
+def test_custom_fields_validate_corrupted_json_400():
+    pid = _first_project_id()
+    status, body = _request(
+        "POST", f"/api/projectbase/projects/{pid}/custom-fields/validate", b"{bad",
+        headers={"Authorization": _superuser_token()})
+    assert status == 400
+
+
+def test_comment_create_content_only_ok():
+    """P1 regression: comment creation must succeed with the canonical
+    `content` field (legacy required `body` is dropped)."""
+    iid = _first_issue_id()
+    status, body = _authed_json("POST", "/api/collections/comments/records",
+                                {"issue": iid, "author": "probe",
+                                 "author_type": "agent", "content": "cycle24 schema probe"})
+    assert status == 200, f"comment create must succeed: {status} {body}"
+    cid = body.get("id")
+    if cid:
+        _request("DELETE", f"/api/collections/comments/records/{cid}",
+                 headers={"Authorization": _superuser_token()})
+
+
+def test_comments_schema_has_no_legacy_body():
+    """The comments collection must not carry the legacy required `body`."""
+    status, col = _get_authed("/api/collections/comments")
+    assert status == 200
+    names = [f["name"] for f in col.get("fields", [])]
+    assert "body" not in names, "legacy comments.body field still present"

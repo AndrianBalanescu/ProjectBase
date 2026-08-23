@@ -47,8 +47,8 @@ migrate((app) => {
             auto("created", true, false), auto("updated", true, true),
         ],
         comments: (id) => [
-            relation("issue", id.issues, { required: true, cascadeDelete: true }), relation("author", id.users),
-            text("body", { required: true }),
+            relation("issue", id.issues, { required: true, cascadeDelete: true }), text("author", { required: true }),
+            select("author_type", ["user", "agent", "system"]), text("content", { required: true }), file("attachments", 5, ["100x100"]),
             auto("created", true, false), auto("updated", true, true),
         ],
         activity: (id) => [
