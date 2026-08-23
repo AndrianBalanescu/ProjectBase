@@ -5,8 +5,8 @@ const IssueDrawerComponent = {
     'milkdown-editor': window.MilkdownEditorComponent || MilkdownEditorComponent,
     'searchable-select': window.SearchableSelectComponent || SearchableSelectComponent
   },
-  props: ['issue', 'projects', 'cycles', 'labels', 'fieldDefs', 'milestones'],
-  emits: ['close', 'update-issue', 'delete-issue'],
+  props: ['issue', 'projects', 'cycles', 'labels', 'fieldDefs', 'milestones', 'issues'],
+  emits: ['close', 'update-issue', 'delete-issue', 'relations-changed'],
   data() {
     return {
       editTitle: '',
@@ -31,7 +31,14 @@ const IssueDrawerComponent = {
       isAgentDropdownOpen: false,
       isFullscreen: false,
       aiLoadingSubtasks: false,
-      aiLoadingDesc: false
+      aiLoadingDesc: false,
+      relationOutgoing: [],
+      relationIncoming: [],
+      relationType: 'blocks',
+      relationQuery: '',
+      relationPickerOpen: false,
+      relationLoading: false,
+      relationError: ''
     };
   },
   computed: {
@@ -52,6 +59,30 @@ const IssueDrawerComponent = {
       let defs = this.fieldDefs;
       if (typeof defs === 'string') { try { defs = JSON.parse(defs); } catch (e) { defs = []; } }
       return Array.isArray(defs) ? defs : [];
+    },
+    blockedByCount() {
+      const blocked = this.relationIncoming.filter(r => r.type === 'blocks').length;
+      const out = this.relationOutgoing.filter(r => r.type === 'blocked_by').length;
+      return blocked + out;
+    },
+    relationCandidates() {
+      const list = Array.isArray(this.issues) ? this.issues : [];
+      const q = this.relationQuery.trim().toLowerCase();
+      const linked = new Set(this.relationOutgoing.map(r => r.issue));
+      return list.filter(i => {
+        if (!i || i.id === this.issue?.id) return false;
+        if (linked.has(i.id)) return false;
+        if (!q) return true;
+        const hay = `${i.identifier || ''} ${i.title || ''}`.toLowerCase();
+        return hay.includes(q);
+      }).slice(0, 8);
+    },
+    relationsByType() {
+      const by = { blocks: [], blocked_by: [], related: [] };
+      for (const r of this.relationOutgoing) {
+        if (by[r.type]) by[r.type].push(r);
+      }
+      return by;
     },
     projectMilestones() {
       const list = Array.isArray(this.milestones) ? this.milestones : [];
@@ -123,6 +154,7 @@ const IssueDrawerComponent = {
           if (typeof cf === 'string') { try { cf = JSON.parse(cf); } catch (e) { cf = {}; } }
           this.editCustomFields = (cf && typeof cf === 'object' && !Array.isArray(cf)) ? { ...cf } : {};
           this.loadComments();
+          this.loadRelations();
         }
       }
     }
@@ -144,6 +176,56 @@ const IssueDrawerComponent = {
         this.comments = await API.getComments(this.issue.id);
       } catch (err) {
         console.error('Comments load error:', err);
+      }
+    },
+    async loadRelations() {
+      if (!this.issue) return;
+      this.relationLoading = true;
+      this.relationError = '';
+      try {
+        const data = await API.getIssueRelations(this.issue.id);
+        this.relationOutgoing = Array.isArray(data.outgoing) ? data.outgoing : [];
+        this.relationIncoming = Array.isArray(data.incoming) ? data.incoming : [];
+      } catch (err) {
+        this.relationError = 'Failed to load relationships';
+        console.error('Relations load error:', err);
+      } finally {
+        this.relationLoading = false;
+      }
+    },
+    async addRelation(targetId) {
+      if (!this.issue || !targetId) return;
+      this.relationLoading = true;
+      this.relationError = '';
+      try {
+        const data = await API.addIssueRelation(this.issue.id, targetId, this.relationType);
+        this.relationQuery = '';
+        this.relationPickerOpen = false;
+        await this.loadRelations();
+        this.$emit('relations-changed', {
+          id: this.issue.id,
+          relations: Array.isArray(data.relations) ? data.relations : []
+        });
+      } catch (err) {
+        this.relationError = err.message || 'Failed to add relationship';
+        console.error('Add relation error:', err);
+      } finally {
+        this.relationLoading = false;
+      }
+    },
+    async removeRelation(targetId, type) {
+      if (!this.issue || !targetId) return;
+      this.relationError = '';
+      try {
+        await API.removeIssueRelation(this.issue.id, targetId, type);
+        await this.loadRelations();
+        this.$emit('relations-changed', {
+          id: this.issue.id,
+          relations: this.relationOutgoing.map(r => ({ issue: r.issue, type: r.type }))
+        });
+      } catch (err) {
+        this.relationError = err.message || 'Failed to remove relationship';
+        console.error('Remove relation error:', err);
       }
     },
     saveChanges() {
@@ -337,6 +419,15 @@ const IssueDrawerComponent = {
             </button>
 
             <span v-if="copiedBadge" class="text-[10px] text-emerald-400 font-medium animate-pulse">Copied!</span>
+
+            <span
+              v-if="blockedByCount > 0"
+              class="px-2 py-0.5 rounded-md bg-red-950/70 border border-red-800/60 text-red-300 text-[10px] font-semibold flex items-center space-x-1"
+              title="This issue is blocked by another issue"
+            >
+              <i data-lucide="lock" class="w-3 h-3"></i>
+              <span>Blocked{{ blockedByCount > 1 ? ' x' + blockedByCount : '' }}</span>
+            </span>
 
             <span v-if="issue.expand && issue.expand.project" class="text-xs text-gray-400 font-medium">
               {{ issue.expand.project.name }}
@@ -773,6 +864,132 @@ const IssueDrawerComponent = {
                   Add
                 </button>
               </div>
+            </div>
+          </div>
+
+          <!-- Issue Relationships (blocks / blocked_by / related) -->
+          <div class="space-y-3 pt-2">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Relationships</label>
+                <span v-if="relationLoading" class="animate-spin text-[10px]">⏳</span>
+                <span v-if="relationOutgoing.length > 0" class="text-xs font-mono text-indigo-400">
+                  ({{ relationOutgoing.length }})
+                </span>
+              </div>
+              <span v-if="relationError" class="text-[10px] text-red-400">{{ relationError }}</span>
+            </div>
+
+            <!-- Blocks -->
+            <div v-if="relationsByType.blocks.length > 0" class="space-y-1.5">
+              <div class="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Blocks</div>
+              <div
+                v-for="r in relationsByType.blocks"
+                :key="'blk' + r.issue"
+                class="group flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-950/60 border border-gray-800"
+              >
+                <a :href="'#/pb/board/issue/' + r.issue" class="flex items-center space-x-2 min-w-0">
+                  <span class="font-mono text-[10px] text-amber-400 shrink-0">{{ r.target.identifier }}</span>
+                  <span class="truncate text-xs text-gray-200">{{ r.target.title }}</span>
+                </a>
+                <button
+                  @click="removeRelation(r.issue, 'blocks')"
+                  class="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                >
+                  <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Blocked by -->
+            <div v-if="relationsByType.blocked_by.length > 0" class="space-y-1.5">
+              <div class="text-[10px] text-red-400/80 font-medium uppercase tracking-wider">Blocked by</div>
+              <div
+                v-for="r in relationsByType.blocked_by"
+                :key="'blb' + r.issue"
+                class="group flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-red-950/30 border border-red-900/40"
+              >
+                <a :href="'#/pb/board/issue/' + r.issue" class="flex items-center space-x-2 min-w-0">
+                  <span class="font-mono text-[10px] text-red-400 shrink-0">{{ r.target.identifier }}</span>
+                  <span class="truncate text-xs text-gray-200">{{ r.target.title }}</span>
+                </a>
+                <button
+                  @click="removeRelation(r.issue, 'blocked_by')"
+                  class="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                >
+                  <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Related -->
+            <div v-if="relationsByType.related.length > 0" class="space-y-1.5">
+              <div class="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Related</div>
+              <div
+                v-for="r in relationsByType.related"
+                :key="'rel' + r.issue"
+                class="group flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-950/60 border border-gray-800"
+              >
+                <a :href="'#/pb/board/issue/' + r.issue" class="flex items-center space-x-2 min-w-0">
+                  <span class="font-mono text-[10px] text-indigo-400 shrink-0">{{ r.target.identifier }}</span>
+                  <span class="truncate text-xs text-gray-200">{{ r.target.title }}</span>
+                </a>
+                <button
+                  @click="removeRelation(r.issue, 'related')"
+                  class="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                >
+                  <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Add relation form -->
+            <div class="flex items-center space-x-2 pt-1">
+              <select
+                v-model="relationType"
+                class="px-2 py-1.5 rounded-lg bg-gray-950/60 border border-gray-800 text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                title="Relation type"
+              >
+                <option value="blocks">Blocks</option>
+                <option value="blocked_by">Blocked by</option>
+                <option value="related">Related</option>
+              </select>
+              <div class="relative flex-1">
+                <input
+                  v-model="relationQuery"
+                  @focus="relationPickerOpen = true"
+                  @keydown.enter="relationCandidates[0] && addRelation(relationCandidates[0].id)"
+                  placeholder="Search issues to link..."
+                  class="w-full px-3 py-1.5 rounded-lg bg-gray-950/60 border border-gray-800 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+                <div
+                  v-if="relationPickerOpen && relationCandidates.length > 0"
+                  class="absolute z-30 mt-1 w-full max-h-44 overflow-y-auto rounded-lg bg-gray-900 border border-gray-700 shadow-xl"
+                >
+                  <button
+                    v-for="c in relationCandidates"
+                    :key="c.id"
+                    @click="addRelation(c.id)"
+                    class="w-full text-left px-3 py-2 hover:bg-gray-800 flex items-center space-x-2 text-xs"
+                  >
+                    <span class="font-mono text-[10px] text-indigo-400 shrink-0">{{ c.identifier }}</span>
+                    <span class="truncate text-gray-200">{{ c.title }}</span>
+                  </button>
+                </div>
+                <div
+                  v-else-if="relationPickerOpen && relationQuery && relationCandidates.length === 0"
+                  class="absolute z-30 mt-1 w-full rounded-lg bg-gray-900 border border-gray-700 shadow-xl px-3 py-2 text-[11px] text-gray-500"
+                >
+                  No matching issues
+                </div>
+              </div>
+              <button
+                @click="relationCandidates[0] && addRelation(relationCandidates[0].id)"
+                :disabled="relationLoading || relationCandidates.length === 0"
+                class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-40 text-white text-xs font-medium transition-colors"
+              >
+                Link
+              </button>
             </div>
           </div>
 

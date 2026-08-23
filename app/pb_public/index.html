@@ -172,10 +172,12 @@
       :cycles="cycles"
       :labels="labels"
       :milestones="milestones"
+      :issues="issues"
       :field-defs="currentProject ? currentProject.custom_field_defs : []"
       @close="closeIssueDrawer"
       @update-issue="handleUpdateIssue"
       @delete-issue="handleDeleteIssue"
+      @relations-changed="handleRelationsChanged"
     ></issue-drawer>
 
     <!-- Command Palette (Cmd + K Omnibar) -->

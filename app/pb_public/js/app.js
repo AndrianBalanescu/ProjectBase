@@ -434,6 +434,18 @@ const App = {
       }
     },
 
+    handleRelationsChanged({ id, relations }) {
+      // Relations were mutated through the custom API routes (which maintain
+      // reciprocal mirrors); reflect the change locally so the board's blocked
+      // indicators and the open drawer stay in sync without waiting for SSE.
+      const rel = Array.isArray(relations) ? relations : [];
+      const idx = this.issues.findIndex(i => i.id === id);
+      if (idx !== -1) this.issues[idx] = { ...this.issues[idx], relations: rel };
+      if (this.selectedIssue && this.selectedIssue.id === id) {
+        this.selectedIssue = { ...this.selectedIssue, relations: rel };
+      }
+    },
+
     async handleDeleteIssue(issueId) {
       if (!confirm('Are you sure you want to delete this issue?')) return;
       try {
