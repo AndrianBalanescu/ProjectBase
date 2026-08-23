@@ -124,6 +124,9 @@ onRecordAfterCreateSuccess((e) => {
         const recipients = e.app.findRecordsByFilter(
             "users", `name = {:name}`, "", 0, 0, { name: assignee })
         for (const u of recipients) {
+            // Skip the actor themselves: creating an issue assigned to you is
+            // not an alert (same rule the update path applies).
+            if (String(u.get("name") || "").trim() === actorName) continue
             try {
                 const col = e.app.findCollectionByNameOrId("notifications")
                 if (!col) return
