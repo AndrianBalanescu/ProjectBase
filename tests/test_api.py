@@ -1419,6 +1419,31 @@ def test_notifications_assignee_gets_assigned_notification():
         _delete_user_by_email(email)
 
 
+def test_notifications_self_assign_on_create_no_notification():
+    """Creating an issue assigned to yourself must not generate an 'assigned'
+    notification (the actor is the assignee; same rule the update path
+    applies). Regression for the create path lacking the self-skip."""
+    email, pw, name, _uid_rec = _create_notif_user()
+    token = _user_token(email, pw)
+    pid = _first_project_id()
+
+    title = f"Notif SelfAssign {_uid()}"
+    st, issue = _request(
+        "POST", "/api/collections/issues/records",
+        {"project": pid, "title": title, "status": "todo",
+         "priority": "medium", "assignee": name},
+        headers={"Authorization": token})
+    assert st == 200, f"self-assign issue create failed: {st} {issue}"
+    iid = issue["id"]
+    try:
+        types = _notif_types(token)
+        assert "assigned" not in types,             f"self-assign must not self-notify, got {types}"
+    finally:
+        _request("DELETE", f"/api/collections/issues/records/{iid}",
+                 headers={"Authorization": _superuser_token()})
+        _delete_user_by_email(email)
+
+
 def test_notifications_unassigned_issue_no_notification():
     """An issue with no assignee must not create notifications."""
     pid = _first_project_id()
