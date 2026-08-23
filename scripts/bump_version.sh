@@ -6,7 +6,7 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION_FILE="$DIR/VERSION"
-OPENAPI_FILE="$DIR/pb_public/openapi.json"
+OPENAPI_FILE="$DIR/app/pb_public/openapi.json"
 
 if [ ! -f "$VERSION_FILE" ]; then
     echo "0.8.0" > "$VERSION_FILE"

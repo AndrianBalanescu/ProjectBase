@@ -11,13 +11,11 @@ RUN curl -sL "https://github.com/pocketbase/pocketbase/releases/download/v${PB_V
     chmod +x pocketbase && \
     rm pb.zip
 
-COPY pb_hooks /app/pb_hooks
-COPY pb_public /app/pb_public
-COPY pb_migrations /app/pb_migrations
+COPY app /app/app
 COPY scripts /app/scripts
 
 EXPOSE 8120
 
-VOLUME ["/app/pb_data"]
+VOLUME ["/app/app/pb_data"]
 
-CMD ["/app/pocketbase", "serve", "--dir", "/app/pb_data", "--publicDir", "/app/pb_public", "--hooksDir", "/app/pb_hooks", "--migrationsDir", "/app/pb_migrations", "--http", "0.0.0.0:8120"]
+CMD ["/app/pocketbase", "serve", "--dir", "/app/app/pb_data", "--publicDir", "/app/app/pb_public", "--hooksDir", "/app/app/pb_hooks", "--migrationsDir", "/app/app/pb_migrations", "--http", "0.0.0.0:8120"]

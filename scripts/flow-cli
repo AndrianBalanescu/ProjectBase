@@ -35,7 +35,9 @@ RESET = "\033[0m"
 
 PROJECTBASE_DIR = "/data/projects/projectbase"
 RUNNER_SCRIPT = os.path.join(PROJECTBASE_DIR, "scripts", "flow_runner.py")
-DB_PATH = os.path.join(PROJECTBASE_DIR, "pb_data", "data.db")
+DB_PATH = os.path.join(PROJECTBASE_DIR, "app", "pb_data", "data.db")
+if not os.path.exists(DB_PATH):
+    DB_PATH = os.path.join(PROJECTBASE_DIR, "pb_data", "data.db")
 
 def run_sqlite(query: str) -> str:
     try:

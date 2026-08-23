@@ -50,6 +50,9 @@ def _resolve_ai_key() -> str:
 AI_API_KEY = _resolve_ai_key()
 AI_MODEL = os.environ.get("AI_MODEL", "rc/claude-sonnet-4-5")
 REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(REPO_DIR, "app", "pb_data", "data.db")
+if not os.path.exists(DB_PATH):
+    DB_PATH = os.path.join(REPO_DIR, "pb_data", "data.db")
 
 class FlowRunner:
     def __init__(self, project_key: str = "PB", cycle_interval: int = 60, dry_run: bool = False):
@@ -92,7 +95,7 @@ class FlowRunner:
         # Direct SQLite fallback if needed
         try:
             out = subprocess.check_output([
-                "sqlite3", os.path.join(REPO_DIR, "pb_data", "data.db"),
+                "sqlite3", DB_PATH,
                 f"SELECT json_object('id', id, 'name', name, 'identifier', identifier, 'settings', settings) FROM projects WHERE identifier='{self.project_key}';"
             ]).decode("utf-8").strip()
             if out:
@@ -104,7 +107,7 @@ class FlowRunner:
     def get_milestones(self, project_id: str) -> List[Dict]:
         try:
             out = subprocess.check_output([
-                "sqlite3", os.path.join(REPO_DIR, "pb_data", "data.db"),
+                "sqlite3", DB_PATH,
                 f"SELECT json_group_array(json_object('id', id, 'name', name, 'description', description, 'status', status, 'target_date', target_date)) FROM milestones WHERE project='{project_id}' OR project='';"
             ]).decode("utf-8").strip()
             if out:
@@ -116,7 +119,7 @@ class FlowRunner:
     def get_active_issues(self, project_id: str) -> List[Dict]:
         try:
             out = subprocess.check_output([
-                "sqlite3", os.path.join(REPO_DIR, "pb_data", "data.db"),
+                "sqlite3", DB_PATH,
                 f"SELECT json_group_array(json_object('id', id, 'identifier', identifier, 'title', title, 'description', description, 'status', status, 'priority', priority)) FROM issues WHERE project='{project_id}' ORDER BY created ASC;"
             ]).decode("utf-8").strip()
             if out:

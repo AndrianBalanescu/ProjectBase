@@ -19,7 +19,7 @@ cd ProjectBase
 ./scripts/bootstrap.sh
 ```
 
-Then open `http://localhost:8120`. The frontend is zero-build, so edit `pb_public/` files and refresh the browser. PocketBase JS hooks in `pb_hooks/` reload automatically in development.
+Then open `http://localhost:8120`. The frontend is zero-build, so edit `app/pb_public/` files and refresh the browser. PocketBase JS hooks in `app/pb_hooks/` reload automatically in development.
 
 ## Plugin Development
 
@@ -28,9 +28,9 @@ A plugin is intentionally simple. It can contain:
 ```text
 my-plugin/
 ├── plugin.json             # manifest
-├── pb_hooks/               # optional PocketBase JS hooks
+├── app/pb_hooks/           # optional PocketBase JS hooks
 │   └── my-plugin.pb.js
-├── pb_public/js/           # optional Vue components
+├── app/pb_public/js/       # optional Vue components
 │   └── my-plugin.js
 ├── README.md
 └── LICENSE
@@ -49,8 +49,8 @@ my-plugin/
   "projectbase": ">=0.1.0",
   "category": "integration",
   "entrypoints": {
-    "hooks": ["pb_hooks/my-plugin.pb.js"],
-    "frontend": ["pb_public/js/my-plugin.js"]
+    "hooks": ["app/pb_hooks/my-plugin.pb.js"],
+    "frontend": ["app/pb_public/js/my-plugin.js"]
   },
   "permissions": ["issues:read", "issues:write"]
 }

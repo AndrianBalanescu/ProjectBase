@@ -806,9 +806,11 @@ def test_manager_admin_cannot_mint_privileged_user_via_create():
 def test_sqlite_performance_indexes_exist():
     """Verify that composite SQLite indexes are applied to the issues table."""
     import sqlite3
-    db_path = os.path.join(os.path.dirname(__file__), "..", "pb_data", "data.db")
+    db_path = os.path.join(os.path.dirname(__file__), "..", "app", "pb_data", "data.db")
     if not os.path.exists(db_path):
-        pytest.skip("pb_data/data.db not accessible locally")
+        db_path = os.path.join(os.path.dirname(__file__), "..", "pb_data", "data.db")
+    if not os.path.exists(db_path):
+        pytest.skip("app/pb_data/data.db not accessible locally")
     
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -850,9 +852,11 @@ def test_health_includes_version_and_license():
 def test_sqlite_query_plan_uses_index():
     """Verify that project-filtered issue lookup uses the composite index instead of full table scan."""
     import sqlite3
-    db_path = os.path.join(os.path.dirname(__file__), "..", "pb_data", "data.db")
+    db_path = os.path.join(os.path.dirname(__file__), "..", "app", "pb_data", "data.db")
     if not os.path.exists(db_path):
-        pytest.skip("pb_data/data.db not accessible locally")
+        db_path = os.path.join(os.path.dirname(__file__), "..", "pb_data", "data.db")
+    if not os.path.exists(db_path):
+        pytest.skip("app/pb_data/data.db not accessible locally")
     
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()

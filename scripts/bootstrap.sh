@@ -24,7 +24,7 @@ fi
 
 # 2. Setup Superuser
 echo "🔑 Ensuring superuser account ($ADMIN_EMAIL)..."
-"$DIR/pocketbase" superuser upsert "$ADMIN_EMAIL" "$ADMIN_PASSWORD" --dir "$DIR/pb_data" > /dev/null 2>&1 || true
+"$DIR/pocketbase" superuser upsert "$ADMIN_EMAIL" "$ADMIN_PASSWORD" --dir "$DIR/app/pb_data" > /dev/null 2>&1 || true
 
 echo "✓ Superuser ready:"
 echo "   Email:    $ADMIN_EMAIL"
