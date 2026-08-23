@@ -5,3 +5,5 @@ __pycache__/
 *.pyc
 .DS_Store
 .flow/
+prism-out/
+.pytest_cache/

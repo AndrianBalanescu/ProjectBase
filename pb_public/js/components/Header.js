@@ -34,6 +34,7 @@ const HeaderComponent = {
             <i data-lucide="layers" class="w-4 h-4"></i>
           </div>
           <span class="text-base font-semibold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">ProjectBase</span>
+          <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-gray-800/80 text-gray-400 border border-gray-700/50 select-none">v0.8.0</span>
         </div>
 
         <div class="h-5 w-px bg-gray-800"></div>
