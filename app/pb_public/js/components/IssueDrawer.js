@@ -27,6 +27,7 @@ const IssueDrawerComponent = {
       newCommentContent: '',
       newCommentAuthorType: 'user', // 'user' or 'agent'
       copiedBadge: false,
+      copiedLinkBadge: false,
       isAgentDropdownOpen: false,
       isFullscreen: false,
       aiLoadingSubtasks: false,
@@ -302,6 +303,14 @@ const IssueDrawerComponent = {
   -d '{"status":"done"}'`;
       navigator.clipboard.writeText(cmd);
       alert('Copied Agent cURL command to clipboard!');
+    },
+    copyIssueLink() {
+      if (!this.issue) return;
+      // Deep link straight to this card: hash route opens the drawer on reload.
+      const url = `${window.location.origin}${window.location.pathname}#/pb/board/issue/${this.issue.id}`;
+      navigator.clipboard.writeText(url);
+      this.copiedLinkBadge = true;
+      setTimeout(() => { this.copiedLinkBadge = false; }, 2000);
     }
   },
   template: `
@@ -335,6 +344,16 @@ const IssueDrawerComponent = {
           </div>
 
           <div class="flex items-center space-x-2">
+            <!-- Share / Copy deep link -->
+            <button
+              @click="copyIssueLink"
+              class="px-2.5 py-1 rounded-md text-[11px] font-mono text-sky-300 hover:text-white bg-sky-950/60 hover:bg-sky-900/70 border border-sky-800/40 transition-colors flex items-center space-x-1.5 shadow-sm select-none"
+              title="Copy direct link to this card"
+            >
+              <i data-lucide="link" class="w-3 h-3"></i>
+              <span>Copy Link</span>
+              <span v-if="copiedLinkBadge" class="text-[10px] text-emerald-400 font-semibold animate-pulse">✓</span>
+            </button>
             <!-- Agent Dispatch Controls -->
             <div class="relative">
               <button
