@@ -36,4 +36,8 @@ Add to ~/.cursor/mcp.json or ~/.flomaster/config.json:
    - Replace defs: PUT  /api/projectbase/projects/<ID>/custom-fields {"fields":[{"label":"Client","type":"text"},{"label":"Gate","type":"select","options":["P0","P1"]}]}
    - Validate:     POST /api/projectbase/projects/<ID>/custom-fields/validate {"values":{"client":"Acme"}}
    - Types: text | number | select | checkbox | date
-6. Full Agent Guide: GET /llms-full.txt
+6. In-app Notifications (recipient-only inbox, hook-generated):
+   - List:   GET  /api/collections/notifications/records?sort=-created
+   - Read:   PATCH /api/collections/notifications/records/<ID> {"read":true}
+   - Read all: POST /api/projectbase/notifications/read-all
+7. Full Agent Guide: GET /llms-full.txt

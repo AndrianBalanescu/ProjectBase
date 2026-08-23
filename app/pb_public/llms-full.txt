@@ -64,6 +64,17 @@ When an agent is assigned to work on a project:
 - author_type (enum: user | agent | system)
 - content (text, markdown)
 
+### notifications (in-app inbox, created by hooks)
+- id (15 char text)
+- recipient (relation -> users, required; only the recipient can read it)
+- issue (relation -> issues, optional)
+- comment (relation -> comments, optional)
+- actor (text, display name of whoever caused it)
+- actor_type (enum: user | agent | system)
+- type (enum: assigned | mentioned | commented | status | priority | system)
+- message (text, human-readable summary)
+- read (bool)
+
 ## 5. cURL Snippets for Non-MCP Agents
 ### Create Task:
 curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/quick-task \
@@ -94,3 +105,15 @@ curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/projec
 curl -s -X PATCH ${PROJECTBASE_URL:-http://localhost:8120}/api/collections/issues/records/<ISSUE_ID> \
   -H "Content-Type: application/json" \
   -d '{"custom_fields":{"client":"Acme","gate":"P1","effort":5}}'
+
+### In-app notifications inbox:
+# List my notifications (only your own rows are visible):
+curl -s ${PROJECTBASE_URL:-http://localhost:8120}/api/collections/notifications/records?sort=-created \
+  -H "Authorization: <USER_TOKEN>"
+# Mark one read:
+curl -s -X PATCH ${PROJECTBASE_URL:-http://localhost:8120}/api/collections/notifications/records/<NOTIF_ID> \
+  -H "Content-Type: application/json" -H "Authorization: <USER_TOKEN>" \
+  -d '{"read":true}'
+# Mark all read:
+curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/notifications/read-all \
+  -H "Authorization: <USER_TOKEN>"

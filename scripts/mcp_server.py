@@ -227,5 +227,30 @@ def get_stats() -> Dict[str, Any]:
     """Get high-level workspace statistics, completion rates, and status breakdowns."""
     return _request("/api/projectbase/stats")
 
+@mcp.tool()
+def list_notifications(unread_only: bool = True, limit: int = 20) -> List[Dict[str, Any]]:
+    """List the current user's in-app notifications (unread first).
+
+    Args:
+        unread_only: If True (default), only return unread notifications.
+        limit: Maximum number of notifications to return (default 20).
+    """
+    res = _request(f"/api/collections/notifications/records?perPage={limit}&sort=-created")
+    items = res.get("items", [])
+    if unread_only:
+        items = [n for n in items if not n.get("read")]
+    return items
+
+@mcp.tool()
+def mark_notification_read(notification_id: str) -> Dict[str, Any]:
+    """Mark a single in-app notification as read by its id."""
+    return _request(f"/api/collections/notifications/records/{notification_id}",
+                    method="PATCH", data={"read": True})
+
+@mcp.tool()
+def mark_all_notifications_read() -> Dict[str, Any]:
+    """Mark every unread in-app notification of the current user as read."""
+    return _request("/api/projectbase/notifications/read-all", method="POST", data={})
+
 if __name__ == "__main__":
     mcp.run()

@@ -64,17 +64,22 @@
     </div>
 
     <template v-else>
-    <header-bar 
+    <header-bar
       :projects="projects"
       :current-project="currentProject"
       :current-view="currentView"
       :realtime-connected="realtimeConnected"
+      :notifications="notifications"
+      :unread-notifications="unreadNotifications"
       @select-project="selectProject"
       @change-view="changeView"
       @open-new-issue="isNewIssueOpen = true"
       @open-omnibar="isOmnibarOpen = true"
       @open-new-project="editingProject = null; isProjectModalOpen = true;"
       @open-custom-fields="isCustomFieldsOpen = true"
+      @toggle-notifications="loadNotifications"
+      @notification-click="handleNotificationClick"
+      @mark-all-read="handleMarkAllNotificationsRead"
     ></header-bar>
 
     <!-- Offline indicator (Service Worker app shell stays usable offline) -->

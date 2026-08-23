@@ -32,6 +32,10 @@ const API = {
     pb.collection('comments').subscribe('*', (e) => {
       this.notifySubscribers('comments', e);
     }).catch(err => console.warn('Comments subscription error:', err));
+
+    pb.collection('notifications').subscribe('*', (e) => {
+      this.notifySubscribers('notifications', e);
+    }).catch(err => console.warn('Notifications subscription error:', err));
   },
 
   unsubscribeAll() {
@@ -41,6 +45,7 @@ const API = {
     try { pb.collection('cycles').unsubscribe('*'); } catch (e) {}
     try { pb.collection('milestones').unsubscribe('*'); } catch (e) {}
     try { pb.collection('comments').unsubscribe('*'); } catch (e) {}
+    try { pb.collection('notifications').unsubscribe('*'); } catch (e) {}
   },
 
   notifySubscribers(collection, event) {
@@ -191,6 +196,27 @@ const API = {
       filter,
       sort: '-created',
       expand: 'project,issue'
+    });
+  },
+
+  // In-app notifications (inbox bell)
+  async getNotifications() {
+    const userId = pb.authStore.model && pb.authStore.model.id;
+    if (!userId) return { items: [] };
+    return await pb.collection('notifications').getList(1, 50, {
+      filter: `recipient = "${userId}"`,
+      sort: '-created',
+      expand: 'issue,issue.project,comment'
+    });
+  },
+
+  async markNotificationRead(id) {
+    return await pb.collection('notifications').update(id, { read: true });
+  },
+
+  async markAllNotificationsRead() {
+    return await pb.send('/api/projectbase/notifications/read-all', {
+      method: 'POST'
     });
   },
 

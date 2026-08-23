@@ -18,7 +18,7 @@ Must-Have = table stakes vs Linear/Plane. Moat = differentiators nobody in the l
 | REST API | ✅ | ✅ | ✅ auto REST + OpenAPI 3.1/Scalar | ✅ shipped |
 | Keyboard-first UX | ✅ | ⚠️ partial | ✅ CommandPalette + shortcuts | ✅ shipped |
 | Importers (Linear/Plane/GitHub) | export only | partial | ✅ CSV + GitHub API importers | ✅ shipped |
-| Notifications | ✅ | ✅ | ✅ Discord/Telegram/webhook | ✅ shipped |
+| Notifications | ✅ | ✅ | ✅ Discord/Telegram/webhook + in-app inbox (assigned/mention/comment/status/priority), unread badge, mark-read, recipient-scoped rules | ✅ shipped |
 | Roadmap view | ✅ | ✅ | ✅ milestones + North Star + progress, assign issues to milestones in create/edit drawer | ✅ shipped |
 | Custom fields | ✅ | paid tier | ✅ text/number/select/checkbox/date, per-project, validation, MCP/OpenAPI/llms docs | ✅ shipped |
 | Offline / local-first | ❌ | ❌ | ✅ Service Worker app shell: pre-cached static shell, network-first API w/ cache fallback, PWA manifest, online/offline banner | ✅ shipped (cycle 18) |
