@@ -156,6 +156,10 @@ body {
   from { opacity: 0; transform: translateY(0.5rem); }
   to   { opacity: 1; transform: translateY(0); }
 }
+@keyframes pb-slide-in-right {
+  from { opacity: 0; transform: translateX(1.5rem); }
+  to   { opacity: 1; transform: translateX(0); }
+}
 
 .animate-in,
 .fade-in {
@@ -182,6 +186,12 @@ body {
 .slide-in-from-bottom-2 {
   animation-name: pb-slide-in-bottom-2;
   animation-duration: 150ms;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+}
+.slide-in-from-right {
+  animation-name: pb-slide-in-right;
+  animation-duration: 200ms;
   animation-timing-function: ease-out;
   animation-fill-mode: both;
 }
