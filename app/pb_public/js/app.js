@@ -240,10 +240,14 @@ const App = {
 
     setupKeyboardShortcuts() {
       window.addEventListener('keydown', (e) => {
-        // Ignore inside input/textarea unless it's Cmd+K or Escape
-        const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName);
+        const target = e.target;
+        const isInput = target && (
+          ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) ||
+          target.isContentEditable ||
+          (target.closest && (target.closest('[contenteditable="true"]') || target.closest('.ProseMirror') || target.closest('.milkdown')))
+        );
 
-        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
           e.preventDefault();
           this.isOmnibarOpen = !this.isOmnibarOpen;
           return;
@@ -254,11 +258,14 @@ const App = {
           this.isNewIssueOpen = false;
           this.isProjectModalOpen = false;
           this.isCycleModalOpen = false;
+          this.isImportOpen = false;
           this.selectedIssue = null;
           return;
         }
 
-        if (isInput) return;
+        // Ignore single-key shortcuts when typing, when modifiers are pressed (e.g. Cmd+C copy), or when a modal/drawer is open
+        if (isInput || e.metaKey || e.ctrlKey || e.altKey) return;
+        if (this.isNewIssueOpen || this.isOmnibarOpen || this.isProjectModalOpen || this.isCycleModalOpen || this.isImportOpen || this.selectedIssue) return;
 
         if (e.key === 'c' || e.key === 'C') {
           e.preventDefault();
