@@ -61,7 +61,9 @@ onRecordAfterCreateSuccess((e) => {
 onRecordAfterUpdateSuccess((e) => {
     try {
         const issue = e.record
-        const original = issue.originalCopy()
+        // NOTE: this PocketBase JSVM has no `originalCopy()`; the pre-update
+        // record proxy is obtained by CALLING `record.original()`.
+        const original = issue.original()
         const assignee = issue.get("assignee") || ""
         const prevAssignee = original ? (original.get("assignee") || "") : ""
 
@@ -101,18 +103,18 @@ onRecordAfterUpdateSuccess((e) => {
         }
 
         // Status change (skip when the actor is the assignee themselves).
-        const oldStatus = original ? original.get("status") : null
-        const newStatus = issue.get("status")
-        if (oldStatus && newStatus && oldStatus !== newStatus && assignee) {
+        const oldStatus = original ? (original.get("status") || "") : ""
+        const newStatus = issue.get("status") || ""
+        if (newStatus && oldStatus !== newStatus && assignee) {
             const recipients = e.app.findRecordsByFilter(
                 "users", `name = {:name}`, "", 0, 0, { name: assignee })
             notify(recipients, "status", `${actorName} moved ${identifier} to ${newStatus}: ${title}`)
         }
 
         // Priority change (skip when the actor is the assignee themselves).
-        const oldPriority = original ? original.get("priority") : null
-        const newPriority = issue.get("priority")
-        if (oldPriority && newPriority && oldPriority !== newPriority && assignee) {
+        const oldPriority = original ? (original.get("priority") || "") : ""
+        const newPriority = issue.get("priority") || ""
+        if (newPriority && oldPriority !== newPriority && assignee) {
             const recipients = e.app.findRecordsByFilter(
                 "users", `name = {:name}`, "", 0, 0, { name: assignee })
             notify(recipients, "priority", `${actorName} set ${identifier} priority to ${newPriority}: ${title}`)
