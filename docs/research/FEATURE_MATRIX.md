@@ -22,6 +22,8 @@ Must-Have = table stakes vs Linear/Plane. Moat = differentiators nobody in the l
 | Roadmap view | ✅ | ✅ | ✅ milestones + North Star + progress, assign issues to milestones in create/edit drawer | ✅ shipped |
 | Custom fields | ✅ | paid tier | ✅ text/number/select/checkbox/date, per-project, validation, MCP/OpenAPI/llms docs | ✅ shipped |
 | Offline / local-first | ❌ | ❌ | ✅ Service Worker app shell: pre-cached static shell, network-first API w/ cache fallback, PWA manifest, online/offline banner | ✅ shipped (cycle 18) |
+| Self-host one-command | ❌ | Docker compose | ✅ `systemd` unit + `scripts/install-systemd.sh`, hardened (NoNewPrivileges, ProtectSystem/Home, PrivateTmp) | ✅ shipped (cycle 19) |
+| Backup & restore | partial | Docker volumes | ✅ `scripts/backup.sh` + `scripts/restore.sh` (online via PB backups API; offline w/ auto-rollback) | ✅ shipped (cycle 19) |
 
 ## Moat (differentiators)
 

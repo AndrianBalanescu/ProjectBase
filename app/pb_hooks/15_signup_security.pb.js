@@ -22,23 +22,31 @@
 // Admin/manager role assignment remains possible only by an authenticated
 // admin (or PocketBase superuser) creating or updating the account; any other
 // creator/updater (or the anonymous public) is forced to member.
-
-function _isPrivileged(req) {
-    const admin = req && req.admin
-    const auth = req && req.auth
-    return Boolean(
-        admin ||
-        (auth && auth.get && (auth.get("role") === "admin" || auth.get("role") === "manager")))
-}
+//
+// Scoping note (why everything is inlined):
+// In the Goja runtime PocketBase uses, module-scope function declarations are
+// NOT resolvable from inside a hook callback — every call to one throws
+// `ReferenceError: <fn> is not defined`. An earlier version declared a
+// module-scope `_isPrivileged(req)` helper and called it from the callbacks;
+// every invocation threw, the catch forced `member` unconditionally, and even
+// superuser-created manager accounts were silently downgraded to member. All
+// logic below is therefore inlined directly inside each callback.
+//
+// A superuser authenticates as a record in the `_superusers` collection, which
+// has no `role` field; it is detected via `auth.collection().name`.
 
 onRecordCreateRequest((e) => {
     try {
-        if (!_isPrivileged(e.requestInfo())) {
-            // Anonymous self-service signup: force member, never escalate.
-            e.record.set("role", "member")
-        }
+        // ANY actor creating a user record (anonymous public, regular
+        // admin/manager, even a superuser via REST) is coerced to 'member' on
+        // the CREATE path. This makes it impossible for a stranger to self-
+        // escalate, and keeps role assignment a strictly UPDATE-path concern:
+        // an account is promoted to admin/manager only by a privileged PATCH
+        // (see the onRecordUpdateRequest handler below and
+        // test_manager_admin_cannot_mint_privileged_user_via_create).
+        e.record.set("role", "member")
     } catch (err) {
-        // On any introspection failure, fail safe to member (never escalate).
+        // Fail safe to member (never escalate).
         try { e.record.set("role", "member") } catch (_) {}
         console.error(">>> Error forcing member role on new user:", err)
     }
@@ -50,10 +58,26 @@ onRecordUpdateRequest((e) => {
         const req = e.requestInfo()
         const auth = req && req.auth
         const isSelfUpdate = auth && auth.id && auth.id === e.record.id
-        if (isSelfUpdate && !req.admin) {
-            // Self-service update: freeze the role to its current stored value.
-            // This blocks self-promotion to admin/manager while allowing a user
-            // (including an existing admin/manager) to edit their own name,
+        // Determine whether this is a privileged updater (superuser, or an
+        // authenticated user with role admin/manager). Privileged updaters may
+        // change roles; a self-service edit by anyone else is frozen.
+        let privileged = false
+        let who = null
+        try { who = req && (req.admin || req.auth) } catch (x) {}
+        if (who) {
+            try {
+                if (who.collection && who.collection().name === "_superusers") {
+                    privileged = true
+                } else if (who.get) {
+                    const role = who.get("role")
+                    privileged = role === "admin" || role === "manager"
+                }
+            } catch (x) {}
+        }
+        if (isSelfUpdate && !privileged) {
+            // Self-service update by a non-privileged user: freeze the role to
+            // its current stored value. This blocks self-promotion to
+            // admin/manager while allowing a user to edit their own name,
             // email, etc. without losing their role.
             let existingRole = "member"
             try {
