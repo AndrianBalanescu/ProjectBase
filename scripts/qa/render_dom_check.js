@@ -1,4 +1,4 @@
-// Render QA for ProjectBase cycle 39 — proves the CSS fix live:
+// Render QA for ProjectBase (cycle 39 CSS fix + cycle 40 issue relationships):
 //  - zero console errors / page errors / failed same-origin requests
 //  - Vue app mounted (#app has content), no raw {{ }} leakage
 //  - compiled Tailwind utilities actually apply (computed styles)
@@ -18,6 +18,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   });
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 
+  const relations = { checked: false };
   const consoleErrors = [];
   const pageErrors = [];
   const failedReqs = [];
@@ -30,7 +31,11 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     }
   });
   page.on('pageerror', (e) => pageErrors.push(String(e).slice(0, 200)));
-  page.on('requestfailed', (r) => failedReqs.push(r.url().slice(0, 120)));
+  page.on('requestfailed', (r) => {
+    // SSE stream teardown on navigation/reload is expected, not a failure.
+    if (r.url().includes('/api/realtime')) return;
+    failedReqs.push(r.url().slice(0, 120));
+  });
   page.on('response', (r) => {
     if (r.url().startsWith(BASE) && r.status() >= 400) {
       all4xx.push(`${r.status()} ${r.url()}`);
@@ -118,6 +123,110 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       const drawer = document.querySelector('.slide-in-from-right');
       return !!drawer && getComputedStyle(drawer).display !== 'none';
     });
+
+    // ---- Issue relationships UI (cycle 40): drawer section renders, adding a
+    // blocks relation through the real UI shows the row + kanban lock badge,
+    // and cleanup removes the temp edge/issue. ----
+    relations.checked = true;
+    const probeId = 'ckat9ahso93piex';
+    const tmpTitle = 'Rel QA target ' + Date.now();
+    // 1. Create a temp target issue in the probe's project (authed page ctx).
+    // The PocketBase SDK stores its token in localStorage; raw fetch calls are
+    // anonymous unless we forward it as the Authorization header.
+    let tmpIdHolder = null;
+    try {
+    const tmp = await page.evaluate(async ({ probeId, tmpTitle }) => {
+      let token = null;
+      try {
+        const raw = localStorage.getItem('pb_auth');
+        if (raw) token = JSON.parse(raw).token;
+      } catch (e) { /* ignore */ }
+      if (!token) {
+        try {
+          const raw2 = localStorage.getItem('pocketbase_auth');
+          if (raw2) token = JSON.parse(raw2).token;
+        } catch (e) { /* ignore */ }
+      }
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = token;
+      const probeRes = await fetch('/api/collections/issues/records/' + probeId, { headers });
+      if (!probeRes.ok) return { error: 'probe fetch ' + probeRes.status };
+      const probe = await probeRes.json();
+      const res = await fetch('/api/collections/issues/records', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ project: probe.project, title: tmpTitle, status: 'todo' })
+      });
+      if (!res.ok) return { error: 'create ' + res.status + ' ' + (await res.text()).slice(0, 120) };
+      return { id: (await res.json()).id };
+    }, { probeId, tmpTitle });
+    if (tmp.id) tmpIdHolder = tmp.id;
+    if (tmp.id) {
+      // 2. Reload so the app's issue list (picker source) includes the temp issue.
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(3000);
+      // 3. Open the probe drawer and verify the Relationships section renders.
+      await page.evaluate((id) => { location.hash = '#/pb/board/issue/' + id; }, probeId);
+      await page.waitForTimeout(2500);
+      relations.sectionRendered = await page.evaluate(() => {
+        const drawer = document.querySelector('.slide-in-from-right');
+        if (!drawer) return false;
+        return !!drawer.querySelector('input[placeholder="Search issues to link..."]');
+      });
+      // 4. Type into the picker and click the temp issue candidate.
+      await page.fill('input[placeholder="Search issues to link..."]', tmpTitle);
+      await page.waitForTimeout(600);
+      const clicked = await page.evaluate((title) => {
+        const btn = Array.from(document.querySelectorAll('button'))
+          .find((b) => b.textContent && b.textContent.includes(title));
+        if (btn) { btn.click(); return true; }
+        return false;
+      }, tmpTitle);
+      relations.pickerPicked = clicked;
+      await page.waitForTimeout(2000);
+      // 5. The Blocks row for the temp issue must appear in the drawer.
+      relations.rowShown = await page.evaluate((title) => {
+        const drawer = document.querySelector('.slide-in-from-right');
+        return !!drawer && (drawer.textContent || '').includes(title);
+      }, tmpTitle);
+      // 6. The kanban card for the temp issue must show the blocked lock badge.
+      // Reload first: programmatic mirror saves don't broadcast SSE, so the
+      // temp issue's relations need a fresh fetch from the server.
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(3000);
+      await page.evaluate(() => { location.hash = '#/pb/board'; });
+      await page.waitForTimeout(2500);
+      relations.kanbanLockShown = await page.evaluate((title) => {
+        const card = Array.from(document.querySelectorAll('.kanban-card-drag-handle'))
+          .find((c) => (c.textContent || '').includes(title));
+        if (!card) return false;
+        return !!(card.querySelector('i[data-lucide="lock"]') || card.querySelector('.text-red-400'));
+      }, tmpTitle);
+    } else {
+      relations.error = tmp.error || 'temp issue create failed';
+    }
+    } finally {
+      // Crash-safe cleanup: always remove the temp issue if it was created.
+      if (tmpIdHolder) {
+        await page.evaluate(async ({ probeId, tmpId }) => {
+          let token = null;
+          try { const raw = localStorage.getItem('pb_auth'); if (raw) token = JSON.parse(raw).token; } catch (e) {}
+          if (!token) { try { const r = localStorage.getItem('pocketbase_auth'); if (r) token = JSON.parse(r).token; } catch (e) {} }
+          const headers = { 'Content-Type': 'application/json' };
+          if (token) headers.Authorization = token;
+          try {
+            await fetch('/api/projectbase/issues/' + probeId + '/relations', {
+              method: 'DELETE',
+              headers,
+              body: JSON.stringify({ issue: tmpId, type: 'blocks' })
+            });
+          } catch (e) { /* ignore */ }
+          try {
+            await fetch('/api/collections/issues/records/' + tmpId, { method: 'DELETE', headers });
+          } catch (e) { /* ignore */ }
+        }, { probeId, tmpId: tmpIdHolder });
+      }
+    }
   }
 
   const failures = [];
@@ -142,6 +251,15 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   if (!checks.animName.startsWith('pb-')) failures.push(`animation ${checks.animName} not a pb-* keyframe`);
   if (checks.animDuration !== '0.15s') failures.push(`animation duration ${checks.animDuration} != 0.15s`);
   if (routing.checked && routing.staleDrawer) failures.push('stale issue drawer shown for nonexistent route issue');
+  if (routing.checked && !routing.issueOpened) failures.push('real issue deep link did not open the drawer');
+  if (routing.checked && routing.staleDrawerOnPlainView) failures.push('stale issue drawer shown on plain view hash');
+  if (relations && relations.checked) {
+    if (relations.error) failures.push('relations setup error: ' + relations.error);
+    if (relations.sectionRendered === false) failures.push('Relationships section did not render in drawer');
+    if (!relations.pickerPicked) failures.push('relation picker could not pick the temp issue');
+    if (relations.rowShown === false) failures.push('added relation row did not appear in drawer');
+    if (relations.kanbanLockShown === false) failures.push('blocked kanban card did not show lock badge');
+  }
   if (routing.checked && !routing.issueOpened) failures.push('real issue deep link did not open the drawer');
   if (routing.checked && routing.staleDrawerOnPlainView) failures.push('stale drawer left open on plain view hash');
   if (!routing.checked) failures.push('routing regression not exercised (no login form found)');
