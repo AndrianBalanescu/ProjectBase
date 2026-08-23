@@ -31,7 +31,8 @@ routerAdd("GET", "/api/projectbase/projects/{id}/custom-fields", (e) => {
     }
     try {
         if (!e.auth || !e.auth.id) return e.unauthorizedError("Authentication required")
-        let project = e.app.findRecordById("projects", e.request.pathValue("id"))
+        let project = null
+        try { project = e.app.findRecordById("projects", e.request.pathValue("id")) } catch (err) { project = null }
         if (!project) return e.notFoundError("Project not found")
         return e.json(200, { fields: readDefs(project) })
     } catch (err) {
@@ -44,7 +45,8 @@ routerAdd("PUT", "/api/projectbase/projects/{id}/custom-fields", (e) => {
     const slugify = (label) => String(label || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40)
     try {
         if (!e.auth || !e.auth.id) return e.unauthorizedError("Authentication required")
-        const project = e.app.findRecordById("projects", e.request.pathValue("id"))
+        let project = null
+        try { project = e.app.findRecordById("projects", e.request.pathValue("id")) } catch (err) { project = null }
         if (!project) return e.notFoundError("Project not found")
         const body = e.requestInfo().body || {}
         const fields = body.fields
@@ -60,6 +62,7 @@ routerAdd("PUT", "/api/projectbase/projects/{id}/custom-fields", (e) => {
             }
             const label = String(f.label || "").trim()
             if (!label) return e.json(400, { error: "Each field needs a label" })
+            if (label.length > 120) return e.json(400, { error: "Field label too long (max 120 chars)" })
             const type = String(f.type || "text").toLowerCase()
             if (TYPES.indexOf(type) === -1) {
                 return e.json(400, { error: "Unsupported type '" + type + "'. Allowed: " + TYPES.join(", ") })
@@ -69,6 +72,9 @@ routerAdd("PUT", "/api/projectbase/projects/{id}/custom-fields", (e) => {
             if (seenKeys[key]) return e.json(400, { error: "Duplicate field key '" + key + "'" })
             seenKeys[key] = true
             const options = Array.isArray(f.options) ? f.options.map((o) => String(o)).slice(0, 100) : []
+            for (let oi = 0; oi < options.length; oi++) {
+                if (options[oi].length > 120) return e.json(400, { error: "Field option too long (max 120 chars)" })
+            }
             if (type === "select" && options.length === 0) {
                 return e.json(400, { error: "Select field '" + label + "' needs at least one option" })
             }
@@ -95,7 +101,8 @@ routerAdd("POST", "/api/projectbase/projects/{id}/custom-fields/validate", (e) =
     }
     try {
         if (!e.auth || !e.auth.id) return e.unauthorizedError("Authentication required")
-        const project = e.app.findRecordById("projects", e.request.pathValue("id"))
+        let project = null
+        try { project = e.app.findRecordById("projects", e.request.pathValue("id")) } catch (err) { project = null }
         if (!project) return e.notFoundError("Project not found")
         const body = e.requestInfo().body || {}
         const defs = readDefs(project)

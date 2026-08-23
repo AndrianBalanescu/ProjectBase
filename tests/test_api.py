@@ -1001,3 +1001,26 @@ def test_issue_custom_fields_roundtrip():
 
     # cleanup issue
     _request("DELETE", f"/api/collections/issues/records/{iid}", headers=hdr)
+
+def test_custom_fields_nonexistent_project_404():
+    """Authed request for a nonexistent project returns 404, not 500."""
+    hdr = {"Authorization": _superuser_token()}
+    st, _ = _request("GET", "/api/projectbase/projects/does-not-exist-xyz/custom-fields", headers=hdr)
+    assert st == 404, f"expected 404, got {st}"
+    st, _ = _request("PUT", "/api/projectbase/projects/does-not-exist-xyz/custom-fields",
+                     {"fields": []}, headers=hdr)
+    assert st == 404, f"expected 404, got {st}"
+
+def test_custom_fields_reject_oversized_input():
+    """Oversized labels and select options are rejected to prevent storage bloat."""
+    pid = _get_any_project_id()
+    hdr = {"Authorization": _superuser_token()}
+    st, body = _request("PUT", f"/api/projectbase/projects/{pid}/custom-fields",
+                        {"fields": [{"label": "A" * 500, "type": "text"}]}, headers=hdr)
+    assert st == 400 and "too long" in body["error"], f"oversized label not rejected: {st} {body}"
+    st, body = _request("PUT", f"/api/projectbase/projects/{pid}/custom-fields",
+                        {"fields": [{"label": "Gate", "type": "select", "options": ["B" * 500]}]}, headers=hdr)
+    assert st == 400 and "too long" in body["error"], f"oversized option not rejected: {st} {body}"
+    st, body = _request("PUT", f"/api/projectbase/projects/{pid}/custom-fields",
+                        {"fields": [{"label": f"f{i}", "type": "text"} for i in range(51)]}, headers=hdr)
+    assert st == 400 and "max 50" in body["error"], f"oversized field count not rejected: {st} {body}"
