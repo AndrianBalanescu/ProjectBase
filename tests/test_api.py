@@ -797,3 +797,49 @@ def test_manager_admin_cannot_mint_privileged_user_via_create():
             f"{creator_role} create of admin must be coerced to member, got {minted.get('role')}")
         _delete_user_by_email(mint_email)
         _delete_user_by_email(emailC)
+
+
+# ---------------------------------------------------------------------------
+# Performance & Indexes (Audit & Optimization)
+# ---------------------------------------------------------------------------
+
+def test_sqlite_performance_indexes_exist():
+    """Verify that composite SQLite indexes are applied to the issues table."""
+    import sqlite3
+    db_path = os.path.join(os.path.dirname(__file__), "..", "pb_data", "data.db")
+    if not os.path.exists(db_path):
+        pytest.skip("pb_data/data.db not accessible locally")
+    
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='issues';")
+    indexes = {row[0] for row in cursor.fetchall()}
+    conn.close()
+
+    expected = {
+        "idx_issues_project_order",
+        "idx_issues_project_number",
+        "idx_issues_project_status",
+        "idx_issues_cycle",
+        "idx_issues_milestone",
+    }
+    missing = expected - indexes
+    assert not missing, f"Missing required performance indexes: {missing}"
+
+
+def test_sqlite_query_plan_uses_index():
+    """Verify that project-filtered issue lookup uses the composite index instead of full table scan."""
+    import sqlite3
+    db_path = os.path.join(os.path.dirname(__file__), "..", "pb_data", "data.db")
+    if not os.path.exists(db_path):
+        pytest.skip("pb_data/data.db not accessible locally")
+    
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("EXPLAIN QUERY PLAN SELECT * FROM issues WHERE project = 'sample' ORDER BY issue_number DESC LIMIT 1;")
+    plan = " ".join(row[3] for row in cursor.fetchall())
+    conn.close()
+
+    assert "idx_issues_project_number" in plan, f"Query plan did not utilize index: {plan}"
+    assert "SCAN" not in plan, f"Query plan performed unindexed table scan: {plan}"
+
