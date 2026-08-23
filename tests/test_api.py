@@ -117,6 +117,9 @@ def test_openapi_spec_valid():
     assert isinstance(body, dict)
     assert body.get("openapi", "").startswith("3.")
     assert "paths" in body
+    # Custom-fields endpoints must be discoverable for agents
+    assert "/projectbase/projects/{id}/custom-fields" in body["paths"]
+    assert "/projectbase/projects/{id}/custom-fields/validate" in body["paths"]
 
 
 def test_llms_txt_served():

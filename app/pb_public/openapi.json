@@ -298,6 +298,144 @@
           }
         }
       }
+    },
+    "/projectbase/projects/{id}/custom-fields": {
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "List Custom Field Definitions",
+        "description": "Returns the ordered list of custom field definitions for a project (Linear-style properties). Field types: text, number, select, checkbox, date.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Project record id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Custom field definitions array",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": { "type": "string" },
+                          "label": { "type": "string" },
+                          "type": { "type": "string", "enum": ["text", "number", "select", "checkbox", "date"] },
+                          "required": { "type": "boolean" },
+                          "options": { "type": "array", "items": { "type": "string" } }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Project not found" }
+        }
+      },
+      "put": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Replace Custom Field Definitions",
+        "description": "Replaces the full ordered list of custom field definitions for a project. Labels/options capped at 120 chars, max 50 fields.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Project record id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["fields"],
+                "properties": {
+                  "fields": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": { "type": "string" },
+                        "label": { "type": "string" },
+                        "type": { "type": "string", "enum": ["text", "number", "select", "checkbox", "date"], "default": "text" },
+                        "required": { "type": "boolean", "default": false },
+                        "options": { "type": "array", "items": { "type": "string" } }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated definitions" },
+          "400": { "description": "Invalid field definition" },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Project not found" }
+        }
+      }
+    },
+    "/projectbase/projects/{id}/custom-fields/validate": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Validate Issue Custom Field Values",
+        "description": "Validates a proposed custom_fields payload against the project's definitions. Returns 200 valid or 422 with an error string.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Project record id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["values"],
+                "properties": {
+                  "values": {
+                    "type": "object",
+                    "description": "Map of field key -> value"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Valid", "content": { "application/json": { "schema": { "type": "object", "properties": { "valid": { "type": "boolean" } } } } } },
+          "401": { "description": "Unauthorized" },
+          "404": { "description": "Project not found" },
+          "422": { "description": "Validation failed", "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" } } } } } }
+        }
+      }
     }
   }
 }
