@@ -22,7 +22,7 @@
 ## 🚀 Key Features
 
 - **⚡ Ultra-Low Footprint**: Consumes only **~16 MB RAM** in production (compared to 2,700 MB on Plane CE). Instant cold starts in <50ms.
-- **✨ Zero-Build Frontend**: Vanilla Vue 3 UMD + Tailwind CSS served straight out of `pb_public/`. Instant browser refreshes with zero `node_modules` overhead.
+- **✨ Zero-Build Frontend**: Vanilla Vue 3 UMD + Tailwind CSS served straight out of `app/pb_public/`. Instant browser refreshes with zero `node_modules` overhead.
 - **📋 Multi-Project & Sprints**: Manage multiple repositories/domains (`LOAD`, `IBR`, `PB`, `HOME`), timeboxed Sprint Cycles, burndown progress, and custom labels.
 - **🎯 Fluid Kanban & List Views**: Drag-and-drop card movements powered by SortableJS with real-time SSE sync across all open browser sessions and agent executions.
 - **📝 Markdown Drawer & Subtasks**: Full markdown specification editor with live preview, interactive checklists, and audit logging comments.

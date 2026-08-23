@@ -37,16 +37,16 @@ done
 command -v docker >/dev/null 2>&1 || die "docker not found"
 
 if [[ "$ASSUME_YES" -ne 1 ]]; then
-  read -r -p "This DELETES all data in $(pwd)/pb_data and reseeds the demo. Continue? [y/N] " ans
+  read -r -p "This DELETES all data in $(pwd)/app/pb_data and reseeds the demo. Continue? [y/N] " ans
   [[ "${ans,,}" == "y" ]] || die "aborted by user"
 fi
 
-[[ -d pb_data ]] || die "no pb_data here — run from a ProjectBase checkout"
+[[ -d app/pb_data ]] || mkdir -p app/pb_data
 
 log "Stopping stack ..."
 docker compose down || true
 
-log "Wiping pb_data ..."
+log "Wiping app/pb_data ..."
 # The container runs as root and owns pb_data files on the bind mount, so a
 # plain host `rm -rf` fails with permission denied for non-root deploy users.
 # Wipe via a throwaway root container over the bind mount instead.
