@@ -16,11 +16,11 @@ Must-Have = table stakes vs Linear/Plane. Moat = differentiators nobody in the l
 | Real-time updates | ✅ | ✅ | ✅ SSE | ✅ shipped |
 | File attachments | ✅ | ✅ | ✅ FileField | ✅ shipped |
 | REST API | ✅ | ✅ | ✅ auto REST + OpenAPI 3.1/Scalar | ✅ shipped |
-| Keyboard-first UX | ✅ | ⚠️ partial | ❌ | **GAP — top priority** |
-| Importers (Linear/Plane/GitHub) | export only | partial | ❌ | **GAP — attacks migration pain** |
+| Keyboard-first UX | ✅ | ⚠️ partial | ✅ CommandPalette + shortcuts | ✅ shipped |
+| Importers (Linear/Plane/GitHub) | export only | partial | ✅ CSV + GitHub API importers | ✅ shipped |
 | Notifications | ✅ | ✅ | ✅ Discord/Telegram/webhook | ✅ shipped |
 | Roadmap view | ✅ | ✅ | ⚠️ milestones UI basic | partial |
-| Custom fields | ✅ | paid tier | ❌ | **GAP** |
+| Custom fields | ✅ | paid tier | ✅ text/number/select/checkbox/date, per-project, validation, MCP/OpenAPI/llms docs | ✅ shipped |
 | Offline / local-first | ❌ | ❌ | ❌ (vendored assets = offline-servable, not local-first) | opportunity |
 
 ## Moat (differentiators)
