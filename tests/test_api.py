@@ -1471,6 +1471,38 @@ def test_notifications_comment_notifies_assignee():
         _delete_user_by_email(email)
 
 
+def test_notifications_status_priority_change_notifies_assignee():
+    """Changing an issue's status/priority (by someone else) notifies the
+    assignee. Regression for the JSVM `record.original()` vs the non-existent
+    `record.originalCopy()` bug that silently dropped these notifications."""
+    email, pw, name, _uid_rec = _create_notif_user()
+    token = _user_token(email, pw)
+    pid = _first_project_id()
+
+    title = f"Notif Change {_uid()}"
+    st, issue = _authed_json("POST", "/api/collections/issues/records",
+                             {"project": pid, "title": title,
+                              "status": "todo", "priority": "low",
+                              "assignee": name})
+    assert st == 200, f"issue create failed: {st} {issue}"
+    iid = issue["id"]
+    try:
+        # The issue starts at 'todo'/'low'; advance it as a non-assignee actor
+        # (the test's anonymous/superuser context is not the assignee name).
+        st_s, body_s = _request(
+            "PATCH", f"/api/collections/issues/records/{iid}",
+            {"status": "in_progress", "priority": "high"},
+            headers={"Authorization": _superuser_token()})
+        assert st_s == 200, f"status/priority change failed: {st_s} {body_s}"
+        types = _notif_types(token)
+        assert "status" in types, f"expected status notification, got {types}"
+        assert "priority" in types, f"expected priority notification, got {types}"
+    finally:
+        _request("DELETE", f"/api/collections/issues/records/{iid}",
+                 headers={"Authorization": _superuser_token()})
+        _delete_user_by_email(email)
+
+
 def test_notifications_mention_notifies_mentioned_user():
     """A comment with @Name mention notifies the mentioned registered user."""
     email, pw, name, _uid_rec = _create_notif_user()
