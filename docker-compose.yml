@@ -4,7 +4,7 @@ services:
     container_name: projectbase
     restart: unless-stopped
     ports:
-      - "8120:8120"
+      - "${PROJECTBASE_PORT:-8120}:8120"
     volumes:
       - ./pb_data:/app/pb_data
       - ./pb_public:/app/pb_public
