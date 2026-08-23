@@ -262,6 +262,62 @@ def test_patch_empty_relations_ok(issues):
     assert status == 200
 
 
+def test_cycle_guard_rejects_contradictory_edges(issues):
+    """A blocks B; adding B blocks A or A blocked_by B must 400 (2-cycle)."""
+    # Fresh pair: use issues['a'] and issues['b'] but start from clean state
+    # (the fixture pair may carry edges from earlier tests; remove them first).
+    for (s, t) in ((issues["a"], issues["b"]), (issues["b"], issues["a"])):
+        for typ in ("blocks", "blocked_by", "related"):
+            _request("DELETE", f"/api/projectbase/issues/{s}/relations",
+                     {"issue": t, "type": typ}, headers=_hdr())
+
+    # A blocks B
+    st, body = _request("POST", f"/api/projectbase/issues/{issues['a']}/relations",
+                        {"issue": issues["b"], "type": "blocks"}, headers=_hdr())
+    assert st == 200, f"setup failed: {st} {body}"
+
+    # B blocks A -> contradictory cycle
+    st, body = _request("POST", f"/api/projectbase/issues/{issues['b']}/relations",
+                        {"issue": issues["a"], "type": "blocks"}, headers=_hdr())
+    assert st == 400, f"expected 400 for cycle, got {st}: {body}"
+
+    # A blocked_by B (which would mirror to B blocks A) -> also a cycle
+    st, body = _request("POST", f"/api/projectbase/issues/{issues['a']}/relations",
+                        {"issue": issues["b"], "type": "blocked_by"}, headers=_hdr())
+    assert st == 400, f"expected 400 for reverse cycle, got {st}: {body}"
+
+    # related is symmetric and must still be allowed alongside blocks
+    st, body = _request("POST", f"/api/projectbase/issues/{issues['a']}/relations",
+                        {"issue": issues["b"], "type": "related"}, headers=_hdr())
+    assert st == 200, f"related should coexist: {st} {body}"
+
+    # cleanup
+    for typ in ("blocks", "related"):
+        _request("DELETE", f"/api/projectbase/issues/{issues['a']}/relations",
+                 {"issue": issues["b"], "type": typ}, headers=_hdr())
+
+
+def test_delete_issue_sweeps_relations(issues):
+    """Deleting an issue removes every edge referencing it from other issues."""
+    # A related C + A blocks C
+    _request("POST", f"/api/projectbase/issues/{issues['a']}/relations",
+             {"issue": issues["c"], "type": "related"}, headers=_hdr())
+    _request("POST", f"/api/projectbase/issues/{issues['a']}/relations",
+             {"issue": issues["c"], "type": "blocks"}, headers=_hdr())
+
+    # Delete C
+    st, _ = _request("DELETE", f"/api/collections/issues/records/{issues['c']}", headers=_hdr())
+    assert st == 204 or st == 200, f"delete C failed: {st}"
+
+    # A must no longer reference C
+    ra = _raw_relations(issues["a"])
+    assert not any(r.get("issue") == issues["c"] for r in ra), f"dangling ref to deleted issue: {ra}"
+
+    # B must not have a dangling mirror either (B had no edges, but verify clean)
+    rb = _raw_relations(issues["b"])
+    assert not any(r.get("issue") == issues["c"] for r in rb), f"dangling mirror on B: {rb}"
+
+
 def test_incoming_lists_blocking_issues(issues):
     """B blocks A => A's GET must list B as an incoming 'blocks' edge."""
     _request("POST", f"/api/projectbase/issues/{issues['b']}/relations",

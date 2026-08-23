@@ -87,6 +87,51 @@ onRecordUpdateRequest((e) => {
     }
 }, "issues")
 
+// --- Delete sweep -----------------------------------------------------------
+// When an issue is deleted, remove every edge referencing it from the
+// relations arrays of all remaining issues (avoids dangling "Unknown issue"
+// rows in the drawer). Runs in its own scope, so helpers are inlined.
+onRecordDelete((e) => {
+    try {
+        const deletedId = e.record.id
+        const TYPES = ["blocks", "blocked_by", "related"]
+        const normalize = (value) => {
+            let arr = value
+            if (Array.isArray(arr) && arr.length > 0 && typeof arr[0] !== "object") {
+                try { arr = JSON.parse(String(arr)) } catch (err) { return [] }
+            } else if (typeof arr === "string") {
+                try { arr = JSON.parse(arr) } catch (err) { return [] }
+            }
+            if (!Array.isArray(arr)) return []
+            const seen = new Set()
+            const out = []
+            for (const r of arr) {
+                if (!r || typeof r !== "object") continue
+                const issue = typeof r.issue === "string" ? r.issue.trim() : ""
+                const type = typeof r.type === "string" ? r.type.trim() : ""
+                if (!/^[a-zA-Z0-9]{10,20}$/.test(issue)) continue
+                if (!TYPES.includes(type)) continue
+                const key = `${issue}::${type}`
+                if (seen.has(key)) continue
+                seen.add(key)
+                out.push({ issue, type })
+            }
+            return out
+        }
+        // Find every issue whose relations JSON mentions the deleted id.
+        const refs = e.app.findRecordsByFilter("issues", `relations ~ '${deletedId}'`, "", 500, 0)
+        for (const rec of refs || []) {
+            if (rec.id === deletedId) continue
+            const next = normalize(rec.get("relations")).filter((r) => r.issue !== deletedId)
+            rec.set("relations", next)
+            e.app.save(rec)
+        }
+    } catch (err) {
+        console.error(">>> onRecordDelete relations sweep error:", String((err && err.message) || err))
+    }
+    e.next()
+}, "issues")
+
 // --- Custom routes ----------------------------------------------------------
 
 // GET /api/projectbase/issues/{id}/relations
@@ -250,6 +295,19 @@ routerAdd("POST", "/api/projectbase/issues/{id}/relations", (e) => {
         const target = resolve(targetId)
         if (!target) {
             return e.notFoundError("Target issue not found")
+        }
+
+        // Reject contradictory cycles: blocks/blocked_by are directed, so a
+        // pair must not hold both. Check both sides (mirrors are maintained
+        // by this API, but direct PATCHes could desync the graph).
+        if (type === "blocks") {
+            if (has(issue, targetId, "blocked_by") || has(target, issue.id, "blocks")) {
+                return e.json(400, { error: "Cycle rejected: the target issue already blocks this issue" })
+            }
+        } else if (type === "blocked_by") {
+            if (has(issue, targetId, "blocks") || has(target, issue.id, "blocked_by")) {
+                return e.json(400, { error: "Cycle rejected: this issue already blocks the target" })
+            }
         }
 
         const changed = append(issue, targetId, type)
