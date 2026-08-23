@@ -326,7 +326,7 @@ const App = {
       this.applyRoute();
     },
 
-    applyRoute() {
+    async applyRoute() {
       if (!this.isAuthenticated) return;
       const hash = window.location.hash.replace(/^#\/?/, '');
       if (!hash) return;
@@ -337,7 +337,15 @@ const App = {
       if (parts.length >= 2 && viewMap[parts[1]]) {
         const projKey = parts[0].toUpperCase();
         const proj = this.projects.find(p => p.identifier === projKey);
-        if (proj) this.currentProject = proj;
+        const prevProjId = this.currentProject ? this.currentProject.id : null;
+        if (proj && proj.id !== prevProjId) {
+          this.currentProject = proj;
+          // The board is project-scoped: reload issues for the route's project so
+          // a hard refresh (#/pb/board) shows that project's tasks, not the
+          // all-projects snapshot loaded during mounted().
+          this.selectedIssue = null;
+          await this.loadIssues();
+        }
         this.currentView = viewMap[parts[1]] || 'board';
         if (parts[2] === 'issue' && parts[3]) {
           const issue = this.issues.find(i => i.id === parts[3]);
