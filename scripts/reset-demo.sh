@@ -47,7 +47,11 @@ log "Stopping stack ..."
 docker compose down || true
 
 log "Wiping pb_data ..."
-rm -rf pb_data
+# The container runs as root and owns pb_data files on the bind mount, so a
+# plain host `rm -rf` fails with permission denied for non-root deploy users.
+# Wipe via a throwaway root container over the bind mount instead.
+docker run --rm -v "$(pwd)/pb_data:/data" alpine:latest sh -c 'find /data -mindepth 1 -delete' \
+  || die "failed to wipe pb_data (is the docker daemon reachable?)"
 
 log "Rebooting (seed migration will rebuild the demo workspace) ..."
 export PROJECTBASE_PORT="$PORT"
