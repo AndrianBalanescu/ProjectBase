@@ -30,10 +30,14 @@ SOURCE_GLOBS = [
 ]
 
 STATIC_CLASS_RE = re.compile(r"""(?<![:\w-])class=(["'])(.*?)\1""", re.S)
-# :class bindings that contain a quoted string literal of static utilities
-# (e.g. :class="isFullscreen ? 'a b' : 'c d'"). We extract the quoted
-# literals so these classes are also guarded against CSS drift.
-BOUND_CLASS_LITERAL_RE = re.compile(r""":class=.*?(["'])([a-z0-9\-\s]+)\1""", re.S)
+# :class bindings contain quoted string literals of static utilities
+# (e.g. :class="isFullscreen ? 'a b' : 'c d'"). The attribute regex captures
+# the whole binding; the literal regex then pulls EVERY quoted class list
+# inside it (a ternary can have multiple branches — first-branch-only
+# extraction was a cycle-39 gap). Single-word quoted values are enum/tab
+# keys, not classes, and are skipped to avoid false positives.
+BOUND_CLASS_ATTR_RE = re.compile(r""":class=(["'])(.*?)\1""", re.S)
+BOUND_CLASS_LITERAL_RE = re.compile(r"""(["'])([a-z0-9\-\s]+)\1""")
 
 # Classes that are pure JS hook selectors / layout markers and intentionally
 # carry no styling of their own (styles come from co-applied utilities or are
@@ -71,14 +75,16 @@ def _static_tokens():
                 if "{" in tok or "}" in tok:
                     continue
                 tokens.add(tok)
-        for match in BOUND_CLASS_LITERAL_RE.finditer(src):
-            literal = match.group(2)
-            # Only treat it as a class list if it contains whitespace. A
-            # single-word quoted value after :class= is usually an enum/tab
-            # key (e.g. activeTab === 'guide'), not a CSS class.
-            if " " in literal:
-                for tok in literal.split():
-                    tokens.add(tok)
+        for am in BOUND_CLASS_ATTR_RE.finditer(src):
+            content = am.group(2)
+            for lm in BOUND_CLASS_LITERAL_RE.finditer(content):
+                literal = lm.group(2)
+                # Only treat it as a class list if it contains whitespace. A
+                # single-word quoted value is usually an enum/tab key (e.g.
+                # activeTab === 'guide'), not a CSS class.
+                if " " in literal:
+                    for tok in literal.split():
+                        tokens.add(tok)
     return tokens
 
 
