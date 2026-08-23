@@ -10,11 +10,13 @@
 
 ## Build order (cycles 2-4)
 
-1. **Cycle 2 — Importers (A) + keyboard polish start (B)**
+> **Status update (cycle 16):** Importers (A), keyboard palette (B), and custom fields (C) are now **all shipped**. Custom fields landed in cycle 16 with a per-project definition manager, validation, and agent-surface docs (OpenAPI / llms / FastMCP). See `docs/research/FEATURE_MATRIX.md` for current status.
+
+1. **Cycle 2 — Importers (A) + keyboard polish start (B)** ✅ shipped
    - A: Linear (CSV/JSON), GitHub issues, Plane export importers as pb_hooks routes + UI drawer. Attacks the loudest user pain (migration lock-in) with zero code shipped today.
    - B: keyboard command palette scaffold — independent code path (pb_public vs pb_hooks), same-cycle build avoids the "import, then exit" trap.
-2. **Cycle 3 — Custom fields (C) + keyboard completion**
-   - C is an additive PocketBase JSONField column — no schema rework, no migration pain, safe to defer.
+2. **Cycle 3 — Custom fields (C) + keyboard completion** ✅ shipped (cycle 16)
+   - C is an additive PocketBase JSONField column — no schema rework, no migration pain.
 3. **Schema: no rework needed yet.** JSONField is additive; multi-workspace tenancy not demanded. Revisit only when a real user asks.
 
 ## Falsifiable validation (from verdict `next_validation`)
