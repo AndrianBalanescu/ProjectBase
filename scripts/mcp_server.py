@@ -148,9 +148,14 @@ def create_issue(
     priority: str = "medium",
     estimate: int = 0,
     assignee: str = "Agent",
-    labels: Optional[List[str]] = None
+    labels: Optional[List[str]] = None,
+    custom_fields: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    """Create a new issue/work item with automatic ID generation (e.g. PB-1)."""
+    """Create a new issue/work item with automatic ID generation (e.g. PB-1).
+
+    Optionally pass custom_fields as a dict keyed by the project's custom field
+    keys (e.g. {"client": "Acme", "gate": "P1"}). Define fields first via the
+    project's custom-fields endpoint (see llms.txt / openapi.json)."""
     proj_id = _find_project_id(project)
     data = {
         "project": proj_id,
@@ -162,6 +167,8 @@ def create_issue(
         "assignee": assignee,
         "labels": labels or []
     }
+    if custom_fields is not None:
+        data["custom_fields"] = custom_fields
     return _request("/api/collections/issues/records", method="POST", data=data)
 
 @mcp.tool()
@@ -172,9 +179,12 @@ def update_issue(
     title: Optional[str] = None,
     description: Optional[str] = None,
     estimate: Optional[int] = None,
-    assignee: Optional[str] = None
+    assignee: Optional[str] = None,
+    custom_fields: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    """Update issue properties such as status (backlog, todo, in_progress, in_review, done, cancelled), priority, or assignee."""
+    """Update issue properties such as status (backlog, todo, in_progress, in_review, done, cancelled), priority, or assignee.
+
+    Pass custom_fields as a dict to set custom field values (e.g. {"client": "Acme", "gate": "P1"})."""
     issue = _find_issue(identifier_or_id)
     data = {}
     if status is not None: data["status"] = status
@@ -183,6 +193,7 @@ def update_issue(
     if description is not None: data["description"] = description
     if estimate is not None: data["estimate"] = estimate
     if assignee is not None: data["assignee"] = assignee
+    if custom_fields is not None: data["custom_fields"] = custom_fields
 
     return _request(f"/api/collections/issues/records/{issue['id']}", method="PATCH", data=data)
 
