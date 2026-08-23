@@ -159,6 +159,7 @@
       :projects="projects"
       :cycles="cycles"
       :labels="labels"
+      :milestones="milestones"
       :field-defs="currentProject ? currentProject.custom_field_defs : []"
       @close="closeIssueDrawer"
       @update-issue="handleUpdateIssue"
@@ -185,6 +186,7 @@
       :current-project="currentProject"
       :cycles="cycles"
       :labels="labels"
+      :milestones="milestones"
       @close="isNewIssueOpen = false"
       @create-issue="handleCreateIssue"
     ></new-issue-modal>
@@ -248,6 +250,7 @@
 
   <!-- Component Scripts -->
   <script src="/js/api.js"></script>
+  <script src="/js/components/SearchableSelect.js"></script>
   <script src="/js/components/MilkdownEditor.js"></script>
   <script src="/js/components/Header.js"></script>
   <script src="/js/components/KanbanBoard.js"></script>
