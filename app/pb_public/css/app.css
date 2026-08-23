@@ -133,3 +133,55 @@ body {
   font-style: italic;
   margin-bottom: 0.75rem;
 }
+
+/* ---------------------------------------------------------------------------
+ * Entrance animations — hand-rolled tailwindcss-animate equivalents.
+ * Stock Tailwind (compiled via scripts/build_css.sh) cannot generate the
+ * `animate-in` family; these utilities are used by modals, the command
+ * palette, dropdowns, and the toast. Keep in sync with template usage.
+ * ------------------------------------------------------------------------- */
+@keyframes pb-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes pb-zoom-in-95 {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes pb-slide-in-top-2 {
+  from { opacity: 0; transform: translateY(-0.5rem); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pb-slide-in-bottom-2 {
+  from { opacity: 0; transform: translateY(0.5rem); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-in,
+.fade-in {
+  animation-name: pb-fade-in;
+  animation-duration: 150ms;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+}
+
+/* Motion variants declared after .fade-in so combined usage
+ * (e.g. "animate-in fade-in zoom-in-95") resolves to the richer motion. */
+.zoom-in-95 {
+  animation-name: pb-zoom-in-95;
+  animation-duration: 150ms;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+}
+.slide-in-from-top-2 {
+  animation-name: pb-slide-in-top-2;
+  animation-duration: 150ms;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+}
+.slide-in-from-bottom-2 {
+  animation-name: pb-slide-in-bottom-2;
+  animation-duration: 150ms;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+}

@@ -1,0 +1,124 @@
+"""tests/test_css_sync.py — guard against stale compiled Tailwind CSS.
+
+Regression background (cycle 39): templates gained new Tailwind utilities
+(pl-7, ml-1.5, text-sky-300, max-h-52, ...) but scripts/build_css.sh was not
+re-run, so the served css/style.css tree-shook them away and the UI silently
+rendered unstyled. Also py-0.2 was used in 8 components even though it is not
+a valid default Tailwind spacing value.
+
+These tests extract every static class token from the frontend sources and
+assert each resolves to a rule in the compiled css/style.css or the
+hand-written css/app.css. They fail whenever someone edits templates without
+rebuilding the CSS, or uses a utility Tailwind cannot generate.
+"""
+
+import glob
+import os
+import re
+import unittest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PB_PUBLIC = os.path.join(ROOT, "app", "pb_public")
+STYLE_CSS = os.path.join(PB_PUBLIC, "css", "style.css")
+APP_CSS = os.path.join(PB_PUBLIC, "css", "app.css")
+
+# Files whose class attributes are checked. Vendor bundles are excluded.
+SOURCE_GLOBS = [
+    os.path.join(PB_PUBLIC, "*.html"),
+    os.path.join(PB_PUBLIC, "js", "*.js"),
+    os.path.join(PB_PUBLIC, "js", "components", "*.js"),
+]
+
+STATIC_CLASS_RE = re.compile(r"""(?<![:\w-])class=(["'])(.*?)\1""", re.S)
+
+# Classes that are pure JS hook selectors / layout markers and intentionally
+# carry no styling of their own (styles come from co-applied utilities or are
+# consumed by SortableJS). Keep this list short and documented.
+MARKER_CLASSES = {
+    # SortableJS drag handle selector (KanbanBoard.js), styled via utilities.
+    "kanban-card-drag-handle",
+}
+
+
+def _css_escape(token: str) -> str:
+    """Escape a class token the way Tailwind emits it in the stylesheet."""
+    return "".join(
+        ("\\" + ch) if not (ch.isalnum() or ch in "_-") else ch for ch in token
+    )
+
+
+def _source_files():
+    files = []
+    for pattern in SOURCE_GLOBS:
+        files.extend(glob.glob(pattern))
+    return sorted(files)
+
+
+def _static_tokens():
+    """All static (non-bound) class attribute tokens across the frontend."""
+    tokens = set()
+    for path in _source_files():
+        with open(path, encoding="utf-8") as fh:
+            src = fh.read()
+        for match in STATIC_CLASS_RE.finditer(src):
+            for tok in match.group(2).split():
+                # Skip Vue interpolation / obviously dynamic fragments.
+                if "{" in tok or "}" in tok:
+                    continue
+                tokens.add(tok)
+    return tokens
+
+
+class TestCompiledCssCoversTemplates(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        with open(STYLE_CSS, encoding="utf-8") as fh:
+            cls.style_css = fh.read()
+        with open(APP_CSS, encoding="utf-8") as fh:
+            cls.app_css = fh.read()
+        # Shipped vendor stylesheets (e.g. milkdown.css) are real style sources.
+        cls.vendor_css = ""
+        for vpath in sorted(glob.glob(os.path.join(PB_PUBLIC, "vendor", "*.css"))):
+            with open(vpath, encoding="utf-8") as fh:
+                cls.vendor_css += fh.read()
+        cls.tokens = _static_tokens()
+        # Sanity: extraction actually found a meaningful number of tokens.
+        assert len(cls.tokens) > 200, "class extraction looks broken"
+
+    def _resolve(self, token: str) -> bool:
+        if token in MARKER_CLASSES:
+            return True
+        escaped = _css_escape(token)
+        return (
+            (escaped in self.style_css)
+            or (escaped in self.app_css)
+            or (escaped in self.vendor_css)
+        )
+
+    def test_every_static_class_resolves(self):
+        missing = sorted(t for t in self.tokens if not self._resolve(t))
+        self.assertEqual(
+            missing,
+            [],
+            "Classes referenced by templates are missing from compiled CSS. "
+            "Run scripts/build_css.sh (and extend app.css for custom utilities). "
+            f"Missing: {missing}",
+        )
+
+    def test_no_invalid_default_spacing_utilities(self):
+        # py-0.2 & friends are not part of Tailwind's default spacing scale;
+        # Tailwind silently drops them (cycle-39 bug). px/pt/pb/py/mx/my variants.
+        bad_re = re.compile(r"^[pm][trblxy]?-0\.[23468]$|^[pm][trblxy]?-0\.25$")
+        bad = sorted(t for t in self.tokens if bad_re.match(t))
+        self.assertEqual(
+            bad,
+            [],
+            f"Invalid default Tailwind spacing utilities used (will never generate CSS): {bad}",
+        )
+
+    def test_compiled_css_is_nontrivial(self):
+        self.assertGreater(len(self.style_css), 40000, "style.css looks truncated")
+
+
+if __name__ == "__main__":
+    unittest.main()

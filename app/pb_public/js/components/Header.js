@@ -295,7 +295,7 @@ const HeaderComponent = {
         >
           <i data-lucide="plus" class="w-3.5 h-3.5"></i>
           <span>New Issue</span>
-          <kbd class="hidden sm:inline-block px-1 py-0.2 rounded bg-indigo-700 text-[10px] font-mono ml-1">C</kbd>
+          <kbd class="hidden sm:inline-block px-1 py-0.5 rounded bg-indigo-700 text-[10px] font-mono ml-1">C</kbd>
         </button>
 
         <!-- PocketBase Admin Dashboard Link -->

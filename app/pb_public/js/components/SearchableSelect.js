@@ -245,7 +245,7 @@ const SearchableSelectComponent = {
             </div>
 
             <div class="flex items-center space-x-1.5 shrink-0 ml-2">
-              <span v-if="opt.badge" class="px-1.5 py-0.2 rounded text-[10px] bg-gray-800 text-gray-400 font-mono">{{ opt.badge }}</span>
+              <span v-if="opt.badge" class="px-1.5 py-0.5 rounded text-[10px] bg-gray-800 text-gray-400 font-mono">{{ opt.badge }}</span>
               <span v-if="opt.value === modelValue" class="text-indigo-400 font-bold">✓</span>
             </div>
           </div>
