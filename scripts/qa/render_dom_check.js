@@ -103,6 +103,21 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       const ti = drawer.querySelector('input[placeholder="Issue title..."]');
       return ti && ti.value.trim().length > 0;
     });
+    // A plain view hash (no issue segment) must close any stale drawer too.
+    await page.evaluate(() => { location.hash = '#/pb/board/issue/ckat9ahso93piex'; });
+    await page.waitForTimeout(2500);
+    routing.issueOpened = await page.evaluate(() => {
+      const drawer = document.querySelector('.slide-in-from-right');
+      if (!drawer) return false;
+      const ti = drawer.querySelector('input[placeholder="Issue title..."]');
+      return ti && ti.value === 'Probe5 test';
+    });
+    await page.evaluate(() => { location.hash = '#/pb/board'; });
+    await page.waitForTimeout(2500);
+    routing.staleDrawerOnPlainView = await page.evaluate(() => {
+      const drawer = document.querySelector('.slide-in-from-right');
+      return !!drawer && getComputedStyle(drawer).display !== 'none';
+    });
   }
 
   const failures = [];
@@ -127,6 +142,8 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   if (!checks.animName.startsWith('pb-')) failures.push(`animation ${checks.animName} not a pb-* keyframe`);
   if (checks.animDuration !== '0.15s') failures.push(`animation duration ${checks.animDuration} != 0.15s`);
   if (routing.checked && routing.staleDrawer) failures.push('stale issue drawer shown for nonexistent route issue');
+  if (routing.checked && !routing.issueOpened) failures.push('real issue deep link did not open the drawer');
+  if (routing.checked && routing.staleDrawerOnPlainView) failures.push('stale drawer left open on plain view hash');
   if (!routing.checked) failures.push('routing regression not exercised (no login form found)');
 
   console.log(JSON.stringify({ checks, routing, failures, all4xx }, null, 1));
