@@ -163,8 +163,8 @@ const ListViewComponent = {
               <tr
                 v-for="issue in processedIssues"
                 :key="issue.id"
-                class="hover:bg-gray-800/40 transition-colors group cursor-pointer border-l-2"
-                :class="{ 'border-red-900/70': isBlocked(issue), 'border-transparent': !isBlocked(issue) }"
+                class="hover:bg-gray-800/40 transition-colors group cursor-pointer"
+                :class="isBlocked(issue) ? 'border-l-2 border-red-900/70' : ''"
                 @click="$emit('open-issue', issue)"
               >
                 <!-- ID -->
