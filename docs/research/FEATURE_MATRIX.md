@@ -19,7 +19,7 @@ Must-Have = table stakes vs Linear/Plane. Moat = differentiators nobody in the l
 | Keyboard-first UX | ✅ | ⚠️ partial | ✅ CommandPalette + shortcuts | ✅ shipped |
 | Importers (Linear/Plane/GitHub) | export only | partial | ✅ CSV + GitHub API importers | ✅ shipped |
 | Notifications | ✅ | ✅ | ✅ Discord/Telegram/webhook | ✅ shipped |
-| Roadmap view | ✅ | ✅ | ⚠️ milestones UI basic | partial |
+| Roadmap view | ✅ | ✅ | ✅ milestones + North Star + progress, assign issues to milestones in create/edit drawer | ✅ shipped |
 | Custom fields | ✅ | paid tier | ✅ text/number/select/checkbox/date, per-project, validation, MCP/OpenAPI/llms docs | ✅ shipped |
 | Offline / local-first | ❌ | ❌ | ❌ (vendored assets = offline-servable, not local-first) | opportunity |
 
