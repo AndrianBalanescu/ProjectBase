@@ -72,6 +72,20 @@ const API = {
     return await pb.collection('projects').delete(id);
   },
 
+  // Custom fields (per-project field definitions)
+  async getCustomFields(projectId) {
+    return await pb.send('/api/projectbase/projects/' + projectId + '/custom-fields', {
+      method: 'GET'
+    });
+  },
+
+  async saveCustomFields(projectId, fields) {
+    return await pb.send('/api/projectbase/projects/' + projectId + '/custom-fields', {
+      method: 'PUT',
+      body: { fields: fields }
+    });
+  },
+
   // Issues
   async getIssues(projectId = null) {
     const filter = projectId ? `project = "${projectId}"` : '1=1';
