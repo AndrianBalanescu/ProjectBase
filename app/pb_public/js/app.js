@@ -75,9 +75,16 @@ const App = {
     }
     this.setupKeyboardShortcuts();
 
+    // Client-side URL routing (hash-based, PocketBase-friendly)
+    window.addEventListener('hashchange', this.handleRouteChange);
+
     nextTick(() => {
+      this.applyRoute();
       if (window.lucide) window.lucide.createIcons();
     });
+  },
+  beforeUnmount() {
+    window.removeEventListener('hashchange', this.handleRouteChange);
   },
   updated() {
     nextTick(() => {
@@ -299,14 +306,57 @@ const App = {
 
     changeView(view) {
       this.currentView = view;
+      this.syncRoute();
+    },
+
+    handleRouteChange() {
+      this.applyRoute();
+    },
+
+    applyRoute() {
+      if (!this.isAuthenticated) return;
+      const hash = window.location.hash.replace(/^#\/?/, '');
+      if (!hash) return;
+      const parts = hash.split('/').filter(Boolean);
+      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', projects: 'projects', stats: 'stats', docs: 'docs', marketplace: 'marketplace', milestones: 'milestones' };
+
+      // parts[0] may be a project identifier or a view name (if no project prefix)
+      if (parts.length >= 2 && viewMap[parts[1]]) {
+        const projKey = parts[0].toUpperCase();
+        const proj = this.projects.find(p => p.identifier === projKey);
+        if (proj) this.currentProject = proj;
+        this.currentView = viewMap[parts[1]] || 'board';
+        if (parts[2] === 'issue' && parts[3]) {
+          const issue = this.issues.find(i => i.id === parts[3]);
+          if (issue) this.selectedIssue = issue;
+        }
+      } else if (viewMap[parts[0]]) {
+        this.currentView = viewMap[parts[0]] || 'board';
+      }
+    },
+
+    syncRoute() {
+      const proj = this.currentProject ? this.currentProject.identifier.toLowerCase() : '';
+      const base = proj ? `#/${proj}` : '';
+      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', projects: 'projects', stats: 'stats', docs: 'docs', marketplace: 'marketplace', milestones: 'milestones' };
+      const v = viewMap[this.currentView] || 'board';
+      let hash = base ? `${base}/${v}` : `#/${v}`;
+      if (this.selectedIssue) {
+        hash += `/issue/${this.selectedIssue.id}`;
+      }
+      if (window.location.hash !== hash) {
+        try { window.history.replaceState(null, '', hash); } catch (e) { /* ignore */ }
+      }
     },
 
     openIssue(issue) {
       this.selectedIssue = issue;
+      this.syncRoute();
     },
 
     closeIssueDrawer() {
       this.selectedIssue = null;
+      this.syncRoute();
     },
 
     async handleCreateIssue(issueData) {

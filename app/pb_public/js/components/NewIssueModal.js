@@ -2,7 +2,8 @@
 
 const NewIssueModalComponent = {
   components: {
-    'searchable-select': window.SearchableSelectComponent || SearchableSelectComponent
+    'searchable-select': window.SearchableSelectComponent || SearchableSelectComponent,
+    'multiselect': window.MultiselectComponent || MultiselectComponent
   },
   props: ['isOpen', 'projects', 'currentProject', 'cycles', 'labels', 'milestones'],
   emits: ['close', 'create-issue'],
@@ -244,23 +245,16 @@ const NewIssueModalComponent = {
             </div>
           </div>
 
-          <!-- Quick Label Chips -->
+          <!-- Labels Multiselect -->
           <div class="space-y-1.5">
             <label class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Labels</label>
-            <div class="flex flex-wrap gap-1.5">
-              <button 
-                v-for="l in ['feature', 'bug', 'core', 'frontend', 'api', 'infra', 'agent']"
-                :key="l"
-                type="button"
-                @click="toggleLabel(l)"
-                class="px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors"
-                :class="selectedLabels.includes(l) ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-gray-950 border-gray-800 text-gray-400 hover:text-white'"
-              >
-                {{ l }}
-              </button>
-            </div>
+            <multiselect
+              v-model="selectedLabels"
+              :options="['feature', 'bug', 'core', 'frontend', 'api', 'infra', 'agent']"
+              placeholder="Select labels..."
+              search-placeholder="Filter labels..."
+            ></multiselect>
           </div>
-
           <!-- Custom Fields (Dynamic from selected project) -->
           <div v-if="selectedProjectFieldDefs.length" class="space-y-2 pt-2 border-t border-gray-800/80">
             <label class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Custom Fields</label>

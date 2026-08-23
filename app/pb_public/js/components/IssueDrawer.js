@@ -28,6 +28,7 @@ const IssueDrawerComponent = {
       newCommentAuthorType: 'user', // 'user' or 'agent'
       copiedBadge: false,
       isAgentDropdownOpen: false,
+      isFullscreen: false,
       aiLoadingSubtasks: false,
       aiLoadingDesc: false
     };
@@ -312,7 +313,7 @@ const IssueDrawerComponent = {
       ></div>
 
       <!-- Slide-Over Drawer Container -->
-      <div class="relative w-full max-w-3xl bg-gray-900 border-l border-gray-800 shadow-2xl flex flex-col h-full z-10 animate-in slide-in-from-right duration-200">
+      <div :class="isFullscreen ? 'fixed inset-0 z-50 bg-gray-900 flex flex-col h-full w-full' : 'relative w-full max-w-3xl bg-gray-900 border-l border-gray-800 shadow-2xl flex flex-col h-full z-10 animate-in slide-in-from-right duration-200'">
         
         <!-- Header -->
         <div class="px-6 py-4 border-b border-gray-800 flex items-center justify-between bg-gray-950/60 select-none">
@@ -404,6 +405,15 @@ const IssueDrawerComponent = {
               title="Delete Issue"
             >
               <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+
+            <!-- Fullscreen Toggle -->
+            <button
+              @click="isFullscreen = !isFullscreen"
+              class="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+              :title="isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'"
+            >
+              <i :data-lucide="isFullscreen ? 'minimize-2' : 'maximize-2'" class="w-4 h-4"></i>
             </button>
 
             <!-- Close Button -->
