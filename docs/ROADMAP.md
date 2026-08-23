@@ -412,3 +412,26 @@ homelab service; issue/comment create verified 200 with the hook active.
 
 **Next (external-gated):** North Star delivery still needs a human: domain + VPS
 for `deploy-demo.sh` (cycle-7 next-items) and first-stranger onboarding.
+
+## Cycle-42 status (2026-08-23)
+
+**Goal:** close a UI consistency gap in the v0.9.0 issue relationships feature.
+The relationships milestone shipped a blocked lock badge + red border on
+**kanban cards** but left the **List view** with no relationship indicator, even
+though every issue already carries a `relations` array in the API.
+
+**Shipped this cycle:**
+- `app/pb_public/js/components/ListView.js` — added `isBlocked()` (same logic as
+  `KanbanBoard`), a lock badge beside the title for issues with a `blocked_by`
+  edge, and a red left-border row highlight (`border-l-2` + `border-red-900/70`)
+  that toggles to transparent for unblocked rows. Reuses the exact utility
+  classes already compiled into `style.css`, so no CSS rebuild was required
+  (verified via `tests/test_css_sync.py`, which passed).
+- `scripts/qa/render_dom_check.js` — added a `listLockShown` assertion that
+  navigates to the list view and verifies the temp blocked issue's row shows the
+  lock badge, mirroring the existing `kanbanLockShown` check.
+
+**Validation:** `pytest tests/` → **140/140 passed**. `node --check` clean on both
+changed JS files. Headless render QA (`scripts/qa/qa-render.sh`) → **PASS** with
+`listLockShown: true` (and `kanbanLockShown: true` / `kanbanLockNoReload: true`
+still green). Pushed to `origin/main` (`710413e`).
