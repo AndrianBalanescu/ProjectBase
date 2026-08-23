@@ -42,7 +42,11 @@ onRecordCreateRequest((e) => {
             try { $app.store().set("pbNotifActorName", "") } catch (x) {}
             try { $app.store().set("pbNotifActorType", "") } catch (x) {}
         }
-    } catch (err) {}
+    } catch (err) {
+        // Auth resolution failed; never attribute to a stale actor.
+        try { $app.store().set("pbNotifActorName", "") } catch (x) {}
+        try { $app.store().set("pbNotifActorType", "") } catch (x) {}
+    }
     e.next()
 }, "issues")
 
@@ -57,7 +61,11 @@ onRecordUpdateRequest((e) => {
             try { $app.store().set("pbNotifActorName", "") } catch (x) {}
             try { $app.store().set("pbNotifActorType", "") } catch (x) {}
         }
-    } catch (err) {}
+    } catch (err) {
+        // Auth resolution failed; never attribute to a stale actor.
+        try { $app.store().set("pbNotifActorName", "") } catch (x) {}
+        try { $app.store().set("pbNotifActorType", "") } catch (x) {}
+    }
     e.next()
 }, "issues")
 
