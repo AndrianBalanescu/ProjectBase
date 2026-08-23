@@ -216,3 +216,48 @@ coerced to `member` by the create hook (the `_isPrivileged` check recognizes
 only the PocketBase superuser on the create path, so every create is member).
 Only the update path (superuser/admin) can legitimately promote. Locked in as
 `test_manager_admin_cannot_mint_privileged_user_via_create`. Suite now **46/46 green**.
+
+## Cycle-6 status (2026-08-22)
+
+**Goal (strategic calibration):** ship-to-strangers infrastructure — the leap from
+"local product" to "a stranger can see it in one command."
+
+**Shipped this cycle:**
+- `scripts/deploy-demo.sh` — one-command public demo deployment: docker compose build+up,
+  superuser seed, health + fresh-boot-seed verification, optional `--install-docker` for
+  fresh VPSes, optional `--domain` (Caddy automatic-HTTPS via `docker-compose.demo.yml` +
+  `deploy/Caddyfile`). Exit-nonzero on any failed check.
+- `scripts/reset-demo.sh` — restores the pristine demo workspace (compose down → wipe
+  pb_data → reboot; seed migration rebuilds 6 projects / 17 issues), optional idempotent
+  `--install-cron HOURS` for scheduled resets. Includes the root-owned-bind-mount fix
+  (wipe via throwaway alpine container — host `rm -rf` hits EPERM since the app container
+  runs as root).
+- `docker-compose.yml` — host port parametrized (`PROJECTBASE_PORT`), default 8120 unchanged.
+- CI: new `docker` job — builds the image, boots the compose stack, and asserts fresh-boot
+  health + seeded projects on every push/PR (guards the cycle-4 regression class forever).
+- Onboarding: post-signup welcome toast orients strangers ("shared demo workspace — press
+  C to create an issue or I to import yours").
+
+**Validation (crime-scene audit):**
+- Full deploy exercised from a **fresh git clone** on a spare port (8199): build → boot →
+  health 200 → 6 projects / 17 issues seeded → UI served. Verified independently via direct
+  API queries, not just the script's own output.
+- Reset proven end-to-end: mutated the demo (junk issue → 18 issues), ran reset, verified
+  pristine state returned (6 / 17 / junk=0).
+- Deterministic headless browser check (Playwright): signup form → account created → app
+  mounted → welcome toast visible, board rendered, **zero console errors, zero 4xx/5xx**.
+  Screenshot: cycle log. iBrowse audit of the login gate: healthy, no blockers.
+- `pytest` 46/46 green (one GitHub-API rate-limit flake re-run individually: pass; core
+  quota 10/60 at audit time).
+- `bash -n` + `docker compose config` (base and demo override) + CI YAML parse all clean.
+- Compose parametrization verified with `PROJECTBASE_PORT=8199 docker compose config`.
+
+**Known-unverified:** the `--install-cron` /etc/cron.d write is static and reviewed but was
+not installed on this host (system-path protection); first real VPS deploy should spot-check
+it. Scout engines were partially degraded this cycle (ask-llm/multi-source-research
+binaries missing from PATH — raw outputs show SCOUT_SKIPPED); deploy best-practice research
+should rerun before the public launch.
+
+**Cycle 7 (next):** point deploy-demo.sh at a real domain (needs human: domain + VPS),
+or continue launch blockers: public demo announcement assets, landing-page demo link,
+lead capture.
