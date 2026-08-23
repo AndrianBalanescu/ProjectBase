@@ -46,6 +46,7 @@ When an agent is assigned to work on a project:
 - subtasks (json array of {id, title, done})
 - labels (json array of string tags)
 - order (number timestamp for drag-and-drop sort)
+- custom_fields (json object keyed by project custom-field key, e.g. {"client":"Acme","gate":"P1"})
 
 ### cycles (sprints)
 - id (15 char text)
@@ -78,3 +79,18 @@ curl -s -X PATCH ${PROJECTBASE_URL:-http://localhost:8120}/api/collections/issue
 curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/collections/comments/records \
   -H "Content-Type: application/json" \
   -d '{"issue":"<ISSUE_ID>","author":"Flomaster Agent","author_type":"agent","content":"E2E browser QA passed with zero errors."}'
+
+### Custom Fields (per-project definitions):
+curl -s -X PUT ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/projects/<PROJECT_ID>/custom-fields \
+  -H "Content-Type: application/json" \
+  -d '{"fields":[{"label":"Client","type":"text"},{"label":"Gate","type":"select","options":["P0","P1","P2"]}]}'
+
+### Validate custom field values:
+curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/projects/<PROJECT_ID>/custom-fields/validate \
+  -H "Content-Type: application/json" \
+  -d '{"values":{"client":"Acme","gate":"P1"}}'
+
+### Set custom fields on an issue (values keyed by field key):
+curl -s -X PATCH ${PROJECTBASE_URL:-http://localhost:8120}/api/collections/issues/records/<ISSUE_ID> \
+  -H "Content-Type: application/json" \
+  -d '{"custom_fields":{"client":"Acme","gate":"P1","effort":5}}'
