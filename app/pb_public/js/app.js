@@ -330,6 +330,7 @@ const App = {
       this.currentProject = project;
       await this.loadIssues();
       this.currentView = 'board';
+      this.syncRoute();
     },
 
     changeView(view) {
