@@ -1,6 +1,9 @@
 // pb_public/js/components/IssueDrawer.js
 
 const IssueDrawerComponent = {
+  components: {
+    'milkdown-editor': window.MilkdownEditorComponent || MilkdownEditorComponent
+  },
   props: ['issue', 'projects', 'cycles', 'labels'],
   emits: ['close', 'update-issue', 'delete-issue'],
   data() {
@@ -479,13 +482,12 @@ const IssueDrawerComponent = {
 
             <!-- Write Mode -->
             <div v-show="descTab === 'write'">
-              <textarea 
+              <milkdown-editor
                 v-model="editDesc"
                 @blur="saveChanges"
-                rows="6"
                 placeholder="Detailed markdown description, requirements, architecture notes..."
-                class="w-full px-3 py-2 rounded-xl bg-gray-950/80 border border-gray-800 text-gray-100 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 leading-relaxed"
-              ></textarea>
+                class="w-full min-h-[140px] px-3 py-2 rounded-xl bg-gray-950/80 border border-gray-800 text-gray-100 text-xs focus-within:ring-1 focus-within:ring-indigo-500 leading-relaxed"
+              ></milkdown-editor>
             </div>
 
             <!-- Preview Mode -->
