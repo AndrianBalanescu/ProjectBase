@@ -827,6 +827,26 @@ def test_sqlite_performance_indexes_exist():
     assert not missing, f"Missing required performance indexes: {missing}"
 
 
+def test_version_endpoint():
+    """Verify version endpoint returns semver, service name, and open-source flag."""
+    st, body = _get("/api/projectbase/version")
+    assert st == 200, f"version endpoint failed: {st} {body}"
+    assert body.get("service") == "ProjectBase"
+    assert body.get("version") == "0.8.0"
+    assert body.get("open_source") is True
+    assert body.get("license") == "MIT"
+
+
+def test_health_includes_version_and_license():
+    """Verify health endpoint includes version and open source license."""
+    st, body = _get("/api/projectbase/health")
+    assert st == 200, f"health endpoint failed: {st} {body}"
+    assert body.get("version") == "0.8.0"
+    assert body.get("license") == "MIT"
+    assert body.get("open_source") is True
+
+
+
 def test_sqlite_query_plan_uses_index():
     """Verify that project-filtered issue lookup uses the composite index instead of full table scan."""
     import sqlite3
