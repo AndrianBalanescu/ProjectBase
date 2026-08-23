@@ -1108,3 +1108,84 @@ def test_milestone_progress_computed_from_linked_issues():
         for iid in created_ids:
             _request("DELETE", f"/api/collections/issues/records/{iid}", headers=hdr)
         _request("DELETE", f"/api/collections/milestones/records/{mid}", headers=hdr)
+
+# ---------------------------------------------------------------------------
+# Offline-first app shell (Service Worker, web manifest, icons)
+# ---------------------------------------------------------------------------
+
+def test_service_worker_served():
+    """The Service Worker must be served as a real static asset."""
+    st, body = _get("/sw.js")
+    assert st == 200, f"sw.js not served: {st} {body}"
+    # Basic sanity: it must reference our shell cache and handle fetches.
+    assert "CACHE_NAME" in body or "addEventListener" in body
+
+def test_service_worker_precaches_app_shell():
+    """The SW must precache the index.html shell and core bundles."""
+    st, body = _get("/sw.js")
+    assert st == 200
+    for asset in ["index.html", "vendor/vue.global.prod.js", "js/app.js",
+                  "vendor/pocketbase.umd.js", "css/style.css"]:
+        assert asset in body, f"SW missing precache entry: {asset}"
+
+def test_index_html_registers_service_worker():
+    """index.html must contain the SW registration snippet."""
+    st, body = _get("/")
+    assert st == 200
+    assert "serviceWorker" in body, "index.html does not register the Service Worker"
+    assert "/sw.js" in body
+
+def test_web_manifest_present_and_valid():
+    """The PWA web manifest must be served and parse as valid JSON."""
+    st, body = _get("/manifest.webmanifest")
+    assert st == 200, f"manifest not served: {st}"
+    assert isinstance(body, dict), f"manifest did not parse as JSON: {type(body)}"
+    assert body.get("name") == "ProjectBase"
+    assert body.get("display") == "standalone"
+    assert body.get("start_url") == "./"
+    # Icons referenced must exist
+    for icon in body.get("icons", []):
+        icon_path = icon["src"].lstrip("./")
+        st2, _ = _get("/" + icon_path)
+        assert st2 == 200, f"manifest icon not served: {icon['src']} -> {st2}"
+
+def test_offline_indicator_bound_in_app():
+    """The app must track navigator online/offline state (isOnline data + handlers)."""
+    st, body = _get("/js/app.js")
+    assert st == 200
+    assert "isOnline" in body, "app.js missing isOnline state"
+    assert "handleOnline" in body and "handleOffline" in body, "app.js missing online/offline handlers"
+
+def test_service_worker_excludes_realtime_sse():
+    """The SW must never intercept /api/realtime (SSE): caching an unbounded
+    stream hangs the fetch handler and breaks realtime sync."""
+    st, body = _get("/sw.js")
+    assert st == 200
+    assert "api/realtime" in body, "SW missing realtime SSE exclusion"
+    # exclusion must run BEFORE the generic /api/ network-first branch
+    assert body.index("api/realtime") < body.index("url.pathname.startsWith('/api/')")
+
+def test_sw_precache_covers_all_index_html_assets():
+    """Drift guard: every local script/css referenced by index.html must be in the
+    SW precache list, otherwise an offline boot would fetch a missing asset."""
+    import re as _re
+    st, sw = _get("/sw.js")
+    assert st == 200
+    st, index = _get("/")
+    assert st == 200
+
+    # Local assets referenced by the page (skip data: URIs and http(s) CDNs)
+    srcs = _re.findall(r'(?:src|href)="(/[^"]+)"', index)
+    local = [s for s in srcs if not s.startswith(("data:", "http"))]
+    # sw.js itself is the registration target, not a precache dependency
+    local = [s for s in local if s != "/sw.js"]
+
+    missing = [s for s in local if f"'./{s.lstrip('/')}'" not in sw]
+    assert not missing, f"index.html assets missing from SW precache: {missing}"
+
+def test_service_worker_excludes_pocketbase_admin_ui():
+    """The SW must never intercept /_/ (PocketBase admin UI): offline navigation
+    to the admin app would otherwise receive the ProjectBase SPA shell."""
+    st, body = _get("/sw.js")
+    assert st == 200
+    assert "startsWith('/_/')" in body, "SW missing PocketBase admin UI exclusion"
