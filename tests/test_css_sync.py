@@ -30,6 +30,10 @@ SOURCE_GLOBS = [
 ]
 
 STATIC_CLASS_RE = re.compile(r"""(?<![:\w-])class=(["'])(.*?)\1""", re.S)
+# :class bindings that contain a quoted string literal of static utilities
+# (e.g. :class="isFullscreen ? 'a b' : 'c d'"). We extract the quoted
+# literals so these classes are also guarded against CSS drift.
+BOUND_CLASS_LITERAL_RE = re.compile(r""":class=.*?(["'])([a-z0-9\-\s]+)\1""", re.S)
 
 # Classes that are pure JS hook selectors / layout markers and intentionally
 # carry no styling of their own (styles come from co-applied utilities or are
@@ -55,7 +59,8 @@ def _source_files():
 
 
 def _static_tokens():
-    """All static (non-bound) class attribute tokens across the frontend."""
+    """All static class tokens across the frontend, including string literals
+    inside :class bindings (e.g. the issue drawer's slide-in-from-right)."""
     tokens = set()
     for path in _source_files():
         with open(path, encoding="utf-8") as fh:
@@ -66,6 +71,14 @@ def _static_tokens():
                 if "{" in tok or "}" in tok:
                     continue
                 tokens.add(tok)
+        for match in BOUND_CLASS_LITERAL_RE.finditer(src):
+            literal = match.group(2)
+            # Only treat it as a class list if it contains whitespace. A
+            # single-word quoted value after :class= is usually an enum/tab
+            # key (e.g. activeTab === 'guide'), not a CSS class.
+            if " " in literal:
+                for tok in literal.split():
+                    tokens.add(tok)
     return tokens
 
 
