@@ -6,34 +6,12 @@
   <title>ProjectBase — Ultra-lightweight Project & Kanban Management</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22 width=%2232%22 height=%2232%22><text y=%2226%22 font-size=%2226%22>⚡</text></svg>" />
   
-  <!-- Tailwind CSS Play CDN (offline fallback ready) -->
-  <script src="/vendor/tailwindcss.js"></script>
-  <script>
-    // Guard: only apply config if the Tailwind runtime actually loaded
-    // (protects against vendor script failure and headless VM checks).
-    if (typeof tailwind !== 'undefined') {
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            brand: {
-              50: '#eef2ff',
-              500: '#6366f1',
-              600: '#4f46e5',
-              700: '#4338ca',
-              900: '#312e81',
-              950: '#1e1b4b'
-            }
-          }
-        }
-      }
-    }
-    }
-  </script>
+  <!-- Static Compiled Tailwind CSS (Tree-shaken & minified) -->
+  <link rel="stylesheet" href="/css/style.css" />
 
-  <!-- App Custom CSS -->
+  <!-- App Custom CSS & Milkdown Theme -->
   <link rel="stylesheet" href="/css/app.css" />
+  <link rel="stylesheet" href="/vendor/milkdown.css" />
 
   <!-- Vendor JS Libraries (100% offline self-contained) -->
   <script src="/vendor/pocketbase.umd.js"></script>
@@ -43,6 +21,7 @@
   <script src="/vendor/marked.min.js"></script>
   <script src="/vendor/purify.min.js"></script>
   <script src="/vendor/confetti.min.js"></script>
+  <script src="/vendor/milkdown.js"></script>
 </head>
 <body class="h-full bg-[#0b0f19] text-gray-100 antialiased selection:bg-indigo-500 selection:text-white overflow-hidden">
   
@@ -234,6 +213,14 @@
       @create-cycle="handleCreateCycle"
     ></cycle-modal>
 
+    <!-- Custom Fields Modal -->
+    <custom-fields-modal
+      :is-open="isCustomFieldsOpen"
+      :project="currentProject"
+      @close="isCustomFieldsOpen = false"
+      @saved="handleCustomFieldsSaved"
+    ></custom-fields-modal>
+
     <!-- Floating Toasts -->
     <div class="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none">
       <div 
@@ -259,6 +246,7 @@
 
   <!-- Component Scripts -->
   <script src="/js/api.js"></script>
+  <script src="/js/components/MilkdownEditor.js"></script>
   <script src="/js/components/Header.js"></script>
   <script src="/js/components/KanbanBoard.js"></script>
   <script src="/js/components/ListView.js"></script>
@@ -274,6 +262,7 @@
   <script src="/js/components/ImportModal.js"></script>
   <script src="/js/components/ProjectModal.js"></script>
   <script src="/js/components/CycleModal.js"></script>
+  <script src="/js/components/CustomFieldsModal.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

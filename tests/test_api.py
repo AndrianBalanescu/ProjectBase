@@ -140,7 +140,8 @@ def test_index_served():
 def test_vendor_assets_local():
     """Zero-build frontend must serve vendored bundles offline."""
     for asset in ("/vendor/vue.global.prod.js", "/vendor/tailwindcss.js",
-                  "/vendor/pocketbase.umd.js", "/vendor/sortable.min.js"):
+                  "/vendor/pocketbase.umd.js", "/vendor/sortable.min.js",
+                  "/vendor/milkdown.js", "/vendor/milkdown.css", "/css/style.css"):
         status, body = _request("GET", asset)
         assert status == 200, f"{asset} missing"
         assert len(body) > 1000, f"{asset} suspiciously small"
