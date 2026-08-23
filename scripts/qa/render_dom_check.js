@@ -212,6 +212,17 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
         if (!card) return false;
         return !!(card.querySelector('i[data-lucide="lock"]') || card.querySelector('.text-red-400'));
       }, tmpTitle);
+      // 7. The list view must also surface the blocked lock badge for the temp
+      // issue (cycle-42: list view previously had no relationship indicator even
+      // though issues carry relations — mirrors the kanban board UI).
+      await page.evaluate(() => { location.hash = '#/pb/list'; });
+      await page.waitForTimeout(2500);
+      relations.listLockShown = await page.evaluate((title) => {
+        const row = Array.from(document.querySelectorAll('tbody tr'))
+          .find((r) => (r.textContent || '').includes(title));
+        if (!row) return false;
+        return !!(row.querySelector('i[data-lucide="lock"]') || row.querySelector('.text-red-400'));
+      }, tmpTitle);
     } else {
       relations.error = tmp.error || 'temp issue create failed';
     }
@@ -270,12 +281,13 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     if (relations.rowShown === false) failures.push('added relation row did not appear in drawer');
     if (relations.kanbanLockNoReload === false) failures.push('blocked kanban card did not show lock badge via SSE (no reload)');
     if (relations.kanbanLockShown === false) failures.push('blocked kanban card did not show lock badge after reload');
+    if (relations.listLockShown === false) failures.push('blocked list-view row did not show lock badge');
   }
   if (routing.checked && !routing.issueOpened) failures.push('real issue deep link did not open the drawer');
   if (routing.checked && routing.staleDrawerOnPlainView) failures.push('stale drawer left open on plain view hash');
   if (!routing.checked) failures.push('routing regression not exercised (no login form found)');
 
-  console.log(JSON.stringify({ checks, routing, failures, all4xx }, null, 1));
+  console.log(JSON.stringify({ checks, routing, relations, failures, all4xx }, null, 1));
   console.log(failures.length === 0 ? 'RENDER QA: PASS' : 'RENDER QA: FAIL');
   await browser.close();
   process.exit(failures.length === 0 ? 0 : 1);

@@ -86,6 +86,10 @@ const ListViewComponent = {
     formatDate(dateStr) {
       if (!dateStr) return '—';
       return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    },
+    isBlocked(issue) {
+      if (!issue || !Array.isArray(issue.relations)) return false;
+      return issue.relations.some(r => r && r.type === 'blocked_by');
     }
   },
   template: `
@@ -156,10 +160,11 @@ const ListViewComponent = {
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-800/60">
-              <tr 
-                v-for="issue in processedIssues" 
+              <tr
+                v-for="issue in processedIssues"
                 :key="issue.id"
-                class="hover:bg-gray-800/40 transition-colors group cursor-pointer"
+                class="hover:bg-gray-800/40 transition-colors group cursor-pointer border-l-2"
+                :class="{ 'border-red-900/70': isBlocked(issue), 'border-transparent': !isBlocked(issue) }"
                 @click="$emit('open-issue', issue)"
               >
                 <!-- ID -->
@@ -176,6 +181,14 @@ const ListViewComponent = {
                 <td class="py-3 px-4 font-medium text-gray-100 max-w-md">
                   <div class="flex items-center space-x-2">
                     <span class="truncate">{{ issue.title }}</span>
+                    <!-- Blocked badge (mirrors Kanban board relationship UI) -->
+                    <span
+                      v-if="isBlocked(issue)"
+                      class="p-1 rounded border flex items-center justify-center bg-red-950/60 border-red-900/70 text-red-400 flex-shrink-0"
+                      title="Blocked by another issue"
+                    >
+                      <i data-lucide="lock" class="w-3 h-3"></i>
+                    </span>
                     <!-- Subtask count badge -->
                     <span v-if="issue.subtasks && issue.subtasks.length > 0" class="px-1.5 py-0.5 rounded bg-gray-800 text-[10px] text-gray-400 font-mono flex-shrink-0">
                       {{ issue.subtasks.filter(s => s.done).length }}/{{ issue.subtasks.length }}
