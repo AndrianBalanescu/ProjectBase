@@ -294,6 +294,48 @@ With every must-have row and the last matrix ❌ now green, the next milestone i
 delivery: point `deploy-demo.sh` at a real domain and run first-stranger onboarding / lead
 capture (needs human input: domain + VPS).
 
+## Cycle-19 status (2026-08-23)
+
+**Goal:** ship the self-hosting / deploy milestone — one-command hardened `systemd`
+service and a live-safe backup + restore toolchain. This is the missing half of the
+"100% self-hostable" promise: the app always ran under a hand-started process or Docker,
+with no lifecycle/backup story.
+
+**Shipped this cycle:**
+- `deploy/projectbase.service` — hardened systemd unit template: `NoNewPrivileges`,
+  `ProtectSystem=full`, `ProtectHome=read-only`, `PrivateTmp`, `ReadWritePaths` scoped to
+  `pb_data` + `pb_migrations`, `Restart=on-failure`. Runs as a dedicated non-login user.
+- `scripts/install-systemd.sh` — idempotent installer. Creates the `projectbase` system
+  user, chowns `pb_data`/`pb_migrations`, renders + installs the unit to
+  `/etc/systemd/system/`, `systemd-analyze verify`, enables + starts, waits on `/api/health`.
+  Refuses the reserved gateway ports (8080/8090); `--print-unit`/`--dry-run` for review.
+- `scripts/backup.sh` — full live backup via the PocketBase backups API: superuser auth →
+  `POST /api/backups` snapshot → wait → short-lived `files/token` → download zip → `unzip -t`
+  + `data.db` verification → local retention (`--keep`) → removes the server-side copy.
+- `scripts/restore.sh` — two modes. **Online** uploads to the running instance and triggers
+  the native restore endpoint (validated, app restarts onto restored data). **Offline**
+  (`--offline [--no-service]`) swaps `pb_data` for the archive with an automatic rollback
+  copy and auto-rollback on a failed health check.
+- Applied the service on the homelab: replaced an ad-hoc user-unit that was serving a stale
+  `pb_data` root copy; the app now runs as the hardened `projectbase.service` on `:8120`
+  with the real data (31 issues / 6 projects intact).
+- **P1 security fix** in `app/pb_hooks/15_signup_security.pb.js`: the privilege guard was
+  silently dead. A module-scope helper (`_isPrivileged`) is not resolvable inside Goja hook
+  callbacks — every invocation threw `ReferenceError`, the catch forced `member`
+  unconditionally, and role escalation checks on UPDATE never ran. Inlined the logic and
+  replaced the `!req.admin` superuser test with a correct
+  `auth.collection().name === "_superusers"` check. Verified: member self-promote is
+  blocked, superuser PATCH can promote to manager, superuser create is coerced to member
+  per the documented model, anon escalation is forced to member, and the journal is clean.
+
+**Validation:** `pytest -v tests/` **82 passed**. 15 new tests in `tests/test_selfhosting.py`
+(unit directives, installer rendering/reserved-port rejection, systemd-analyze, live
+backup download/verify/cleanup + retention, restore non-zip/no-db/--app-dir-ordering
+rejection, and a full online backup→restore round-trip on a scratch instance). Static
+frontend guard passed; iBrowse visual QA reached a clean Vue mount (summarizer degraded,
+same known limitation). FEATURE_MATRIX gained `Self-host one-command` and `Backup &
+restore` rows (shipped). Docs: `docs/research/cycles/cycle-19-selfhosting.md`.
+
 ## Cycle-17 status (2026-08-23)
 
 **Goal:** close the last remaining must-have gap in the feature matrix — **Roadmap view** was

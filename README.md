@@ -80,6 +80,27 @@
    - PocketBase Admin Panel: [http://localhost:8120/_/](http://localhost:8120/_/)
      - Default Admin: `your configured admin credentials`
 
+**Run as a hardened systemd service (recommended for production):**
+```bash
+sudo ./scripts/install-systemd.sh            # installs projectbase.service on :8120
+systemctl status projectbase               # verify it is active & healthy
+```
+The installer creates a dedicated non-login `projectbase` user, hardens the unit
+(`NoNewPrivileges`, `ProtectSystem`, `ProtectHome=read-only`, `PrivateTmp`), enables +
+starts it, and waits for `/api/health`. Preview the exact unit without root:
+`./scripts/install-systemd.sh --print-unit`.
+
+**Backup & restore:**
+```bash
+./scripts/backup.sh --out backups          # full live backup to backups/projectbase-*.zip
+./scripts/restore.sh backups/projectbase-*.zip               # online restore (app restarts)
+./scripts/restore.sh backups/projectbase-*.zip --offline     # offline swap w/ auto-rollback
+```
+`backup.sh` snapshots the whole data dir via the PocketBase backups API (verifies the
+archive, keeps the last `--keep` local copies, and removes the server-side copy).
+`restore.sh` validates the archive before applying and rolls back automatically if the
+app fails its health check. See `./scripts/backup.sh --help` / `./scripts/restore.sh --help`.
+
 ---
 
 ### Option B: Docker / Docker Compose

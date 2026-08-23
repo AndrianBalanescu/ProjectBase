@@ -9,3 +9,4 @@ __pycache__/
 prism-out/
 .pytest_cache/
 **/research/jobs/
+backups/
