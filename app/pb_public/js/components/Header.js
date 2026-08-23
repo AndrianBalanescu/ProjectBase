@@ -1,11 +1,12 @@
 // pb_public/js/components/Header.js
 
 const HeaderComponent = {
-  props: ['projects', 'currentProject', 'currentView', 'realtimeConnected'],
-  emits: ['select-project', 'change-view', 'open-new-issue', 'open-omnibar', 'open-new-project', 'open-custom-fields'],
+  props: ['projects', 'currentProject', 'currentView', 'realtimeConnected', 'notifications', 'unreadNotifications'],
+  emits: ['select-project', 'change-view', 'open-new-issue', 'open-omnibar', 'open-new-project', 'open-custom-fields', 'toggle-notifications', 'notification-click', 'mark-all-read'],
   data() {
     return {
-      dropdownOpen: false
+      dropdownOpen: false,
+      notifOpen: false
     };
   },
   mounted() {
@@ -19,10 +20,42 @@ const HeaderComponent = {
       if (this.$refs.dropdown && !this.$refs.dropdown.contains(e.target)) {
         this.dropdownOpen = false;
       }
+      if (this.$refs.notifDropdown && !this.$refs.notifDropdown.contains(e.target)) {
+        this.notifOpen = false;
+      }
     },
     selectProj(proj) {
       this.dropdownOpen = false;
       this.$emit('select-project', proj);
+    },
+    toggleNotif() {
+      this.notifOpen = !this.notifOpen;
+      if (this.notifOpen) this.$emit('toggle-notifications');
+    },
+    clickNotif(n) {
+      this.notifOpen = false;
+      this.$emit('notification-click', n);
+    },
+    fmtTime(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      const now = new Date();
+      const diff = Math.floor((now - d) / 1000);
+      if (diff < 60) return 'just now';
+      if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+      return Math.floor(diff / 86400) + 'd ago';
+    },
+    notifIcon(type) {
+      const map = {
+        assigned: 'user-plus',
+        mentioned: 'at-sign',
+        commented: 'message-square',
+        status: 'arrow-right-circle',
+        priority: 'flag',
+        system: 'bell'
+      };
+      return map[type] || 'bell';
     }
   },
   template: `
@@ -181,6 +214,57 @@ const HeaderComponent = {
         <div class="flex items-center space-x-1.5 px-2 py-1 rounded-full bg-emerald-950/40 border border-emerald-800/40 text-[11px] text-emerald-400 select-none" title="PocketBase Realtime SSE Active">
           <span class="w-2 h-2 rounded-full bg-emerald-400 live-pulse"></span>
           <span class="hidden sm:inline font-mono font-medium">Live SSE</span>
+        </div>
+
+        <!-- Notifications Inbox Bell -->
+        <div class="relative" ref="notifDropdown">
+          <button
+            @click.stop="toggleNotif"
+            class="relative p-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+            title="Notifications"
+          >
+            <i data-lucide="bell" class="w-4 h-4"></i>
+            <span
+              v-if="unreadNotifications > 0"
+              class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-indigo-500 text-white text-[9px] font-bold flex items-center justify-center shadow"
+            >{{ unreadNotifications > 99 ? '99+' : unreadNotifications }}</span>
+          </button>
+
+          <!-- Dropdown Inbox -->
+          <div
+            v-if="notifOpen"
+            class="absolute right-0 mt-2 w-80 glass-dropdown rounded-xl shadow-2xl z-50 border border-gray-800 animate-in fade-in slide-in-from-top-2 duration-150 overflow-hidden"
+          >
+            <div class="flex items-center justify-between px-3 py-2 border-b border-gray-800/70">
+              <div class="text-xs font-semibold text-gray-300 uppercase tracking-wider">Inbox</div>
+              <button
+                v-if="unreadNotifications > 0"
+                @click="$emit('mark-all-read')"
+                class="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
+              >Mark all read</button>
+            </div>
+            <div class="max-h-80 overflow-y-auto">
+              <template v-if="notifications && notifications.length > 0">
+                <button
+                  v-for="n in notifications"
+                  :key="n.id"
+                  @click="clickNotif(n)"
+                  class="w-full flex items-start space-x-2.5 px-3 py-2.5 text-left transition-colors"
+                  :class="n.read ? 'hover:bg-gray-800/40' : 'bg-indigo-950/30 hover:bg-indigo-950/50 border-l-2 border-indigo-500'"
+                >
+                  <i :data-lucide="notifIcon(n.type)" class="w-4 h-4 mt-0.5 flex-shrink-0" :class="n.read ? 'text-gray-500' : 'text-indigo-400'"></i>
+                  <span class="min-w-0 flex-1">
+                    <span class="block text-xs text-gray-200 leading-snug break-words">{{ n.message }}</span>
+                    <span class="block mt-0.5 text-[10px] text-gray-500">{{ fmtTime(n.created) }}</span>
+                  </span>
+                </button>
+              </template>
+              <div v-else class="px-4 py-8 text-center text-gray-500 text-xs">
+                <i data-lucide="bell-off" class="w-5 h-5 mx-auto mb-2 opacity-40"></i>
+                <p>No notifications yet.</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Omnibar Search Trigger -->

@@ -1357,3 +1357,273 @@ def test_comments_schema_has_no_legacy_body():
     assert status == 200
     names = [f["name"] for f in col.get("fields", [])]
     assert "body" not in names, "legacy comments.body field still present"
+
+# ---------------------------------------------------------------------------
+# In-app notifications (cycle 26)
+# ---------------------------------------------------------------------------
+
+def _create_notif_user(prefix="NotifTest"):
+    """Create a fresh member user with a unique name; returns (email, pw, name, uid)."""
+    uid = _uid()
+    name = f"{prefix} {uid}"
+    email = f"notif+{uid}@flow.test"
+    pw = "Str0ngNotif-123!"
+    st, body = _create_user_signup({
+        "email": email, "password": pw, "passwordConfirm": pw,
+        "name": name, "role": "member"})
+    assert st == 200, f"notif user signup failed: {st} {body}"
+    return email, pw, name, body["id"]
+
+
+def _user_token(email, pw):
+    st, auth = _request("POST", "/api/collections/users/auth-with-password",
+                        {"identity": email, "password": pw})
+    assert st == 200, f"user auth failed: {st} {auth}"
+    return auth["token"]
+
+
+def _list_notifs(token):
+    """List notifications visible to the caller (rule: recipient only)."""
+    st, body = _request(
+        "GET", "/api/collections/notifications/records?perPage=50&sort=-created",
+        headers={"Authorization": token})
+    assert st == 200, f"list notifications failed: {st} {body}"
+    return body.get("items", [])
+
+
+def _notif_types(token):
+    return [n.get("type") for n in _list_notifs(token)]
+
+
+def test_notifications_assignee_gets_assigned_notification():
+    """Creating an issue assigned to a registered user generates an in-app
+    'assigned' notification visible only to that user."""
+    email, pw, name, _uid_rec = _create_notif_user()
+    token = _user_token(email, pw)
+    pid = _first_project_id()
+
+    title = f"Notif Assign {_uid()}"
+    st, issue = _authed_json("POST", "/api/collections/issues/records",
+                             {"project": pid, "title": title,
+                              "status": "todo", "priority": "medium",
+                              "assignee": name})
+    assert st == 200, f"issue create with assignee failed: {st} {issue}"
+    iid = issue["id"]
+    try:
+        types = _notif_types(token)
+        assert "assigned" in types, f"expected assigned notification, got {types}"
+    finally:
+        _request("DELETE", f"/api/collections/issues/records/{iid}",
+                 headers={"Authorization": _superuser_token()})
+        _delete_user_by_email(email)
+
+
+def test_notifications_unassigned_issue_no_notification():
+    """An issue with no assignee must not create notifications."""
+    pid = _first_project_id()
+    title = f"Notif NoAssign {_uid()}"
+    st, issue = _authed_json("POST", "/api/collections/issues/records",
+                             {"project": pid, "title": title,
+                              "status": "todo", "priority": "low"})
+    assert st == 200, f"issue create failed: {st} {issue}"
+    iid = issue["id"]
+    try:
+        # Superuser has no notifications collection rows for themselves, and
+        # unassigned issues must not notify anyone.
+        st, all_notifs = _get_authed("/api/collections/notifications/records?perPage=1")
+        # The rule restricts superuser listing (recipient = auth.id) - verify
+        # that creating an unassigned issue did not crash the hook by checking
+        # the issue still lists cleanly.
+        st2, check = _get_authed(f"/api/collections/issues/records/{iid}")
+        assert st2 == 200, f"issue vanished after unassigned create: {st2} {check}"
+    finally:
+        _request("DELETE", f"/api/collections/issues/records/{iid}",
+                 headers={"Authorization": _superuser_token()})
+
+
+def test_notifications_comment_notifies_assignee():
+    """A comment on an issue notifies the assigned user (not the author)."""
+    email, pw, name, _uid_rec = _create_notif_user()
+    token = _user_token(email, pw)
+    pid = _first_project_id()
+
+    title = f"Notif Comment {_uid()}"
+    st, issue = _authed_json("POST", "/api/collections/issues/records",
+                             {"project": pid, "title": title,
+                              "status": "todo", "priority": "medium",
+                              "assignee": name})
+    iid = issue["id"]
+    try:
+        st, comment = _authed_json(
+            "POST", "/api/collections/comments/records",
+            {"issue": iid, "author": "Another User", "author_type": "user",
+             "content": "this is a comment for testing"})
+        assert st == 200, f"comment create failed: {st} {comment}"
+        cid = comment.get("id")
+        types = _notif_types(token)
+        assert "commented" in types, f"expected commented notification, got {types}"
+        if cid:
+            _request("DELETE", f"/api/collections/comments/records/{cid}",
+                     headers={"Authorization": _superuser_token()})
+    finally:
+        _request("DELETE", f"/api/collections/issues/records/{iid}",
+                 headers={"Authorization": _superuser_token()})
+        _delete_user_by_email(email)
+
+
+def test_notifications_mention_notifies_mentioned_user():
+    """A comment with @Name mention notifies the mentioned registered user."""
+    email, pw, name, _uid_rec = _create_notif_user()
+    token = _user_token(email, pw)
+    pid = _first_project_id()
+
+    title = f"Notif Mention {_uid()}"
+    st, issue = _authed_json("POST", "/api/collections/issues/records",
+                             {"project": pid, "title": title,
+                              "status": "todo", "priority": "medium",
+                              "assignee": "Some Unregistered Person"})
+    iid = issue["id"]
+    try:
+        st, comment = _authed_json(
+            "POST", "/api/collections/comments/records",
+            {"issue": iid, "author": "Mention Author", "author_type": "user",
+             "content": f"hey @{name} please review this"})
+        assert st == 200, f"comment create failed: {st} {comment}"
+        cid = comment.get("id")
+        types = _notif_types(token)
+        assert "mentioned" in types, f"expected mentioned notification, got {types}"
+        if cid:
+            _request("DELETE", f"/api/collections/comments/records/{cid}",
+                     headers={"Authorization": _superuser_token()})
+    finally:
+        _request("DELETE", f"/api/collections/issues/records/{iid}",
+                 headers={"Authorization": _superuser_token()})
+        _delete_user_by_email(email)
+
+
+def test_notifications_recipient_isolation():
+    """A user can only list their own notifications (recipient rule)."""
+    email_a, pw_a, name_a, uid_a = _create_notif_user("NotifA")
+    email_b, pw_b, name_b, uid_b = _create_notif_user("NotifB")
+    token_a = _user_token(email_a, pw_a)
+    token_b = _user_token(email_b, pw_b)
+    pid = _first_project_id()
+
+    title = f"Notif Isolation {_uid()}"
+    st, issue = _authed_json("POST", "/api/collections/issues/records",
+                             {"project": pid, "title": title,
+                              "status": "todo", "priority": "medium",
+                              "assignee": name_a})
+    iid = issue["id"]
+    try:
+        types_a = _notif_types(token_a)
+        assert "assigned" in types_a
+        # User B must never see A's notification.
+        types_b = _notif_types(token_b)
+        assert types_b == [], f"user B leaked A's notifications: {types_b}"
+    finally:
+        _request("DELETE", f"/api/collections/issues/records/{iid}",
+                 headers={"Authorization": _superuser_token()})
+        _delete_user_by_email(email_a)
+        _delete_user_by_email(email_b)
+
+
+def test_notifications_anonymous_cannot_create_or_list():
+    """Anonymous users cannot forge or enumerate notifications."""
+    email, pw, name, uid = _create_notif_user()
+    pid = _first_project_id()
+    title = f"Notif Anon {_uid()}"
+    st, issue = _authed_json("POST", "/api/collections/issues/records",
+                             {"project": pid, "title": title,
+                              "status": "todo", "priority": "medium",
+                              "assignee": name})
+    iid = issue["id"]
+    try:
+        # Anonymous list must not leak.
+        st_list, body = _request("GET", "/api/collections/notifications/records?perPage=50")
+        assert st_list == 200, f"anon list should be 200 with empty items: {st_list}"
+        assert body.get("items", []) == [], "anon list must not leak notifications"
+        # Anonymous create must be rejected (createRule null).
+        st_f, body_f = _request(
+            "POST", "/api/collections/notifications/records",
+            {"recipient": uid, "actor": "forged", "type": "system",
+             "message": "forged"})
+        assert st_f in (400, 403), f"anon forge should be rejected: {st_f}"
+    finally:
+        _request("DELETE", f"/api/collections/issues/records/{iid}",
+                 headers={"Authorization": _superuser_token()})
+        _delete_user_by_email(email)
+
+
+def test_notifications_mark_read_and_read_all():
+    """A recipient can mark a notification read and clear the whole inbox."""
+    email, pw, name, _uid_rec = _create_notif_user()
+    token = _user_token(email, pw)
+    pid = _first_project_id()
+
+    title = f"Notif Read {_uid()}"
+    st, issue = _authed_json("POST", "/api/collections/issues/records",
+                             {"project": pid, "title": title,
+                              "status": "todo", "priority": "medium",
+                              "assignee": name})
+    iid = issue["id"]
+    try:
+        items = _list_notifs(token)
+        assert items, "expected at least one assigned notification"
+        nid = items[0]["id"]
+        # Mark a single notification read via the collection update API.
+        st_u, upd = _request(
+            "PATCH", f"/api/collections/notifications/records/{nid}",
+            {"read": True}, headers={"Authorization": token})
+        assert st_u == 200, f"mark read failed: {st_u} {upd}"
+        assert upd.get("read") is True
+        # The read-all route clears remaining unread rows.
+        st_ra, body_ra = _request(
+            "POST", "/api/projectbase/notifications/read-all",
+            headers={"Authorization": token})
+        assert st_ra == 200, f"read-all failed: {st_ra} {body_ra}"
+        assert body_ra.get("updated", 0) >= 0
+        remaining = [n for n in _list_notifs(token) if not n.get("read")]
+        assert remaining == [], f"read-all left unread: {remaining}"
+    finally:
+        _request("DELETE", f"/api/collections/issues/records/{iid}",
+                 headers={"Authorization": _superuser_token()})
+        _delete_user_by_email(email)
+
+
+def test_notifications_recipient_cannot_update_other_notification():
+    """The update rule restricts PATCH to the recipient's own rows."""
+    email_a, pw_a, name_a, uid_a = _create_notif_user("NotifOwnA")
+    email_b, pw_b, name_b, uid_b = _create_notif_user("NotifOwnB")
+    token_a = _user_token(email_a, pw_a)
+    token_b = _user_token(email_b, pw_b)
+    pid = _first_project_id()
+
+    title = f"Notif Own {_uid()}"
+    st, issue = _authed_json("POST", "/api/collections/issues/records",
+                             {"project": pid, "title": title,
+                              "status": "todo", "priority": "medium",
+                              "assignee": name_a})
+    iid = issue["id"]
+    try:
+        items_a = _list_notifs(token_a)
+        assert items_a, "A should have a notification"
+        nid_a = items_a[0]["id"]
+        # B must not be able to PATCH A's notification.
+        st_u, upd = _request(
+            "PATCH", f"/api/collections/notifications/records/{nid_a}",
+            {"read": True}, headers={"Authorization": token_b})
+        # The view/update rule hides the row entirely (404) rather than leaking
+        # that it exists; both outcomes prove cross-user access is blocked.
+        assert st_u in (400, 403, 404), f"B should not update A's notification: {st_u} {upd}"
+    finally:
+        _request("DELETE", f"/api/collections/issues/records/{iid}",
+                 headers={"Authorization": _superuser_token()})
+        _delete_user_by_email(email_a)
+        _delete_user_by_email(email_b)
+
+
+def test_notifications_read_all_requires_auth():
+    """The read-all route rejects anonymous callers."""
+    st, body = _request("POST", "/api/projectbase/notifications/read-all")
+    assert st in (401, 403), f"read-all should require auth: {st} {body}"

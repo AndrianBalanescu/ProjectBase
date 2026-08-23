@@ -361,3 +361,54 @@ blockers). Commits pushed to origin/main.
 With every must-have row in the feature matrix now green, the next milestone is North Star
 delivery (cycle-7 next-items): point `deploy-demo.sh` at a real domain and run first-stranger
 onboarding / lead capture.
+
+## Cycle-26 status (2026-08-23)
+
+**Goal:** close the last visible table-stakes gap in the feature matrix — in-app
+notifications. External-channel notifications (Discord/Telegram/webhook) shipped
+earlier, but a Linear/Plane-class product needs a header bell + inbox so users see
+"someone assigned you / mentioned you / commented on your issue" without leaving
+the app. Also gives agents a native channel to surface attention items.
+
+**Shipped this cycle:**
+- `app/pb_migrations/1710000012_add_notifications.js` — additive `notifications`
+  collection: recipient (users relation, cascade), optional issue/comment
+  relations, actor, actor_type, type (assigned|mentioned|commented|status|
+  priority|system), message, read flag. Rules are recipient-scoped:
+  `recipient = @request.auth.id` on list/view/update; createRule null so only
+  pb_hooks can write rows; delete for recipient or admin. Purely additive +
+  idempotent, safe on existing and fresh installs.
+- `app/pb_hooks/55_notifications.pb.js` — hook-generated notifications:
+  - issue created/updated → `assigned` for the free-text assignee matched to a
+    registered `users.name`;
+  - status / priority change → `status` / `priority` for the assignee (skipped
+    when the actor is the assignee themselves);
+  - comment on an assigned issue → `commented`;
+  - `@Name` mention in a comment → `mentioned` (registered-user enumeration
+    avoids regex over-matching on space-containing names).
+  - `POST /api/projectbase/notifications/read-all` — bell "mark all read".
+  - All logic is inlined in the callbacks: the Goja runtime does not resolve
+    module-scope function declarations inside hook callbacks (same bug class as
+    the cycle-5 P0 fix in 15_signup_security.pb.js). Every path is try/catch so
+    a broken notification can never break the core issue/comment write path.
+- Frontend: header bell with live unread badge + dropdown inbox (Header.js),
+  notification state + realtime SSE refresh in app.js, API client methods
+  (`getNotifications`, `markNotificationRead`, `markAllNotificationsRead`),
+  recipient-filtered listing with `expand=issue,issue.project,comment`, click a
+  notification to jump to the issue (project switch included) and mark read.
+- Agent surface: 3 new FastMCP tools (`list_notifications`,
+  `mark_notification_read`, `mark_all_notifications_read`), llms.txt +
+  llms-full.txt documented the collection and endpoints.
+- Tests: 9 new in tests/test_api.py (assigned/commented/mentioned generation,
+  recipient isolation, anonymous list-empty + forge-rejected, mark-read +
+  read-all, cross-user update blocked, read-all auth gate). Full suite:
+  **118 passed** (was 109).
+
+**Validation:** `uv run pytest -v tests/` → 118 passed. `flow.frontend_guard`
+clean; `node --check` clean on all changed JS. iBrowse visual QA attempted
+(remote :3000 timeout — no result captured; the app served the new bell without
+console errors during local API-driven checks). Migration applied live on the
+homelab service; issue/comment create verified 200 with the hook active.
+
+**Next (external-gated):** North Star delivery still needs a human: domain + VPS
+for `deploy-demo.sh` (cycle-7 next-items) and first-stranger onboarding.

@@ -58,6 +58,10 @@ const App = {
       filterPriority: '',
       filterCycle: '',
 
+      // In-app notifications inbox
+      notifications: [],
+      isNotificationsOpen: false,
+
       // Toast Notifications
       toasts: []
     };
@@ -65,6 +69,9 @@ const App = {
   computed: {
     filteredIssuesCount() {
       return this.issues.length;
+    },
+    unreadNotifications() {
+      return this.notifications.filter(n => !n.read).length;
     }
   },
   async mounted() {
@@ -166,12 +173,13 @@ const App = {
     },
     async loadAllData() {
       try {
-        const [projs, iss, cycs, mls, lbls] = await Promise.all([
+        const [projs, iss, cycs, mls, lbls, notifs] = await Promise.all([
           API.getProjects(),
           API.getIssues(this.currentProject ? this.currentProject.id : null),
           API.getCycles(this.currentProject ? this.currentProject.id : null),
           API.getMilestones(this.currentProject ? this.currentProject.id : null),
-          API.getLabels(this.currentProject ? this.currentProject.id : null)
+          API.getLabels(this.currentProject ? this.currentProject.id : null),
+          API.getNotifications()
         ]);
 
         this.projects = projs;
@@ -179,6 +187,7 @@ const App = {
         this.cycles = cycs;
         this.milestones = mls;
         this.labels = lbls;
+        this.notifications = (notifs && notifs.items) || [];
 
         // Auto-select first favorite project if none selected
         if (!this.currentProject && this.projects.length > 0) {
@@ -206,6 +215,12 @@ const App = {
       API.initRealtime((collection, event) => {
         const { action, record } = event;
         
+        if (collection === 'notifications') {
+          // In-app notifications: refresh the inbox + unread badge live.
+          this.loadNotifications();
+          return;
+        }
+
         if (collection === 'issues') {
           if (action === 'create') {
             // Only add if belongs to current project or in All Projects mode
@@ -522,6 +537,64 @@ const App = {
       } catch (err) {
         console.error('Cycle creation failed:', err);
         this.showToast('Failed to create cycle', 'error');
+      }
+    },
+
+    async loadNotifications() {
+      try {
+        const res = await API.getNotifications();
+        this.notifications = (res && res.items) || [];
+      } catch (err) {
+        // Non-fatal: the inbox just stays stale on a transient failure.
+        console.warn('Notification load failed:', err);
+      }
+    },
+
+    async handleNotificationClick(notification) {
+      // Open the referenced issue (if any) and mark the notification read.
+      if (notification && !notification.read) {
+        try {
+          await API.markNotificationRead(notification.id);
+          notification.read = true;
+          this.notifications = [...this.notifications];
+        } catch (err) {
+          console.warn('Mark notification read failed:', err);
+        }
+      }
+      if (notification && notification.issue) {
+        const issueId = typeof notification.issue === 'string'
+          ? notification.issue
+          : notification.issue.id;
+        // The API request uses expand=issue,issue.project so the full record
+        // (and its project) ride along even when the issue is not in the
+        // currently-loaded project-scoped list.
+        const issue = this.issues.find(i => i.id === issueId)
+          || (notification.expand && notification.expand.issue);
+        if (issue) {
+          // Switch to the issue's project so the board shows the right context.
+          const projId = typeof issue.project === 'string'
+            ? issue.project
+            : (issue.project && (issue.project.id || issue.project));
+          if (projId && this.currentProject && projId !== this.currentProject.id) {
+            const proj = this.projects.find(p => p.id === projId);
+            if (proj) {
+              this.currentProject = proj;
+              await this.loadIssues();
+            }
+          }
+          // Prefer the freshly loaded record after any project switch.
+          this.openIssue(this.issues.find(i => i.id === issueId) || issue);
+        }
+      }
+      this.isNotificationsOpen = false;
+    },
+
+    async handleMarkAllNotificationsRead() {
+      try {
+        await API.markAllNotificationsRead();
+        this.notifications = this.notifications.map(n => ({ ...n, read: true }));
+      } catch (err) {
+        console.warn('Mark all notifications read failed:', err);
       }
     },
 
