@@ -118,7 +118,6 @@ class FlowRunner:
             "author": "Flow Autonomous Engine",
             "author_type": "agent",
             "content": content,
-            "body": content,
         })
         return bool(res and res.get("id"))
 

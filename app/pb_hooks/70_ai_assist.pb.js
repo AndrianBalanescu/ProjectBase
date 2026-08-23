@@ -6,7 +6,8 @@ routerAdd("POST", "/api/projectbase/ai-assist", (e) => {
         if (!e.auth || !e.auth.id) {
             return e.unauthorizedError("Authentication required")
         }
-        let body = e.requestInfo().body || {}
+        let body
+        try { body = e.requestInfo().body || {} } catch (bErr) { return e.json(400, { error: "Invalid JSON body" }) }
         let action = body.action || "generate_subtasks"
         let title = body.title || ""
         let description = body.description || ""
@@ -129,6 +130,7 @@ Be direct, technical, concise.`
             result: resultText
         })
     } catch (err) {
-        return e.json(500, { error: err.message })
+        console.log(">>> [ProjectBase] ai-assist error:", JSON.stringify(String((err && err.message) || err)))
+        return e.json(500, { error: "Internal server error" })
     }
 })

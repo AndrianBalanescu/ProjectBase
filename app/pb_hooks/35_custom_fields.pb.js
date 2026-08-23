@@ -36,7 +36,8 @@ routerAdd("GET", "/api/projectbase/projects/{id}/custom-fields", (e) => {
         if (!project) return e.notFoundError("Project not found")
         return e.json(200, { fields: readDefs(project) })
     } catch (err) {
-        return e.json(500, { error: err.message })
+        console.log(">>> [ProjectBase] custom-fields error:", JSON.stringify(String((err && err.message) || err)))
+        return e.json(500, { error: "Internal server error" })
     }
 })
 
@@ -48,7 +49,8 @@ routerAdd("PUT", "/api/projectbase/projects/{id}/custom-fields", (e) => {
         let project = null
         try { project = e.app.findRecordById("projects", e.request.pathValue("id")) } catch (err) { project = null }
         if (!project) return e.notFoundError("Project not found")
-        const body = e.requestInfo().body || {}
+        let body
+        try { body = e.requestInfo().body || {} } catch (bErr) { return e.json(400, { error: "Invalid JSON body" }) }
         const fields = body.fields
         if (!Array.isArray(fields)) return e.json(400, { error: "Expected body { fields: [...] }" })
         if (fields.length > 50) return e.json(400, { error: "Too many custom fields (max 50)" })
@@ -85,7 +87,8 @@ routerAdd("PUT", "/api/projectbase/projects/{id}/custom-fields", (e) => {
         e.app.save(project)
         return e.json(200, { success: true, fields: normalized })
     } catch (err) {
-        return e.json(500, { error: err.message })
+        console.log(">>> [ProjectBase] custom-fields error:", JSON.stringify(String((err && err.message) || err)))
+        return e.json(500, { error: "Internal server error" })
     }
 })
 
@@ -104,7 +107,8 @@ routerAdd("POST", "/api/projectbase/projects/{id}/custom-fields/validate", (e) =
         let project = null
         try { project = e.app.findRecordById("projects", e.request.pathValue("id")) } catch (err) { project = null }
         if (!project) return e.notFoundError("Project not found")
-        const body = e.requestInfo().body || {}
+        let body
+        try { body = e.requestInfo().body || {} } catch (bErr) { return e.json(400, { error: "Invalid JSON body" }) }
         const defs = readDefs(project)
         const values = (body.values !== null && typeof body.values === "object" && !Array.isArray(body.values)) ? body.values : {}
         const errors = []
@@ -132,6 +136,7 @@ routerAdd("POST", "/api/projectbase/projects/{id}/custom-fields/validate", (e) =
         if (errors.length) return e.json(422, { error: errors.join("; ") })
         return e.json(200, { valid: true })
     } catch (err) {
-        return e.json(500, { error: err.message })
+        console.log(">>> [ProjectBase] custom-fields error:", JSON.stringify(String((err && err.message) || err)))
+        return e.json(500, { error: "Internal server error" })
     }
 })

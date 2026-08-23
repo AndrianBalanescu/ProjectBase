@@ -31,7 +31,8 @@ routerAdd("POST", "/api/projectbase/import/github", (e) => {
             return e.unauthorizedError("Authentication required")
         }
 
-        let body = e.requestInfo().body || {}
+        let body
+        try { body = e.requestInfo().body || {} } catch (bErr) { return e.json(400, { error: "Invalid JSON body" }) }
         let projectId = body.project_id
         let repo = String(body.repo || "").trim()
         let token = body.token != null ? String(body.token).trim() : ""
@@ -237,6 +238,7 @@ routerAdd("POST", "/api/projectbase/import/github", (e) => {
             rate_limit: { remaining: rateLimitRemaining, reset_at: resetAt },
         })
     } catch (err) {
-        return e.json(500, { error: String((err && err.message) || err) })
+        console.log(">>> [ProjectBase] github import error:", JSON.stringify(String((err && err.message) || err)))
+        return e.json(500, { error: "Internal server error" })
     }
 })
