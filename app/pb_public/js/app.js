@@ -19,7 +19,8 @@ const App = {
     'new-issue-modal': NewIssueModalComponent,
     'import-modal': ImportModalComponent,
     'project-modal': ProjectModalComponent,
-    'cycle-modal': CycleModalComponent
+    'cycle-modal': CycleModalComponent,
+    'custom-fields-modal': CustomFieldsModalComponent
   },
   data() {
     return {
@@ -49,6 +50,7 @@ const App = {
       isProjectModalOpen: false,
       editingProject: null,
       isCycleModalOpen: false,
+      isCustomFieldsOpen: false,
 
       // Filters
       filterQuery: '',
@@ -363,6 +365,14 @@ const App = {
         console.error('Project save error:', err);
         this.showToast('Failed to save project', 'error');
       }
+    },
+
+    async handleCustomFieldsSaved(fields) {
+      // Update the current project's cached defs so the IssueDrawer can render them.
+      if (this.currentProject) {
+        this.currentProject.custom_field_defs = fields;
+      }
+      this.showToast('Custom fields saved', 'success');
     },
 
     async handleDeleteProject(projectId) {

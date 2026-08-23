@@ -4,7 +4,7 @@ const IssueDrawerComponent = {
   components: {
     'milkdown-editor': window.MilkdownEditorComponent || MilkdownEditorComponent
   },
-  props: ['issue', 'projects', 'cycles', 'labels'],
+  props: ['issue', 'projects', 'cycles', 'labels', 'fieldDefs'],
   emits: ['close', 'update-issue', 'delete-issue'],
   data() {
     return {
@@ -18,6 +18,7 @@ const IssueDrawerComponent = {
       editAssignee: '',
       editLabels: [],
       subtasks: [],
+      editCustomFields: {},
       newSubtaskTitle: '',
       descTab: 'write', // 'write' or 'preview'
       comments: [],
@@ -41,6 +42,11 @@ const IssueDrawerComponent = {
       const completed = this.subtasks.filter(s => s.done).length;
       const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
       return { total, completed, percent };
+    },
+    fieldDefsNormalized() {
+      let defs = this.fieldDefs;
+      if (typeof defs === 'string') { try { defs = JSON.parse(defs); } catch (e) { defs = []; } }
+      return Array.isArray(defs) ? defs : [];
     }
   },
   watch: {
@@ -58,6 +64,9 @@ const IssueDrawerComponent = {
           this.editAssignee = newVal.assignee || '';
           this.editLabels = Array.isArray(newVal.labels) ? [...newVal.labels] : [];
           this.subtasks = Array.isArray(newVal.subtasks) ? JSON.parse(JSON.stringify(newVal.subtasks)) : [];
+          let cf = newVal.custom_fields;
+          if (typeof cf === 'string') { try { cf = JSON.parse(cf); } catch (e) { cf = {}; } }
+          this.editCustomFields = (cf && typeof cf === 'object' && !Array.isArray(cf)) ? { ...cf } : {};
           this.loadComments();
         }
       }
@@ -95,7 +104,8 @@ const IssueDrawerComponent = {
         cycle: this.editCycle || null,
         assignee: this.editAssignee,
         labels: this.editLabels,
-        subtasks: this.subtasks
+        subtasks: this.subtasks,
+        custom_fields: this.editCustomFields
       });
     },
     async dispatchAgent(target = 'flomaster') {
@@ -445,6 +455,61 @@ const IssueDrawerComponent = {
             </div>
           </div>
 
+          <!-- Custom Fields -->
+          <div v-if="fieldDefsNormalized.length" class="space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Custom Fields</label>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div v-for="f in fieldDefsNormalized" :key="f.key" class="space-y-1">
+                <label class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">
+                  {{ f.label }} <span v-if="f.required" class="text-red-400">*</span>
+                </label>
+
+                <input
+                  v-if="f.type === 'text'"
+                  v-model="editCustomFields[f.key]"
+                  @blur="saveChanges"
+                  placeholder="—"
+                  class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+
+                <input
+                  v-else-if="f.type === 'number'"
+                  v-model.number="editCustomFields[f.key]"
+                  @blur="saveChanges"
+                  type="number"
+                  placeholder="—"
+                  class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+
+                <select
+                  v-else-if="f.type === 'select'"
+                  v-model="editCustomFields[f.key]"
+                  @change="saveChanges"
+                  class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                >
+                  <option value="">—</option>
+                  <option v-for="opt in f.options" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
+
+                <label v-else-if="f.type === 'checkbox'" class="flex items-center gap-2 text-xs text-gray-300">
+                  <input type="checkbox" v-model="editCustomFields[f.key]" @change="saveChanges" class="accent-indigo-500" />
+                  {{ editCustomFields[f.key] ? 'Yes' : 'No' }}
+                </label>
+
+                <input
+                  v-else-if="f.type === 'date'"
+                  v-model="editCustomFields[f.key]"
+                  @change="saveChanges"
+                  type="date"
+                  class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+          </div>
+
           <!-- Description Section (Write & Preview Tabs & AI Polish) -->
           <div class="space-y-2">
             <div class="flex items-center justify-between border-b border-gray-800 pb-1.5">
@@ -463,15 +528,22 @@ const IssueDrawerComponent = {
               </div>
               
               <div class="flex items-center bg-gray-950 p-0.5 rounded-lg border border-gray-800 text-xs">
-                <button 
-                  @click="descTab = 'write'" 
+                <button
+                  @click="descTab = 'rich'"
                   class="px-2.5 py-1 rounded-md font-medium transition-all"
-                  :class="descTab === 'write' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-gray-200'"
+                  :class="descTab === 'rich' || descTab === 'write' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-gray-200'"
                 >
-                  Write
+                  Rich
                 </button>
-                <button 
-                  @click="descTab = 'preview'" 
+                <button
+                  @click="descTab = 'raw'"
+                  class="px-2.5 py-1 rounded-md font-medium transition-all"
+                  :class="descTab === 'raw' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-gray-200'"
+                >
+                  Raw
+                </button>
+                <button
+                  @click="descTab = 'preview'"
                   class="px-2.5 py-1 rounded-md font-medium transition-all"
                   :class="descTab === 'preview' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-gray-200'"
                 >
@@ -480,8 +552,8 @@ const IssueDrawerComponent = {
               </div>
             </div>
 
-            <!-- Write Mode -->
-            <div v-show="descTab === 'write'">
+            <!-- Rich Mode (Milkdown WYSIWYG) -->
+            <div v-show="descTab === 'rich' || descTab === 'write'">
               <milkdown-editor
                 v-model="editDesc"
                 @blur="saveChanges"
@@ -490,6 +562,16 @@ const IssueDrawerComponent = {
               ></milkdown-editor>
             </div>
 
+            <!-- Raw Mode (Monospace Textarea) -->
+            <div v-show="descTab === 'raw'">
+              <textarea
+                v-model="editDesc"
+                @blur="saveChanges"
+                rows="6"
+                placeholder="Detailed markdown description, requirements, architecture notes..."
+                class="w-full px-3 py-2 rounded-xl bg-gray-950/80 border border-gray-800 text-gray-100 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 leading-relaxed"
+              ></textarea>
+            </div>
             <!-- Preview Mode -->
             <div 
               v-show="descTab === 'preview'"

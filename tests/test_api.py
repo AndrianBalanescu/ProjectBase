@@ -868,3 +868,136 @@ def test_sqlite_query_plan_uses_index():
     assert "idx_issues_project_number" in plan, f"Query plan did not utilize index: {plan}"
     assert "SCAN" not in plan, f"Query plan performed unindexed table scan: {plan}"
 
+
+# ---------------------------------------------------------------------------
+# Custom fields (cycle 16) — per-project field definitions + validation
+# ---------------------------------------------------------------------------
+
+def test_custom_fields_requires_authentication():
+    """Custom-fields endpoints must reject anonymous callers."""
+    status, _ = _request("GET", "/api/projectbase/projects/x/custom-fields")
+    assert status == 401
+    status, _ = _request("PUT", "/api/projectbase/projects/x/custom-fields",
+                         {"fields": [{"label": "A", "type": "text"}]})
+    assert status == 401
+
+def test_custom_fields_get_and_put():
+    """Define custom fields on a project and read them back."""
+    pid = _get_any_project_id()
+    hdr = {"Authorization": _superuser_token()}
+
+    # Clean slate
+    st, _ = _request("PUT", f"/api/projectbase/projects/{pid}/custom-fields",
+                     {"fields": []}, headers=hdr)
+    assert st == 200
+
+    st, body = _request("GET", f"/api/projectbase/projects/{pid}/custom-fields",
+                        headers=hdr)
+    assert st == 200, f"GET custom-fields failed: {st} {body}"
+    assert body["fields"] == []
+
+    fields = [
+        {"label": "Client", "type": "text"},
+        {"label": "Effort", "type": "number"},
+        {"label": "Gate", "type": "select", "options": ["P0", "P1", "P2"]},
+        {"label": "Signoff", "type": "checkbox"},
+        {"label": "Due", "type": "date"},
+    ]
+    st, body = _request("PUT", f"/api/projectbase/projects/{pid}/custom-fields",
+                        {"fields": fields}, headers=hdr)
+    assert st == 200, f"PUT custom-fields failed: {st} {body}"
+    # Auto-derived keys
+    keys = [f["key"] for f in body["fields"]]
+    assert "client" in keys
+    assert "gate" in keys
+    assert "signoff" in keys
+
+    st, body = _request("GET", f"/api/projectbase/projects/{pid}/custom-fields",
+                        headers=hdr)
+    assert st == 200
+    assert len(body["fields"]) == 5
+    # cleanup
+    _request("PUT", f"/api/projectbase/projects/{pid}/custom-fields",
+             {"fields": []}, headers=hdr)
+
+def test_custom_fields_reject_invalid():
+    """Unsupported type, empty select options, and duplicate keys are rejected."""
+    pid = _get_any_project_id()
+    hdr = {"Authorization": _superuser_token()}
+
+    st, body = _request("PUT", f"/api/projectbase/projects/{pid}/custom-fields",
+                        {"fields": [{"label": "Bad", "type": "boolean"}]}, headers=hdr)
+    assert st == 400, f"expected 400 for bad type, got {st}: {body}"
+
+    st, body = _request("PUT", f"/api/projectbase/projects/{pid}/custom-fields",
+                        {"fields": [{"label": "Gate", "type": "select", "options": []}]}, headers=hdr)
+    assert st == 400, f"expected 400 for empty select, got {st}: {body}"
+
+    st, body = _request("PUT", f"/api/projectbase/projects/{pid}/custom-fields",
+                        {"fields": [{"label": "A", "key": "dup"}, {"label": "B", "key": "dup"}]}, headers=hdr)
+    assert st == 400, f"expected 400 for dup key, got {st}: {body}"
+
+def test_custom_fields_validate():
+    """Validation endpoint catches type + required errors."""
+    pid = _get_any_project_id()
+    hdr = {"Authorization": _superuser_token()}
+    _request("PUT", f"/api/projectbase/projects/{pid}/custom-fields",
+             {"fields": [
+                 {"label": "Client", "type": "text", "required": True},
+                 {"label": "Effort", "type": "number"},
+                 {"label": "Gate", "type": "select", "options": ["P0", "P1"]},
+             ]}, headers=hdr)
+
+    # valid payload
+    st, body = _request("POST", f"/api/projectbase/projects/{pid}/custom-fields/validate",
+                        {"values": {"client": "Acme", "effort": 5, "gate": "P1"}}, headers=hdr)
+    assert st == 200 and body["valid"] is True, f"validate failed: {st} {body}"
+
+    # missing required + bad select
+    st, body = _request("POST", f"/api/projectbase/projects/{pid}/custom-fields/validate",
+                        {"values": {"gate": "P9"}}, headers=hdr)
+    assert st == 422, f"expected 422 for invalid, got {st}: {body}"
+    assert "Client is required" in body["error"]
+    assert "P0, P1" in body["error"]
+
+    # bad number
+    st, body = _request("POST", f"/api/projectbase/projects/{pid}/custom-fields/validate",
+                        {"values": {"client": "x", "effort": "lots"}}, headers=hdr)
+    assert st == 422 and "must be a number" in body["error"]
+
+    _request("PUT", f"/api/projectbase/projects/{pid}/custom-fields",
+             {"fields": []}, headers=hdr)
+
+def test_issue_custom_fields_roundtrip():
+    """Set custom_fields on an issue and read them back (via PocketBase API)."""
+    pid = _get_any_project_id()
+    hdr = {"Authorization": _superuser_token()}
+    title = f"Custom Fields Issue {_uid()}"
+    # create an issue
+    st, body = _request("POST", "/api/projectbase/import/csv",
+                        {"project_id": pid, "rows": [{"title": title}]}, headers=hdr)
+    assert st == 200 and body["imported"] == 1
+    iid = None
+    # find the issue
+    from urllib.parse import quote
+    q = "/api/collections/issues/records?perPage=200&filter=" + quote(f"title='{title}'")
+    st, lst = _get_authed(q)
+    assert st == 200 and lst.get("items")
+    iid = lst["items"][0]["id"]
+
+    # update with custom fields
+    st, body = _request("PATCH", f"/api/collections/issues/records/{iid}",
+                        {"custom_fields": {"client": "Acme", "effort": 3, "gate": "P0"}}, headers=hdr)
+    assert st == 200, f"PATCH custom_fields failed: {st} {body}"
+
+    st, body = _request("GET", f"/api/collections/issues/records/{iid}", headers=hdr)
+    assert st == 200
+    cf = body.get("custom_fields") or {}
+    if isinstance(cf, str):
+        import json as _json
+        cf = _json.loads(cf)
+    assert cf.get("client") == "Acme", f"custom_fields not persisted: {cf}"
+    assert cf.get("effort") == 3
+
+    # cleanup issue
+    _request("DELETE", f"/api/collections/issues/records/{iid}", headers=hdr)
