@@ -4,10 +4,10 @@ start:
 	./scripts/start.sh
 
 dev:
-	./pocketbase serve --dir ./pb_data --publicDir ./pb_public --hooksDir ./pb_hooks --http 0.0.0.0:8120 --dev
+	./pocketbase serve --dir ./app/pb_data --publicDir ./app/pb_public --hooksDir ./app/pb_hooks --migrationsDir ./app/pb_migrations --http 0.0.0.0:8120 --dev
 
 test:
-	python3 -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8120/api/projectbase/health').read().decode())"
+	pytest -v tests/
 
 mcp:
 	uv run ./scripts/mcp_server.py
@@ -19,4 +19,4 @@ docker-up:
 	docker compose up -d
 
 clean:
-	rm -rf pb_data
+	rm -rf app/pb_data pb_data
