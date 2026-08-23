@@ -1,6 +1,9 @@
 // pb_public/js/components/NewIssueModal.js
 
 const NewIssueModalComponent = {
+  components: {
+    'searchable-select': window.SearchableSelectComponent || SearchableSelectComponent
+  },
   props: ['isOpen', 'projects', 'currentProject', 'cycles', 'labels', 'milestones'],
   emits: ['close', 'create-issue'],
   data() {
@@ -15,7 +18,8 @@ const NewIssueModalComponent = {
       cycleId: '',
       milestoneId: '',
       assignee: '',
-      selectedLabels: []
+      selectedLabels: [],
+      customFields: {}
     };
   },
   watch: {
@@ -32,6 +36,7 @@ const NewIssueModalComponent = {
         this.milestoneId = '';
         this.assignee = '';
         this.selectedLabels = [];
+        this.customFields = {};
 
         this.$nextTick(() => {
           const inp = this.$refs.titleInput;
@@ -46,6 +51,13 @@ const NewIssueModalComponent = {
       const list = Array.isArray(this.milestones) ? this.milestones : [];
       if (!this.projectId) return list;
       return list.filter(m => !m.project || m.project === this.projectId);
+    },
+    selectedProjectFieldDefs() {
+      const p = (this.projects || []).find(proj => proj.id === this.projectId);
+      if (!p || !p.custom_field_defs) return [];
+      let defs = p.custom_field_defs;
+      if (typeof defs === 'string') { try { defs = JSON.parse(defs); } catch (e) { defs = []; } }
+      return Array.isArray(defs) ? defs : [];
     }
   },
   methods: {
@@ -77,7 +89,8 @@ const NewIssueModalComponent = {
         cycle: this.cycleId || null,
         milestone: this.milestoneId || null,
         assignee: this.assignee.trim(),
-        labels: this.selectedLabels
+        labels: this.selectedLabels,
+        custom_fields: this.customFields
       });
 
       this.$emit('close');
@@ -247,6 +260,56 @@ const NewIssueModalComponent = {
               </button>
             </div>
           </div>
+
+          <!-- Custom Fields (Dynamic from selected project) -->
+          <div v-if="selectedProjectFieldDefs.length" class="space-y-2 pt-2 border-t border-gray-800/80">
+            <label class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Custom Fields</label>
+            <div class="grid grid-cols-2 gap-3">
+              <div v-for="f in selectedProjectFieldDefs" :key="f.key" class="space-y-1">
+                <label class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">
+                  {{ f.label }} <span v-if="f.required" class="text-red-400">*</span>
+                </label>
+                <input
+                  v-if="f.type === 'text'"
+                  v-model="customFields[f.key]"
+                  placeholder="—"
+                  class="w-full px-2.5 py-1.5 rounded-lg bg-gray-950/80 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+                <input
+                  v-else-if="f.type === 'number'"
+                  v-model.number="customFields[f.key]"
+                  type="number"
+                  placeholder="0"
+                  class="w-full px-2.5 py-1.5 rounded-lg bg-gray-950/80 border border-gray-800 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+                <select
+                  v-else-if="f.type === 'select'"
+                  v-model="customFields[f.key]"
+                  class="w-full px-2.5 py-1.5 rounded-lg bg-gray-950/80 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                >
+                  <option value="">Select...</option>
+                  <option v-for="opt in f.options" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
+                <div v-else-if="f.type === 'checkbox'" class="pt-2">
+                  <label class="inline-flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      v-model="customFields[f.key]"
+                      class="rounded bg-gray-950 border-gray-700 text-indigo-600 focus:ring-0"
+                    />
+                    <span class="text-xs text-gray-300">{{ f.label }}</span>
+                  </label>
+                </div>
+                <input
+                  v-else-if="f.type === 'date'"
+                  v-model="customFields[f.key]"
+                  type="date"
+                  class="w-full px-2.5 py-1.5 rounded-lg bg-gray-950/80 border border-gray-800 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+          </div>
+
 
         </div>
 
