@@ -835,20 +835,30 @@ def test_sqlite_performance_indexes_exist():
 
 
 def test_version_endpoint():
-    """Verify version endpoint returns semver, service name, and open-source flag."""
+    """Verify version endpoint returns semver matching VERSION file, service name, and open-source flag."""
+    expected = "0.9.0"
+    try:
+        expected = open(os.path.join(os.path.dirname(__file__), "..", "VERSION")).read().strip()
+    except Exception:
+        pass
     st, body = _get("/api/projectbase/version")
     assert st == 200, f"version endpoint failed: {st} {body}"
     assert body.get("service") == "ProjectBase"
-    assert body.get("version") == "0.8.0"
+    assert body.get("version") == expected
     assert body.get("open_source") is True
     assert body.get("license") == "MIT"
 
 
 def test_health_includes_version_and_license():
     """Verify health endpoint includes version and open source license."""
+    expected = "0.9.0"
+    try:
+        expected = open(os.path.join(os.path.dirname(__file__), "..", "VERSION")).read().strip()
+    except Exception:
+        pass
     st, body = _get("/api/projectbase/health")
     assert st == 200, f"health endpoint failed: {st} {body}"
-    assert body.get("version") == "0.8.0"
+    assert body.get("version") == expected
     assert body.get("license") == "MIT"
     assert body.get("open_source") is True
 

@@ -10,7 +10,7 @@ Must-Have = table stakes vs Linear/Plane. Moat = differentiators nobody in the l
 | List view | ✅ | ✅ | ✅ | ✅ shipped |
 | Multi-project workspaces | ✅ | ✅ | ✅ (LOAD/IBR/PB/HOME seeded) | ✅ shipped |
 | Sprints / cycles | ✅ | ✅ | ✅ cycles + burndown | ✅ shipped |
-| Subtasks / relationships | ✅ | ✅ | ✅ subtasks + markdown drawer | ✅ shipped |
+| Subtasks / relationships | ✅ | ✅ | ✅ subtasks + markdown drawer + blocks/blocked_by/related (reciprocal mirroring, kanban blocked badges, REST + FastMCP) | ✅ shipped (cycle 40) |
 | Labels & priorities | ✅ | ✅ | ✅ | ✅ shipped |
 | Multi-user auth + roles | ✅ | ✅ | ✅ auth gate, admin/manager roles, hardened rules | ✅ shipped (cycle-1 audit: rules verified) |
 | Real-time updates | ✅ | ✅ | ✅ SSE | ✅ shipped |
