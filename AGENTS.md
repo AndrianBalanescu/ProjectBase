@@ -9,4 +9,5 @@
 - **Docs:** research and plans go in `docs/`; no loose root artifacts.
 - **Kanban & MCP:** use ProjectBase MCP (`mcp__projectbase__*`) or API (`:8120`) to pick active issues, move to `in_progress`, and mark `done` with audit comments.
 - **Commit:** small coherent commits; do not push unless explicitly requested. Stop before destructive data changes, credentials, external publishing, or ambiguous product decisions.
+- **No doc-only churn:** do not create commits that only mark milestones/roadmap items as "shipped" without real code. Docs describing delivered work must be committed together with that work.
 - **Done:** report implementation, tests, security impact, documentation, and known limitations honestly.
