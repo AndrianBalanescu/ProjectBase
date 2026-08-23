@@ -38,7 +38,11 @@ const ProjectsViewComponent = {
           <div 
             v-for="p in projects" 
             :key="p.id"
-            class="p-5 rounded-2xl bg-gray-900/70 hover:bg-gray-900/95 border border-gray-800 hover:border-gray-700 transition-all shadow-xl hover:shadow-2xl flex flex-col justify-between group"
+            @click="$emit('select-project', p)"
+            role="button"
+            tabindex="0"
+            @keydown.enter="$emit('select-project', p)"
+            class="p-5 rounded-2xl bg-gray-900/70 hover:bg-gray-900/95 border border-gray-800 hover:border-gray-700 transition-all shadow-xl hover:shadow-2xl flex flex-col justify-between group cursor-pointer"
           >
             <!-- Card Top: Icon, Name, Star, Key -->
             <div>
