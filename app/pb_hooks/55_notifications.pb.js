@@ -27,44 +27,53 @@
 // (PocketBase's shared KV store) in the request hooks and consume it in the
 // after hooks. Without this, actorName always falls back to "Agent" and the
 // "skip when the actor is the assignee" suppression never works.
-
+//
+// CONCURRENCY NOTE (critical): `$app.store()` is process-wide and PocketBase
+// serves requests concurrently, so a single global key would let one request's
+// actor leak into another's notification (deterministic under parallel PATCH).
+// Actor values are therefore keyed by the record id (`pbNotifActor:<id>:name`),
+// which is available in the update request hook and can be assigned in the
+// create request hook (PocketBase honors a 15-char base36 id set before save).
+// The after-success hook reads only its own record's key, making attribution
+// race-free. Keys are deleted after read to keep the store bounded.
 
 // Capture the acting user during the request phase (auth available here only)
-// into $app.store() so the after-success hooks (separate sandbox) can read it.
+// into $app.store() keyed by the record id so the after-success hooks
+// (separate sandbox) can read it without cross-request races.
 onRecordCreateRequest((e) => {
     try {
+        let rid = e.record.id
+        if (!rid) {
+            const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+            let id = ""
+            for (let i = 0; i < 15; i++) id += chars[Math.floor(Math.random() * chars.length)]
+            try { e.record.set("id", id) } catch (x) {}
+            rid = e.record.id
+        }
         const req = e.requestInfo()
         const auth = req ? req.auth : null
-        if (auth && auth.get) {
-            try { $app.store().set("pbNotifActorName", auth.get("name") || "") } catch (x) {}
-            try { $app.store().set("pbNotifActorType", "user") } catch (x) {}
-        } else {
-            try { $app.store().set("pbNotifActorName", "") } catch (x) {}
-            try { $app.store().set("pbNotifActorType", "") } catch (x) {}
-        }
+        const name = (auth && auth.get) ? (auth.get("name") || "") : ""
+        const type = (auth && auth.get) ? "user" : ""
+        try { $app.store().set("pbNotifActor:" + rid + ":name", name) } catch (x) {}
+        try { $app.store().set("pbNotifActor:" + rid + ":type", type) } catch (x) {}
     } catch (err) {
-        // Auth resolution failed; never attribute to a stale actor.
-        try { $app.store().set("pbNotifActorName", "") } catch (x) {}
-        try { $app.store().set("pbNotifActorType", "") } catch (x) {}
+        // Auth resolution failed; nothing to attribute (stale keys are
+        // deleted by the after-success hook after read).
     }
     e.next()
 }, "issues")
 
 onRecordUpdateRequest((e) => {
     try {
+        const rid = e.record.id || ""
         const req = e.requestInfo()
         const auth = req ? req.auth : null
-        if (auth && auth.get) {
-            try { $app.store().set("pbNotifActorName", auth.get("name") || "") } catch (x) {}
-            try { $app.store().set("pbNotifActorType", "user") } catch (x) {}
-        } else {
-            try { $app.store().set("pbNotifActorName", "") } catch (x) {}
-            try { $app.store().set("pbNotifActorType", "") } catch (x) {}
-        }
+        const name = (auth && auth.get) ? (auth.get("name") || "") : ""
+        const type = (auth && auth.get) ? "user" : ""
+        try { $app.store().set("pbNotifActor:" + rid + ":name", name) } catch (x) {}
+        try { $app.store().set("pbNotifActor:" + rid + ":type", type) } catch (x) {}
     } catch (err) {
-        // Auth resolution failed; never attribute to a stale actor.
-        try { $app.store().set("pbNotifActorName", "") } catch (x) {}
-        try { $app.store().set("pbNotifActorType", "") } catch (x) {}
+        // Auth resolution failed; nothing to attribute.
     }
     e.next()
 }, "issues")
@@ -73,13 +82,18 @@ onRecordUpdateRequest((e) => {
 onRecordAfterCreateSuccess((e) => {
     try {
         const issue = e.record
-        const assignee = issue.get("assignee") || ""
-        if (!assignee) return
-
+        // Read + remove the actor keys FIRST so cleanup happens even when the
+        // record has no assignee (and thus no notification is created).
         let actorName = "Agent"
         let actorType = "system"
-        try { actorName = $app.store().get("pbNotifActorName") || "Agent" } catch (x) {}
-        try { actorType = $app.store().get("pbNotifActorType") || "system" } catch (x) {}
+        const ridKey = issue.id || ""
+        try { actorName = $app.store().get("pbNotifActor:" + ridKey + ":name") || "Agent" } catch (x) {}
+        try { actorType = $app.store().get("pbNotifActor:" + ridKey + ":type") || "system" } catch (x) {}
+        try { $app.store().remove("pbNotifActor:" + ridKey + ":name") } catch (x) {}
+        try { $app.store().remove("pbNotifActor:" + ridKey + ":type") } catch (x) {}
+
+        const assignee = issue.get("assignee") || ""
+        if (!assignee) return
         const identifier = issue.get("identifier") || "task"
         const title = issue.get("title") || ""
 
@@ -119,8 +133,11 @@ onRecordAfterUpdateSuccess((e) => {
 
         let actorName = "Agent"
         let actorType = "system"
-        try { actorName = $app.store().get("pbNotifActorName") || "Agent" } catch (x) {}
-        try { actorType = $app.store().get("pbNotifActorType") || "system" } catch (x) {}
+        const ridKey = issue.id || ""
+        try { actorName = $app.store().get("pbNotifActor:" + ridKey + ":name") || "Agent" } catch (x) {}
+        try { actorType = $app.store().get("pbNotifActor:" + ridKey + ":type") || "system" } catch (x) {}
+        try { $app.store().remove("pbNotifActor:" + ridKey + ":name") } catch (x) {}
+        try { $app.store().remove("pbNotifActor:" + ridKey + ":type") } catch (x) {}
         const identifier = issue.get("identifier") || "task"
         const title = issue.get("title") || ""
 

@@ -13,6 +13,7 @@ Usage:
 
 import json
 import os
+import threading
 import uuid
 import urllib.error
 import urllib.request
@@ -1553,6 +1554,72 @@ def test_notifications_actor_attribution_and_self_suppression():
                  headers={"Authorization": _superuser_token()})
         _delete_user_by_email(email_a)
         _delete_user_by_email(email_b)
+
+
+def test_notifications_concurrent_updates_no_actor_cross_talk():
+    """Parallel updates to different issues must not leak one request's actor
+    into another's notification. Regression: the actor was captured in a single
+    global $app.store() key, and PocketBase serves requests concurrently, so a
+    parallel PATCH deterministically attributed the wrong actor (the assignee
+    of issue A saw user C as the actor for user B's update)."""
+    email_a, pw_a, name_a, uid_a = _create_notif_user("NotifRaceA")
+    email_b, pw_b, name_b, uid_b = _create_notif_user("NotifRaceB")
+    email_c, pw_c, name_c, uid_c = _create_notif_user("NotifRaceC")
+    token_a = _user_token(email_a, pw_a)
+    token_b = _user_token(email_b, pw_b)
+    token_c = _user_token(email_c, pw_c)
+    pid = _first_project_id()
+    uid = _uid()
+
+    # Issue 1 assigned to A (B will move it); issue 2 assigned to C (C moves it
+    # itself, which must be suppressed -> C should never see a status alert).
+    st, issue1 = _authed_json("POST", "/api/collections/issues/records",
+                              {"project": pid, "title": f"Race A {uid}",
+                               "status": "todo", "priority": "low",
+                               "assignee": name_a})
+    assert st == 200, f"issue1 create failed: {st} {issue1}"
+    st, issue2 = _authed_json("POST", "/api/collections/issues/records",
+                              {"project": pid, "title": f"Race C {uid}",
+                               "status": "todo", "priority": "low",
+                               "assignee": name_c})
+    assert st == 200, f"issue2 create failed: {st} {issue2}"
+    i1, i2 = issue1["id"], issue2["id"]
+    try:
+        for status1, status2 in (("in_progress", "in_progress"),
+                                 ("in_review", "in_review"),
+                                 ("done", "done")):
+            barrier = threading.Barrier(2)
+            results = {}
+            def fire(iid, status, tok, key):
+                barrier.wait()
+                try:
+                    st_x, body_x = _request(
+                        "PATCH", f"/api/collections/issues/records/{iid}",
+                        {"status": status}, headers={"Authorization": tok})
+                    results[key] = (st_x, body_x)
+                except Exception as exc:  # pragma: no cover - failure surface
+                    results[key] = ("exc", str(exc))
+            t1 = threading.Thread(target=fire, args=(i1, status1, token_b, "b"))
+            t2 = threading.Thread(target=fire, args=(i2, status2, token_c, "c"))
+            t1.start(); t2.start(); t1.join(); t2.join()
+            assert results.get("b", (None,))[0] == 200, results
+            assert results.get("c", (None,))[0] == 200, results
+
+            # A must see B's status change with actor == name_b.
+            a_status = [n for n in _list_notifs(token_a)
+                        if n.get("type") == "status"]
+            assert a_status, "expected A to receive a status notification"
+            assert a_status[0].get("actor") == name_b,                 f"cross-talk: A's latest status actor={a_status[0].get('actor')!r}, want {name_b!r}"
+            # C changing their own issue must never self-notify.
+            c_status = [n for n in _list_notifs(token_c)
+                        if n.get("type") == "status"]
+            assert c_status == [],                 f"C self-change leaked status notifications: {c_status}"
+    finally:
+        for iid in (i1, i2):
+            _request("DELETE", f"/api/collections/issues/records/{iid}",
+                     headers={"Authorization": _superuser_token()})
+        for email in (email_a, email_b, email_c):
+            _delete_user_by_email(email)
 
 
 def test_notifications_mention_notifies_mentioned_user():
