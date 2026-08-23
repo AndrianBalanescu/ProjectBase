@@ -365,7 +365,9 @@ const App = {
         this.currentView = viewMap[parts[1]] || 'board';
         if (parts[2] === 'issue' && parts[3]) {
           const issue = this.issues.find(i => i.id === parts[3]);
-          if (issue) this.selectedIssue = issue;
+          // Never show a stale drawer: close it when the route's issue
+          // doesn't exist (deleted or broken shared link).
+          this.selectedIssue = issue || null;
         }
       } else if (viewMap[parts[0]]) {
         this.currentView = viewMap[parts[0]] || 'board';
