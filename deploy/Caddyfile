@@ -1,0 +1,10 @@
+# Managed by scripts/deploy-demo.sh -- automatic HTTPS for the ProjectBase demo.
+{$DEMO_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy projectbase:8120
+	header {
+		Strict-Transport-Security "max-age=31536000;"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}

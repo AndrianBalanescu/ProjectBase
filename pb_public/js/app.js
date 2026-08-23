@@ -121,6 +121,7 @@ const App = {
         this.signupPasswordConfirm = '';
         await this.loadAllData();
         this.setupRealtime();
+        this.showToast('Welcome! You are in the shared demo workspace — press C to create an issue or I to import yours.', 'success');
       } catch (err) {
         this.authError = err?.response?.data?.email?.message
           || err?.response?.data?.password?.message
