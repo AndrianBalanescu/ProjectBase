@@ -78,6 +78,29 @@ onRecordUpdateRequest((e) => {
     e.next()
 }, "issues")
 
+// Clean up actor keys on FAILED requests too (the success after-hooks remove
+// them on the happy path; without these, a failed create/update would leave
+// two keys in the process-wide store forever).
+onRecordAfterCreateError((e) => {
+    try {
+        const ridKey = e.record && e.record.id ? e.record.id : ""
+        if (ridKey) {
+            try { $app.store().remove("pbNotifActor:" + ridKey + ":name") } catch (x) {}
+            try { $app.store().remove("pbNotifActor:" + ridKey + ":type") } catch (x) {}
+        }
+    } catch (err) {}
+}, "issues")
+
+onRecordAfterUpdateError((e) => {
+    try {
+        const ridKey = e.record && e.record.id ? e.record.id : ""
+        if (ridKey) {
+            try { $app.store().remove("pbNotifActor:" + ridKey + ":name") } catch (x) {}
+            try { $app.store().remove("pbNotifActor:" + ridKey + ":type") } catch (x) {}
+        }
+    } catch (err) {}
+}, "issues")
+
 // 1 + 2 + 3. Issue created / updated: notify on assignment / status / priority.
 onRecordAfterCreateSuccess((e) => {
     try {
