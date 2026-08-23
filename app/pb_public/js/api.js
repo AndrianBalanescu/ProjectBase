@@ -117,6 +117,44 @@ const API = {
     return await pb.collection('issues').delete(id);
   },
 
+  // Issue relationships (blocks / blocked_by / related)
+  _authHeaders(extra = {}) {
+    const headers = { ...extra };
+    if (pb.authStore.token) headers['Authorization'] = pb.authStore.token;
+    return headers;
+  },
+
+  async getIssueRelations(issueId) {
+    const res = await fetch(`/api/projectbase/issues/${issueId}/relations`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to load relations');
+    return data;
+  },
+
+  async addIssueRelation(issueId, targetId, type) {
+    const res = await fetch(`/api/projectbase/issues/${issueId}/relations`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ issue: targetId, type })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to add relation');
+    return data;
+  },
+
+  async removeIssueRelation(issueId, targetId, type) {
+    const res = await fetch(`/api/projectbase/issues/${issueId}/relations`, {
+      method: 'DELETE',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ issue: targetId, type })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to remove relation');
+    return data;
+  },
+
   // Cycles (Sprints)
   async getCycles(projectId = null) {
     const filter = projectId ? `project = "${projectId}"` : '1=1';

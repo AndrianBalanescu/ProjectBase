@@ -207,6 +207,10 @@ const KanbanBoardComponent = {
       }
       return { text: formatted, status: 'upcoming' };
     },
+    isBlocked(issue) {
+      if (!issue || !Array.isArray(issue.relations)) return false;
+      return issue.relations.some(r => r && r.type === 'blocked_by');
+    },
     getSubtaskProgress(issue) {
       if (!issue.subtasks || !Array.isArray(issue.subtasks) || issue.subtasks.length === 0) return null;
       const total = issue.subtasks.length;
@@ -353,6 +357,7 @@ const KanbanBoardComponent = {
                 :data-issue-id="issue.id"
                 :data-order="issue.order || 0"
                 class="kanban-card-drag-handle group relative bg-gray-950/90 hover:bg-gray-800/70 border border-gray-800/90 hover:border-gray-700/80 rounded-xl p-3 shadow-md hover:shadow-xl transition-all cursor-pointer select-none"
+                :class="{ 'border-red-900/70': isBlocked(issue) }"
                 @click="$emit('open-issue', issue)"
               >
                 <!-- Card Header -->
@@ -377,6 +382,14 @@ const KanbanBoardComponent = {
                       :title="'Priority: ' + issue.priority"
                     >
                       <i :data-lucide="getPriorityIcon(issue.priority).icon" class="w-3 h-3"></i>
+                    </span>
+
+                    <span
+                      v-if="isBlocked(issue)"
+                      class="p-1 rounded border flex items-center justify-center bg-red-950/60 border-red-900/70 text-red-400"
+                      title="Blocked by another issue"
+                    >
+                      <i data-lucide="lock" class="w-3 h-3"></i>
                     </span>
                   </div>
                 </div>
