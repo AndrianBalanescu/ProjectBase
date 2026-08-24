@@ -1832,3 +1832,23 @@ def test_long_description_saves_over_5000():
     # Clean up the probe issue.
     _request("DELETE", f"/api/collections/issues/records/{body['id']}",
              headers={"Authorization": _superuser_token()})
+
+def test_create_issue_updates_local_list_without_sse():
+    """Regression for PB-56: creating an issue in the UI must add it to the
+    local `this.issues` list immediately, not depend on the SSE realtime event
+    (which can be missed when the stream is not yet connected). The
+    `handleCreateIssue` handler in app.js must unshift the created record into
+    the local list, mirroring the realtime create handler."""
+    app_js = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                          "app", "pb_public", "js", "app.js")
+    with open(app_js) as fh:
+        src = fh.read()
+    # The create handler must add the created issue to the local list.
+    assert "this.issues.unshift(created)" in src, (
+        "handleCreateIssue must add the created issue to this.issues locally "
+        "(PB-56: new items did not appear without a refresh when SSE was missed)"
+    )
+    # It must guard against duplicates (same guard as the realtime handler).
+    assert "this.issues.find(i => i.id === created.id)" in src, (
+        "handleCreateIssue must dedupe against the existing list"
+    )

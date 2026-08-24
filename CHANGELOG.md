@@ -11,6 +11,12 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Fixed
+- **Create-issue list sync (PB-56)**: creating an issue in the UI now adds it
+  to the board/list immediately instead of depending on the SSE realtime event,
+  which could be missed when the stream was not yet connected (the new item
+  previously only appeared after a manual refresh). `handleCreateIssue` in
+  `app.js` now unshifts the created record into the local list with the same
+  duplicate guard as the realtime handler.
 - Version consistency: the UI header badge (`Header.js`) now shows `v0.9.0`
   instead of the stale `v0.8.0`, and `scripts/bump_version.sh` now keeps the
   header badge and the custom-routes health/version endpoints in sync on every

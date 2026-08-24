@@ -571,3 +571,34 @@ packaging so the version is consistent everywhere.
 **Next (v1.1+):** timeline/Gantt, portfolio dashboard, batch multi-select
 (deferred by the v1.0 stabilization verdict). Monitor inbound Gantt demand to
 test the flip condition.
+
+## Cycle-8 shipped (2026-08-24): create-issue list sync fix (PB-56)
+
+**Goal:** fix the genuine user-reported P0 bug PB-56 — creating new items in
+the UI didn't add them to the list unless the page was refreshed, and deleting
+a just-added item errored.
+
+**Root cause:** `handleCreateIssue` in `app.js` created the issue via the API
+but never added it to the local `this.issues` list — it relied entirely on the
+SSE realtime event. When the stream was not yet connected or the event was
+missed, the new item only appeared after a manual refresh, and subsequent
+operations on it (e.g. delete) were inconsistent.
+
+**Shipped this cycle:**
+- `app/pb_public/js/app.js` — `handleCreateIssue` now unshifts the created
+  record into `this.issues` immediately, with the same duplicate guard as the
+  realtime create handler. The item appears instantly and stays consistent.
+- `tests/test_api.py` — source-level regression test pinning the local-list
+  update (guards against reverting to SSE-only behavior).
+- `CHANGELOG.md` — `[Unreleased]` entry for the fix.
+
+**Validation (crime-scene audit):**
+- `pytest tests/` → **144/144 passed** (143 + 1 new regression test).
+- `flow.frontend_guard` clean; `qa-render.sh` → **PASS** (all urlState,
+  relations, focusMode suites green).
+- iBrowse remote host down (github.com ETIMEOUT, environmental) → local
+  playwright create-flow verification used: created an issue in the UI and it
+  appeared in the board immediately (before=3, after=4) with no page refresh
+  and no console errors. Delete of the created item returned 204 (clean).
+- Git clean, `0209419` on `origin/main` (HEAD == origin/main). PB-56 marked
+  `done` with a structured audit comment (commit, tests, QA, summary).
