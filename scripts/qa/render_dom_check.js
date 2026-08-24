@@ -89,6 +89,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   // a stale drawer (cycle-39 finding: applyRoute kept the previous
   // selectedIssue when the route's issue id did not resolve). ----
   const routing = { checked: false };
+  const resize = { checked: false };
   const email = page.locator('input[placeholder="Email"]');
   if (await email.count()) {
     const qaEmail = process.env.QA_EMAIL || 'f@flow.com';
@@ -123,6 +124,63 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       const drawer = document.querySelector('.slide-in-from-right');
       return !!drawer && getComputedStyle(drawer).display !== 'none';
     });
+
+    // ---- Drawer resize (cycle 43): drag handle widens the drawer, width
+    // persists across reload, and double-click resets to the 768px default. ----
+
+    await page.evaluate(() => { localStorage.removeItem('pb.drawer.width'); });
+    await page.evaluate(() => { location.hash = '#/pb/board/issue/ckat9ahso93piex'; });
+    await page.waitForTimeout(2500);
+    const handle = page.locator('.slide-in-from-right > .cursor-col-resize').first();
+    if (await handle.count()) {
+      resize.checked = true;
+      resize.handleFound = true;
+      const before = await page.evaluate(() => {
+        const d = document.querySelector('.slide-in-from-right');
+        return d ? d.getBoundingClientRect().width : 0;
+      });
+      const hb = await handle.boundingBox();
+      if (hb) {
+        const y = hb.y + hb.height / 2;
+        await page.mouse.move(hb.x + 1, y);
+        await page.mouse.down();
+        await page.mouse.move(hb.x + 1 - 300, y, { steps: 6 });
+        await page.mouse.up();
+        await page.waitForTimeout(300);
+        const after = await page.evaluate(() => {
+          const d = document.querySelector('.slide-in-from-right');
+          return d ? d.getBoundingClientRect().width : 0;
+        });
+        resize.widthGrew = after > before + 250;
+        resize.persisted = await page.evaluate((beforeW) => {
+          const v = parseInt(localStorage.getItem('pb.drawer.width') || '', 10);
+          return !isNaN(v) && v > beforeW + 250;
+        }, before);
+        // Reload: the saved width must survive a fresh mount.
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(3000);
+        await page.evaluate(() => { location.hash = '#/pb/board/issue/ckat9ahso93piex'; });
+        await page.waitForTimeout(2000);
+        resize.survivesReload = await page.evaluate(() => {
+          const d = document.querySelector('.slide-in-from-right');
+          return !!d && d.getBoundingClientRect().width > 1000;
+        });
+        // Double-click the handle: width resets to the max-w-3xl default (768px).
+        const hb2 = await page.locator('.slide-in-from-right > .cursor-col-resize').first().boundingBox();
+        if (hb2) {
+          await page.mouse.dblclick(hb2.x + 1, hb2.y + hb2.height / 2);
+          await page.waitForTimeout(300);
+          resize.resetWorks = await page.evaluate(() => {
+            const d = document.querySelector('.slide-in-from-right');
+            return !!d && Math.abs(d.getBoundingClientRect().width - 768) < 2
+              && localStorage.getItem('pb.drawer.width') === null;
+          });
+        }
+      }
+      await page.evaluate(() => { location.hash = '#/pb/board'; });
+      await page.evaluate(() => { localStorage.removeItem('pb.drawer.width'); });
+      await page.waitForTimeout(1500);
+    }
 
     // ---- Issue relationships UI (cycle 40): drawer section renders, adding a
     // blocks relation through the real UI shows the row + kanban lock badge,
@@ -286,8 +344,16 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   if (routing.checked && !routing.issueOpened) failures.push('real issue deep link did not open the drawer');
   if (routing.checked && routing.staleDrawerOnPlainView) failures.push('stale drawer left open on plain view hash');
   if (!routing.checked) failures.push('routing regression not exercised (no login form found)');
+  if (resize.checked) {
+    if (!resize.handleFound) failures.push('drawer resize handle missing');
+    if (resize.widthGrew === false) failures.push('dragging resize handle did not widen drawer');
+    if (!resize.persisted) failures.push('drawer width not persisted to localStorage');
+    if (resize.survivesReload === false) failures.push('drawer width lost after reload');
+    if (resize.resetWorks === false) failures.push('double-click did not reset drawer width to 768px');
+    if (resize.checked && !resize.widthGrew && resize.widthGrew !== false) failures.push('drawer resize drag not exercised');
+  }
 
-  console.log(JSON.stringify({ checks, routing, relations, failures, all4xx }, null, 1));
+  console.log(JSON.stringify({ checks, routing, resize, relations, failures, all4xx }, null, 1));
   console.log(failures.length === 0 ? 'RENDER QA: PASS' : 'RENDER QA: FAIL');
   await browser.close();
   process.exit(failures.length === 0 ? 0 : 1);
