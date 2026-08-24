@@ -45,8 +45,8 @@ app/
 docs/                  <- research, ROADMAP, TODO, architecture, COMPETITORS, FEATURE_MATRIX
 scripts/               <- start.sh, build_css.sh, backup.sh, restore.sh, install-systemd.sh, deploy-demo.sh,
                           reset-demo.sh, bump_version.sh, flow-cli (CLI wrapper), pb-cli, mcp_server.py,
-                          flow_runner.py, flow-daemon.sh, flow-cli, install.sh
-tests/                 <- test_api.py, test_selfhosting.py, test_flow_runner_sync.py, test_foss_schema.py, test_css_sync.py (CSS/template drift guard)
+                          pb_autonomous_runner.py, pb-autonomous-daemon.sh, flow-cli, install.sh
+tests/                 <- test_api.py, test_selfhosting.py, test_autonomous_runner_sync.py, test_foss_schema.py, test_css_sync.py (CSS/template drift guard)
 deploy/                <- projectbase.service, Caddyfile
 .github/workflows/ci.yml  <- CI (seeds superuser, runs tests)
 ```

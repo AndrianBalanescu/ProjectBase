@@ -1,13 +1,13 @@
-# Cycle 20 — Bidirectional Kanban sync for the autonomous Flow daemon
+# Cycle 20 — Bidirectional Kanban sync for the autonomous daemon
 
 **Date:** 2026-08-23 · **Milestone:** agent / mcp / core · **Tests:** 87 passed (2 new)
 
 ## Why
 
-The "autonomous Flow pipeline + FastMCP bidirectional Kanban sync" milestone
+The "autonomous pipeline + FastMCP bidirectional Kanban sync" milestone
 (PB-43) had been open since the agent-dispatch work shipped. The MCP server
 already gave agents read/write access to the Kanban, but the autonomous daemon
-(`scripts/flow_runner.py`) was **read-only**: it read issues via direct SQLite,
+(`scripts/pb_autonomous_runner.py`) was **read-only**: it read issues via direct SQLite,
 never authenticated to the API, never claimed a task, never posted audit
 comments, and never wrote status back. So agents could see and drive the board,
 but the autonomous pipeline could not reflect its own work on it. This cycle
@@ -17,17 +17,17 @@ closed that one-way gap.
 
 | Change | Detail |
 |---|---|
-| `scripts/flow_runner.py` auth | Authenticates against the API via the protocol superuser (`f@flow.com`/`superdev123`, overridable via `PB_SUPERUSER_EMAIL`/`PB_SUPERUSER_PASSWORD`), falling back to a `users` account, then to read-only SQLite if unreachable. |
-| `scripts/flow_runner.py` read path | `get_milestones` / `get_active_issues` now read through the **same authenticated API** it writes to (single source of truth), so a task it just claimed is visible on the next read. SQLite remains a fallback when the API is down. |
-| `scripts/flow_runner.py` write-back | On each cycle the daemon **claims** a backlog/todo task to `in_progress` and posts an **agent audit comment** (`🔄 Flow daemon picked up ...`). `--dry-run` reports but never writes. |
-| `scripts/flow_runner.py` URL encoding | Filter queries in the API reads are now URL-encoded, fixing a `URL can't contain control characters` error from the un-encoded `project = '...'` filter. |
+| `scripts/pb_autonomous_runner.py` auth | Authenticates against the API via the protocol superuser (`f@flow.com`/`superdev123`, overridable via `PB_SUPERUSER_EMAIL`/`PB_SUPERUSER_PASSWORD`), falling back to a `users` account, then to read-only SQLite if unreachable. |
+| `scripts/pb_autonomous_runner.py` read path | `get_milestones` / `get_active_issues` now read through the **same authenticated API** it writes to (single source of truth), so a task it just claimed is visible on the next read. SQLite remains a fallback when the API is down. |
+| `scripts/pb_autonomous_runner.py` write-back | On each cycle the daemon **claims** a backlog/todo task to `in_progress` and posts an **agent audit comment** (`🔄 Autonomous daemon picked up ...`). `--dry-run` reports but never writes. |
+| `scripts/pb_autonomous_runner.py` URL encoding | Filter queries in the API reads are now URL-encoded, fixing a `URL can't contain control characters` error from the un-encoded `project = '...'` filter. |
 | `scripts/mcp_server.py` `add_comment` | **Bug fix:** the comments schema required both `content` and a legacy `body` (repair migration 0003 re-added `body` as a required field). The tool sent only `content`, so every agent audit comment POST failed with a 400. The `body` drift was later removed by migration 1710000011, so the canonical schema now requires only `content`; writers send `content` alone. |
-| Tests | New `tests/test_flow_runner_sync.py` drives `flow_runner.py --once` against a scratch PocketBase instance and asserts auth, claim→`in_progress`, agent comment persistence, and that `--dry-run` never writes. |
+| Tests | New `tests/test_autonomous_runner_sync.py` drives `pb_autonomous_runner.py --once` against a scratch PocketBase instance and asserts auth, claim→`in_progress`, agent comment persistence, and that `--dry-run` never writes. |
 
 ## Verification
 
 - `pytest -v tests/` → **87 passed / 3 skipped** (was 85 passed; +2 new sync tests).
-- `flow_runner.py --project PB --once` against the live instance authenticated
+- `pb_autonomous_runner.py --project PB --once` against the live instance authenticated
   and correctly resolved PB-43 as the active task.
 - MCP `add_comment` verified end-to-end against the live server: the comment now
   persists (both `content` and `body` populated); probe comment cleaned up.
