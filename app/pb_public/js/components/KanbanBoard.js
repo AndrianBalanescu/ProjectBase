@@ -1,13 +1,10 @@
 // pb_public/js/components/KanbanBoard.js
 
 const KanbanBoardComponent = {
-  props: ['issues', 'projects', 'currentProject', 'cycles', 'labels'],
-  emits: ['open-issue', 'create-issue', 'update-issue', 'delete-issue', 'open-shortcuts-modal'],
+  props: ['issues', 'projects', 'currentProject', 'cycles', 'labels', 'filterQuery', 'filterPriority', 'filterCycle'],
+  emits: ['open-issue', 'create-issue', 'update-issue', 'delete-issue', 'open-shortcuts-modal', 'update:filterQuery', 'update:filterPriority', 'update:filterCycle'],
   data() {
     return {
-      searchQuery: '',
-      filterPriority: '',
-      filterCycle: '',
       columns: [
         { key: 'backlog', name: 'Backlog', color: '#6b7280', icon: 'circle-dot' },
         { key: 'todo', name: 'Todo', color: '#8b5cf6', icon: 'circle' },
@@ -22,9 +19,23 @@ const KanbanBoardComponent = {
     };
   },
   computed: {
+    // Writable proxies over the filter props so the template keeps plain
+    // v-model bindings while the state (and the URL query) lives in the root app.
+    searchModel: {
+      get() { return this.filterQuery; },
+      set(v) { this.$emit('update:filterQuery', v); }
+    },
+    priorityModel: {
+      get() { return this.filterPriority; },
+      set(v) { this.$emit('update:filterPriority', v); }
+    },
+    cycleModel: {
+      get() { return this.filterCycle; },
+      set(v) { this.$emit('update:filterCycle', v); }
+    },
     activeFilterCount() {
       let count = 0;
-      if (this.searchQuery) count++;
+      if (this.filterQuery) count++;
       if (this.filterPriority) count++;
       if (this.filterCycle) count++;
       return count;
@@ -32,8 +43,8 @@ const KanbanBoardComponent = {
     filteredIssues() {
       return this.issues.filter(issue => {
         // Text filter
-        if (this.searchQuery) {
-          const q = this.searchQuery.toLowerCase();
+        if (this.filterQuery) {
+          const q = this.filterQuery.toLowerCase();
           const matchTitle = (issue.title || '').toLowerCase().includes(q);
           const matchId = (issue.identifier || '').toLowerCase().includes(q);
           const matchDesc = (issue.description || '').toLowerCase().includes(q);
@@ -73,9 +84,9 @@ const KanbanBoardComponent = {
   },
   methods: {
     clearFilters() {
-      this.searchQuery = '';
-      this.filterPriority = '';
-      this.filterCycle = '';
+      this.$emit('update:filterQuery', '');
+      this.$emit('update:filterPriority', '');
+      this.$emit('update:filterCycle', '');
     },
     getIssuesForColumn(columnKey) {
       return this.filteredIssues
@@ -228,7 +239,7 @@ const KanbanBoardComponent = {
           <div class="relative">
             <i data-lucide="search" class="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-2.5"></i>
             <input 
-              v-model="searchQuery" 
+              v-model="searchModel" 
               placeholder="Filter tasks..."
               class="pl-8 pr-3 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-48 sm:w-60"
             />
@@ -236,7 +247,7 @@ const KanbanBoardComponent = {
 
           <!-- Priority Filter -->
           <select 
-            v-model="filterPriority"
+            v-model="priorityModel"
             class="px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-xs text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
             <option value="">All Priorities</option>
@@ -250,7 +261,7 @@ const KanbanBoardComponent = {
           <!-- Cycle Filter -->
           <select 
             v-if="cycles && cycles.length > 0"
-            v-model="filterCycle"
+            v-model="cycleModel"
             class="px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-xs text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[160px] truncate"
           >
             <option value="">All Cycles</option>

@@ -1,12 +1,10 @@
 // pb_public/js/components/CyclesView.js
 
 const CyclesViewComponent = {
-  props: ['cycles', 'issues', 'projects', 'currentProject'],
-  emits: ['open-issue', 'open-new-cycle', 'update-cycle', 'delete-cycle'],
+  props: ['cycles', 'issues', 'projects', 'currentProject', 'selectedCycleId'],
+  emits: ['open-issue', 'open-new-cycle', 'update-cycle', 'delete-cycle', 'update:selectedCycleId'],
   data() {
-    return {
-      selectedCycleId: null
-    };
+    return {};
   },
   computed: {
     activeCycle() {
@@ -87,7 +85,7 @@ const CyclesViewComponent = {
               <div 
                 v-for="c in cycles" 
                 :key="c.id"
-                @click="selectedCycleId = c.id"
+                @click="$emit('update:selectedCycleId', c.id)"
                 class="p-3.5 rounded-xl border transition-all cursor-pointer select-none"
                 :class="(currentCycle && currentCycle.id === c.id) ? 'bg-indigo-950/40 border-indigo-500/60 shadow-lg shadow-indigo-500/10' : 'bg-gray-900/60 border-gray-800 hover:border-gray-700'"
               >
