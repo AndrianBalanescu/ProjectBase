@@ -98,6 +98,7 @@
         :current-project="currentProject"
         :cycles="cycles"
         :labels="labels"
+        :selected-issue-ids="selectedIssueIds"
         v-model:filter-query="filterQuery"
         v-model:filter-priority="filterPriority"
         v-model:filter-cycle="filterCycle"
@@ -105,6 +106,7 @@
         @create-issue="handleCreateIssue"
         @update-issue="handleUpdateIssue"
         @delete-issue="handleDeleteIssue"
+        @toggle-issue-selection="toggleIssueSelection"
       ></kanban-board>
 
       <!-- 2. List View -->
@@ -115,6 +117,7 @@
         :current-project="currentProject"
         :cycles="cycles"
         :labels="labels"
+        :selected-issue-ids="selectedIssueIds"
         v-model:filter-query="filterQuery"
         v-model:filter-priority="filterPriority"
         v-model:filter-cycle="filterCycle"
@@ -122,6 +125,8 @@
         @update-issue="handleUpdateIssue"
         @delete-issue="handleDeleteIssue"
         @open-new-issue="isNewIssueOpen = true"
+        @toggle-issue-selection="toggleIssueSelection"
+        @select-all-visible="selectAllVisibleIssues"
       ></list-view>
 
       <!-- 3. Cycles / Sprints View -->
@@ -165,6 +170,84 @@
         v-else-if="currentView === 'marketplace'"
       ></marketplace-view>
     </main>
+
+    <!-- Bulk Actions Bar (board/list multi-select) -->
+    <div
+      v-if="selectedIssueIds.size > 0"
+      class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 rounded-2xl bg-gray-900/95 backdrop-blur border border-gray-700/80 shadow-2xl shadow-black/60"
+    >
+      <span class="font-mono text-indigo-300 font-semibold whitespace-nowrap">
+        {{ selectedIssueIds.size }} selected
+      </span>
+      <button
+        type="button"
+        class="flex items-center gap-1 px-2 py-1 rounded-lg text-gray-400 hover:text-gray-100 hover:bg-gray-800/70 transition-colors"
+        title="Clear selection (Esc)"
+        @click="clearIssueSelection"
+      >
+        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+        <span class="text-[11px]">Clear</span>
+      </button>
+
+      <div class="w-px h-5 bg-gray-700/70 hidden sm:block"></div>
+
+      <label class="flex items-center gap-2 text-gray-400">
+        <span class="text-[10px] uppercase tracking-wider">Status</span>
+        <select
+          v-model="bulkStatus"
+          class="bg-gray-950/90 border border-gray-700/80 rounded-lg px-2 py-1 text-gray-200 outline-none focus:border-indigo-500/70 text-xs"
+          @change="applyBulkField('status', $event.target.value)"
+        >
+          <option value="" disabled>Set status…</option>
+          <option value="backlog">Backlog</option>
+          <option value="todo">Todo</option>
+          <option value="in_progress">In Progress</option>
+          <option value="in_review">In Review</option>
+          <option value="done">Done</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </label>
+
+      <label class="flex items-center gap-2 text-gray-400">
+        <span class="text-[10px] uppercase tracking-wider">Priority</span>
+        <select
+          v-model="bulkPriority"
+          class="bg-gray-950/90 border border-gray-700/80 rounded-lg px-2 py-1 text-gray-200 outline-none focus:border-indigo-500/70 text-xs"
+          @change="applyBulkField('priority', $event.target.value)"
+        >
+          <option value="" disabled>Set priority…</option>
+          <option value="urgent">Urgent</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+          <option value="none">None</option>
+        </select>
+      </label>
+
+      <label v-if="cycles.length" class="flex items-center gap-2 text-gray-400">
+        <span class="text-[10px] uppercase tracking-wider">Cycle</span>
+        <select
+          v-model="bulkCycle"
+          class="bg-gray-950/90 border border-gray-700/80 rounded-lg px-2 py-1 text-gray-200 outline-none focus:border-indigo-500/70 text-xs"
+          @change="applyBulkField('cycle', $event.target.value)"
+        >
+          <option value="" disabled>Set cycle…</option>
+          <option value="">No cycle</option>
+          <option v-for="c in cycles" :key="c.id" :value="c.id">{{ c.name }}</option>
+        </select>
+      </label>
+
+      <div class="w-px h-5 bg-gray-700/70 hidden sm:block"></div>
+
+      <button
+        type="button"
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600/90 hover:bg-red-500 text-white text-xs font-semibold transition-colors"
+        @click="bulkDeleteSelected"
+      >
+        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+        <span>Delete</span>
+      </button>
+    </div>
 
     <!-- Issue Detail Slide-Over Drawer -->
     <issue-drawer 

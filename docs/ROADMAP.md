@@ -726,3 +726,106 @@ adversarial fuzzing, security) to confirm the release is clean.
 - Security: anon read of issues/projects/comments returns **empty** (rule-gated,
   no leak); anon `_superusers` list → 403; openapi.json served 200 for docs.
 - Git clean on `origin/main`; docs-only change → no frontend rebuild required.
+
+## Cycle-16 shipped (2026-08-24): batch multi-select + bulk actions
+
+**Goal (first v1.1 feature, deferred from the cycle-4 stabilization verdict):**
+give the board and list views a zero-friction multi-select so users can
+triage many issues at once — the "move 3 cards backlog→todo, assign 2
+priorities, change 1 cycle" workflow from the cycle-1 falsifiable validation —
+without N per-record requests.
+
+**Shipped this cycle:**
+- `app/pb_hooks/31_bulk_actions.pb.js` — two new agent-surface routes:
+  `POST /api/projectbase/issues/bulk-update` (whitelisted fields: status,
+  priority, cycle, milestone, estimate, due_date, labels, order + per-project
+  `custom_*`; up to 500 ids) and `POST /api/projectbase/issues/bulk-delete`
+  (admin/manager only, mirroring the issues deleteRule; superuser always
+  allowed). Each record is saved through `app.save()`/`app.delete()` so the
+  activity audit hook and realtime SSE fire per record. Response carries
+  `updated/deleted`, `missing`, `total` counts.
+- `app/pb_public/js/api.js` — `bulkUpdateIssues(ids, data)` /
+  `bulkDeleteIssues(ids)` client methods.
+- `app/pb_public/js/app.js` — selection state lifted into the root app
+  (`selectedIssueIds`), Esc clears selection (drawer close takes priority),
+  realtime deletes prune the set, project switch clears it, `bulkUpdateSelected`
+  applies the patch locally + toasts, `bulkDeleteSelected` confirms + removes.
+- `app/pb_public/js/components/KanbanBoard.js` — per-card selection checkbox
+  (hover-revealed), selected ring highlight, Cmd/Ctrl+click toggles selection
+  instead of opening the drawer.
+- `app/pb_public/js/components/ListView.js` — selection checkbox column +
+  select-all in the header, selected row highlight, Cmd/Ctrl+click toggle.
+- `app/pb_public/index.html` — floating bulk action bar (bottom, glassy):
+  status / priority / cycle selects + Delete + Clear; wired to both views.
+- Docs: OpenAPI + llms.txt/llms-full.txt agent surface updated; `AGENTS.md`
+  directory map; `CHANGELOG.md` `[Unreleased]`.
+
+**Validation (crime-scene audit):**
+- `pytest tests/` → **168/168 passed** (149 + 19 new in
+  `tests/test_bulk_actions.py` covering auth, validation, happy path, missing
+  accounting, role gating, labels, custom-field prefix, and frontend wiring).
+- `python3 -m flow.frontend_guard` → ALL FRONTEND FILES VERIFIED.
+- `node --check` clean on all four changed JS files.
+- `scripts/qa/qa-render.sh` → RENDER QA PASS (see below).
+- iBrowse visual QA: see verdict in this cycle's inspect phase (remote egress
+  fallback used in prior cycles when homelab host unreachable).
+- Adversarial: bulk-update with bad field / bad status / bad cycle → 400;
+  member bulk-delete → 403; anon both routes → 401/403; nonexistent ids
+  counted as `missing` without failing the batch.
+
+**Next (v1.1+):** timeline/Gantt and portfolio dashboard remain deferred per
+the v1.0 stabilization verdict. Batch multi-select is the first v1.1 item to
+land; natural follow-ups are shift+click range selection and bulk custom-field
+editing from the bar.
+
+## Cycle-17 shipped (2026-08-24): Shift+click range selection (v1.1 feature 2)
+
+**Goal (natural follow-up #1 from the cycle-16 roadmap note):** make bulk
+multi-select zero-friction by adding Linear-style Shift+click range selection
+on top of the cycle-16 checkboxes, so "grab 12 backlog items at once" is a
+click, a shift, a click — no N taps.
+
+**Shipped this cycle:**
+- `app/pb_public/js/app.js` — selection anchor state (`lastSelectedIssueId`):
+  every toggle updates the anchor; new `rangeSelectIssue(orderedIssues,
+  target)` merges the inclusive anchor→target range (union with the current
+  selection) and falls back to a single selection when the anchor is missing or
+  filtered out; the anchor resets with Esc/project switch and is pruned when
+  its record is deleted via realtime.
+- `app/pb_public/js/components/KanbanBoard.js` — Shift+click on a card emits
+  `range-select-issue` with the board's visible order (fixed column order,
+  cards sorted by `order` inside each column); no drawer opens.
+- `app/pb_public/js/components/ListView.js` — Shift+click on a row emits
+  `range-select-issue` with the current `processedIssues` sort order.
+- `app/pb_public/index.html` — binds `@range-select-issue="rangeSelectIssue"`
+  on both views.
+- `scripts/qa/render_dom_check.js` — new 15-assertion range suite: board anchor
+  count, forward range → 3 selected, checked-checkbox count == 3, no drawer on
+  shift+click, Esc clears, board cross-column span (expected count derived from
+  the live DOM), list forward range, list reverse range, plus a full E2E block
+  that creates 3 temp issues, range-selects them, applies status `todo` via the
+  bulk bar, verifies all 3 moved through the API, and proves cleanup (DELETE
+  responses 204). Non-vacuous probe guards fail the suite if the board/list
+  have <3 items.
+
+**Verification:**
+- `scripts/qa/qa-render.sh` → **RENDER QA PASS**, range suite all green
+  (boardProbed, boardAnchorOne, boardRangeThree, boardCheckedCount=3,
+  boardNoDrawer, boardEscClears, boardCrossColumnOK=4, listProbed,
+  listRangeThree, listReverseThree, applyCardsFound, applyBarThree,
+  applyMovedAll, applyBarCleared, applyDeletedAll). Only 4xx is the
+  intentional login-probe 400.
+- `pytest tests/` → **168/168 passed** in 19s.
+- `python3 -m flow.frontend_guard` → ALL FRONTEND FILES VERIFIED; `node --check`
+  clean on all three changed JS files + the QA script.
+- Security/adversarial probes: anon issues read → empty, anon `_superusers` →
+  403, anon bulk-update/bulk-delete → 401, malformed JSON → 400, 501 ids →
+- iBrowse visual QA: homelab host could not navigate to `127.0.0.1:8120`
+  (entry `goto` timeout 30s, same external egress class as cycle 16); the
+  documented local render-QA fallback passed with the full range suite.
+- Git clean, `df392de` on `origin/main` (HEAD == origin/main). PB-67 marked
+  `done` with a structured audit comment (commit, tests, QA, summary).
+
+**Next:** bulk custom-field editing from the bulk bar (backend whitelist
+already accepts `custom_*`; needs the bar UI picker), then timeline/Gantt and
+portfolio dashboard per the v1.0 stabilization verdict.

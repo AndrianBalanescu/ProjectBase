@@ -1,13 +1,12 @@
 // pb_public/js/components/ListView.js
 
 const ListViewComponent = {
-  props: ['issues', 'projects', 'currentProject', 'cycles', 'labels', 'filterQuery', 'filterPriority', 'filterCycle'],
-  emits: ['open-issue', 'update-issue', 'delete-issue', 'open-new-issue'],
+  props: ['issues', 'projects', 'currentProject', 'cycles', 'labels', 'filterQuery', 'filterPriority', 'filterCycle', 'selectedIssueIds'],
+  emits: ['open-issue', 'update-issue', 'delete-issue', 'open-new-issue', 'toggle-issue-selection', 'select-all-visible'],
   data() {
     return {
       sortBy: 'created',
-      sortDesc: true,
-      selectedIssues: new Set()
+      sortDesc: true
     };
   },
   computed: {
@@ -90,7 +89,43 @@ const ListViewComponent = {
     isBlocked(issue) {
       if (!issue || !Array.isArray(issue.relations)) return false;
       return issue.relations.some(r => r && r.type === 'blocked_by');
-    }
+    },
+
+    // --- Batch multi-select ---
+    isSelected(issue) {
+      return !!(this.selectedIssueIds && this.selectedIssueIds.has(issue.id));
+    },
+
+    toggleSelect(issue) {
+      this.$emit('toggle-issue-selection', issue);
+    },
+
+    allVisibleSelected() {
+      return this.processedIssues.length > 0 &&
+        this.processedIssues.every(i => this.isSelected(i));
+    },
+
+    toggleSelectAll() {
+      if (this.allVisibleSelected()) {
+        // Clear: emit per-issue removal for every visible row.
+        for (const issue of this.processedIssues) {
+          if (this.isSelected(issue)) this.$emit('toggle-issue-selection', issue);
+        }
+      } else {
+        this.$emit('select-all-visible', this.processedIssues);
+      }
+    },
+
+    handleRowClick(event, issue) {
+      // Cmd/Ctrl+click toggles multi-select without opening the drawer.
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        this.toggleSelect(issue);
+        return;
+      }
+      this.$emit('open-issue', issue);
+    },
   },
   template: `
     <div class="h-[calc(100vh-3.5rem)] overflow-y-auto p-6 bg-[#0b0f19]">
@@ -119,6 +154,17 @@ const ListViewComponent = {
           <table class="w-full text-left text-xs border-collapse">
             <thead>
               <tr class="border-b border-gray-800 bg-gray-950/80 text-gray-400 uppercase tracking-wider font-semibold select-none">
+                <th class="py-3 pl-4 pr-1 w-10">
+                  <button
+                    type="button"
+                    class="w-4 h-4 rounded border flex items-center justify-center transition-colors"
+                    :class="allVisibleSelected() ? 'bg-indigo-500 border-indigo-400 text-white' : 'border-gray-600 hover:border-indigo-400 text-transparent'"
+                    :title="allVisibleSelected() ? 'Clear selection' : 'Select all visible'"
+                    @click.stop="toggleSelectAll"
+                  >
+                    <i data-lucide="check" class="w-3 h-3"></i>
+                  </button>
+                </th>
                 <th class="py-3 px-4 w-28 cursor-pointer hover:text-white" @click="toggleSort('identifier')">
                   <div class="flex items-center space-x-1">
                     <span>ID</span>
@@ -164,9 +210,21 @@ const ListViewComponent = {
                 v-for="issue in processedIssues"
                 :key="issue.id"
                 class="hover:bg-gray-800/40 transition-colors group cursor-pointer"
-                :class="isBlocked(issue) ? 'border-l-2 border-red-900/70' : ''"
-                @click="$emit('open-issue', issue)"
+                :class="isBlocked(issue) ? 'border-l-2 border-red-900/70' : (isSelected(issue) ? 'bg-indigo-950/30' : '')"
+                @click="handleRowClick($event, issue)"
               >
+                <!-- Selection -->
+                <td class="py-3 pl-4 pr-1">
+                  <button
+                    type="button"
+                    class="w-4 h-4 rounded border flex items-center justify-center transition-colors"
+                    :class="isSelected(issue) ? 'bg-indigo-500 border-indigo-400 text-white' : 'border-gray-600 hover:border-indigo-400 text-transparent group-hover:text-gray-500'"
+                    :title="isSelected(issue) ? 'Deselect (Esc)' : 'Select for bulk actions'"
+                    @click.stop="toggleSelect(issue)"
+                  >
+                    <i data-lucide="check" class="w-3 h-3"></i>
+                  </button>
+                </td>
                 <!-- ID -->
                 <td class="py-3 px-4 font-mono font-medium text-gray-400 whitespace-nowrap">
                   <span class="flex items-center space-x-1.5">

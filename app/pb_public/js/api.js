@@ -117,6 +117,21 @@ const API = {
     return await pb.collection('issues').delete(id);
   },
 
+  // Bulk actions (board/list multi-select) — one request per action
+  async bulkUpdateIssues(ids, data) {
+    return await pb.send('/api/projectbase/issues/bulk-update', {
+      method: 'POST',
+      body: { ids: ids, data: data }
+    });
+  },
+
+  async bulkDeleteIssues(ids) {
+    return await pb.send('/api/projectbase/issues/bulk-delete', {
+      method: 'POST',
+      body: { ids: ids }
+    });
+  },
+
   // Issue relationships (blocks / blocked_by / related)
   _authHeaders(extra = {}) {
     const headers = { ...extra };

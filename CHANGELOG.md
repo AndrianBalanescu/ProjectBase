@@ -11,6 +11,19 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **Batch multi-select + bulk actions (v1.1 feature 1)**: board cards and list
+  rows now expose a selection checkbox (plus Cmd/Ctrl+click to toggle without
+  opening the drawer). A floating action bar applies status / priority / cycle
+  changes or deletes to every selected issue in one request. Backend:
+  `app/pb_hooks/31_bulk_actions.pb.js` adds
+  `POST /api/projectbase/issues/bulk-update` and
+  `POST /api/projectbase/issues/bulk-delete` (up to 500 ids per call,
+  per-record hooks + realtime SSE preserved; delete gated to admin/manager,
+  mirroring the issues deleteRule). Frontend: selection state lifted into the
+  root app (`selectedIssueIds`), board + list wiring, Esc to clear, list
+  select-all. Docs: OpenAPI + llms.txt/llms-full.txt agent surface updated.
+  19 new regression tests (`tests/test_bulk_actions.py`).
+
 - **Agent-surface OpenAPI coverage**: `openapi.json` now documents every
   implemented `/api/projectbase/*` custom route so autonomous agents discover
   the full surface. Newly added: `/projectbase/version`, `/projectbase/import/csv`,

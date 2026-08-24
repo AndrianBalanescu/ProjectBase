@@ -1,8 +1,8 @@
 // pb_public/js/components/KanbanBoard.js
 
 const KanbanBoardComponent = {
-  props: ['issues', 'projects', 'currentProject', 'cycles', 'labels', 'filterQuery', 'filterPriority', 'filterCycle'],
-  emits: ['open-issue', 'create-issue', 'update-issue', 'delete-issue', 'open-shortcuts-modal', 'update:filterQuery', 'update:filterPriority', 'update:filterCycle'],
+  props: ['issues', 'projects', 'currentProject', 'cycles', 'labels', 'filterQuery', 'filterPriority', 'filterCycle', 'selectedIssueIds'],
+  emits: ['open-issue', 'create-issue', 'update-issue', 'delete-issue', 'open-shortcuts-modal', 'toggle-issue-selection', 'update:filterQuery', 'update:filterPriority', 'update:filterCycle'],
   data() {
     return {
       columns: [
@@ -87,6 +87,25 @@ const KanbanBoardComponent = {
       this.$emit('update:filterQuery', '');
       this.$emit('update:filterPriority', '');
       this.$emit('update:filterCycle', '');
+    },
+
+    isSelected(issue) {
+      return !!(this.selectedIssueIds && this.selectedIssueIds.has(issue.id));
+    },
+
+    toggleSelect(issue) {
+      this.$emit('toggle-issue-selection', issue);
+    },
+
+    handleCardClick(event, issue) {
+      // Cmd/Ctrl+click toggles multi-select without opening the drawer.
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        this.toggleSelect(issue);
+        return;
+      }
+      this.$emit('open-issue', issue);
     },
     getIssuesForColumn(columnKey) {
       return this.filteredIssues
@@ -368,12 +387,21 @@ const KanbanBoardComponent = {
                 :data-issue-id="issue.id"
                 :data-order="issue.order || 0"
                 class="kanban-card-drag-handle group relative bg-gray-950/90 hover:bg-gray-800/70 border border-gray-800/90 hover:border-gray-700/80 rounded-xl p-3 shadow-md hover:shadow-xl transition-all cursor-pointer select-none"
-                :class="{ 'border-red-900/70': isBlocked(issue) }"
-                @click="$emit('open-issue', issue)"
+                :class="{ 'border-red-900/70': isBlocked(issue), 'ring-2 ring-indigo-500/70 border-indigo-500/80 bg-indigo-950/30': isSelected(issue) }"
+                @click="handleCardClick($event, issue)"
               >
                 <!-- Card Header -->
                 <div class="flex items-center justify-between text-xs mb-1.5">
                   <div class="flex items-center space-x-1.5">
+                    <button
+                      type="button"
+                      class="shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors mr-0.5"
+                      :class="isSelected(issue) ? 'bg-indigo-500 border-indigo-400 text-white' : 'border-gray-600 hover:border-indigo-400 text-transparent group-hover:text-gray-500'"
+                      :title="isSelected(issue) ? 'Deselect (Esc)' : 'Select for bulk actions'"
+                      @click.stop="toggleSelect(issue)"
+                    >
+                      <i data-lucide="check" class="w-3 h-3"></i>
+                    </button>
                     <span v-if="!currentProject && issue.expand && issue.expand.project" class="text-xs" :title="issue.expand.project.name">
                       {{ issue.expand.project.icon || '📁' }}
                     </span>

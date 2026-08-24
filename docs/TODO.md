@@ -4,7 +4,7 @@ Refreshed 2026-08-24 (flow cycle 4). Items 1-4 audited against the codebase — 
 
 ## v1.0 direction (decided)
 
-- C. ~~v1.0 direction: stabilization vs feature release~~ — ✅ **decided**: stabilization (paid 4-model debate, valid verdict, confidence 0.62). Build order + flip conditions in `docs/ROADMAP.md` § "v1.0 direction decided". Features (timeline/Gantt, portfolio dashboard, batch multi-select) defer to v1.1+.
+- C. ~~v1.0 direction: stabilization vs feature release~~ — ✅ **decided**: stabilization (paid 4-model debate, valid verdict, confidence 0.62). Build order + flip conditions in `docs/ROADMAP.md` § "v1.0 direction decided". Timeline/Gantt and portfolio dashboard defer to v1.1+; **batch multi-select shipped (cycle 16)**.
 
 ## Shipped (verified in code)
 

@@ -107,6 +107,19 @@ curl -s -X PATCH ${PROJECTBASE_URL:-http://localhost:8120}/api/collections/issue
   -H "Content-Type: application/json" \
   -d '{"custom_fields":{"client":"Acme","gate":"P1","effort":5}}'
 
+### Bulk actions (board/list multi-select, up to 500 ids per call):
+# Update status/priority/cycle/labels/etc. on many issues at once:
+curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/issues/bulk-update \
+  -H "Content-Type: application/json" -H "Authorization: <USER_TOKEN>" \
+  -d '{"ids":["<ISSUE_ID>","<ISSUE_ID2>"],"data":{"status":"in_progress","priority":"high"}}'
+# Allowed data fields: status, priority, cycle, milestone, estimate, due_date,
+# labels, order, plus per-project custom_* fields. Returns {"updated":N,"missing":N,"total":N}.
+# Delete many issues at once (admin/manager role only):
+curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/issues/bulk-delete \
+  -H "Content-Type: application/json" -H "Authorization: <USER_TOKEN>" \
+  -d '{"ids":["<ISSUE_ID>","<ISSUE_ID2>"]}'
+# Returns {"deleted":N,"missing":N,"total":N}.
+
 ### Issue relationships (blocks / blocked_by / related):
 # List resolved relations (outgoing + incoming) for an issue:
 curl -s ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/issues/<ISSUE_ID>/relations \
