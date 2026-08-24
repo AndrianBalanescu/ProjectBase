@@ -928,6 +928,36 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   }
   timeline.checked = true;
 
+  // ---- Portfolio Dashboard view (cycle 20): the view must mount, aggregate
+  // per-project progress, and a nav command must switch to it. The view fetches
+  // its own workspace snapshot, so no temp data is required. ----
+  const portfolio = { checked: false };
+  try {
+    // Navigate via the Portfolio nav command (proves header wiring).
+    await page.evaluate(() => { location.hash = '#/pb/portfolio'; });
+    await page.waitForTimeout(2500);
+    portfolio.viewMounted = await page.evaluate(() => {
+      const app = document.querySelector('#app');
+      return !!(app && /Portfolio Dashboard/.test(app.textContent || '') && app.querySelector('.max-w-7xl'));
+    });
+    // The view must render at least one project progress row (live data).
+    portfolio.projectRowShown = await page.evaluate(() => {
+      const app = document.querySelector('#app');
+      const txt = app ? app.textContent : '';
+      return /Project Progress/.test(txt) && (txt.match(/Total Issues/g) || []).length > 0;
+    });
+    // The keyboard 9 shortcut must switch to the portfolio view.
+    await page.evaluate(() => { location.hash = '#/pb/board'; });
+    await page.waitForTimeout(1800);
+    await page.keyboard.press('9');
+    await page.waitForTimeout(1800);
+    portfolio.shortcutWorks = await page.evaluate(() => {
+      const app = document.querySelector('#app');
+      return !!(app && /Portfolio Dashboard/.test(app.textContent || ''));
+    });
+  } catch (e) { portfolio.error = String(e).slice(0, 200); }
+  portfolio.checked = true;
+
   const failures = [];
   // The browser's network logger emits a GENERIC "Failed to load resource ... 400"
   // console error without naming the URL. If every 4xx was the whitelisted auth
@@ -1039,8 +1069,16 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   } else if (!timeline.checked) {
     failures.push('timeline E2E not exercised');
   }
+  if (portfolio && portfolio.checked) {
+    if (portfolio.error) failures.push('portfolio E2E setup error: ' + portfolio.error);
+    if (portfolio.viewMounted === false) failures.push('portfolio view did not mount');
+    if (portfolio.projectRowShown === false) failures.push('portfolio did not render project progress rows');
+    if (portfolio.shortcutWorks === false) failures.push('keyboard 9 did not switch to the portfolio view');
+  } else if (!portfolio.checked) {
+    failures.push('portfolio E2E not exercised');
+  }
 
-  console.log(JSON.stringify({ checks, routing, resize, urlState, relations, focusMode, bulk, range, customField, timeline, failures, all4xx }, null, 1));
+  console.log(JSON.stringify({ checks, routing, resize, urlState, relations, focusMode, bulk, range, customField, timeline, portfolio, failures, all4xx }, null, 1));
   console.log(failures.length === 0 ? 'RENDER QA: PASS' : 'RENDER QA: FAIL');
   await browser.close();
   process.exit(failures.length === 0 ? 0 : 1);

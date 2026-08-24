@@ -182,6 +182,15 @@
       <marketplace-view
         v-else-if="currentView === 'marketplace'"
       ></marketplace-view>
+
+      <!-- 8. Portfolio Dashboard View -->
+      <portfolio-view
+        v-else-if="currentView === 'portfolio'"
+        :projects="projects"
+        :issues="issues"
+        :milestones="milestones"
+        @select-project="selectProject"
+      ></portfolio-view>
     </main>
 
     <!-- Bulk Actions Bar (board/list multi-select) -->
@@ -437,6 +446,7 @@
   <script src="/js/components/TimelineView.js"></script>
   <script src="/js/components/ProjectsView.js"></script>
   <script src="/js/components/StatsView.js"></script>
+  <script src="/js/components/PortfolioView.js"></script>
   <script src="/js/components/DocsView.js"></script>
   <script src="/js/components/MarketplaceView.js"></script>
   <script src="/js/components/IssueDrawer.js"></script>

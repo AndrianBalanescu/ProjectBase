@@ -1934,3 +1934,39 @@ def test_realtime_handles_cycles_and_comments():
     assert "if (this.issue) this.loadComments();" in dsrc, (
         "IssueDrawer must reload comments when commentRefreshKey changes"
     )
+
+def test_portfolio_view_wired_and_precached():
+    """The Portfolio Dashboard (v1.1, cycle 20) must be wired through the
+    index.html asset list, the app.js component map, both hash viewMaps, and
+    the Service Worker precache, so offline boot and route navigation work."""
+    import re as _re
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    index = open(os.path.join(root, "app", "pb_public", "index.html")).read()
+    app_js = open(os.path.join(root, "app", "pb_public", "js", "app.js")).read()
+    sw = open(os.path.join(root, "app", "pb_public", "sw.js")).read()
+
+    # index.html includes the component and renders it under the portfolio view.
+    assert "js/components/PortfolioView.js" in index, (
+        "index.html must include PortfolioView.js"
+    )
+    assert "currentView === 'portfolio'" in index, (
+        "index.html must gate the portfolio view on currentView"
+    )
+    # app.js registers the component, maps the route, and adds the 9 shortcut.
+    assert "'portfolio-view': PortfolioViewComponent" in app_js, (
+        "app.js must register the portfolio-view component"
+    )
+    assert "portfolio: 'portfolio'" in app_js, (
+        "app.js viewMaps must include the portfolio route"
+    )
+    assert "this.currentView = 'portfolio'" in app_js, (
+        "app.js must support switching to the portfolio view"
+    )
+    # SW precache must cover the new asset (drift guard).
+    assert "'./js/components/PortfolioView.js'" in sw, (
+        "Service Worker must precache PortfolioView.js"
+    )
+    # The live-served asset must exist (200).
+    st, body = _get("/js/components/PortfolioView.js")
+    assert st == 200, f"PortfolioView.js not served: {st}"
+    assert "Portfolio Dashboard" in body, "PortfolioView.js must define the view"

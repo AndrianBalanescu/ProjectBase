@@ -197,6 +197,15 @@ const HeaderComponent = {
             <i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i>
             <span>Analytics</span>
           </button>
+          <button
+            @click="$emit('change-view', 'portfolio')"
+            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all font-medium"
+            :class="currentView === 'portfolio' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'"
+            title="Portfolio Dashboard (9)"
+          >
+            <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i>
+            <span>Portfolio</span>
+          </button>
           <button 
             @click="$emit('change-view', 'docs')" 
             class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all font-medium"
