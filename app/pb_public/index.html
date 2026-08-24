@@ -175,6 +175,7 @@
       :milestones="milestones"
       :issues="issues"
       :field-defs="currentProject ? currentProject.custom_field_defs : []"
+      :comment-refresh-key="commentRefreshKey"
       v-model:width-override="drawerWidthOverride"
       @close="closeIssueDrawer"
       @update-issue="handleUpdateIssue"

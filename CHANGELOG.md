@@ -11,6 +11,12 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Fixed
+- **Realtime cycles & comments sync**: the realtime handler in `app.js`
+  subscribed to `cycles` and `comments` events (via `api.js`) but never handled
+  them, so cycle changes and new comments from other users did not update the
+  UI in real-time. The handler now updates the local `cycles` list on
+  create/update/delete and bumps a `commentRefreshKey` that the open
+  `IssueDrawer` watches to reload its comment thread live.
 - **Create-issue list sync (PB-56)**: creating an issue in the UI now adds it
   to the board/list immediately instead of depending on the SSE realtime event,
   which could be missed when the stream was not yet connected (the new item

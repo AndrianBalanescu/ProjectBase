@@ -602,3 +602,34 @@ operations on it (e.g. delete) were inconsistent.
   and no console errors. Delete of the created item returned 204 (clean).
 - Git clean, `0209419` on `origin/main` (HEAD == origin/main). PB-56 marked
   `done` with a structured audit comment (commit, tests, QA, summary).
+
+## Cycle-9 shipped (2026-08-24): realtime cycles & comments sync
+
+**Goal:** close a real-time SSE gap flagged by the strategic calibration focus
+on real-time sync. `api.js` subscribed to `cycles` and `comments` realtime
+events, but the `app.js` realtime handler only handled `notifications`,
+`issues`, `milestones`, and `projects`. So a cycle created/updated/deleted by
+another user, or a new comment on an open issue, did not appear until a manual
+refresh.
+
+**Shipped this cycle:**
+- `app/pb_public/js/app.js` — the realtime handler now reacts to `cycles`
+  (create/update/delete, project-scoped like issues) and `comments` (bumps a
+  new `commentRefreshKey` counter).
+- `app/pb_public/js/components/IssueDrawer.js` — accepts a `commentRefreshKey`
+  prop and watches it to reload the comment thread live when a realtime comment
+  event arrives.
+- `app/pb_public/index.html` — wires `:comment-refresh-key` into the drawer.
+- `tests/test_api.py` — source-level regression test pinning the cycles +
+  comments realtime handling.
+- `CHANGELOG.md` — `[Unreleased]` entry.
+
+**Validation (crime-scene audit):**
+- `pytest tests/` → **145/145 passed** (144 + 1 new regression test).
+- `flow.frontend_guard` clean; `node --check` clean on both changed JS files.
+- `qa-render.sh` → **PASS** (all urlState, relations, focusMode suites green).
+- Live comment create/delete verified against the running app (realtime event
+  fires on create; the refresh-key mechanism is exercised by the regression
+  test). iBrowse remote host down (github.com ETIMEOUT, environmental) → local
+  render QA used as the visual fallback.
+- Git clean, pushed to `origin/main`.
