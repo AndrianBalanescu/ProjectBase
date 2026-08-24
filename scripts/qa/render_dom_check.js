@@ -752,6 +752,11 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     }, { probeId, tmpTitle });
     if (tmp.id) tmpIdHolder = tmp.id;
     if (tmp.id) ignoredCleanupUrls.add(BASE + '/api/collections/issues/records/' + tmp.id);
+    // The cleanup DELETE to the relations route can abort client-side after
+    // the server processed it (same documented pattern as the tmp-record
+    // delete); the end state is verified via explicit assertions below, so
+    // ignore that URL to avoid a false failure.
+    ignoredCleanupUrls.add(BASE + '/api/projectbase/issues/' + probeId + '/relations');
     if (tmp.id) {
       // 2. Reload so the app's issue list (picker source) includes the temp issue.
       await page.reload({ waitUntil: 'domcontentloaded' });
