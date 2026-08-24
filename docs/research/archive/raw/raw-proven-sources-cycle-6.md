@@ -1,4 +1,4 @@
-# Proven sources — cycle 6 — 2026-08-23 00:18 UTC
+# Proven sources — cycle 6 — 2026-08-24 07:45 UTC
 
 Use these as **starting businesses**, not vibes. Prefer: copy a working model,
 host a hot OSS tool, or fill an obvious gap next to something that already sells.
@@ -85,14 +85,14 @@ HN window: Show HN with points≥20 created in the last **90 days** (not all-tim
 - **angle:** Paid SKU? Copycat? Host-OSS? Gap next to this?
 
 ### Show HN: I trained a 125M model to autocomplete piano on-device
-- **points:** 588
+- **points:** 589
 - **created:** 2026-08-20T12:04:38Z
 - **url:** https://simedw.com/2026/08/20/midi-autocomplete/
 - **hn:** https://news.ycombinator.com/item?id=49373456
 - **angle:** Paid SKU? Copycat? Host-OSS? Gap next to this?
 
 ### Show HN: Needle2: 14MB agentic LLM for phones, wearables, smart home and robots
-- **points:** 536
+- **points:** 537
 - **created:** 2026-08-10T17:22:07Z
 - **url:** https://cactuscompute.com/needle
 - **hn:** https://news.ycombinator.com/item?id=49246804
@@ -204,7 +204,7 @@ HN window: Show HN with points≥20 created in the last **90 days** (not all-tim
 - **angle:** Paid SKU? Copycat? Host-OSS? Gap next to this?
 
 ### Show HN: Huzzah – a novel approach to coding with AI
-- **points:** 377
+- **points:** 379
 - **created:** 2026-08-20T19:05:36Z
 - **url:** https://www.danielvaughn.dev/posts/huzzah/
 - **hn:** https://news.ycombinator.com/item?id=49378768
@@ -289,84 +289,84 @@ HN window: Show HN with points≥20 created in the last **90 days** (not all-tim
 
 ## Product Hunt — recent launches
 
-### Open Analytics
-- **url:** https://www.producthunt.com/products/subtitlegenerator
+### Phoenix
+- **url:** https://www.producthunt.com/products/contrive
 - **angle:** Who pays? Pricing page? Vertical copycat?
 
-### Port Radar for macOS
-- **url:** https://www.producthunt.com/products/pocket-by-meta
+### Offloop
+- **url:** https://www.producthunt.com/products/navigara
 - **angle:** Who pays? Pricing page? Vertical copycat?
 
-### Pawvis
-- **url:** https://www.producthunt.com/products/velofiler
+### PaymentKit
+- **url:** https://www.producthunt.com/products/google-antigravity
 - **angle:** Who pays? Pricing page? Vertical copycat?
 
-### AutoClaw
+### Destiny Rings
+- **url:** https://www.producthunt.com/products/cortex-by-skynetlab
+- **angle:** Who pays? Pricing page? Vertical copycat?
+
+### IFAH
+- **url:** https://www.producthunt.com/products/bumply
+- **angle:** Who pays? Pricing page? Vertical copycat?
+
+### Wavepocket ▶︎•၊||၊||။၊|။
+- **url:** https://www.producthunt.com/products/trama-mac-automation-in-plain-language
+- **angle:** Who pays? Pricing page? Vertical copycat?
+
+### Lucid Train
+- **url:** https://www.producthunt.com/products/localdock
+- **angle:** Who pays? Pricing page? Vertical copycat?
+
+### Dropstone
+- **url:** https://www.producthunt.com/products/decawork
+- **angle:** Who pays? Pricing page? Vertical copycat?
+
+### WorldMap.lol
+- **url:** https://www.producthunt.com/products/treebar-where-is-codex
+- **angle:** Who pays? Pricing page? Vertical copycat?
+
+### Local Music Organizer for Mac
+- **url:** https://www.producthunt.com/products/aximote
+- **angle:** Who pays? Pricing page? Vertical copycat?
+
+### Tab Notes
+- **url:** https://www.producthunt.com/products/construct-computer
+- **angle:** Who pays? Pricing page? Vertical copycat?
+
+### Claude Academy
+- **url:** https://www.producthunt.com/products/flown
+- **angle:** Who pays? Pricing page? Vertical copycat?
+
+### FetchSandbox MCP
+- **url:** https://www.producthunt.com/products/kanasensei
+- **angle:** Who pays? Pricing page? Vertical copycat?
+
+### ANCBuddy for Bose QC Ultra
+- **url:** https://www.producthunt.com/products/openlogi
+- **angle:** Who pays? Pricing page? Vertical copycat?
+
+### Plask
+- **url:** https://www.producthunt.com/products/yatko
+- **angle:** Who pays? Pricing page? Vertical copycat?
+
+### Yattayo
 - **url:** https://www.producthunt.com/products/zero-15
 - **angle:** Who pays? Pricing page? Vertical copycat?
 
-### Maccess
-- **url:** https://www.producthunt.com/products/toplify
+### Port Radar for macOS
+- **url:** https://www.producthunt.com/products/velofiler
 - **angle:** Who pays? Pricing page? Vertical copycat?
 
-### Agents Never Sleep
-- **url:** https://www.producthunt.com/products/kerasformers
+### Pocket by Meta
+- **url:** https://www.producthunt.com/products/open-analytics-2
 - **angle:** Who pays? Pricing page? Vertical copycat?
 
-### Router by Ramp
-- **url:** https://www.producthunt.com/products/mindcase
+### SubtitleGenerator
+- **url:** https://www.producthunt.com/products/z-ai
 - **angle:** Who pays? Pricing page? Vertical copycat?
 
-### Project SKY
-- **url:** https://www.producthunt.com/products/actx0
-- **angle:** Who pays? Pricing page? Vertical copycat?
-
-### Wizstar
-- **url:** https://www.producthunt.com/products/shogunai
-- **angle:** Who pays? Pricing page? Vertical copycat?
-
-### Epho
-- **url:** https://www.producthunt.com/products/outlook-google-calendar-sync-for-mac
-- **angle:** Who pays? Pricing page? Vertical copycat?
-
-### Antigravity IDE Extensions
-- **url:** https://www.producthunt.com/products/dockhand
-- **angle:** Who pays? Pricing page? Vertical copycat?
-
-### fx (by Vercel)
-- **url:** https://www.producthunt.com/products/supernova-ai
-- **angle:** Who pays? Pricing page? Vertical copycat?
-
-### Flunkey
-- **url:** https://www.producthunt.com/products/onecli
-- **angle:** Who pays? Pricing page? Vertical copycat?
-
-### PixelRead AI OCR
-- **url:** https://www.producthunt.com/products/local-7
-- **angle:** Who pays? Pricing page? Vertical copycat?
-
-### Plow Latch
-- **url:** https://www.producthunt.com/products/surfdeck
-- **angle:** Who pays? Pricing page? Vertical copycat?
-
-### Lynqo
-- **url:** https://www.producthunt.com/products/berd
-- **angle:** Who pays? Pricing page? Vertical copycat?
-
-### NobodyWho
-- **url:** https://www.producthunt.com/products/lifelong-the-family-health-company
-- **angle:** Who pays? Pricing page? Vertical copycat?
-
-### MiniMax Design
-- **url:** https://www.producthunt.com/products/calendly
-- **angle:** Who pays? Pricing page? Vertical copycat?
-
-### Glasp for Firefox
-- **url:** https://www.producthunt.com/products/meetstream-ai
-- **angle:** Who pays? Pricing page? Vertical copycat?
-
-### HyNote for Mac
-- **url:** https://www.producthunt.com/products/shape-5
+### Pawvis
+- **url:** https://www.producthunt.com/products/maccess
 - **angle:** Who pays? Pricing page? Vertical copycat?
 
 ## Boring SaaS / revenue references (use with ask-llm q3)

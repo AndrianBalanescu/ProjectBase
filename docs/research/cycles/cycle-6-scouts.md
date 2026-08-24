@@ -12,9 +12,9 @@
 | sonar dual | archive/sonar/sonar-track-*-cycle-6.md |
 
 Queries:
-- social: PocketBase self-host demo deployment 2026 best practices reverse proxy TLS docker compose single VPS small RAM
-- competitive: Linear Plane demo sandbox public trial deployment strategy self-hosted project management 2026
-- docs: PocketBase docker healthcheck migrations superuser env PB_SUPERUSER_EMAIL production compose example
+- social: Plane CE self-hosted memory RAM usage complaints docker compose too heavy Reddit HN 2025 2026
+- competitive: Plane CE minimum VPS requirements RAM vs Linear Focalable Taiga lightweight issue tracker hosting cost
+- docs: Plane CE official documentation architecture containers postgres redis minio memcached setup.aero self-host requirements
 
 Notes:
 - ask-llm timeouts: sonar-fast≈90s, sonar≈180s, research≈300s (was 30s — that killed deep scouts under parallel load)
