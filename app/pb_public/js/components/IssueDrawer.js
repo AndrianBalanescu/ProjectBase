@@ -5,7 +5,7 @@ const IssueDrawerComponent = {
     'milkdown-editor': window.MilkdownEditorComponent || MilkdownEditorComponent,
     'searchable-select': window.SearchableSelectComponent || SearchableSelectComponent
   },
-  props: ['issue', 'projects', 'cycles', 'labels', 'fieldDefs', 'milestones', 'issues', 'widthOverride'],
+  props: ['issue', 'projects', 'cycles', 'labels', 'fieldDefs', 'milestones', 'issues', 'widthOverride', 'commentRefreshKey'],
   emits: ['close', 'update-issue', 'delete-issue', 'relations-changed', 'update:widthOverride'],
   data() {
     return {
@@ -175,6 +175,13 @@ const IssueDrawerComponent = {
       handler(v) {
         const w = parseInt(v, 10);
         if (!isNaN(w) && w >= 360 && w <= 1280) this.drawerWidth = w;
+      }
+    },
+    // Live realtime comment events (from any user) bump this key; reload the
+    // thread so new/updated comments appear without a manual refresh.
+    commentRefreshKey: {
+      handler() {
+        if (this.issue) this.loadComments();
       }
     }
   },

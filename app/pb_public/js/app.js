@@ -67,6 +67,10 @@ const App = {
       notifications: [],
       isNotificationsOpen: false,
 
+      // Bumped on every realtime comment event so the open IssueDrawer can
+      // refresh its comment thread live (see IssueDrawer watch on this key).
+      commentRefreshKey: 0,
+
       // Toast Notifications
       toasts: []
     };
@@ -284,6 +288,28 @@ const App = {
               this.currentProject = this.projects[0] || null;
             }
           }
+        }
+
+        if (collection === 'cycles') {
+          if (action === 'create') {
+            // Only add if it belongs to the current project (or All Projects).
+            if (!this.currentProject || record.project === this.currentProject.id) {
+              const exists = this.cycles.find(c => c.id === record.id);
+              if (!exists) this.cycles.push(record);
+            }
+          } else if (action === 'update') {
+            const idx = this.cycles.findIndex(c => c.id === record.id);
+            if (idx !== -1) this.cycles[idx] = { ...this.cycles[idx], ...record };
+          } else if (action === 'delete') {
+            this.cycles = this.cycles.filter(c => c.id !== record.id);
+            if (this.selectedCycleId === record.id) this.selectedCycleId = null;
+          }
+        }
+
+        if (collection === 'comments') {
+          // A comment was created/updated/deleted. Bump the refresh key so the
+          // open IssueDrawer reloads its thread live (it filters by issue id).
+          this.commentRefreshKey++;
         }
       });
     },

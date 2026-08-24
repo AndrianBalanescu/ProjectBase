@@ -1852,3 +1852,46 @@ def test_create_issue_updates_local_list_without_sse():
     assert "this.issues.find(i => i.id === created.id)" in src, (
         "handleCreateIssue must dedupe against the existing list"
     )
+
+def test_realtime_handles_cycles_and_comments():
+    """Regression: api.js subscribes to `cycles` and `comments` realtime events,
+    but the app.js realtime handler previously only handled notifications,
+    issues, milestones, and projects. As a result, cycle changes and new
+    comments from other users did not update the UI in real-time. The handler
+    must now update the local cycles list and bump a commentRefreshKey so the
+    open IssueDrawer reloads its thread live."""
+    app_js = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                          "app", "pb_public", "js", "app.js")
+    with open(app_js) as fh:
+        src = fh.read()
+    # The realtime handler must react to cycle create/update/delete.
+    assert "collection === 'cycles'" in src, (
+        "realtime handler must handle cycles events"
+    )
+    assert "this.cycles.push(record)" in src, (
+        "realtime cycle create must add the cycle to the local list"
+    )
+    assert "this.cycles[idx] = { ...this.cycles[idx], ...record }" in src, (
+        "realtime cycle update must merge the record into the local list"
+    )
+    assert "this.cycles.filter(c => c.id !== record.id)" in src, (
+        "realtime cycle delete must remove the cycle from the local list"
+    )
+    # The realtime handler must react to comment events by bumping a refresh key.
+    assert "collection === 'comments'" in src, (
+        "realtime handler must handle comments events"
+    )
+    assert "this.commentRefreshKey++" in src, (
+        "realtime comment event must bump commentRefreshKey"
+    )
+    # The IssueDrawer must watch that key and reload the thread.
+    drawer = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                          "app", "pb_public", "js", "components", "IssueDrawer.js")
+    with open(drawer) as fh:
+        dsrc = fh.read()
+    assert "commentRefreshKey" in dsrc, (
+        "IssueDrawer must accept the commentRefreshKey prop"
+    )
+    assert "if (this.issue) this.loadComments();" in dsrc, (
+        "IssueDrawer must reload comments when commentRefreshKey changes"
+    )
