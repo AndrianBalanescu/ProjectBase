@@ -25,22 +25,29 @@ const MilkdownEditorComponent = {
   watch: {
     modelValue(value) {
       if (!this.editor || this.syncing) return;
-      const current = this.editor.getMarkdown();
-      if (value !== current) {
-        this.syncing = true;
-        try {
-          this.editor.editor.action((ctx) => {
-            const editorView = ctx.get(Milkdown.EditorViewCtx);
-            const state = editorView.state;
-            const tr = state.tr.replaceWith(0, state.doc.content.size,
-              state.schema.text(value || ''));
-            editorView.dispatch(tr);
-          });
-        } catch (_) {
-          // Milkdown owns the document model; avoid disrupting typing on a stale update.
-        } finally {
-          this.syncing = false;
-        }
+      // The Crepe instance exposes getMarkdown, but crepe.create() may resolve
+      // to a wrapper without it. Guard so an external modelValue update never
+      // throws an uncaught TypeError (pre-existing console error).
+      let current;
+      try {
+        current = typeof this.editor.getMarkdown === 'function' ? this.editor.getMarkdown() : null;
+      } catch (_) {
+        current = null;
+      }
+      if (current === null || value === current) return;
+      this.syncing = true;
+      try {
+        this.editor.editor.action((ctx) => {
+          const editorView = ctx.get(Milkdown.EditorViewCtx);
+          const state = editorView.state;
+          const tr = state.tr.replaceWith(0, state.doc.content.size,
+            state.schema.text(value || ''));
+          editorView.dispatch(tr);
+        });
+      } catch (_) {
+        // Milkdown owns the document model; avoid disrupting typing on a stale update.
+      } finally {
+        this.syncing = false;
       }
     },
     readonly(value) {
