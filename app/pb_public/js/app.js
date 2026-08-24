@@ -456,6 +456,14 @@ const App = {
     async handleCreateIssue(issueData) {
       try {
         const created = await API.createIssue(issueData);
+        // Add the created issue to the local list immediately so it appears
+        // without waiting for (or depending on) the SSE realtime event. This
+        // fixes PB-56: creating an item in the UI did not show it in the list
+        // until a manual refresh when the realtime event was missed.
+        if (!this.currentProject || created.project === this.currentProject.id) {
+          const exists = this.issues.find(i => i.id === created.id);
+          if (!exists) this.issues.unshift(created);
+        }
         this.showToast(`Created issue ${created.identifier}`, 'success');
       } catch (err) {
         console.error('Issue create failed:', err);
