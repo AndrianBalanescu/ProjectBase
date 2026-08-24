@@ -19,6 +19,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 
   const relations = { checked: false };
+  const urlState = { checked: false };
   const consoleErrors = [];
   const pageErrors = [];
   const failedReqs = [];
@@ -182,6 +183,91 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       await page.waitForTimeout(1500);
     }
 
+    // ---- URL deep-link state (cycle 4): filters (?q= &priority= &cycle=),
+    // the Cycles view tab (?cycle=) and drawer width (?w=) must round-trip
+    // through the hash — typing a filter rewrites the URL, and a shared URL
+    // restores the same view state after a reload. ----
+    try {
+      urlState.checked = true;
+      // 1. Typing in the board search box must land in the hash query.
+      await page.evaluate(() => { location.hash = '#/pb/board'; });
+      await page.waitForTimeout(1500);
+      const search = page.locator('input[placeholder="Filter tasks..."]').first();
+      if (await search.count()) {
+        await search.fill('URL state probe');
+        await page.waitForTimeout(600);
+        urlState.filterWritesUrl = await page.evaluate(
+          () => new URLSearchParams(location.hash.split('?')[1] || '').get('q') === 'URL state probe'
+        );
+        // Clearing the input must drop the param (clean URLs).
+        await search.fill('');
+        await page.waitForTimeout(600);
+        urlState.filterClearsUrl = await page.evaluate(
+          () => new URLSearchParams(location.hash.split('?')[1] || '').get('q') === null
+        );
+      }
+      // 2. A deep link with ?q= must restore the filter after a reload and
+      // actually narrow the board (a garbage term matches nothing).
+      await page.evaluate(() => { location.hash = '#/pb/board?q=zzz-no-match-xyz'; });
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(3000);
+      urlState.qRestored = await page.evaluate(() => {
+        const input = document.querySelector('input[placeholder="Filter tasks..."]');
+        return !!input && input.value === 'zzz-no-match-xyz';
+      });
+      // 3. ?priority= must preselect the priority filter.
+      await page.evaluate(() => { location.hash = '#/pb/board?priority=urgent'; });
+      await page.waitForTimeout(2000);
+      urlState.priorityRestored = await page.evaluate(() => {
+        const sel = Array.from(document.querySelectorAll('select')).find((s) =>
+          Array.from(s.options).some((o) => o.value === 'urgent'));
+        return !!sel && sel.value === 'urgent';
+      });
+      // 4. Clicking a cycle card in Cycles view must add ?cycle=<id>, and the
+      // shared URL must reopen that same cycle after a reload.
+      await page.evaluate(() => { location.hash = '#/pb/cycles'; });
+      await page.waitForTimeout(2000);
+      const cycleCard = page.locator('div.cursor-pointer.select-none').first();
+      if (await cycleCard.count()) {
+        await cycleCard.click();
+        await page.waitForTimeout(800);
+        const cycleId = await page.evaluate(
+          () => new URLSearchParams(location.hash.split('?')[1] || '').get('cycle')
+        );
+        urlState.tabWritesUrl = !!cycleId;
+        if (cycleId) {
+          // Capture the rendered cycle heading, then prove the shared URL
+          // reopens that exact cycle after a fresh reload.
+          const pickedName = await page.evaluate(() => {
+            const h = document.querySelector('h3.text-lg');
+            return h ? (h.textContent || '').trim() : '';
+          });
+          await page.reload({ waitUntil: 'domcontentloaded' });
+          await page.waitForTimeout(3000);
+          urlState.tabRestored = await page.evaluate((name) => {
+            const h = document.querySelector('h3.text-lg');
+            return !!h && name.length > 0 && (h.textContent || '').trim() === name;
+          }, pickedName);
+        }
+      }
+      // 5. ?w= must widen the drawer for the session WITHOUT persisting to
+      // localStorage (session-only override).
+      await page.evaluate(() => { localStorage.removeItem('pb.drawer.width'); });
+      await page.evaluate(() => { location.hash = '#/pb/board/issue/ckat9ahso93piex?w=1100'; });
+      await page.waitForTimeout(2500);
+      urlState.wOverridesWidth = await page.evaluate(() => {
+        const d = document.querySelector('.slide-in-from-right');
+        return !!d && Math.abs(d.getBoundingClientRect().width - 1100) < 4;
+      });
+      urlState.wNotPersisted = await page.evaluate(
+        () => localStorage.getItem('pb.drawer.width') === null
+      );
+      await page.evaluate(() => { location.hash = '#/pb/board'; });
+      await page.waitForTimeout(1200);
+    } catch (e) {
+      urlState.error = String(e).slice(0, 200);
+    }
+
     // ---- Issue relationships UI (cycle 40): drawer section renders, adding a
     // blocks relation through the real UI shows the row + kanban lock badge,
     // and cleanup removes the temp edge/issue. ----
@@ -332,6 +418,17 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   if (routing.checked && routing.staleDrawer) failures.push('stale issue drawer shown for nonexistent route issue');
   if (routing.checked && !routing.issueOpened) failures.push('real issue deep link did not open the drawer');
   if (routing.checked && routing.staleDrawerOnPlainView) failures.push('stale issue drawer shown on plain view hash');
+  if (urlState && urlState.checked) {
+    if (urlState.error) failures.push('url state setup error: ' + urlState.error);
+    if (urlState.filterWritesUrl === false) failures.push('typing a board filter did not write ?q= to the URL');
+    if (urlState.filterClearsUrl === false) failures.push('clearing the board filter did not drop ?q= from the URL');
+    if (urlState.qRestored === false) failures.push('?q= deep link did not restore the search filter after reload');
+    if (urlState.priorityRestored === false) failures.push('?priority= deep link did not preselect the priority filter');
+    if (urlState.tabWritesUrl === false) failures.push('clicking a cycle card did not write ?cycle= to the URL');
+    if (urlState.tabRestored === false) failures.push('?cycle= deep link did not reopen the same cycle after reload');
+    if (urlState.wOverridesWidth === false) failures.push('?w= deep link did not widen the drawer to 1100px');
+    if (urlState.wNotPersisted === false) failures.push('?w= override leaked into localStorage');
+  }
   if (relations && relations.checked) {
     if (relations.error) failures.push('relations setup error: ' + relations.error);
     if (relations.sectionRendered === false) failures.push('Relationships section did not render in drawer');
@@ -353,7 +450,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     if (resize.checked && !resize.widthGrew && resize.widthGrew !== false) failures.push('drawer resize drag not exercised');
   }
 
-  console.log(JSON.stringify({ checks, routing, resize, relations, failures, all4xx }, null, 1));
+  console.log(JSON.stringify({ checks, routing, resize, urlState, relations, failures, all4xx }, null, 1));
   console.log(failures.length === 0 ? 'RENDER QA: PASS' : 'RENDER QA: FAIL');
   await browser.close();
   process.exit(failures.length === 0 ? 0 : 1);

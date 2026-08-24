@@ -5,8 +5,8 @@ const IssueDrawerComponent = {
     'milkdown-editor': window.MilkdownEditorComponent || MilkdownEditorComponent,
     'searchable-select': window.SearchableSelectComponent || SearchableSelectComponent
   },
-  props: ['issue', 'projects', 'cycles', 'labels', 'fieldDefs', 'milestones', 'issues'],
-  emits: ['close', 'update-issue', 'delete-issue', 'relations-changed'],
+  props: ['issue', 'projects', 'cycles', 'labels', 'fieldDefs', 'milestones', 'issues', 'widthOverride'],
+  emits: ['close', 'update-issue', 'delete-issue', 'relations-changed', 'update:widthOverride'],
   data() {
     return {
       editTitle: '',
@@ -165,11 +165,26 @@ const IssueDrawerComponent = {
           this.loadRelations();
         }
       }
+    },
+    // Live ?w= URL param: clamped 360-1280 like the drag handle. While an
+    // override is active the URL wins; any manual resize clears it so the
+    // user's localStorage preference takes back over.
+    widthOverride: {
+      immediate: true,
+      handler(v) {
+        const w = parseInt(v, 10);
+        if (!isNaN(w) && w >= 360 && w <= 1280) this.drawerWidth = w;
+      }
     }
   },
   mounted() {
     const saved = parseInt((typeof localStorage !== 'undefined' && localStorage.getItem('pb.drawer.width')) || '', 10);
     if (!isNaN(saved) && saved >= 360 && saved <= 1280) this.drawerWidth = saved;
+    // URL ?w= overrides the saved width for this deep link (not persisted).
+    if (this.widthOverride) {
+      const w = parseInt(this.widthOverride, 10);
+      if (!isNaN(w) && w >= 360 && w <= 1280) this.drawerWidth = w;
+    }
     this.$nextTick(() => {
       if (window.lucide) window.lucide.createIcons();
     });
@@ -208,6 +223,8 @@ const IssueDrawerComponent = {
       try {
         if (this.drawerWidth) localStorage.setItem('pb.drawer.width', String(this.drawerWidth));
       } catch (err) { /* private mode: ignore */ }
+      // Manual resize ends any ?w= URL override; localStorage is the source of truth again.
+      this.$emit('update:widthOverride', null);
     },
     resetWidth() {
       this.stopResize();
@@ -215,6 +232,7 @@ const IssueDrawerComponent = {
       try {
         localStorage.removeItem('pb.drawer.width');
       } catch (err) { /* private mode: ignore */ }
+      this.$emit('update:widthOverride', null);
     },
     async loadComments() {
       if (!this.issue) return;
