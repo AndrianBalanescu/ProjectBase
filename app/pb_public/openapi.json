@@ -58,6 +58,10 @@
     {
       "name": "Agent Dispatch",
       "description": "Autonomous agent dispatch and job triggers"
+    },
+    {
+      "name": "Bulk Actions",
+      "description": "Batch operations for the board/list multi-select workflow"
     }
   ],
   "paths": {
@@ -1266,6 +1270,216 @@
           },
           "404": {
             "description": "Issue not found"
+          }
+        }
+      }
+    },
+    "/projectbase/issues/bulk-update": {
+      "post": {
+        "tags": [
+          "Bulk Actions"
+        ],
+        "summary": "Bulk Update Issues",
+        "description": "Update one or more fields on up to 500 issues in a single request (board/list multi-select). Each record is saved through the standard hooks, so the activity audit and realtime SSE fire per record.",
+        "security": [
+          {
+            "PBUserAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ids",
+                  "data"
+                ],
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "example": "abc123def456ghi789"
+                    },
+                    "description": "Issue record ids to update (max 500)",
+                    "maxItems": 500,
+                    "minItems": 1
+                  },
+                  "data": {
+                    "type": "object",
+                    "description": "Field updates. Only whitelisted fields are allowed; per-project custom fields use the custom_ prefix.",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "backlog",
+                          "todo",
+                          "in_progress",
+                          "in_review",
+                          "done",
+                          "cancelled"
+                        ]
+                      },
+                      "priority": {
+                        "type": "string",
+                        "enum": [
+                          "urgent",
+                          "high",
+                          "medium",
+                          "low",
+                          "none"
+                        ]
+                      },
+                      "cycle": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "example": "admzsfez5xsxyeu",
+                        "description": "Cycle record id or null/empty to clear"
+                      },
+                      "milestone": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "Milestone record id or null/empty to clear"
+                      },
+                      "estimate": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9999
+                      },
+                      "due_date": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "example": "2026-09-01 00:00:00.000Z"
+                      },
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 64
+                        }
+                      },
+                      "order": {
+                        "type": "number"
+                      }
+                    },
+                    "additionalProperties": {
+                      "type": "string",
+                      "description": "Per-project custom field values (custom_* prefix)"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bulk update summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "updated": {
+                      "type": "integer"
+                    },
+                    "missing": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error (bad ids/data/field value)"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/projectbase/issues/bulk-delete": {
+      "post": {
+        "tags": [
+          "Bulk Actions"
+        ],
+        "summary": "Bulk Delete Issues",
+        "description": "Delete up to 500 issues in a single request. Requires an admin or manager role (mirrors the issues collection deleteRule).",
+        "security": [
+          {
+            "PBUserAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ids"
+                ],
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Issue record ids to delete (max 500)",
+                    "maxItems": 500,
+                    "minItems": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bulk delete summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "integer"
+                    },
+                    "missing": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient role (member)"
           }
         }
       }

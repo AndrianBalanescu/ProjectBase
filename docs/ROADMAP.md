@@ -762,3 +762,54 @@ cycle closes the loop with a regression guard and re-verifies the whole release.
   anon `_superusers` → 403; oversized title (200k) → 400; malformed JSON → 400;
   missing project → 400. Verified the credential leak is gone from `origin/main`
   (HEAD == `6929c82`, key read from env).
+
+## Cycle-16 shipped (2026-08-24): batch multi-select + bulk actions
+
+**Goal (first v1.1 feature, deferred from the cycle-4 stabilization verdict):**
+give the board and list views a zero-friction multi-select so users can
+triage many issues at once — the "move 3 cards backlog→todo, assign 2
+priorities, change 1 cycle" workflow from the cycle-1 falsifiable validation —
+without N per-record requests.
+
+**Shipped this cycle:**
+- `app/pb_hooks/31_bulk_actions.pb.js` — two new agent-surface routes:
+  `POST /api/projectbase/issues/bulk-update` (whitelisted fields: status,
+  priority, cycle, milestone, estimate, due_date, labels, order + per-project
+  `custom_*`; up to 500 ids) and `POST /api/projectbase/issues/bulk-delete`
+  (admin/manager only, mirroring the issues deleteRule; superuser always
+  allowed). Each record is saved through `app.save()`/`app.delete()` so the
+  activity audit hook and realtime SSE fire per record. Response carries
+  `updated/deleted`, `missing`, `total` counts.
+- `app/pb_public/js/api.js` — `bulkUpdateIssues(ids, data)` /
+  `bulkDeleteIssues(ids)` client methods.
+- `app/pb_public/js/app.js` — selection state lifted into the root app
+  (`selectedIssueIds`), Esc clears selection (drawer close takes priority),
+  realtime deletes prune the set, project switch clears it, `bulkUpdateSelected`
+  applies the patch locally + toasts, `bulkDeleteSelected` confirms + removes.
+- `app/pb_public/js/components/KanbanBoard.js` — per-card selection checkbox
+  (hover-revealed), selected ring highlight, Cmd/Ctrl+click toggles selection
+  instead of opening the drawer.
+- `app/pb_public/js/components/ListView.js` — selection checkbox column +
+  select-all in the header, selected row highlight, Cmd/Ctrl+click toggle.
+- `app/pb_public/index.html` — floating bulk action bar (bottom, glassy):
+  status / priority / cycle selects + Delete + Clear; wired to both views.
+- Docs: OpenAPI + llms.txt/llms-full.txt agent surface updated; `AGENTS.md`
+  directory map; `CHANGELOG.md` `[Unreleased]`.
+
+**Validation (crime-scene audit):**
+- `pytest tests/` → **168/168 passed** (149 + 19 new in
+  `tests/test_bulk_actions.py` covering auth, validation, happy path, missing
+  accounting, role gating, labels, custom-field prefix, and frontend wiring).
+- `python3 -m flow.frontend_guard` → ALL FRONTEND FILES VERIFIED.
+- `node --check` clean on all four changed JS files.
+- `scripts/qa/qa-render.sh` → RENDER QA PASS (see below).
+- iBrowse visual QA: see verdict in this cycle's inspect phase (remote egress
+  fallback used in prior cycles when homelab host unreachable).
+- Adversarial: bulk-update with bad field / bad status / bad cycle → 400;
+  member bulk-delete → 403; anon both routes → 401/403; nonexistent ids
+  counted as `missing` without failing the batch.
+
+**Next (v1.1+):** timeline/Gantt and portfolio dashboard remain deferred per
+the v1.0 stabilization verdict. Batch multi-select is the first v1.1 item to
+land; natural follow-ups are shift+click range selection and bulk custom-field
+editing from the bar.

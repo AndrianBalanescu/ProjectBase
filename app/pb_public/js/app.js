@@ -41,6 +41,10 @@ const App = {
       milestones: [],
       labels: [],
       selectedIssue: null,
+      selectedIssueIds: new Set(),
+      bulkStatus: '',
+      bulkPriority: '',
+      bulkCycle: '',
       realtimeConnected: true,
       isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
       
@@ -257,6 +261,9 @@ const App = {
             }
           } else if (action === 'delete') {
             this.issues = this.issues.filter(i => i.id !== record.id);
+            if (this.selectedIssueIds.has(record.id)) {
+              this.selectedIssueIds.delete(record.id);
+            }
             if (this.selectedIssue && this.selectedIssue.id === record.id) {
               this.selectedIssue = null;
             }
@@ -335,7 +342,11 @@ const App = {
           this.isProjectModalOpen = false;
           this.isCycleModalOpen = false;
           this.isImportOpen = false;
-          this.selectedIssue = null;
+          if (this.selectedIssue) {
+            this.selectedIssue = null;
+          } else if (this.selectedIssueIds.size > 0) {
+            this.clearIssueSelection();
+          }
           return;
         }
 
@@ -371,6 +382,7 @@ const App = {
       this.currentProject = project;
       await this.loadIssues();
       this.currentView = 'board';
+      this.clearIssueSelection();
       this.syncRoute();
     },
 
@@ -560,6 +572,84 @@ const App = {
       } catch (err) {
         console.error('Issue delete failed:', err);
         this.showToast('Failed to delete issue', 'error');
+      }
+    },
+
+    // --- Batch multi-select (board/list) ---
+    isIssueSelected(issue) {
+      return this.selectedIssueIds.has(issue.id);
+    },
+
+    toggleIssueSelection(issue) {
+      if (!issue || !issue.id) return;
+      if (this.selectedIssueIds.has(issue.id)) {
+        this.selectedIssueIds.delete(issue.id);
+      } else {
+        this.selectedIssueIds.add(issue.id);
+      }
+    },
+
+    selectAllVisibleIssues(issues) {
+      // Replace the selection with the currently visible (filtered) set.
+      this.selectedIssueIds = new Set((issues || []).map(i => i.id));
+    },
+
+    clearIssueSelection() {
+      this.selectedIssueIds = new Set();
+    },
+
+    selectedIssuesList() {
+      return this.issues.filter(i => this.selectedIssueIds.has(i.id));
+    },
+
+    async bulkUpdateSelected(patch) {
+      const ids = Array.from(this.selectedIssueIds);
+      if (ids.length === 0) return;
+      const count = ids.length;
+      try {
+        const res = await API.bulkUpdateIssues(ids, patch);
+        // Apply the patch locally immediately; realtime SSE also confirms each
+        // record, but this keeps the UI instant for the acting user.
+        for (const key of Object.keys(patch)) {
+          for (const issue of this.issues) {
+            if (this.selectedIssueIds.has(issue.id)) {
+              issue[key] = patch[key];
+            }
+          }
+        }
+        this.clearIssueSelection();
+        this.showToast(`Updated ${res.updated || count} issue${(res.updated || count) === 1 ? '' : 's'}`, 'success');
+      } catch (err) {
+        console.error('Bulk update failed:', err);
+        this.showToast('Failed to bulk update issues', 'error');
+      }
+    },
+
+    async applyBulkField(field, value) {
+      if (!value) return;
+      const patch = {};
+      patch[field] = value;
+      await this.bulkUpdateSelected(patch);
+      this.bulkStatus = '';
+      this.bulkPriority = '';
+      this.bulkCycle = '';
+    },
+
+    async bulkDeleteSelected() {
+      const ids = Array.from(this.selectedIssueIds);
+      if (ids.length === 0) return;
+      if (!confirm(`Delete ${ids.length} selected issue${ids.length === 1 ? '' : 's'}? This cannot be undone.`)) return;
+      try {
+        const res = await API.bulkDeleteIssues(ids);
+        this.issues = this.issues.filter(i => !this.selectedIssueIds.has(i.id));
+        if (this.selectedIssue && this.selectedIssueIds.has(this.selectedIssue.id)) {
+          this.selectedIssue = null;
+        }
+        this.clearIssueSelection();
+        this.showToast(`Deleted ${res.deleted || ids.length} issue${(res.deleted || ids.length) === 1 ? '' : 's'}`, 'success');
+      } catch (err) {
+        console.error('Bulk delete failed:', err);
+        this.showToast('Failed to bulk delete issues', 'error');
       }
     },
 

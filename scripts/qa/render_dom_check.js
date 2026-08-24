@@ -20,6 +20,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
 
   const relations = { checked: false };
   const urlState = { checked: false };
+  const bulk = { checked: false };
   const consoleErrors = [];
   const pageErrors = [];
   const failedReqs = [];
@@ -303,6 +304,66 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       urlState.error = String(e).slice(0, 200);
     }
 
+    // ---- Batch multi-select + bulk bar (cycle 16): board card checkboxes
+    // toggle a selection the root app tracks; the floating action bar appears
+    // with the right count; Esc clears; list view select-all works. ----
+    try {
+      await page.evaluate(() => { location.hash = '#/pb/board'; });
+      await page.waitForTimeout(1500);
+
+      const boardSelectBtns = page.locator('button[title^="Select for bulk actions"]');
+      if (await boardSelectBtns.count() >= 2) {
+        await boardSelectBtns.nth(0).click();
+        await page.waitForTimeout(300);
+        bulk.barShownAfterOne = await page.evaluate(() => {
+          const bar = document.querySelector('.fixed.bottom-5.left-1\\/2');
+          return !!bar && getComputedStyle(bar).display !== 'none';
+        });
+        bulk.countOne = await page.evaluate(() => {
+          const bar = document.querySelector('.fixed.bottom-5.left-1\\/2');
+          return bar ? (bar.textContent || '').includes('1 selected') : false;
+        });
+
+        await boardSelectBtns.nth(1).click();
+        await page.waitForTimeout(300);
+        bulk.countTwo = await page.evaluate(() => {
+          const bar = document.querySelector('.fixed.bottom-5.left-1\\/2');
+          return bar ? (bar.textContent || '').includes('2 selected') : false;
+        });
+
+        // Esc clears the selection and hides the bar.
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(400);
+        bulk.escClears = await page.evaluate(() => {
+          return !document.querySelector('.fixed.bottom-5.left-1\\/2');
+        });
+      }
+
+      // List view select-all header checkbox selects every visible row.
+      await page.keyboard.press('2'); // list view shortcut
+      await page.waitForTimeout(1200);
+      const listHeaderBtn = page.locator('thead button[title*="Select all visible"]');
+      if (await listHeaderBtn.count()) {
+        const rows = await page.locator('tbody tr').count();
+        await listHeaderBtn.click();
+        await page.waitForTimeout(400);
+        bulk.selectAllCount = await page.evaluate(() => {
+          const bar = document.querySelector('.fixed.bottom-5.left-1\\/2');
+          return bar ? (bar.textContent || '').match(/(\d+) selected/) : null;
+        });
+        bulk.selectAllMatchesRows = !!(bulk.selectAllCount &&
+          rows > 0 && Number(bulk.selectAllCount[1]) === rows);
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(300);
+      }
+
+      await page.keyboard.press('1'); // back to board
+      await page.waitForTimeout(800);
+      bulk.checked = true;
+    } catch (e) {
+      bulk.error = String(e).slice(0, 200);
+    }
+
     // ---- Issue relationships UI (cycle 40): drawer section renders, adding a
     // blocks relation through the real UI shows the row + kanban lock badge,
     // and cleanup removes the temp edge/issue. ----
@@ -474,6 +535,14 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     if (relations.kanbanLockShown === false) failures.push('blocked kanban card did not show lock badge after reload');
     if (relations.listLockShown === false) failures.push('blocked list-view row did not show lock badge');
   }
+  if (bulk && bulk.checked) {
+    if (bulk.error) failures.push('bulk select setup error: ' + bulk.error);
+    if (bulk.barShownAfterOne === false) failures.push('bulk bar did not appear after selecting one card');
+    if (bulk.countOne === false) failures.push('bulk bar did not show "1 selected"');
+    if (bulk.countTwo === false) failures.push('bulk bar did not show "2 selected" after second selection');
+    if (bulk.escClears === false) failures.push('Esc did not clear the bulk selection');
+    if (bulk.selectAllMatchesRows === false) failures.push('list select-all did not select every visible row');
+  }
   if (routing.checked && !routing.issueOpened) failures.push('real issue deep link did not open the drawer');
   if (routing.checked && routing.staleDrawerOnPlainView) failures.push('stale drawer left open on plain view hash');
   if (!routing.checked) failures.push('routing regression not exercised (no login form found)');
@@ -494,7 +563,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     failures.push(`focus mode not exercised: ${focusMode.error}`);
   }
 
-  console.log(JSON.stringify({ checks, routing, resize, urlState, relations, focusMode, failures, all4xx }, null, 1));
+  console.log(JSON.stringify({ checks, routing, resize, urlState, relations, focusMode, bulk, failures, all4xx }, null, 1));
   console.log(failures.length === 0 ? 'RENDER QA: PASS' : 'RENDER QA: FAIL');
   await browser.close();
   process.exit(failures.length === 0 ? 0 : 1);

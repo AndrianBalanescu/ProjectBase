@@ -35,6 +35,7 @@ app/
     15_signup_security.pb.js   <- signup hardening
     20_issue_hooks.pb.js       <- auto issue_number/identifier + activity audit
     30_custom_routes.pb.js     <- /api/projectbase/* custom routes (health, version, stats, quick-task)
+    31_bulk_actions.pb.js      <- /api/projectbase/issues/bulk-update + bulk-delete (multi-select)
     35_custom_fields.pb.js     <- per-project custom field validation
     40_importers.pb.js / 45_github_importer.pb.js  <- CSV + GitHub importers
     50_cron_automation.pb.js   <- scheduled automations

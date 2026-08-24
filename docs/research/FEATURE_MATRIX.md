@@ -17,6 +17,7 @@ Must-Have = table stakes vs Linear/Plane. Moat = differentiators nobody in the l
 | File attachments | ✅ | ✅ | ✅ FileField | ✅ shipped |
 | REST API | ✅ | ✅ | ✅ auto REST + OpenAPI 3.1/Scalar | ✅ shipped |
 | Keyboard-first UX | ✅ | ⚠️ partial | ✅ CommandPalette + shortcuts | ✅ shipped |
+| Batch multi-select + bulk actions | ✅ | ⚠️ partial | ✅ board + list checkboxes, select-all, Esc clear, floating status/priority/cycle bar + bulk delete (REST, admin/manager-gated delete) | ✅ shipped (cycle 16) |
 | Importers (Linear/Plane/GitHub) | export only | partial | ✅ CSV + GitHub API importers | ✅ shipped |
 | Notifications | ✅ | ✅ | ✅ Discord/Telegram/webhook + in-app inbox (assigned/mention/comment/status/priority), unread badge, mark-read, recipient-scoped rules | ✅ shipped |
 | Roadmap view | ✅ | ✅ | ✅ milestones + North Star + progress, assign issues to milestones in create/edit drawer | ✅ shipped |
