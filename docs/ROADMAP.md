@@ -625,7 +625,7 @@ refresh.
 - `CHANGELOG.md` — `[Unreleased]` entry.
 
 **Validation (crime-scene audit):**
-- `pytest tests/` → **145/145 passed** (144 + 1 new regression test).
+- `pytest tests/` → **146/146 passed** (145 + 1 new regression test).
 - `flow.frontend_guard` clean; `node --check` clean on both changed JS files.
 - `qa-render.sh` → **PASS** (all urlState, relations, focusMode suites green).
 - Live comment create/delete verified against the running app (realtime event
@@ -664,11 +664,13 @@ as the only shape with no covering index (62.5 ms p50 at 10k issues).
 
 ## Cycle-11 shipped (2026-08-24): agent-surface OpenAPI coverage
 
-**Goal (strategic calibration item 3 — OpenAPI schemas / agentic workflows):**
-close the agent-discovery drift in the hand-maintained `openapi.json`. Six
-implemented `/api/projectbase/*` custom routes were not documented, so
-autonomous agents consuming the spec could not discover importers, AI assist,
-agent dispatch, or the notifications read-all endpoint.
+**Goal (PB-62, strategic calibration item 3 — OpenAPI schemas / agentic
+workflows):** close the agent-discovery drift in the hand-maintained
+`openapi.json`. Six implemented `/api/projectbase/*` custom routes were not
+documented, so autonomous agents consuming the spec could not discover
+importers, AI assist, agent dispatch, or the notifications read-all endpoint.
+PB-62 was marked done with a structured audit comment (commit, tests, QA,
+summary).
 
 **Shipped this cycle:**
 - `app/pb_public/openapi.json` — added the six missing routes with full
@@ -697,3 +699,30 @@ agent dispatch, or the notifications read-all endpoint.
 - `node --check` clean on all touched JS (none touched this cycle).
 - No frontend UI code changed → no iBrowse/render QA required; the only served
   artifact is `openapi.json`, verified via direct HTTP.
+
+## Cycle-12 (2026-08-24): audit-driven docs bookkeeping + crime-scene audit
+
+**Goal:** close the two P2 findings left by the cycle-11 inspect audit, and
+re-run the full crime-scene audit (frontend_guard, render QA, iBrowse attempt,
+adversarial fuzzing, security) to confirm the release is clean.
+
+**Shipped this cycle:**
+- `docs/ROADMAP.md` — fixed the stale cycle-10 test count (145/145 → 146/146,
+  matching the committed suite) and added the PB-62 reference to the cycle-11
+  section for backlog/bookkeeping consistency.
+- `CHANGELOG.md` — `[Unreleased]`/`Fixed` entry documenting the bookkeeping fix.
+
+**Validation (crime-scene audit):**
+- `pytest tests/` → **146/146 passed**.
+- `python3 -m flow.frontend_guard` → **ALL FRONTEND FILES VERIFIED**.
+- `scripts/qa/qa-render.sh` → **RENDER QA: PASS** (urlState, relations,
+  focusMode suites green; the single 4xx is the expected pre-auth 400 on
+  `users/auth-with-password`).
+- iBrowse visual QA attempted; the homelab iBrowse host returned an
+  environmental `github.com ETIMEOUT` (network egress), same documented
+  fallback as prior cycles → local render QA used as the visual fallback.
+- Adversarial: oversized issue title (200k chars) → 400
+  `validation_max_text_constraint`; malformed JSON → 400; missing project → 400.
+- Security: anon read of issues/projects/comments returns **empty** (rule-gated,
+  no leak); anon `_superusers` list → 403; openapi.json served 200 for docs.
+- Git clean on `origin/main`; docs-only change → no frontend rebuild required.

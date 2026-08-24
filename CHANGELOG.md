@@ -26,6 +26,10 @@ subscriptions, Stripe, or paid tiers.
   UI view was already single-digit ms and is unchanged.
 
 ### Fixed
+- **Docs bookkeeping (cycle-12, from inspect audit)**: corrected the stale
+  test-count in the cycle-10 ROADMAP section (145/145 → 146/146, matching the
+  actual committed suite) and referenced PB-62 in the cycle-11 ROADMAP section
+  so the tracked backlog and the shipped-prose stay consistent.
 - **Realtime cycles & comments sync**: the realtime handler in `app.js`
   subscribed to `cycles` and `comments` events (via `api.js`) but never handled
   them, so cycle changes and new comments from other users did not update the
