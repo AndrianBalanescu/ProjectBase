@@ -11,6 +11,15 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **Portfolio Dashboard realtime refresh (v1.1 feature 5 follow-up)**: the
+  Portfolio Dashboard now stays live. Previously it fetched its workspace
+  snapshot only on mount, so creating/updating/deleting an issue, milestone,
+  project, or cycle elsewhere in the app left the dashboard stale until a
+  reload. The shell now bumps a `realtimeTick` counter on every SSE event for
+  those workspace-scoped collections and passes it down as a prop; the view
+  watches it and debounces a single refetch (400 ms) so a burst of events
+  triggers exactly one refresh. Verified by a new pytest drift-guard test and
+  the local render-QA suite (zero console errors, no raw-mustache leaks).
 - **Portfolio Dashboard (v1.1 feature 5)**: a cross-project workspace overview
   at `#/pb/portfolio` aggregating every project, issue and milestone. KPI cards
   (total issues, completion %, in-flight/open work, estimate load), a

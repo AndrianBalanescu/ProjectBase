@@ -12,21 +12,31 @@
 // already receive (no extra backend round-trip), matching ProjectsView.
 
 const PortfolioViewComponent = {
-  props: ['projects', 'issues', 'milestones'],
+  props: ['projects', 'issues', 'milestones', 'realtimeTick'],
   emits: ['select-project'],
   data() {
     return {
       allProjects: this.projects || [],
       allIssues: [],
       allMilestones: [],
-      loaded: false
+      loaded: false,
+      refreshTimer: null
     };
   },
   async mounted() {
     await this.refresh();
   },
+  beforeUnmount() {
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+  },
   watch: {
     projects(v) { this.allProjects = v || []; },
+    // The shell bumps this on every realtime issue/milestone/project/cycle
+    // event. Debounce so a burst of SSE events triggers a single refetch.
+    realtimeTick() {
+      if (this.refreshTimer) clearTimeout(this.refreshTimer);
+      this.refreshTimer = setTimeout(() => this.refresh(), 400);
+    },
   },
   methods: {
     async refresh() {

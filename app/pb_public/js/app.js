@@ -52,6 +52,9 @@ const App = {
       bulkCustomValue: '', // text/number/select/date value to apply
       bulkCustomChecked: false, // checkbox value to apply
       realtimeConnected: true,
+      // Bumped on any realtime issue/milestone/project/cycle event so views
+      // that aggregate a workspace snapshot (PortfolioView) can refetch.
+      realtimeTick: 0,
       isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
       
       // Modals
@@ -345,6 +348,14 @@ const App = {
           // A comment was created/updated/deleted. Bump the refresh key so the
           // open IssueDrawer reloads its thread live (it filters by issue id).
           this.commentRefreshKey++;
+        }
+
+        // Any change to the workspace-scoped collections (issues, milestones,
+        // projects, cycles) bumps the tick so snapshot-aggregating views
+        // (PortfolioView) refetch their cross-project data in realtime.
+        if (collection === 'issues' || collection === 'milestones' ||
+            collection === 'projects' || collection === 'cycles') {
+          this.realtimeTick++;
         }
       });
     },

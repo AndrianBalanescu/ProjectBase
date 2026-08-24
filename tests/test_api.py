@@ -1970,3 +1970,40 @@ def test_portfolio_view_wired_and_precached():
     st, body = _get("/js/components/PortfolioView.js")
     assert st == 200, f"PortfolioView.js not served: {st}"
     assert "Portfolio Dashboard" in body, "PortfolioView.js must define the view"
+
+
+def test_portfolio_realtime_tick_wiring():
+    """The Portfolio Dashboard must refetch its workspace snapshot on realtime
+    issue/milestone/project/cycle events. The shell bumps a `realtimeTick`, and
+    the view watches it (debounced) to call refresh(). This drift-guard keeps
+    the realtime path wired end to end (app.js -> index.html -> PortfolioView)."""
+    import re as _re
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    index = open(os.path.join(root, "app", "pb_public", "index.html")).read()
+    app_js = open(os.path.join(root, "app", "pb_public", "js", "app.js")).read()
+    pf = open(os.path.join(root, "app", "pb_public", "js", "components", "PortfolioView.js")).read()
+
+    # index.html passes the tick down to the portfolio view.
+    assert ":realtime-tick=\"realtimeTick\"" in index, (
+        "index.html must bind realtime-tick to the shell's realtimeTick"
+    )
+    # app.js declares the tick and bumps it on workspace-scoped events.
+    assert "realtimeTick: 0" in app_js, (
+        "app.js must initialize realtimeTick"
+    )
+    assert _re.search(r"realtimeTick\+\+", app_js), (
+        "app.js must bump realtimeTick on a realtime event"
+    )
+    # PortfolioView accepts the prop, watches it (debounced), and refetches.
+    assert "'realtimeTick'" in pf or "realtimeTick" in pf, (
+        "PortfolioView must declare the realtimeTick prop"
+    )
+    assert "realtimeTick()" in pf, (
+        "PortfolioView must watch realtimeTick"
+    )
+    assert "this.refresh()" in pf, (
+        "PortfolioView must call refresh() from the realtime watcher"
+    )
+    assert "refreshTimer" in pf, (
+        "PortfolioView must debounce the realtime refetch"
+    )
