@@ -11,10 +11,17 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **Agent-surface OpenAPI coverage**: `openapi.json` now documents every
+  implemented `/api/projectbase/*` custom route so autonomous agents discover
+  the full surface. Newly added: `/projectbase/version`, `/projectbase/import/csv`,
+  `/projectbase/import/github`, `/projectbase/notifications/read-all`,
+  `/projectbase/ai-assist`, and `/projectbase/dispatch-agent`, plus tags for
+  Importers, Notifications, AI Assist, and Agent Dispatch. `test_openapi_spec_valid`
+  now asserts all 12 custom routes are present to prevent future drift.
 - **Global cross-project sort index**: migration `1710000017` adds
   `idx_issues_created` on `issues (created DESC)`, giving the worst-case
   cross-project `sort=-created` query a covering index. Measured p50 for that
-  query at 10k issues dropped from **62.5 ms → 44.3 ms** (p95 64.9 → 93.0 ms
+  query at 10k issues dropped from **62.5 ms → 45.1 ms** (p95 64.9 → 47.6 ms
   on this host; the p95 spread is noise on a shared box). Every project-scoped
   UI view was already single-digit ms and is unchanged.
 
