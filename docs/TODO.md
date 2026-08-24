@@ -27,3 +27,12 @@ Refreshed 2026-08-24 (flow cycle 4). Items 1-4 audited against the codebase — 
 - H. ~~Bulk custom-field editing (v1.1 feature 3)~~ — ✅ **shipped (cycle 18)**: bulk-bar Custom picker (per-project defs; text/number/select/checkbox/date) + backend fix where custom-field bulk updates were silent no-ops (`custom_*` phantom columns) or wholesale-replaced the `custom_fields` object. Now merges a partial object per record (null/'' clears one key); optimistic local apply mirrors the merge. 2 new pytest cases + render-QA E2E proving unrelated custom values survive. See `docs/ROADMAP.md` § "Cycle-18 shipped".
 - I. ~~Timeline / Gantt view (v1.1 feature 4)~~ — ✅ **shipped (cycle 19)**: day-grid schedule of cycles/milestones/issues with `issues.start_date` (additive migration 1710000018), status-colored bars, click-to-open drawer, header nav + command palette + keyboard `4` + `#/pb/timeline` route; bulk-update + OpenAPI + llms.txt accept `start_date`. See `docs/ROADMAP.md` § "Cycle-19 shipped".
 - J. ~~Portfolio Dashboard (v1.1 feature 5)~~ — ✅ **shipped (cycle 20)**: cross-project workspace overview at `#/pb/portfolio` (KPI cards, per-project progress bars, milestones & roadmap-health panel with overdue surfacing), fetches its own workspace snapshot, wired via header nav + command palette + keyboard `9` + hash route. New pytest wiring test + render-QA E2E. See `docs/ROADMAP.md` § "Cycle-20 shipped".
+
+## Shipped in cycle 23 (2026-08-24): harden
+
+- ✅ **Secret-scan regression guard restored**: `tests/test_secret_scan.py`
+  (previously only on the archived `backup/security-clown-commits` branch) is
+  back on `main` — the guard that would have caught the cycle-12 P1 hardcoded
+  iBrowse key before merge. 177/177 tests pass.
+- ✅ **Repo privacy P0 fixed**: `AndrianBalanescu/ProjectBase` restored to
+  PRIVATE (publishing is a human decision; no such decision was recorded).

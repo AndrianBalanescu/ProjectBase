@@ -11,6 +11,14 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **Secret/hardcoded-credential regression guard (harden)**: new
+  `tests/test_secret_scan.py` scans every tracked source file for live-looking
+  API keys, auth tokens, private keys, and long base64 secret assignments
+  (excluding vendored bundles, binary assets, and archived research dumps),
+  and asserts the QA scripts read `IBROWSE_API_KEY` from the environment. This
+  is the guard that would have caught the cycle-12 P1 credential leak before
+  merge. The GitHub repo is also restored to PRIVATE (publishing is a human
+  decision).
 - **Portfolio Dashboard realtime refresh (v1.1 feature 5 follow-up)**: the
   Portfolio Dashboard now stays live. Previously it fetched its workspace
   snapshot only on mount, so creating/updating/deleting an issue, milestone,

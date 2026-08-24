@@ -1041,3 +1041,32 @@ full reload. This cycle makes it stay live.
 
 **Next:** the remaining v1.1 backlog and the North Star external-gated items
 (public demo domain + first-stranger onboarding), which still need human input.
+
+## Cycle-23 shipped (2026-08-24): harden — secret-scan regression guard + repo privacy P0
+
+**Context:** cycle-22 inspect locked `harden` after flagging a P0: the
+`AndrianBalanescu/ProjectBase` GitHub repo was **PUBLIC**. Publishing is a
+human decision per the flow rules and no such decision was recorded, so the
+repo was restored to **PRIVATE** this cycle (reversible; can be made public
+again by a human at any time).
+
+**Shipped this cycle:**
+- `tests/test_secret_scan.py` — ported the secret/hardcoded-credential
+  regression guard that lived only on the archived
+  `backup/security-clown-commits` branch back onto `main`. It scans every
+  `git ls-files`-tracked source file (excluding vendored bundles, binary
+  assets, and archived research dumps) for live-looking API keys, tokens,
+  private keys, and long base64 secret assignments, and asserts the cycle-12
+  regression site (`scripts/qa/run_10_ibrowse_e2e.{sh,py}`) reads
+  `IBROWSE_API_KEY` from the environment rather than a literal. This is the
+  guard that would have caught the cycle-12 P1 credential leak before merge.
+
+**Verification:**
+- `pytest tests/` → **177/177 passed** (was 174; +3 new guard tests).
+- `python3 -m flow.frontend_guard` → ALL FRONTEND FILES VERIFIED.
+- Render QA (`scripts/qa/qa-render.sh 8120`) → **PASS**, zero failures
+  (portfolio realtime KPI 57→58 E2E still green); iBrowse host busy/timeout so
+  the documented local fallback was used.
+
+**Next:** remaining v1.1 backlog and North Star external-gated items (public
+demo domain + first-stranger onboarding) still need human input.
