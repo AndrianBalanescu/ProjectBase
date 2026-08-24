@@ -974,6 +974,9 @@ workspace overview.
   portfolio E2E green: view mounts (`Portfolio Dashboard` + `.max-w-7xl`),
   per-project progress rows render against live data, and the `9` shortcut
   switches to the portfolio view.
+- Milestone status convention: the view treats `achieved` milestones as
+  complete (100% when nothing is linked, never flagged overdue), matching the
+  existing MilestonesView convention (fix commit 982af48, audit-hat finding).
 - Adversarial fuzz: hostile portfolio hashes (encoded script tags, XSS-in-`?q=`,
   path-traversal `?cycle=`, bogus issue deep links, trailing slashes) → all
   render cleanly with zero page errors and zero raw-mustache leaks.

@@ -22,7 +22,9 @@ subscriptions, Stripe, or paid tiers.
   command palette action, keyboard shortcut `9`, and the `#/pb/portfolio` hash
   route (both viewMaps); the Service Worker precache was bumped to shell-v3 to
   cover the new asset. Verified by a new pytest wiring/drift-guard test and a
-  render-QA E2E (view mounts, project rows render, shortcut works).
+  render-QA E2E (view mounts, project rows render, shortcut works). Achieved
+  milestones are treated as complete (100%, never overdue), matching the
+  MilestonesView convention.
 - **Timeline / Gantt view (v1.1 feature 4)**: a scrollable day-grid schedule
   of cycles (start→end bars), milestones (target-date markers) and issues
   (start→due bars, status-colored). New additive `issues.start_date` field
