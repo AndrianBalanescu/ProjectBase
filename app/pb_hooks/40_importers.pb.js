@@ -121,6 +121,7 @@ routerAdd("POST", "/api/projectbase/import/csv", (e) => {
                 rec.set("status", normStatus(row.status))
                 rec.set("priority", normPriority(row.priority))
                 rec.set("assignee", row.assignee ? String(row.assignee) : "")
+                if (row.start_date) rec.set("start_date", String(row.start_date))
                 if (row.due_date) rec.set("due_date", String(row.due_date))
                 if (row.estimate != null && row.estimate !== "") rec.set("estimate", Number(row.estimate) || 0)
                 if (Array.isArray(row.labels)) rec.set("labels", row.labels.map(String))

@@ -402,6 +402,24 @@ def test_importer_source_metadata_persisted():
     assert sm.get("importer") == "csv"
     assert sm.get("source_key") == key
 
+def test_importer_persists_start_date():
+    """CSV import rows may carry start_date (Timeline/Gantt data source)."""
+    pid = _get_any_project_id()
+    title = f"Importer Start Date {_uid()}"
+    status, _ = _request(
+        "POST", "/api/projectbase/import/csv",
+        {"project_id": pid, "rows": [{"title": title, "start_date": "2026-09-05 00:00:00.000Z"}]},
+        headers={"Authorization": _superuser_token()})
+    assert status == 200
+    from urllib.parse import quote
+    q = "/api/collections/issues/records?filter=" + quote(f"(title='{title}')") + "&perPage=5"
+    st, recs = _get_authed(q)
+    assert st == 200
+    assert recs.get("items"), "imported issue not found"
+    assert recs["items"][0].get("start_date", "").startswith("2026-09-05"), \
+        f"importer did not persist start_date: {recs['items'][0].get('start_date')}"
+
+
 
 
 # ---------------------------------------------------------------------------
