@@ -813,3 +813,56 @@ without N per-record requests.
 the v1.0 stabilization verdict. Batch multi-select is the first v1.1 item to
 land; natural follow-ups are shift+click range selection and bulk custom-field
 editing from the bar.
+
+## Cycle-17 shipped (2026-08-24): Shift+click range selection (v1.1 feature 2)
+
+**Goal (natural follow-up #1 from the cycle-16 roadmap note):** make bulk
+multi-select zero-friction by adding Linear-style Shift+click range selection
+on top of the cycle-16 checkboxes, so "grab 12 backlog items at once" is a
+click, a shift, a click — no N taps.
+
+**Shipped this cycle:**
+- `app/pb_public/js/app.js` — selection anchor state (`lastSelectedIssueId`):
+  every toggle updates the anchor; new `rangeSelectIssue(orderedIssues,
+  target)` merges the inclusive anchor→target range (union with the current
+  selection) and falls back to a single selection when the anchor is missing or
+  filtered out; the anchor resets with Esc/project switch and is pruned when
+  its record is deleted via realtime.
+- `app/pb_public/js/components/KanbanBoard.js` — Shift+click on a card emits
+  `range-select-issue` with the board's visible order (fixed column order,
+  cards sorted by `order` inside each column); no drawer opens.
+- `app/pb_public/js/components/ListView.js` — Shift+click on a row emits
+  `range-select-issue` with the current `processedIssues` sort order.
+- `app/pb_public/index.html` — binds `@range-select-issue="rangeSelectIssue"`
+  on both views.
+- `scripts/qa/render_dom_check.js` — new 15-assertion range suite: board anchor
+  count, forward range → 3 selected, checked-checkbox count == 3, no drawer on
+  shift+click, Esc clears, board cross-column span (expected count derived from
+  the live DOM), list forward range, list reverse range, plus a full E2E block
+  that creates 3 temp issues, range-selects them, applies status `todo` via the
+  bulk bar, verifies all 3 moved through the API, and proves cleanup (DELETE
+  responses 204). Non-vacuous probe guards fail the suite if the board/list
+  have <3 items.
+
+**Verification:**
+- `scripts/qa/qa-render.sh` → **RENDER QA PASS**, range suite all green
+  (boardProbed, boardAnchorOne, boardRangeThree, boardCheckedCount=3,
+  boardNoDrawer, boardEscClears, boardCrossColumnOK=4, listProbed,
+  listRangeThree, listReverseThree, applyCardsFound, applyBarThree,
+  applyMovedAll, applyBarCleared, applyDeletedAll). Only 4xx is the
+  intentional login-probe 400.
+- `pytest tests/` → **168/168 passed** in 19s.
+- `python3 -m flow.frontend_guard` → ALL FRONTEND FILES VERIFIED; `node --check`
+  clean on all three changed JS files + the QA script.
+- Security/adversarial probes: anon issues read → empty, anon `_superusers` →
+  403, anon bulk-update/bulk-delete → 401, malformed JSON → 400, 501 ids →
+  400, invalid field → 400. Superuser pre-seeded (`f@flow.com`).
+- iBrowse visual QA: homelab host could not navigate to `127.0.0.1:8120`
+  (entry `goto` timeout 30s, same external egress class as cycle 16); the
+  documented local render-QA fallback passed with the full range suite.
+- Git clean, `df392de` on `origin/main` (HEAD == origin/main). PB-67 marked
+  `done` with a structured audit comment (commit, tests, QA, summary).
+
+**Next:** bulk custom-field editing from the bulk bar (backend whitelist
+already accepts `custom_*`; needs the bar UI picker), then timeline/Gantt and
+portfolio dashboard per the v1.0 stabilization verdict.

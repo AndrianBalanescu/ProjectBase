@@ -107,6 +107,7 @@
         @update-issue="handleUpdateIssue"
         @delete-issue="handleDeleteIssue"
         @toggle-issue-selection="toggleIssueSelection"
+        @range-select-issue="rangeSelectIssue"
       ></kanban-board>
 
       <!-- 2. List View -->
@@ -126,6 +127,7 @@
         @delete-issue="handleDeleteIssue"
         @open-new-issue="isNewIssueOpen = true"
         @toggle-issue-selection="toggleIssueSelection"
+        @range-select-issue="rangeSelectIssue"
         @select-all-visible="selectAllVisibleIssues"
       ></list-view>
 

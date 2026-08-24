@@ -123,6 +123,8 @@ DOCUMENTED_CUSTOM_ROUTES = [
     "/projectbase/projects/{id}/custom-fields",
     "/projectbase/projects/{id}/custom-fields/validate",
     "/projectbase/issues/{id}/relations",
+    "/projectbase/issues/bulk-update",
+    "/projectbase/issues/bulk-delete",
     "/projectbase/import/csv",
     "/projectbase/import/github",
     "/projectbase/notifications/read-all",

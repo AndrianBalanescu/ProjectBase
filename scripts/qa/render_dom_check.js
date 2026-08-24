@@ -21,6 +21,11 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   const relations = { checked: false };
   const urlState = { checked: false };
   const bulk = { checked: false };
+  const range = { checked: false };
+  // URLs whose requests are intentionally ignored from the failure list (the
+  // range+apply E2E's cleanup DELETEs can abort client-side after the server
+  // already processed them; the end state is verified instead).
+  const ignoredCleanupUrls = new Set();
   const consoleErrors = [];
   const pageErrors = [];
   const failedReqs = [];
@@ -36,6 +41,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   page.on('requestfailed', (r) => {
     // SSE stream teardown on navigation/reload is expected, not a failure.
     if (r.url().includes('/api/realtime')) return;
+    if (ignoredCleanupUrls.has(r.url())) return;
     failedReqs.push(r.url().slice(0, 120));
   });
   page.on('response', (r) => {
@@ -43,6 +49,9 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       all4xx.push(`${r.status()} ${r.url()}`);
       // Same designed fallback.
       if (r.url().includes('/api/collections/users/auth-with-password') && r.status() === 400) return;
+      // Cleanup/verification URLs for the range+apply E2E are expected to 404
+      // (deleted records) and are checked via explicit assertions instead.
+      if (ignoredCleanupUrls.has(r.url())) return;
       failedReqs.push(`${r.status()} ${r.url().slice(0, 120)}`);
     }
   });
@@ -364,6 +373,212 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       bulk.error = String(e).slice(0, 200);
     }
 
+    // ---- Shift+click range selection (cycle 17): after anchoring with a
+    // single toggle, Shift+clicking a later card selects the whole visible
+    // range (Linear-style), the bulk bar count proves the union, Esc clears,
+    // and the reverse direction works too. Probed on board and list. ----
+    try {
+      await page.evaluate(() => { location.hash = '#/pb/board'; });
+      await page.waitForTimeout(1500);
+
+      const boardSelectBtns = page.locator('button[title^="Select for bulk actions"]');
+      const boardCards = page.locator('.kanban-card-drag-handle');
+      range.boardProbed = await boardSelectBtns.count() >= 3;
+      if (range.boardProbed) {
+        // Anchor at card 0 via its checkbox.
+        await boardSelectBtns.nth(0).click();
+        await page.waitForTimeout(300);
+        range.boardAnchorOne = await page.evaluate(() => {
+          const bar = document.querySelector('.fixed.bottom-5.left-1\\/2');
+          return bar ? (bar.textContent || '').includes('1 selected') : false;
+        });
+        // Shift+click card 2 -> cards 0,1,2 selected, no drawer opens.
+        await boardCards.nth(2).click({ modifiers: ['Shift'] });
+        await page.waitForTimeout(400);
+        range.boardRangeThree = await page.evaluate(() => {
+          const bar = document.querySelector('.fixed.bottom-5.left-1\\/2');
+          return bar ? (bar.textContent || '').includes('3 selected') : false;
+        });
+        range.boardCheckedCount = await page.locator('button[title^="Deselect (Esc)"]').count();
+        range.boardNoDrawer = !(await page.locator('.slide-in-from-right').count());
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(300);
+        range.boardEscClears = !(await page.locator('button[title^="Deselect (Esc)"]').count());
+
+        // Cross-column span: anchor the first backlog card, shift+click the
+        // first todo-column card. The flatten must run column-by-column, so
+        // every visible backlog card plus that one todo card is selected.
+        // Expected count is derived from the live DOM (project-scoped board),
+        // never hardcoded.
+        const backlogVisible = await page.locator('#kanban-col-backlog .kanban-card-drag-handle').count();
+        await boardSelectBtns.nth(0).click();
+        await page.waitForTimeout(300);
+        const firstTodoCard = page.locator('#kanban-col-todo .kanban-card-drag-handle').first();
+        if (await firstTodoCard.count()) {
+          await firstTodoCard.click({ modifiers: ['Shift'] });
+          await page.waitForTimeout(400);
+          range.boardCrossColumn = await page.evaluate(() => {
+            const bar = document.querySelector('.fixed.bottom-5.left-1\\/2');
+            if (!bar) return null;
+            const m = (bar.textContent || '').match(/(\d+) selected/);
+            return m ? Number(m[1]) : null;
+          });
+          range.boardCrossColumnExpected = backlogVisible + 1;
+          range.boardCrossColumnOK = range.boardCrossColumn === backlogVisible + 1;
+          await page.keyboard.press('Escape');
+          await page.waitForTimeout(300);
+        }
+      }
+
+      // List view: anchor row 0 then shift+click row 2 -> 3 selected; reverse
+      // (anchor row 2, shift+click row 0) must still select 3.
+      await page.keyboard.press('2'); // list view shortcut
+      await page.waitForTimeout(1200);
+      const rows = page.locator('tbody tr');
+      range.listProbed = await rows.count() >= 3;
+      if (range.listProbed) {
+        const rowBtns = page.locator('tbody tr button[title^="Select for bulk actions"]');
+        const titleCell = (n) => rows.nth(n).locator('td').nth(2);
+        await rowBtns.nth(0).click();
+        await page.waitForTimeout(300);
+        await titleCell(2).click({ modifiers: ['Shift'] });
+        await page.waitForTimeout(400);
+        range.listRangeThree = await page.evaluate(() => {
+          const bar = document.querySelector('.fixed.bottom-5.left-1\\/2');
+          return bar ? (bar.textContent || '').includes('3 selected') : false;
+        });
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(300);
+        await rowBtns.nth(2).click();
+        await page.waitForTimeout(300);
+        await titleCell(0).click({ modifiers: ['Shift'] });
+        await page.waitForTimeout(400);
+        range.listReverseThree = await page.evaluate(() => {
+          const bar = document.querySelector('.fixed.bottom-5.left-1\\/2');
+          return bar ? (bar.textContent || '').includes('3 selected') : false;
+        });
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(300);
+      }
+
+      // ---- Range selection drives a real bulk action (cycle 17 E2E): create
+      // 3 temp issues, range-select them via shift+click, apply status 'todo'
+      // through the bulk bar, verify all 3 moved via API, then clean up. ----
+      // Title prefix must be short: board cards truncate titles (~20 chars),
+      // so the locator matches the visible prefix, never the full title.
+      const applyPrefix = 'Rap' + (Date.now() % 100000000);
+      const applyTitle = applyPrefix + ' ' + Date.now();
+      const applyDbg = await page.evaluate(async (title) => {
+        let token = null;
+        for (const k of ['pb_auth', 'pocketbase_auth']) {
+          try { token = JSON.parse(localStorage.getItem(k)).token; if (token) break; } catch (e) {}
+        }
+        const h = { 'Content-Type': 'application/json' };
+        if (token) h.Authorization = token;
+        const projRes = await fetch('/api/collections/projects/records?perPage=1', { headers: h });
+        const proj = (await projRes.json()).items[0];
+        const creates = [];
+        for (let i = 1; i <= 3; i++) {
+          const r = await fetch('/api/collections/issues/records', {
+            method: 'POST', headers: h,
+            body: JSON.stringify({ project: proj ? proj.id : '', title: title + ' #' + i, status: 'backlog', priority: 'medium' })
+          });
+          creates.push({ status: r.status, id: ((await r.json()).id || null) });
+        }
+        return { token: !!token, proj: proj ? proj.id : null, creates };
+      }, applyTitle);
+      const applyIds = (applyDbg.creates || []).map(c => c.id);
+      range.applyDbg = applyDbg;
+      // Ensure the app is on the board BEFORE reload: the reload restores the
+      // route from the hash, and the range suite's list section leaves the app
+      // on #/pb/list where no board cards exist.
+      await page.evaluate(() => { location.hash = '#/pb/board'; });
+      await page.waitForTimeout(400);
+      // Reload so loadIssues deterministically includes the raw-fetch-created
+      // issues (realtime SSE may have dropped by this point in the suite).
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(3500);
+      range.applyPost = await page.evaluate((prefix) => {
+        const q = new URLSearchParams(location.hash.split('?')[1] || '');
+        const cards = Array.from(document.querySelectorAll('.kanban-card-drag-handle'));
+        return {
+          hash: location.hash,
+          loginForm: !!document.querySelector('input[placeholder="Email"]'),
+          cardCount: cards.length,
+          rapCards: cards.filter(c => (c.textContent || '').includes(prefix)).length,
+          sample: cards.slice(0, 5).map(c => (c.textContent || '').slice(0, 40)),
+          filterQ: q.get('q'), filterP: q.get('priority'), filterC: q.get('cycle'),
+        };
+      }, applyPrefix);
+      const applyCards = page.locator('.kanban-card-drag-handle:has-text("' + applyPrefix + '")');
+      if (applyIds.length === 3 && applyIds.every(Boolean) && (await applyCards.count()) === 3) {
+        range.applyCardsFound = true;
+        await applyCards.nth(0).locator('button[title^="Select for bulk actions"]').click();
+        await page.waitForTimeout(300);
+        await applyCards.nth(2).click({ modifiers: ['Shift'] });
+        await page.waitForTimeout(400);
+        range.applyBarThree = await page.evaluate(() => {
+          const bar = document.querySelector('.fixed.bottom-5.left-1\\/2');
+          return bar ? (bar.textContent || '').includes('3 selected') : false;
+        });
+        // Apply status 'todo' via the bulk bar status select (single match).
+        const applyStatus = page.locator('.fixed.bottom-5.left-1\\/2 label:has-text("Status") select');
+        await applyStatus.selectOption('todo');
+        await page.waitForTimeout(800);
+        range.applyMovedAll = await page.evaluate(async (ids) => {
+          let token = null;
+          for (const k of ['pb_auth', 'pocketbase_auth']) {
+            try { token = JSON.parse(localStorage.getItem(k)).token; if (token) break; } catch (e) {}
+          }
+          const h = {}; if (token) h.Authorization = token;
+          let ok = true;
+          for (const id of ids) {
+            const r = await fetch('/api/collections/issues/records/' + id, { headers: h });
+            if (r.status !== 200 || (await r.json()).status !== 'todo') { ok = false; break; }
+          }
+          return ok;
+        }, applyIds);
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(300);
+        range.applyBarCleared = await page.evaluate(() => !document.querySelector('.fixed.bottom-5.left-1\\/2'));
+      } else {
+        range.applyCardsFound = false;
+      }
+      // Cleanup: delete the temp apply issues. The server-side end state is
+      // what matters; a client-side abort of the DELETE after the server
+      // processed it is expected (see ignoredCleanupUrls).
+      for (const id of applyIds) {
+        if (id) ignoredCleanupUrls.add(BASE + '/api/collections/issues/records/' + id);
+      }
+      const delResults = await page.evaluate(async (ids) => {
+        let token = null;
+        for (const k of ['pb_auth', 'pocketbase_auth']) {
+          try { token = JSON.parse(localStorage.getItem(k)).token; if (token) break; } catch (e) {}
+        }
+        const h = { 'Content-Type': 'application/json' };
+        if (token) h.Authorization = token;
+        const out = [];
+        for (const id of ids) {
+          if (!id) { out.push('no-id'); continue; }
+          try {
+            const r = await fetch('/api/collections/issues/records/' + id, { method: 'DELETE', headers: h });
+            out.push(r.status);
+          } catch (e) {
+            out.push('aborted:' + String(e).slice(0, 30));
+          }
+        }
+        return out;
+      }, applyIds);
+      range.applyDeletedAll = delResults.length === 3 && delResults.every((s) => s === 204);
+      range.applyDelResults = delResults;
+
+      await page.keyboard.press('1'); // back to board
+      await page.waitForTimeout(800);
+      range.checked = true;
+    } catch (e) {
+      range.error = String(e).slice(0, 200);
+    }
+
     // ---- Issue relationships UI (cycle 40): drawer section renders, adding a
     // blocks relation through the real UI shows the row + kanban lock badge,
     // and cleanup removes the temp edge/issue. ----
@@ -543,6 +758,24 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     if (bulk.escClears === false) failures.push('Esc did not clear the bulk selection');
     if (bulk.selectAllMatchesRows === false) failures.push('list select-all did not select every visible row');
   }
+  if (range && range.checked) {
+    if (range.error) failures.push('range select setup error: ' + range.error);
+    if (range.boardProbed === false) failures.push('range suite could not probe the board (need >=3 cards)');
+    if (range.listProbed === false) failures.push('range suite could not probe the list view (need >=3 rows)');
+    if (range.boardAnchorOne === false) failures.push('board anchor click did not select 1 issue');
+    if (range.boardRangeThree === false) failures.push('board shift+click did not select the range (expected 3)');
+    if (range.boardCheckedCount !== undefined && range.boardCheckedCount !== 3) failures.push(`board range selected ${range.boardCheckedCount} checkboxes, expected 3`);
+    if (range.boardNoDrawer === false) failures.push('board shift+click opened the drawer');
+    if (range.boardEscClears === false) failures.push('Esc did not clear the board range selection');
+    if (range.boardCrossColumnOK === false) failures.push(`board cross-column span selected ${range.boardCrossColumn}, expected ${range.boardCrossColumnExpected} (${range.boardCrossColumnExpected - 1} backlog + first todo)`);
+    if (range.listRangeThree === false) failures.push('list shift+click did not select the range (expected 3)');
+    if (range.listReverseThree === false) failures.push('list reverse shift+click did not select the range (expected 3)');
+    if (range.applyCardsFound === false) failures.push('range+apply E2E could not find its 3 temp cards on the board');
+    if (range.applyBarThree === false) failures.push('range+apply E2E: bulk bar did not show 3 selected before applying');
+    if (range.applyMovedAll === false) failures.push('range+apply E2E: bulk status apply did not move all 3 temp issues to todo');
+    if (range.applyBarCleared === false) failures.push('range+apply E2E: Esc did not clear the bulk bar after apply');
+    if (range.applyDeletedAll === false) failures.push('range+apply E2E: temp issues were not deleted (cleanup end state)');
+  }
   if (routing.checked && !routing.issueOpened) failures.push('real issue deep link did not open the drawer');
   if (routing.checked && routing.staleDrawerOnPlainView) failures.push('stale drawer left open on plain view hash');
   if (!routing.checked) failures.push('routing regression not exercised (no login form found)');
@@ -563,7 +796,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     failures.push(`focus mode not exercised: ${focusMode.error}`);
   }
 
-  console.log(JSON.stringify({ checks, routing, resize, urlState, relations, focusMode, bulk, failures, all4xx }, null, 1));
+  console.log(JSON.stringify({ checks, routing, resize, urlState, relations, focusMode, bulk, range, failures, all4xx }, null, 1));
   console.log(failures.length === 0 ? 'RENDER QA: PASS' : 'RENDER QA: FAIL');
   await browser.close();
   process.exit(failures.length === 0 ? 0 : 1);

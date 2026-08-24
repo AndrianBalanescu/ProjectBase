@@ -2,7 +2,7 @@
 
 const KanbanBoardComponent = {
   props: ['issues', 'projects', 'currentProject', 'cycles', 'labels', 'filterQuery', 'filterPriority', 'filterCycle', 'selectedIssueIds'],
-  emits: ['open-issue', 'create-issue', 'update-issue', 'delete-issue', 'open-shortcuts-modal', 'toggle-issue-selection', 'update:filterQuery', 'update:filterPriority', 'update:filterCycle'],
+  emits: ['open-issue', 'create-issue', 'update-issue', 'delete-issue', 'open-shortcuts-modal', 'toggle-issue-selection', 'range-select-issue', 'update:filterQuery', 'update:filterPriority', 'update:filterCycle'],
   data() {
     return {
       columns: [
@@ -98,6 +98,13 @@ const KanbanBoardComponent = {
     },
 
     handleCardClick(event, issue) {
+      // Shift+click selects the range from the last anchor to this card.
+      if (event.shiftKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        this.$emit('range-select-issue', this.boardOrderedIssues(), issue);
+        return;
+      }
       // Cmd/Ctrl+click toggles multi-select without opening the drawer.
       if (event.ctrlKey || event.metaKey) {
         event.preventDefault();
@@ -106,6 +113,17 @@ const KanbanBoardComponent = {
         return;
       }
       this.$emit('open-issue', issue);
+    },
+    // Visible board order, column by column (fixed column order, cards sorted
+    // by order within each column) — the order a user sees while range-selecting.
+    boardOrderedIssues() {
+      const seen = [];
+      for (const col of this.columns) {
+        for (const issue of this.getIssuesForColumn(col.key)) {
+          seen.push(issue);
+        }
+      }
+      return seen;
     },
     getIssuesForColumn(columnKey) {
       return this.filteredIssues
