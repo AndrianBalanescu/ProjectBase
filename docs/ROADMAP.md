@@ -467,6 +467,13 @@ competitor emerging — neither holds today.
 2. **Fullscreen focus mode** for description editing (TODO open item A).
    *Shipped in cycle 5.* → open TODO item A closed. See § "Cycle-5 shipped".
 3. **Published benchmarks** — RAM, cold start, 10k-issue query vs Plane CE.
+   *Shipped in cycle 6.* Reproducible stdlib harness `scripts/bench/bench.py`
+   (isolated scratch instance, never the live one); published results in
+   `docs/BENCHMARKS.md` with raw JSON in `docs/research/bench/`. Headline:
+   50 MB idle / 98 MB at 10k issues, 36–96 ms cold start, 2.0 ms p50 board
+   query at 10k issues; Plane CE cited at 4 GB min RAM / 13 containers
+   (vendor docs, linked in BENCHMARKS.md). Smoke test in
+   `tests/test_benchmarks.py`.
 4. **Security pass** + CHANGELOG + versioned release packaging (CHANGELOG is
    genuinely absent today).
 
