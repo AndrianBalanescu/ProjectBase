@@ -38,10 +38,18 @@ const IssueDrawerComponent = {
       relationQuery: '',
       relationPickerOpen: false,
       relationLoading: false,
-      relationError: ''
+      relationError: '',
+      drawerWidth: null, // persisted user-resized width (px); null = default max-w-3xl
+      isResizing: false
     };
   },
   computed: {
+    drawerStyle() {
+      if (this.isFullscreen || !this.drawerWidth) return null;
+      const maxW = Math.max(360, Math.min(1280, window.innerWidth - 64));
+      const w = Math.min(this.drawerWidth, maxW);
+      return { width: w + 'px', maxWidth: '95vw' };
+    },
     renderedDescription() {
       if (!this.editDesc) return '<p class="text-gray-500 italic">No description provided. Click write to add details.</p>';
       if (window.marked && window.DOMPurify) {
@@ -160,9 +168,14 @@ const IssueDrawerComponent = {
     }
   },
   mounted() {
+    const saved = parseInt((typeof localStorage !== 'undefined' && localStorage.getItem('pb.drawer.width')) || '', 10);
+    if (!isNaN(saved) && saved >= 360 && saved <= 1280) this.drawerWidth = saved;
     this.$nextTick(() => {
       if (window.lucide) window.lucide.createIcons();
     });
+  },
+  beforeUnmount() {
+    this.stopResize();
   },
   updated() {
     this.$nextTick(() => {
@@ -170,6 +183,39 @@ const IssueDrawerComponent = {
     });
   },
   methods: {
+    startResize(e) {
+      if (this.isFullscreen) return;
+      e.preventDefault();
+      this.isResizing = true;
+      document.body.classList.add('select-none');
+      this._resizeMove = (ev) => this.onResizeMove(ev);
+      this._resizeUp = () => this.stopResize();
+      window.addEventListener('mousemove', this._resizeMove);
+      window.addEventListener('mouseup', this._resizeUp);
+    },
+    onResizeMove(e) {
+      if (!this.isResizing) return;
+      const maxW = Math.max(360, Math.min(1280, window.innerWidth - 64));
+      const w = window.innerWidth - e.clientX;
+      this.drawerWidth = Math.round(Math.min(Math.max(w, 360), maxW));
+    },
+    stopResize() {
+      if (!this.isResizing) return;
+      this.isResizing = false;
+      document.body.classList.remove('select-none');
+      window.removeEventListener('mousemove', this._resizeMove);
+      window.removeEventListener('mouseup', this._resizeUp);
+      try {
+        if (this.drawerWidth) localStorage.setItem('pb.drawer.width', String(this.drawerWidth));
+      } catch (err) { /* private mode: ignore */ }
+    },
+    resetWidth() {
+      this.stopResize();
+      this.drawerWidth = null;
+      try {
+        localStorage.removeItem('pb.drawer.width');
+      } catch (err) { /* private mode: ignore */ }
+    },
     async loadComments() {
       if (!this.issue) return;
       try {
@@ -415,7 +461,16 @@ const IssueDrawerComponent = {
       ></div>
 
       <!-- Slide-Over Drawer Container -->
-      <div :class="isFullscreen ? 'fixed inset-0 z-50 bg-gray-900 flex flex-col h-full w-full' : 'relative w-full max-w-3xl bg-gray-900 border-l border-gray-800 shadow-2xl flex flex-col h-full z-10 animate-in slide-in-from-right duration-200'">
+      <div :class="isFullscreen ? 'fixed inset-0 z-50 bg-gray-900 flex flex-col h-full w-full' : 'relative w-full max-w-3xl bg-gray-900 border-l border-gray-800 shadow-2xl flex flex-col h-full z-10 animate-in slide-in-from-right duration-200'" :style="drawerStyle">
+
+        <!-- Drag-to-resize handle (hidden in fullscreen; double-click resets) -->
+        <div
+          v-if="!isFullscreen"
+          @mousedown="startResize"
+          @dblclick="resetWidth"
+          class="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20 bg-transparent hover:bg-indigo-500/50 active:bg-indigo-500/70 transition-colors"
+          title="Drag to resize drawer · double-click to reset"
+        ></div>
         
         <!-- Header -->
         <div class="px-6 py-4 border-b border-gray-800 flex items-center justify-between bg-gray-950/60 select-none">
