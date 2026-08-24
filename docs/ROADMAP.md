@@ -465,6 +465,7 @@ competitor emerging — neither holds today.
    Cycles view tab (`?cycle=`), drawer width (`?w=`) as shareable hash state.
    *Shipped in cycle 4 (this commit).* → open TODO item B closed.
 2. **Fullscreen focus mode** for description editing (TODO open item A).
+   *Shipped in cycle 5.* → open TODO item A closed. See § "Cycle-5 shipped".
 3. **Published benchmarks** — RAM, cold start, 10k-issue query vs Plane CE.
 4. **Security pass** + CHANGELOG + versioned release packaging (CHANGELOG is
    genuinely absent today).
