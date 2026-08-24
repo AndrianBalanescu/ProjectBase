@@ -934,3 +934,52 @@ dashboard remains v1.1+).
 **Next:** portfolio dashboard (the other half of the v1.1 note), then the
 North Star external-gated items (public demo domain + first-stranger
 onboarding), which still need human input.
+
+## Cycle-20 shipped (2026-08-24): Portfolio Dashboard (v1.1 feature 5)
+
+**Goal (roadmap "Next" after cycle-19):** ship the deferred portfolio dashboard
+— the other half of the "timeline/Gantt and portfolio dashboard" v1.1 note. The
+Timeline view shipped in cycle 19; this cycle delivers the cross-project
+workspace overview.
+
+**Shipped this cycle:**
+- `app/pb_public/js/components/PortfolioView.js` — zero-build Vue 3 portfolio
+  dashboard aggregating every project, issue and milestone:
+  - KPI cards: total issues, overall completion %, in-flight/open work, and
+    estimate load (story points).
+  - A per-project progress list (done / in-flight / total) with color
+    completion bars, sorted by issue count; clicking a row opens that
+    project's board via the existing `select-project` flow.
+  - A milestones & roadmap-health panel that surfaces upcoming and overdue
+    targets (overdue first, then soonest target, then done) with per-milestone
+    progress.
+  - It fetches its own workspace snapshot (`API.getIssues(null)` +
+    `API.getMilestones(null)`) on mount so it stays accurate regardless of the
+    project the shell currently scopes its props to (no extra backend round
+    trip beyond the two standard reads).
+- Wiring: `index.html` view block + script include; `app.js` component
+  registration, both `viewMap`s (`portfolio: 'portfolio'`), and keyboard
+  shortcut `9` (board 1, list 2, cycles 3, timeline 4, projects 5, stats 6,
+  docs 7, marketplace 8, portfolio 9); `Header.js` Portfolio nav button;
+  `CommandPalette.js` `act_portfolio` action; `#/pb/portfolio` hash route.
+- `app/pb_public/sw.js` — precache list gains `PortfolioView.js`; cache name
+  bumped `projectbase-shell-v2` → `v3` so clients re-fetch the shell.
+- `app/pb_public/css/style.css` — rebuilt via `scripts/build_css.sh`.
+
+**Verification:**
+- `pytest tests/` → **173/173 passed** (was 172; +1: new
+  `test_portfolio_view_wired_and_precached` wiring/drift-guard test).
+- `node --check` clean on all changed JS + the QA script.
+- Render QA (`scripts/qa/qa-render.sh`) → **RENDER QA: PASS** with a new
+  portfolio E2E green: view mounts (`Portfolio Dashboard` + `.max-w-7xl`),
+  per-project progress rows render against live data, and the `9` shortcut
+  switches to the portfolio view.
+- Adversarial fuzz: hostile portfolio hashes (encoded script tags, XSS-in-`?q=`,
+  path-traversal `?cycle=`, bogus issue deep links, trailing slashes) → all
+  render cleanly with zero page errors and zero raw-mustache leaks.
+- iBrowse remote QA host was unreachable (Tailscale DNS/route, the documented
+  cycle-39 fallback case); the local headless render QA is the designated
+  fallback and passed.
+
+**Next:** the remaining v1.1 backlog and the North Star external-gated items
+(public demo domain + first-stranger onboarding), which still need human input.

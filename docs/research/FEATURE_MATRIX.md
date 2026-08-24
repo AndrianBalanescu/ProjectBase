@@ -22,6 +22,7 @@ Must-Have = table stakes vs Linear/Plane. Moat = differentiators nobody in the l
 | Notifications | ✅ | ✅ | ✅ Discord/Telegram/webhook + in-app inbox (assigned/mention/comment/status/priority), unread badge, mark-read, recipient-scoped rules | ✅ shipped |
 | Roadmap view | ✅ | ✅ | ✅ milestones + North Star + progress, assign issues to milestones in create/edit drawer | ✅ shipped |
 | Timeline / Gantt | ✅ | ✅ | ✅ day-grid schedule of cycles, milestones & issues (`issues.start_date` + due dates), status-colored bars, click-to-open, header/palette/keyboard/route wiring | ✅ shipped (cycle 19) |
+| Portfolio dashboard | ✅ | ✅ | ✅ cross-project overview at `#/pb/portfolio` (KPI cards, per-project progress bars, milestones & roadmap-health panel with overdue surfacing), workspace snapshot, header/palette/keyboard `9`/route wiring | ✅ shipped (cycle 20) |
 | Custom fields | ✅ | paid tier | ✅ text/number/select/checkbox/date, per-project, validation, MCP/OpenAPI/llms docs | ✅ shipped |
 | Offline / local-first | ❌ | ❌ | ✅ Service Worker app shell: pre-cached static shell, network-first API w/ cache fallback, PWA manifest, online/offline banner | ✅ shipped (cycle 18) |
 | Self-host one-command | ❌ | Docker compose | ✅ `systemd` unit + `scripts/install-systemd.sh`, hardened (NoNewPrivileges, ProtectSystem/Home, PrivateTmp) | ✅ shipped (cycle 19) |

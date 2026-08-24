@@ -11,6 +11,18 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **Portfolio Dashboard (v1.1 feature 5)**: a cross-project workspace overview
+  at `#/pb/portfolio` aggregating every project, issue and milestone. KPI cards
+  (total issues, completion %, in-flight/open work, estimate load), a
+  per-project progress list with color completion bars (clicking a row opens
+  that project's board), and a milestones & roadmap-health panel that surfaces
+  upcoming/overdue targets. It fetches its own workspace snapshot
+  (`getIssues(null)` + `getMilestones(null)`) so it stays accurate regardless
+  of the project the shell currently scopes to. Wired via a header nav button,
+  command palette action, keyboard shortcut `9`, and the `#/pb/portfolio` hash
+  route (both viewMaps); the Service Worker precache was bumped to shell-v3 to
+  cover the new asset. Verified by a new pytest wiring/drift-guard test and a
+  render-QA E2E (view mounts, project rows render, shortcut works).
 - **Timeline / Gantt view (v1.1 feature 4)**: a scrollable day-grid schedule
   of cycles (start→end bars), milestones (target-date markers) and issues
   (start→due bars, status-colored). New additive `issues.start_date` field
