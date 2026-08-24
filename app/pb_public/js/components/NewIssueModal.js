@@ -15,6 +15,7 @@ const NewIssueModalComponent = {
       status: 'todo',
       priority: 'medium',
       estimate: 0,
+      startDate: '',
       dueDate: '',
       cycleId: '',
       milestoneId: '',
@@ -32,6 +33,7 @@ const NewIssueModalComponent = {
         this.status = 'todo';
         this.priority = 'medium';
         this.estimate = 0;
+        this.startDate = '';
         this.dueDate = '';
         this.cycleId = '';
         this.milestoneId = '';
@@ -86,6 +88,7 @@ const NewIssueModalComponent = {
         status: this.status,
         priority: this.priority,
         estimate: Number(this.estimate) || 0,
+        start_date: this.startDate ? new Date(this.startDate).toISOString() : null,
         due_date: this.dueDate ? new Date(this.dueDate).toISOString() : null,
         cycle: this.cycleId || null,
         milestone: this.milestoneId || null,
@@ -174,8 +177,8 @@ const NewIssueModalComponent = {
             ></textarea>
           </div>
 
-          <!-- Meta Row: Priority, Estimate, Due Date -->
-          <div class="grid grid-cols-3 gap-3">
+          <!-- Meta Row: Priority, Estimate, Start & Due Dates -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div class="space-y-1">
               <label class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Priority</label>
               <select 
@@ -197,6 +200,15 @@ const NewIssueModalComponent = {
                 v-model.number="estimate"
                 min="0"
                 max="50"
+                class="w-full px-2.5 py-1.5 rounded-xl bg-gray-950/80 border border-gray-800 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+
+            <div class="space-y-1">
+              <label class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Start Date</label>
+              <input
+                type="date"
+                v-model="startDate"
                 class="w-full px-2.5 py-1.5 rounded-xl bg-gray-950/80 border border-gray-800 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>

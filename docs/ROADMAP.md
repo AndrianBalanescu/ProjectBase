@@ -885,3 +885,52 @@ lost `client:Acme`).
 **Next:** timeline/Gantt and portfolio dashboard per the v1.0 stabilization
 verdict.
 
+
+## Cycle-19 shipped (2026-08-24): Timeline / Gantt view (v1.1 feature 4)
+
+**Goal (roadmap "Next" after cycle-18):** ship the deferred v1.1 timeline/Gantt
+milestone — a schedule view of cycles, milestones and issues on a day grid, the
+first half of the "timeline/Gantt and portfolio dashboard" note (portfolio
+dashboard remains v1.1+).
+
+**Shipped this cycle:**
+- `app/pb_migrations/1710000018_issue_start_date.js` — additive nullable
+  `issues.start_date` (date only). Fresh installs also get it via the repair
+  migration (`1710000003`) issues def. Applied to the live DB (verified via
+  `_collections` fields: `due_date`, `start_date`, `updated`).
+- `app/pb_public/js/components/TimelineView.js` — zero-build Vue 3 Gantt:
+  month-tick ruler, weekly gridlines, section rows (Cycles → Milestones →
+  Issues), status-colored bars positioned by day offset, empty state when
+  nothing is scheduled, and click-to-open on issue bars (emits `open-issue`).
+  Issues without a start date fall back to their cycle start (or `created`).
+- Wiring: `index.html` view block + script include; `app.js` component
+  registration, both `viewMap`s (`timeline: 'timeline'`), and keyboard
+  shortcut `4` (board 1, list 2, cycles 3, timeline 4, projects 5, stats 6,
+  docs 7, marketplace 8); `Header.js` Timeline nav button; `CommandPalette.js`
+  `act_timeline` action.
+- `start_date` in create/edit: `NewIssueModal.js` (Start Date input, reset,
+  payload) and `IssueDrawer.js` (Start Date field, watch, save payload).
+- `app/pb_hooks/31_bulk_actions.pb.js` — bulk-update whitelists + validates
+  `start_date` (same shape as `due_date`).
+- Agent surface: `app/pb_public/openapi.json` (2 schemas gain `start_date`),
+  `app/pb_public/llms.txt` bulk-update field list.
+- `app/pb_public/sw.js` — precache list gains `TimelineView.js` (regression
+  test `test_sw_precache_covers_all_index_html_assets`).
+- `app/pb_public/css/style.css` — rebuilt via `scripts/build_css.sh`.
+
+**Verification:**
+- `pytest tests/` → **171/171 passed** (was 168; +3: `start_date` roundtrip,
+  bulk update + validation, frontend wiring incl. SW precache + CSS sync).
+- `node --check` clean on all changed JS + the QA script.
+- Render QA (`scripts/qa/qa-render.sh`) → **RENDER QA: PASS** with the new
+  timeline E2E green: view mounts with day grid, dated temp issue bar renders,
+  clicking the bar opens the drawer (hash `#/pb/timeline/issue/<id>`), and the
+  `4` shortcut switches to the timeline. Also fixed a pre-existing QA gap: the
+  relations E2E cleanup DELETE was never added to `ignoredCleanupUrls`, so its
+  client-side abort was counted as a failed request.
+- Live schema check: `start_date` present on `issues`; create roundtrip + bulk
+  update verified against the live instance.
+
+**Next:** portfolio dashboard (the other half of the v1.1 note), then the
+North Star external-gated items (public demo domain + first-stranger
+onboarding), which still need human input.

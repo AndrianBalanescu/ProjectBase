@@ -18,6 +18,7 @@ routerAdd("POST", "/api/projectbase/issues/bulk-update", (e) => {
         cycle: 1,
         milestone: 1,
         estimate: 1,
+        start_date: 1,
         due_date: 1,
         labels: 1,
         order: 1
@@ -96,6 +97,11 @@ routerAdd("POST", "/api/projectbase/issues/bulk-update", (e) => {
                 return e.json(400, { error: "Invalid 'estimate' value" })
             }
             updates.estimate = n
+        }
+        if (updates.start_date !== undefined && updates.start_date !== null && updates.start_date !== "") {
+            if (typeof updates.start_date !== "string" || isNaN(Date.parse(updates.start_date))) {
+                return e.json(400, { error: "Invalid 'start_date' value" })
+            }
         }
         if (updates.due_date !== undefined && updates.due_date !== null && updates.due_date !== "") {
             if (typeof updates.due_date !== "string" || isNaN(Date.parse(updates.due_date))) {

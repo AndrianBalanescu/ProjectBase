@@ -165,8 +165,16 @@ const HeaderComponent = {
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
             <span>Cycles</span>
           </button>
-          <button 
-            @click="$emit('change-view', 'milestones')" 
+          <button
+            @click="$emit('change-view', 'timeline')"
+            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all font-medium"
+            :class="currentView === 'timeline' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'"
+          >
+            <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+            <span>Timeline</span>
+          </button>
+          <button
+            @click="$emit('change-view', 'milestones')"
             class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all font-medium"
             :class="currentView === 'milestones' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'"
           >

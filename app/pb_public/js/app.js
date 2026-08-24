@@ -10,6 +10,7 @@ const App = {
     'list-view': ListViewComponent,
     'cycles-view': CyclesViewComponent,
     'milestones-view': MilestonesViewComponent,
+    'timeline-view': TimelineViewComponent,
     'projects-view': ProjectsViewComponent,
     'stats-view': StatsViewComponent,
     'docs-view': DocsViewComponent,
@@ -24,7 +25,7 @@ const App = {
   },
   data() {
     return {
-      currentView: 'board', // 'board', 'list', 'cycles', 'projects', 'stats'
+      currentView: 'board', // 'board', 'list', 'cycles', 'timeline', 'projects', 'stats'
       authReady: false,
       isAuthenticated: false,
       authMode: 'login', // 'login' | 'signup'
@@ -386,12 +387,14 @@ const App = {
         } else if (e.key === '3') {
           this.currentView = 'cycles';
         } else if (e.key === '4') {
-          this.currentView = 'projects';
+          this.currentView = 'timeline';
         } else if (e.key === '5') {
-          this.currentView = 'stats';
+          this.currentView = 'projects';
         } else if (e.key === '6') {
-          this.currentView = 'docs';
+          this.currentView = 'stats';
         } else if (e.key === '7') {
+          this.currentView = 'docs';
+        } else if (e.key === '8') {
           this.currentView = 'marketplace';
         }
       });
@@ -444,7 +447,7 @@ const App = {
       this.applyHashQueryState(params);
       if (!hash) return;
       const parts = hash.split('/').filter(Boolean);
-      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', projects: 'projects', stats: 'stats', docs: 'docs', marketplace: 'marketplace', milestones: 'milestones' };
+      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', timeline: 'timeline', projects: 'projects', stats: 'stats', docs: 'docs', marketplace: 'marketplace', milestones: 'milestones' };
 
       // parts[0] may be a project identifier or a view name (if no project prefix)
       if (parts.length >= 2 && viewMap[parts[1]]) {
@@ -479,7 +482,7 @@ const App = {
 
     syncRoute() {
       const proj = this.currentProject ? this.currentProject.identifier.toLowerCase() : '';
-      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', projects: 'projects', stats: 'stats', docs: 'docs', marketplace: 'marketplace', milestones: 'milestones' };
+      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', timeline: 'timeline', projects: 'projects', stats: 'stats', docs: 'docs', marketplace: 'marketplace', milestones: 'milestones' };
       const v = viewMap[this.currentView] || 'board';
       let hash = proj ? `#/${proj}/${v}` : `#/${v}`;
       if (this.selectedIssue) {

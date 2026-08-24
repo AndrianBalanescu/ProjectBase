@@ -41,7 +41,7 @@ migrate((app) => {
         issues: (id) => [
             relation("project", id.projects, { required: true, cascadeDelete: true }), text("identifier", { required: true }), number("issue_number"),
             text("title", { required: true }), text("description"), select("status", ["backlog", "todo", "in_progress", "in_review", "done", "cancelled"]),
-            select("priority", ["urgent", "high", "medium", "low", "none"]), text("assignee"), date("due_date"), number("estimate"),
+            select("priority", ["urgent", "high", "medium", "low", "none"]), text("assignee"), date("start_date"), date("due_date"), number("estimate"),
             json("labels"), json("subtasks"), file("attachments", 10, ["100x100", "400x300"]),
             relation("cycle", id.cycles), relation("milestone", id.milestones), number("order"),
             auto("created", true, false), auto("updated", true, true),

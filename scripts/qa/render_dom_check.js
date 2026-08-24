@@ -39,10 +39,12 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     }
   });
   page.on('pageerror', (e) => pageErrors.push(String(e).slice(0, 200)));
+
   page.on('requestfailed', (r) => {
     // SSE stream teardown on navigation/reload is expected, not a failure.
     if (r.url().includes('/api/realtime')) return;
     if (ignoredCleanupUrls.has(r.url())) return;
+
     failedReqs.push(r.url().slice(0, 120));
   });
   page.on('response', (r) => {
@@ -749,6 +751,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       return { id: (await res.json()).id };
     }, { probeId, tmpTitle });
     if (tmp.id) tmpIdHolder = tmp.id;
+    if (tmp.id) ignoredCleanupUrls.add(BASE + '/api/collections/issues/records/' + tmp.id);
     if (tmp.id) {
       // 2. Reload so the app's issue list (picker source) includes the temp issue.
       await page.reload({ waitUntil: 'domcontentloaded' });
@@ -837,6 +840,93 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       }
     }
   }
+
+  // ---- Timeline / Gantt view (cycle 19): a temp issue with start + due dates
+  // must render a timeline bar, the view must mount with a day grid, and the
+  // Timeline nav command must switch the view. Cleanup removes the temp issue. ----
+  const timeline = { checked: false };
+  let tlProbeId = null;
+  try {
+    const tlTitle = 'TL QA target ' + Date.now();
+    const tlSetup = await page.evaluate(async ({ tlTitle }) => {
+      let token = null;
+      try { const raw = localStorage.getItem('pb_auth'); if (raw) token = JSON.parse(raw).token; } catch (e) {}
+      if (!token) { try { const r = localStorage.getItem('pocketbase_auth'); if (r) token = JSON.parse(r).token; } catch (e) {} }
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = token;
+      const projRes = await fetch('/api/collections/projects/records?perPage=1', { headers });
+      if (!projRes.ok) return { error: 'projects ' + projRes.status };
+      const proj = (await projRes.json()).items[0];
+      const now = new Date();
+      const start = new Date(now.getTime() - 3 * 86400000).toISOString();
+      const due = new Date(now.getTime() + 4 * 86400000).toISOString();
+      const res = await fetch('/api/collections/issues/records', {
+        method: 'POST', headers,
+        body: JSON.stringify({ project: proj.id, title: tlTitle, status: 'in_progress',
+          start_date: start, due_date: due })
+      });
+      if (!res.ok) return { error: 'create ' + res.status + ' ' + (await res.text()).slice(0, 160) };
+      return { id: (await res.json()).id };
+    }, { tlTitle });
+    if (tlSetup && tlSetup.id) {
+      tlProbeId = tlSetup.id;
+      ignoredCleanupUrls.add(BASE + '/api/collections/issues/records/' + tlProbeId);
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(3000);
+      // Navigate via the Timeline nav command (proves header wiring).
+      await page.evaluate(() => { location.hash = '#/pb/timeline'; });
+      await page.waitForTimeout(2500);
+      timeline.viewMounted = await page.evaluate(() => {
+        const app = document.querySelector('#app');
+        return !!(app && /Timeline/.test(app.textContent || '') && app.querySelector('.overflow-x-auto'));
+      });
+      // The temp issue's bar must be present with its title in the schedule.
+      timeline.barShown = await page.evaluate((title) => {
+        return !!Array.from(document.querySelectorAll('.rounded-md.border')).find((b) => (b.textContent || '').includes(title));
+      }, tlTitle);
+      // Clicking the issue bar must open the issue drawer.
+      if (timeline.barShown) {
+        await page.evaluate((title) => {
+          const bar = Array.from(document.querySelectorAll('.rounded-md.border'))
+            .find((b) => (b.textContent || '').includes(title));
+          if (bar) bar.click();
+        }, tlTitle);
+        await page.waitForTimeout(1200);
+        timeline.barOpensDrawer = await page.evaluate((title) => {
+          const drawer = document.querySelector('.slide-in-from-right');
+          if (!drawer) return false;
+          const input = drawer.querySelector('input[placeholder="Issue title..."]');
+          const text = (drawer.textContent || '');
+          // Title lives in the drawer's title input; identifier/title also
+          // render in the header, so match either source.
+          return (input && input.value && title.includes(input.value.trim())) ||
+                 text.includes(title);
+        }, tlTitle);
+      }
+      // Keyboard shortcut 4 must also reach the timeline view.
+      await page.keyboard.press('1'); // board
+      await page.waitForTimeout(600);
+      await page.keyboard.press('4'); // timeline (new shortcut slot)
+      await page.waitForTimeout(1200);
+      timeline.shortcutWorks = await page.evaluate(() => {
+        const app = document.querySelector('#app');
+        return !!app && /Timeline/.test(app.textContent || '');
+      });
+    } else {
+      timeline.error = (tlSetup && tlSetup.error) || 'setup failed';
+    }
+  } catch (e) { timeline.error = String(e).slice(0, 200); }
+  if (tlProbeId) {
+    await page.evaluate(async (id) => {
+      let token = null;
+      try { const raw = localStorage.getItem('pb_auth'); if (raw) token = JSON.parse(raw).token; } catch (e) {}
+      if (!token) { try { const r = localStorage.getItem('pocketbase_auth'); if (r) token = JSON.parse(r).token; } catch (e) {} }
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = token;
+      try { await fetch('/api/collections/issues/records/' + id, { method: 'DELETE', headers }); } catch (e) {}
+    }, tlProbeId);
+  }
+  timeline.checked = true;
 
   const failures = [];
   // The browser's network logger emits a GENERIC "Failed to load resource ... 400"
@@ -940,7 +1030,17 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     failures.push('custom-field picker E2E not exercised');
   }
 
-  console.log(JSON.stringify({ checks, routing, resize, urlState, relations, focusMode, bulk, range, customField, failures, all4xx }, null, 1));
+  if (timeline && timeline.checked) {
+    if (timeline.error) failures.push('timeline E2E setup error: ' + timeline.error);
+    if (timeline.viewMounted === false) failures.push('timeline view did not mount (no day grid)');
+    if (timeline.barShown === false) failures.push('timeline did not render a bar for the temp dated issue');
+    if (timeline.barOpensDrawer === false) failures.push('clicking a timeline issue bar did not open the drawer');
+    if (timeline.shortcutWorks === false) failures.push('keyboard 4 did not switch to the timeline view');
+  } else if (!timeline.checked) {
+    failures.push('timeline E2E not exercised');
+  }
+
+  console.log(JSON.stringify({ checks, routing, resize, urlState, relations, focusMode, bulk, range, customField, timeline, failures, all4xx }, null, 1));
   console.log(failures.length === 0 ? 'RENDER QA: PASS' : 'RENDER QA: FAIL');
   await browser.close();
   process.exit(failures.length === 0 ? 0 : 1);

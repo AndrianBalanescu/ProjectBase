@@ -11,6 +11,19 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **Timeline / Gantt view (v1.1 feature 4)**: a scrollable day-grid schedule
+  of cycles (start→end bars), milestones (target-date markers) and issues
+  (start→due bars, status-colored). New additive `issues.start_date` field
+  (migration 1710000018) so issues get a real start date; the create modal,
+  issue drawer, and bulk-update route all accept `start_date` (whitelisted +
+  validated). The view is registered in the header nav, command palette
+  (Timeline), keyboard shortcut `4` (views re-slotted: board 1, list 2, cycles
+  3, timeline 4, projects 5, stats 6, docs 7, marketplace 8), and hash route
+  `#/pb/timeline`. Clicking an issue bar opens its drawer. OpenAPI + llms.txt
+  agent-surface docs updated with `start_date`. Verified by 3 new pytest cases
+  (roundtrip, bulk update + validation, frontend wiring) and a new render-QA
+  E2E (view mounts, dated issue bar renders, bar click opens drawer, keyboard
+  shortcut works).
 - **Bulk custom-field editing (v1.1 feature 3)**: the bulk multi-select bar now
   renders a per-project Custom-field picker when the active project defines
   custom fields (text / number / select / checkbox / date). Choosing a field

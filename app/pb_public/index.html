@@ -143,6 +143,17 @@
         @open-new-cycle="isCycleModalOpen = true"
       ></cycles-view>
 
+      <!-- 3b. Timeline / Gantt View -->
+      <timeline-view
+        v-else-if="currentView === 'timeline'"
+        :issues="issues"
+        :cycles="cycles"
+        :milestones="milestones"
+        :projects="projects"
+        :current-project="currentProject"
+        @open-issue="openIssue"
+      ></timeline-view>
+
       <!-- 4. Projects Overview -->
       <projects-view 
         v-else-if="currentView === 'projects'"
@@ -423,6 +434,7 @@
   <script src="/js/components/ListView.js"></script>
   <script src="/js/components/CyclesView.js"></script>
   <script src="/js/components/MilestonesView.js"></script>
+  <script src="/js/components/TimelineView.js"></script>
   <script src="/js/components/ProjectsView.js"></script>
   <script src="/js/components/StatsView.js"></script>
   <script src="/js/components/DocsView.js"></script>

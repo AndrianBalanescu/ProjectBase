@@ -434,3 +434,55 @@ def test_bulk_hook_registered_and_validated():
     assert "/api/projectbase/issues/bulk-delete" in src
     assert "EDITABLE_FIELDS" in src
     assert "Insufficient role: admin or manager required" in src
+
+def test_issue_start_date_roundtrip():
+    """start_date persists through create + read (Timeline/Gantt data source)."""
+    pid = _get_any_project_id()
+    issue = _create_issue(pid, f"Start Date RT {_uid()}",
+                          {"start_date": "2026-08-24 00:00:00.000Z"})
+    try:
+        st, body = _request("GET", f"/api/collections/issues/records/{issue['id']}",
+                            headers=_hdr())
+        assert st == 200, f"read failed: {st} {body}"
+        assert body.get("start_date", "").startswith("2026-08-24"), \
+            f"start_date not persisted: {body.get('start_date')}"
+    finally:
+        _delete_issue(issue["id"])
+
+def test_bulk_update_start_date_allowed_and_validated():
+    """bulk-update accepts start_date (whitelisted + validated) and persists it."""
+    pid = _get_any_project_id()
+    issue = _create_issue(pid, f"Bulk Start Date {_uid()}")
+    try:
+        st, body = _request("POST", "/api/projectbase/issues/bulk-update",
+                            {"ids": [issue["id"]], "data": {"start_date": "2026-08-20 00:00:00.000Z"}},
+                            headers=_hdr())
+        assert st == 200, f"bulk start_date update failed: {st} {body}"
+        st2, rec = _request("GET", f"/api/collections/issues/records/{issue['id']}",
+                            headers=_hdr())
+        assert rec.get("start_date", "").startswith("2026-08-20"), \
+            f"bulk start_date not persisted: {rec.get('start_date')}"
+
+        # Invalid start_date must be rejected with 400.
+        st3, body3 = _request("POST", "/api/projectbase/issues/bulk-update",
+                              {"ids": [issue["id"]], "data": {"start_date": "not-a-date"}},
+                              headers=_hdr())
+        assert st3 == 400, f"invalid start_date should 400: {st3} {body3}"
+    finally:
+        _delete_issue(issue["id"])
+
+def test_timeline_view_registered_in_frontend():
+    """TimelineView is wired into the app shell: component file, script include,
+    app.js registration + route mapping, header nav, and command palette."""
+    assert "TimelineViewComponent" in _read("app/pb_public/js/components/TimelineView.js")
+    assert "TimelineView.js" in _read("app/pb_public/index.html")
+    assert "timeline-view" in _read("app/pb_public/index.html")
+    app_src = _read("app/pb_public/js/app.js")
+    assert "'timeline-view': TimelineViewComponent" in app_src
+    assert "timeline: 'timeline'" in app_src
+    header_src = _read("app/pb_public/js/components/Header.js")
+    assert "'timeline'" in header_src and "Timeline" in header_src
+    assert "act_timeline" in _read("app/pb_public/js/components/CommandPalette.js")
+    assert "start_date" in _read("app/pb_public/js/components/NewIssueModal.js")
+    assert "start_date" in _read("app/pb_public/js/components/IssueDrawer.js")
+    assert "start_date" in _read("app/pb_hooks/31_bulk_actions.pb.js")

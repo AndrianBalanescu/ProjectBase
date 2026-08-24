@@ -14,6 +14,7 @@ const IssueDrawerComponent = {
       editStatus: 'backlog',
       editPriority: 'none',
       editEstimate: 0,
+      editStartDate: '',
       editDueDate: '',
       editCycle: '',
       editMilestone: '',
@@ -153,6 +154,7 @@ const IssueDrawerComponent = {
           this.editStatus = newVal.status || 'backlog';
           this.editPriority = newVal.priority || 'none';
           this.editEstimate = newVal.estimate || 0;
+          this.editStartDate = newVal.start_date ? newVal.start_date.substring(0, 10) : '';
           this.editDueDate = newVal.due_date ? newVal.due_date.substring(0, 10) : '';
           this.editCycle = newVal.cycle || '';
           this.editMilestone = newVal.milestone || '';
@@ -343,6 +345,7 @@ const IssueDrawerComponent = {
         status: this.editStatus,
         priority: this.editPriority,
         estimate: Number(this.editEstimate) || 0,
+        start_date: this.editStartDate ? new Date(this.editStartDate).toISOString() : null,
         due_date: this.editDueDate ? new Date(this.editDueDate).toISOString() : null,
         cycle: this.editCycle || null,
         milestone: this.editMilestone || null,
@@ -706,6 +709,17 @@ const IssueDrawerComponent = {
                 @blur="saveChanges"
                 min="0"
                 max="100"
+                class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+
+            <!-- Start Date -->
+            <div class="space-y-1">
+              <label class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Start Date</label>
+              <input
+                type="date"
+                v-model="editStartDate"
+                @change="saveChanges"
                 class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>

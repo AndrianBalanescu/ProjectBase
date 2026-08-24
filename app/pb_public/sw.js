@@ -43,6 +43,7 @@ const PRECACHE_PATHS = [
   './js/components/ListView.js',
   './js/components/CyclesView.js',
   './js/components/MilestonesView.js',
+  './js/components/TimelineView.js',
   './js/components/ProjectsView.js',
   './js/components/StatsView.js',
   './js/components/DocsView.js',
