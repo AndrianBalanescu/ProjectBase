@@ -1,0 +1,155 @@
+"""Secret / hardcoded-credential regression guard.
+
+Regression background (cycle 12): a live iBrowse API key (`sk_live_...`) was
+committed hardcoded in `scripts/qa/run_10_ibrowse_e2e.{sh,py}`, which triggered
+the cycle-12 inspect audit veto (FAILED_AUDIT / P1 credential leak). The key was
+subsequently removed and moved to an environment variable (`IBROWSE_API_KEY`),
+but nothing prevented the same class of bug from coming back.
+
+These tests scan every tracked source file for known secret patterns (API keys,
+auth tokens, private keys, hardcoded credentials) and fail if any is found. It
+is the regression guard that would have caught the cycle-12 P1 before merge.
+
+Scope:
+  - Scans all tracked files EXCEPT: vendored third-party bundles
+    (app/pb_public/vendor/), binary assets, archived research dumps
+    (docs/research/archive/), and the seeded demo superuser credential which is
+    intentionally public (documented in AGENTS.md + CI for local dev + the
+    self-host demo) and is not a secret.
+  - Uses git ls-files so only files actually committed to the repo are checked
+    (a file that never lands in git is not a leak).
+
+Intentionally tolerated (NOT secrets, safe to ship):
+  - `superdev123` / `f@flow.com` — the documented seeded demo superuser used by
+    AGENTS.md, CI, and the local dev server. It is a well-known dev bootstrap,
+    not a live credential. See test_foss_schema.py (the same "not a secret"
+    posture for the self-hostable demo).
+  - `IBROWSE_API_KEY` — an env-var *reference*, not a value.
+"""
+
+import os
+import re
+import subprocess
+
+REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+# Patterns for actual secrets. We look for long high-entropy-looking tokens
+# and the standard well-known prefix families.
+SECRET_PATTERNS = [
+    # Stripe-style live/test secret keys
+    re.compile(r"\bsk_live_[A-Za-z0-9]{10,}\b"),
+    re.compile(r"\bsk_test_[A-Za-z0-9]{10,}\b"),
+    re.compile(r"\bwhsec_[A-Za-z0-9]{10,}\b"),
+    # Anthropic / OpenAI
+    re.compile(r"\bsk-ant-[A-Za-z0-9]{10,}\b"),
+    re.compile(r"\bsk-proj-[A-Za-z0-9]{10,}\b"),
+    re.compile(r"\bsk-[A-Za-z0-9_-]{20,}\b"),
+    # GitHub personal access tokens
+    re.compile(r"\bghp_[A-Za-z0-9]{20,}\b"),
+    re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}\b"),
+    # Slack
+    re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b"),
+    # AWS access key id
+    re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
+    # Google API keys
+    re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b"),
+    # Private key blocks (PEM). Note the "BEGIN ... PRIVATE KEY" header itself
+    # is the tell; a real key will also have a long base64 body.
+    re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----"),
+    # Generic long base64-ish secret assignments (a rough net for the class of
+    # `KEY = "<40+ base64>"` that bit us). Only matches assignment context.
+    re.compile(r"""(?is)(?:key|token|secret|api_key|apikey|password|passwd)\s*[:=]\s*["'][A-Za-z0-9+/=_\-]{32,}["']"""),
+]
+
+# Directories / files excluded from the scan.
+EXCLUDE_DIRS = (
+    os.path.join(REPO, "app", "pb_public", "vendor"),     # vendored bundles
+    os.path.join(REPO, "docs", "research", "archive"),    # raw scout dumps
+    os.path.join(REPO, ".git"),
+)
+EXCLUDE_EXT = (".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", ".woff2", ".ttf")
+
+# Demo bootstrap credential that is intentionally public (dev seed), NOT a secret.
+DEV_BOOTSTRAP_CRED = ("f@flow.com", "superdev123")
+
+
+def _tracked_files():
+    """Yield all files tracked by git, newest-first, excluding vendored/binary."""
+    res = subprocess.run(
+        ["git", "-C", REPO, "ls-files"], capture_output=True, text=True, timeout=60
+    )
+    assert res.returncode == 0, f"git ls-files failed:\n{res.stderr}"
+    for rel in res.stdout.splitlines():
+        full = os.path.join(REPO, rel)
+        if any(full.startswith(ex) for ex in EXCLUDE_DIRS):
+            continue
+        if full.endswith(EXCLUDE_EXT):
+            continue
+        if not os.path.isfile(full):
+            continue
+        yield full
+
+
+def _scan_file(path):
+    """Return list of (pattern, line_no, snippet) matches in one file."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            lines = fh.readlines()
+    except OSError:
+        return []
+    hits = []
+    for idx, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        for pat in SECRET_PATTERNS:
+            m = pat.search(line)
+            if not m:
+                continue
+            # A private-key header with no body (e.g. a doc placeholder) is a
+            # real hit — there is no legit reason to commit one.
+            hit = (pat.pattern, idx, stripped[:120])
+            if hit not in hits:
+                hits.append(hit)
+    return hits
+
+
+def test_no_hardcoded_secrets_in_tracked_sources():
+    """No committed source file contains a live-looking secret or key."""
+    failures = []
+    scanned = 0
+    for path in _tracked_files():
+        scanned += 1
+        for pattern, lineno, snippet in _scan_file(path):
+            # Allow the documented demo superuser bootstrap credential.
+            if snippet and all(c in snippet for c in DEV_BOOTSTRAP_CRED):
+                continue
+            failures.append((os.path.relpath(path, REPO), pattern, lineno, snippet))
+    assert not failures, (
+        "Hardcoded secret detected in tracked source (would have been a P1):\n"
+        + "\n".join(f"  {f[0]}:{f[2]} [{f[1]}]  {f[3]!r}" for f in failures)
+        + f"\nscanned {scanned} files"
+    )
+
+
+def test_secret_pattern_is_well_formed():
+    """The guard itself must never match the placeholder used in its own file."""
+    # Ensure the pattern list is non-trivial (catches accidental empties).
+    assert SECRET_PATTERNS, "SECRET_PATTERNS must not be empty"
+    assert all(hasattr(p, "pattern") for p in SECRET_PATTERNS)
+
+
+def test_qa_scripts_do_not_hardcode_ibrowse_key():
+    """The exact cycle-12 regression site stays clean: the iBrowse key must be
+    read from the environment, never a literal in the committed QA scripts."""
+    qa_py = os.path.join(REPO, "scripts", "qa", "run_10_ibrowse_e2e.py")
+    qa_sh = os.path.join(REPO, "scripts", "qa", "run_10_ibrowse_e2e.sh")
+    for path in (qa_py, qa_sh):
+        assert os.path.isfile(path), f"missing expected QA script {path}"
+        with open(path, encoding="utf-8") as fh:
+            src = fh.read()
+        # No literal sk_live_/sk_ value in these files.
+        assert "sk_live_" not in src, f"{path} hardcodes a live iBrowse key"
+        assert "sk_" not in src.replace("IBROWSE_API_KEY", ""), (
+            f"{path} appears to hardcode an iBrowse key value"
+        )

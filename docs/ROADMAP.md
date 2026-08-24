@@ -726,3 +726,37 @@ adversarial fuzzing, security) to confirm the release is clean.
 - Security: anon read of issues/projects/comments returns **empty** (rule-gated,
   no leak); anon `_superusers` list → 403; openapi.json served 200 for docs.
 - Git clean on `origin/main`; docs-only change → no frontend rebuild required.
+
+## Cycle-13 (2026-08-24): secret-scan regression guard + crime-scene audit
+
+**Goal (harden):** the cycle-12 inspect audit veto (FAILED_AUDIT / P1 credential
+leak — a hardcoded iBrowse `sk_live_` key in the QA scripts) was caused by a
+committed secret, and nothing prevented that class of bug from recurring. This
+cycle closes the loop with a regression guard and re-verifies the whole release.
+
+**Shipped this cycle:**
+- `tests/test_secret_scan.py` — new 3-test regression guard that scans every
+  git-tracked source file for live-secret patterns (API keys, auth tokens,
+  private keys, hardcoded credentials) and fails CI on any hit. It is the guard
+  that would have caught the cycle-12 P1 before merge. It excludes vendored
+  third-party bundles and raw archived research dumps, and intentionally
+  tolerates the documented seeded demo superuser (`superdev123`, a public dev
+  bootstrap, not a secret). Includes a mutation-proven check that the two QA
+  scripts read `IBROWSE_API_KEY` from the environment rather than a literal.
+- `CHANGELOG.md` — `[Unreleased]`/`Added` entry for the guard.
+
+**Validation (crime-scene audit):**
+- `pytest tests/` → **149/149 passed** (146 + 3 new guard tests).
+- Mutation-tested the guard: injecting a `sk_live_...` literal into the QA
+  script flips the two relevant tests to **FAIL** (proving it catches the
+  exact cycle-12 regression), then restored clean.
+- `python3 -m flow.frontend_guard` → **ALL FRONTEND FILES VERIFIED**.
+- `scripts/qa/qa-render.sh` → **RENDER QA: PASS** (urlState, relations,
+  focusMode suites green).
+- iBrowse visual QA attempted; the homelab iBrowse host returned the same
+  documented environmental `github.com ETIMEOUT` (network egress) as prior
+  cycles → local render QA used as the visual fallback.
+- Security: anon read of issues/projects returns **empty**; anon create → 400;
+  anon `_superusers` → 403; oversized title (200k) → 400; malformed JSON → 400;
+  missing project → 400. Verified the credential leak is gone from `origin/main`
+  (HEAD == `6929c82`, key read from env).

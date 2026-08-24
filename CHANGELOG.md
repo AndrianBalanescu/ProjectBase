@@ -11,6 +11,16 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **Secret / hardcoded-credential regression guard**: new `tests/test_secret_scan.py`
+  scans every git-tracked source file for live-secret patterns (API keys,
+  auth tokens, private keys, hardcoded credentials) and fails CI if any is
+  found. This is the regression guard that would have caught the cycle-12 P1
+  credential leak (a hardcoded iBrowse `sk_live_` key in the QA scripts) before
+  it ever reached `origin/main`. Vendored bundles and raw archived research
+  dumps are excluded; the documented seeded demo superuser (`superdev123`) is
+  intentionally tolerated as a non-secret dev bootstrap. Includes a mutation-
+  proven check that the two QA scripts read `IBROWSE_API_KEY` from the
+  environment rather than a literal.
 - **Agent-surface OpenAPI coverage**: `openapi.json` now documents every
   implemented `/api/projectbase/*` custom route so autonomous agents discover
   the full surface. Newly added: `/projectbase/version`, `/projectbase/import/csv`,
