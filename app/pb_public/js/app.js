@@ -53,10 +53,15 @@ const App = {
       isCycleModalOpen: false,
       isCustomFieldsOpen: false,
 
-      // Filters
+      // Filters (URL-synced: shared as ?q=&priority=&cycle= hash params)
       filterQuery: '',
       filterPriority: '',
       filterCycle: '',
+
+      // URL-synced UI state: selected cycle tab in Cycles view (?cycle=)
+      // and drawer width override in px (?w=, session-only; localStorage still wins after a manual resize)
+      selectedCycleId: null,
+      drawerWidthOverride: null,
 
       // In-app notifications inbox
       notifications: [],
@@ -73,6 +78,16 @@ const App = {
     unreadNotifications() {
       return this.notifications.filter(n => !n.read).length;
     }
+  },
+  watch: {
+    // URL deep-link state: every change rewrites the hash query (replaceState,
+    // no history spam), so filters/tabs/drawer width are shareable and survive reload.
+    filterQuery() { this.syncRoute(); },
+    filterPriority() { this.syncRoute(); },
+    filterCycle() { this.syncRoute(); },
+    selectedCycleId() { this.syncRoute(); },
+    drawerWidthOverride() { this.syncRoute(); },
+    currentView() { this.syncRoute(); }
   },
   async mounted() {
     this.isAuthenticated = !!API.client.authStore.isValid;
@@ -342,9 +357,34 @@ const App = {
       this.applyRoute();
     },
 
+    // Hash query helpers — URL state for filters (?q= &priority= &cycle=),
+    // the Cycles view tab (?cycle=) and the drawer width override (?w=).
+    parseHashQuery(hash) {
+      const qIdx = hash.indexOf('?');
+      if (qIdx === -1) return { path: hash, params: new URLSearchParams() };
+      return { path: hash.slice(0, qIdx), params: new URLSearchParams(hash.slice(qIdx + 1)) };
+    },
+
+    applyHashQueryState(params) {
+      const q = (params.get('q') || '').slice(0, 200);
+      const priority = params.get('priority') || '';
+      const cycle = params.get('cycle') || '';
+      const validPriorities = ['urgent', 'high', 'medium', 'low', 'none'];
+      this.filterQuery = q;
+      this.filterPriority = validPriorities.includes(priority) ? priority : '';
+      this.filterCycle = cycle;
+      this.selectedCycleId = cycle || null;
+      const w = parseInt(params.get('w') || '', 10);
+      // Same clamp range as the IssueDrawer drag handle (360-1280px).
+      this.drawerWidthOverride = !isNaN(w) && w >= 360 && w <= 1280 ? w : null;
+    },
+
     async applyRoute() {
       if (!this.isAuthenticated) return;
-      const hash = window.location.hash.replace(/^#\/?/, '');
+      const raw = window.location.hash.replace(/^#\/?/, '');
+      if (!raw) return;
+      const { path: hash, params } = this.parseHashQuery(raw);
+      this.applyHashQueryState(params);
       if (!hash) return;
       const parts = hash.split('/').filter(Boolean);
       const viewMap = { board: 'board', list: 'list', cycles: 'cycles', projects: 'projects', stats: 'stats', docs: 'docs', marketplace: 'marketplace', milestones: 'milestones' };
@@ -382,13 +422,22 @@ const App = {
 
     syncRoute() {
       const proj = this.currentProject ? this.currentProject.identifier.toLowerCase() : '';
-      const base = proj ? `#/${proj}` : '';
       const viewMap = { board: 'board', list: 'list', cycles: 'cycles', projects: 'projects', stats: 'stats', docs: 'docs', marketplace: 'marketplace', milestones: 'milestones' };
       const v = viewMap[this.currentView] || 'board';
-      let hash = base ? `${base}/${v}` : `#/${v}`;
+      let hash = proj ? `#/${proj}/${v}` : `#/${v}`;
       if (this.selectedIssue) {
         hash += `/issue/${this.selectedIssue.id}`;
       }
+      // Canonical query: only non-empty state lands in the URL, so plain views stay clean.
+      const params = new URLSearchParams();
+      if (this.filterQuery) params.set('q', this.filterQuery);
+      if (this.filterPriority) params.set('priority', this.filterPriority);
+      // cycle= doubles as the board/list cycle filter and the Cycles view tab.
+      const cycleId = this.currentView === 'cycles' ? this.selectedCycleId : this.filterCycle;
+      if (cycleId) params.set('cycle', cycleId);
+      if (this.drawerWidthOverride) params.set('w', String(this.drawerWidthOverride));
+      const qs = params.toString();
+      if (qs) hash += `?${qs}`;
       if (window.location.hash !== hash) {
         try { window.history.replaceState(null, '', hash); } catch (e) { /* ignore */ }
       }

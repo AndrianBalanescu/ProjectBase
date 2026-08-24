@@ -444,3 +444,65 @@ unblocked row a 2px gray left edge (the tbody `divide-gray-800/60` rule at
 otherwise). Re-verified via computed-style E2E: blocked rows 2px red
 `rgba(127,29,29,.7)` edge, unblocked rows `border-left-width:0`, badge 22x22 with
 12x12 lock svg not clipped; suite 140/140, render QA PASS.
+
+## v1.0 direction decided (cycle-4 debate, 2026-08-24)
+
+**Verdict source:** `docs/research/debates/debate-verdict-cycle-2.md`
+(flow-debate-v1, paid, `flow_debate.py --validate` → **valid: true**, status
+COMPLETE, confidence 0.62).
+
+**Winner: Direction A — Stabilization v1.0.** URL deep-link completion,
+fullscreen editing, published benchmarks, security pass, and packaging ship
+**before** timeline/Gantt, portfolio dashboard, or batch multi-select (deferred
+to v1.1+). All three participating models (DeepSeek V4 Flash, Gemini 3.7, GLM
+5.3) independently converged on A; no participant defended B as primary v1.0
+scope. Flip conditions before committing v1.1 timeline work: >50% of inbound
+requests citing Gantt as the sole blocker, or a single-binary sub-50MB MIT
+competitor emerging — neither holds today.
+
+**v1.0 build order:**
+1. **URL deep-link completion** — filters (`?q=`, `?priority=`, `?cycle=`),
+   Cycles view tab (`?cycle=`), drawer width (`?w=`) as shareable hash state.
+   *Shipped in cycle 4 (this commit).* → open TODO item B closed.
+2. **Fullscreen focus mode** for description editing (TODO open item A).
+3. **Published benchmarks** — RAM, cold start, 10k-issue query vs Plane CE.
+4. **Security pass** + CHANGELOG + versioned release packaging (CHANGELOG is
+   genuinely absent today).
+
+**next_validation (verbatim intent):** headless-browser integration test
+exercising bidirectional URL state sync (active filter, active tab, open
+drawer) asserting round-trip fidelity; concurrently publish one benchmark run
+(RAM, cold start, 10k-issue query) vs Plane CE. Monitor inbound Gantt demand to
+test the flip condition before v1.1.
+
+**Uncertainty:** GPT 5.6 Sol High failed in Round 1 (process_error); Direction B
+was only reconstructed via cross-critiques, so its strongest defenses may be
+understated.
+
+## Cycle-4 shipped (2026-08-24): URL deep-link state
+
+- `app/pb_public/js/app.js` — hash query parsing (`parseHashQuery`,
+  `applyHashQueryState`) + canonical re-serialization in `syncRoute()`; root
+  state for `filterQuery/filterPriority/filterCycle/selectedCycleId/
+  drawerWidthOverride`; watchers sync URL on every state change (and
+  `currentView` for keyboard 1-7 view switches).
+- `KanbanBoard.js` — filters lifted from local data to props with writable
+  computed proxies (`searchModel/priorityModel/cycleModel`), emitted via
+  `update:filterQuery` etc.; `clearFilters` emits resets.
+- `CyclesView.js` — `selectedCycleId` lifted to a prop (`update:selectedCycleId`
+  emit), so the active cycle tab is URL-addressable.
+- `IssueDrawer.js` — `widthOverride` prop: `?w=` (clamped 360-1280) wins for the
+  session without touching `localStorage`; any manual resize or double-click
+  reset clears the override (local preference takes back over).
+- `index.html` — `v-model:` bindings wire board/list filters, cycle tab, and
+  drawer width to the root state.
+- `scripts/qa/render_dom_check.js` — 8 new `urlState` assertions (filter
+  write/clear, `?q=`/`?priority=`/`?cycle=`/`?w=` restore after reload,
+  session-only width override).
+
+**Validation:** `pytest tests/` → 140/140. Headless render QA → PASS (all 8
+urlState checks + prior routing/resize/relations suites). Fuzzed hostile hashes
+(oversized `?q`, XSS payloads, invalid priority/w/cycle, broken query) → no
+page errors, no mustache leaks, app alive; `?q=` clamped to 200 chars, invalid
+values dropped. iBrowse remote QA host down (DNS ETIMEOUT, cycle-39 fallback
+case) → local `qa-render.sh` fallback used.
