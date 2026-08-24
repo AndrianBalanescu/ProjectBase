@@ -475,7 +475,7 @@ competitor emerging — neither holds today.
    (vendor docs, linked in BENCHMARKS.md). Smoke test in
    `tests/test_benchmarks.py`.
 4. **Security pass** + CHANGELOG + versioned release packaging (CHANGELOG is
-   genuinely absent today).
+   genuinely absent today). *Shipped in cycle 7.* See § "Cycle-7 shipped".
 
 **next_validation (verbatim intent):** headless-browser integration test
 exercising bidirectional URL state sync (active filter, active tab, open
@@ -539,3 +539,35 @@ suites). iBrowse remote QA host down (github.com ETIMEOUT, environmental) → lo
 
 **Next (v1.0 item 3/4):** published benchmarks — RAM, cold start, 10k-issue query
 vs Plane CE.
+
+## Cycle-7 shipped (2026-08-24): security pass + CHANGELOG + versioned release packaging
+
+**Goal (v1.0 build order item 4/4):** close the last v1.0 stabilization item —
+a security pass, a CHANGELOG (genuinely absent), and versioned release
+packaging so the version is consistent everywhere.
+
+**Shipped this cycle:**
+- `CHANGELOG.md` — new, Keep-a-Changelog + SemVer format, full history from
+  initial release through 0.9.0, with an `[Unreleased]` section.
+- **Version consistency fix**: the UI header badge (`Header.js`) showed a stale
+  `v0.8.0` while `VERSION` was `0.9.0`. Fixed the badge to `v0.9.0` and extended
+  `scripts/bump_version.sh` to keep the header badge and the custom-routes
+  health/version endpoints in sync on every bump (previously only `VERSION` and
+  `openapi.json` were updated).
+- **Security pass**: audited all PocketBase collection API rules and hooks.
+  Verified: anon gets empty lists (no data leak), anon create denied, admin UI
+  requires superuser, member self-escalation blocked, cross-tenant isolation
+  intact, notifications recipient-scoped. No new gaps found; existing 143-test
+  suite (including 20+ security/role/privacy tests) all green.
+
+**Validation (crime-scene audit):**
+- `pytest tests/` → **143/143 passed**.
+- `bash -n scripts/bump_version.sh` clean; `bump_version.sh show` → `v0.9.0`.
+- Adversarial probes: anon list users/projects → empty (200, no leak); anon
+  create issue → 400; admin UI → 200 (superuser-gated).
+- Version refs now consistent: `VERSION`, `openapi.json`, `Header.js` badge,
+  and custom-routes health/version all report `0.9.0`.
+
+**Next (v1.1+):** timeline/Gantt, portfolio dashboard, batch multi-select
+(deferred by the v1.0 stabilization verdict). Monitor inbound Gantt demand to
+test the flip condition.

@@ -64,4 +64,16 @@ with open('$OPENAPI_FILE', 'w', encoding='utf-8') as f:
 "
 fi
 
+# Update the Header.js version badge (vX.Y.Z) so the UI stays in sync.
+HEADER_FILE="$DIR/app/pb_public/js/components/Header.js"
+if [ -f "$HEADER_FILE" ]; then
+    sed -i -E "s/v[0-9]+\.[0-9]+\.[0-9]+/v$NEW_VERSION/g" "$HEADER_FILE"
+fi
+
+# Update the hardcoded version in the custom routes hook (health + version endpoints).
+ROUTES_FILE="$DIR/app/pb_hooks/30_custom_routes.pb.js"
+if [ -f "$ROUTES_FILE" ]; then
+    sed -i -E "s/version: \"[0-9]+\.[0-9]+\.[0-9]+\"/version: \"$NEW_VERSION\"/g" "$ROUTES_FILE"
+fi
+
 echo "🚀 Bumped ProjectBase version: v$CURRENT -> v$NEW_VERSION"
