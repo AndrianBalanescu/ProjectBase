@@ -19,12 +19,12 @@ Scope:
   - Uses git ls-files so only files actually committed to the repo are checked
     (a file that never lands in git is not a leak).
 
-Intentionally tolerated (NOT secrets, safe to ship):
-  - `superdev123` / `f@flow.com` — the documented seeded demo superuser used by
-    AGENTS.md, CI, and the local dev server. It is a well-known dev bootstrap,
-    not a live credential. See test_foss_schema.py (the same "not a secret"
-    posture for the self-hostable demo).
-  - `IBROWSE_API_KEY` — an env-var *reference*, not a value.
+Not tolerated (no whitelist): the documented demo superuser bootstrap
+(`superdev123` / `f@flow.com`) is a known dev credential but is deliberately
+NOT whitelisted — it matches none of the secret patterns on its own (it is a
+12-char password, far below the high-entropy thresholds), and a whitelist would
+risk masking a real key accidentally co-located with the demo credential on one
+line. `IBROWSE_API_KEY` is only an env-var *reference*, never a value.
 """
 
 import os
@@ -68,9 +68,6 @@ EXCLUDE_DIRS = (
     os.path.join(REPO, ".git"),
 )
 EXCLUDE_EXT = (".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", ".woff2", ".ttf")
-
-# Demo bootstrap credential that is intentionally public (dev seed), NOT a secret.
-DEV_BOOTSTRAP_CRED = ("f@flow.com", "superdev123")
 
 
 def _tracked_files():
@@ -121,9 +118,6 @@ def test_no_hardcoded_secrets_in_tracked_sources():
     for path in _tracked_files():
         scanned += 1
         for pattern, lineno, snippet in _scan_file(path):
-            # Allow the documented demo superuser bootstrap credential.
-            if snippet and all(c in snippet for c in DEV_BOOTSTRAP_CRED):
-                continue
             failures.append((os.path.relpath(path, REPO), pattern, lineno, snippet))
     assert not failures, (
         "Hardcoded secret detected in tracked source (would have been a P1):\n"

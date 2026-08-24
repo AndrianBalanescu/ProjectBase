@@ -739,10 +739,12 @@ cycle closes the loop with a regression guard and re-verifies the whole release.
   git-tracked source file for live-secret patterns (API keys, auth tokens,
   private keys, hardcoded credentials) and fails CI on any hit. It is the guard
   that would have caught the cycle-12 P1 before merge. It excludes vendored
-  third-party bundles and raw archived research dumps, and intentionally
-  tolerates the documented seeded demo superuser (`superdev123`, a public dev
-  bootstrap, not a secret). Includes a mutation-proven check that the two QA
-  scripts read `IBROWSE_API_KEY` from the environment rather than a literal.
+  third-party bundles and raw archived research dumps. No whitelist: the
+  documented seeded demo superuser (`superdev123`) is deliberately not exempted
+  because it matches none of the secret patterns on its own and an exemption
+  could mask a real key co-located with the demo credential on one line.
+  Includes a mutation-proven check that the two QA scripts read
+  `IBROWSE_API_KEY` from the environment rather than a literal.
 - `CHANGELOG.md` — `[Unreleased]`/`Added` entry for the guard.
 
 **Validation (crime-scene audit):**
