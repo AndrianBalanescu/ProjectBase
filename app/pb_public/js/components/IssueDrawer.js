@@ -240,9 +240,14 @@ const IssueDrawerComponent = {
       this.descTab = 'rich';
       this.$nextTick(() => {
         if (window.lucide) window.lucide.createIcons();
-        // Focus the Milkdown editor root so typing starts immediately.
-        const root = this.$el && this.$el.querySelector('.milkdown-editor-root, .milkdown');
-        if (root && root.focus) root.focus();
+        // Focus the Milkdown editor root so typing starts immediately. The
+        // editor mounts asynchronously (crepe.create()), so retry briefly.
+        const tryFocus = (attempt) => {
+          const root = document.querySelector('.fixed.inset-0.z-\\[60\\] [contenteditable="true"]');
+          if (root && root.focus) { root.focus(); return; }
+          if (attempt < 30) setTimeout(() => tryFocus(attempt + 1), 100);
+        };
+        tryFocus(0);
       });
     },
     exitDescFocus() {
