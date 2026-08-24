@@ -46,6 +46,9 @@ const App = {
       bulkStatus: '',
       bulkPriority: '',
       bulkCycle: '',
+      bulkCustomFieldKey: '', // per-project custom field chosen in the bulk bar
+      bulkCustomValue: '', // text/number/select/date value to apply
+      bulkCustomChecked: false, // checkbox value to apply
       realtimeConnected: true,
       isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
       
@@ -86,6 +89,18 @@ const App = {
     },
     unreadNotifications() {
       return this.notifications.filter(n => !n.read).length;
+    },
+    currentFieldDefs() {
+      // Per-project custom field schemas; JSON may arrive as a string from the
+      // API, so normalize to an array before exposing to the bulk bar.
+      let defs = this.currentProject ? this.currentProject.custom_field_defs : [];
+      if (typeof defs === 'string') { try { defs = JSON.parse(defs); } catch (e) { defs = []; } }
+      return Array.isArray(defs) ? defs : [];
+    },
+    selectedBulkCustomField() {
+      const key = this.bulkCustomFieldKey;
+      if (!key) return null;
+      return this.currentFieldDefs.find(f => f.key === key) || null;
     }
   },
   watch: {
@@ -647,11 +662,20 @@ const App = {
       try {
         const res = await API.bulkUpdateIssues(ids, patch);
         // Apply the patch locally immediately; realtime SSE also confirms each
-        // record, but this keeps the UI instant for the acting user.
+        // record, but this keeps the UI instant for the acting user. For the
+        // custom_fields object we merge (preserving unrelated keys) to mirror
+        // the backend's partial-update semantics.
         for (const key of Object.keys(patch)) {
           for (const issue of this.issues) {
             if (this.selectedIssueIds.has(issue.id)) {
-              issue[key] = patch[key];
+              if (key === 'custom_fields') {
+                let cf = issue[key];
+                if (typeof cf === 'string') { try { cf = JSON.parse(cf); } catch (e) { cf = {}; } }
+                if (!cf || typeof cf !== 'object' || Array.isArray(cf)) cf = {};
+                issue[key] = { ...cf, ...patch[key] };
+              } else {
+                issue[key] = patch[key];
+              }
             }
           }
         }
@@ -671,6 +695,20 @@ const App = {
       this.bulkStatus = '';
       this.bulkPriority = '';
       this.bulkCycle = '';
+    },
+
+    // Apply a per-project custom field value to every selected issue. The
+    // backend merges this partial object into each record's custom_fields JSON,
+    // preserving unrelated values (a null/'' value clears that one key).
+    async applyBulkCustomField(field, value) {
+      if (!field) return;
+      const patch = {};
+      patch.custom_fields = {};
+      patch.custom_fields[field] = value;
+      await this.bulkUpdateSelected(patch);
+      this.bulkCustomFieldKey = '';
+      this.bulkCustomValue = '';
+      this.bulkCustomChecked = false;
     },
 
     async bulkDeleteSelected() {

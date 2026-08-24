@@ -241,6 +241,69 @@
 
       <div class="w-px h-5 bg-gray-700/70 hidden sm:block"></div>
 
+      <!-- Bulk custom-field picker (per-project schemas from currentProject) -->
+      <div v-if="currentFieldDefs.length" class="flex items-center gap-2 text-gray-400">
+        <span class="text-[10px] uppercase tracking-wider">Custom</span>
+        <select
+          v-model="bulkCustomFieldKey"
+          class="bg-gray-950/90 border border-gray-700/80 rounded-lg px-2 py-1 text-gray-200 outline-none focus:border-indigo-500/70 text-xs"
+        >
+          <option value="" disabled>Field…</option>
+          <option v-for="f in currentFieldDefs" :key="f.key" :value="f.key">{{ f.label }}</option>
+        </select>
+
+        <input
+          v-if="selectedBulkCustomField && selectedBulkCustomField.type === 'text'"
+          v-model="bulkCustomValue"
+          @keydown.enter="bulkCustomFieldKey && applyBulkCustomField(bulkCustomFieldKey, bulkCustomValue)"
+          placeholder="Value…"
+          class="bg-gray-950/90 border border-gray-700/80 rounded-lg px-2 py-1 text-gray-200 outline-none focus:border-indigo-500/70 text-xs"
+        />
+        <input
+          v-else-if="selectedBulkCustomField && selectedBulkCustomField.type === 'number'"
+          v-model.number="bulkCustomValue"
+          @keydown.enter="bulkCustomFieldKey && applyBulkCustomField(bulkCustomFieldKey, bulkCustomValue)"
+          type="number"
+          placeholder="Value…"
+          class="bg-gray-950/90 border border-gray-700/80 rounded-lg px-2 py-1 text-gray-200 font-mono outline-none focus:border-indigo-500/70 text-xs"
+        />
+        <select
+          v-else-if="selectedBulkCustomField && selectedBulkCustomField.type === 'select'"
+          v-model="bulkCustomValue"
+          class="bg-gray-950/90 border border-gray-700/80 rounded-lg px-2 py-1 text-gray-200 outline-none focus:border-indigo-500/70 text-xs"
+        >
+          <option value="" disabled>Set…</option>
+          <option value="">Clear</option>
+          <option v-for="opt in selectedBulkCustomField.options" :key="opt" :value="opt">{{ opt }}</option>
+        </select>
+        <input
+          v-else-if="selectedBulkCustomField && selectedBulkCustomField.type === 'date'"
+          v-model="bulkCustomValue"
+          type="date"
+          class="bg-gray-950/90 border border-gray-700/80 rounded-lg px-2 py-1 text-gray-200 font-mono outline-none focus:border-indigo-500/70 text-xs"
+        />
+        <label
+          v-else-if="selectedBulkCustomField && selectedBulkCustomField.type === 'checkbox'"
+          class="flex items-center gap-1.5 text-xs text-gray-300"
+        >
+          <input type="checkbox" v-model="bulkCustomChecked" class="accent-indigo-500" />
+          {{ bulkCustomChecked ? 'Yes' : 'No' }}
+        </label>
+
+        <button
+          type="button"
+          :disabled="!bulkCustomFieldKey || !selectedBulkCustomField"
+          class="px-2 py-1 rounded-lg bg-indigo-600/80 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          @click="selectedBulkCustomField.type === 'checkbox'
+            ? applyBulkCustomField(bulkCustomFieldKey, bulkCustomChecked)
+            : applyBulkCustomField(bulkCustomFieldKey, bulkCustomValue)"
+        >
+          Apply
+        </button>
+      </div>
+
+      <div class="w-px h-5 bg-gray-700/70 hidden sm:block"></div>
+
       <button
         type="button"
         class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600/90 hover:bg-red-500 text-white text-xs font-semibold transition-colors"

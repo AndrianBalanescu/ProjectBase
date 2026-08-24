@@ -255,16 +255,67 @@ def test_bulk_update_labels_array():
         _delete_issue(issue["id"])
 
 
+def test_bulk_update_custom_fields_partial_merge():
+    """Bulk custom-field updates must MERGE into each record's custom_fields
+    JSON (preserving unrelated keys), not wholesale-replace or write phantom
+    custom_* columns. A null/'' value clears that single key."""
+    pid = _get_any_project_id()
+    issue = _create_issue(pid, f"Bulk CF Merge {_uid()}",
+                          {"custom_fields": {"effort": 3, "client": "Acme", "qa": True}})
+    try:
+        # 1. Partial update: only 'effort' changes, others survive.
+        st, body = _request("POST", "/api/projectbase/issues/bulk-update",
+                            {"ids": [issue["id"]], "data": {"custom_fields": {"effort": 9}}},
+                            headers=_hdr())
+        assert st == 200, f"custom_fields bulk update failed: {st} {body}"
+        st2, rec = _request("GET", f"/api/collections/issues/records/{issue['id']}",
+                            headers=_hdr())
+        assert rec["custom_fields"] == {"effort": 9, "client": "Acme", "qa": True}
+
+        # 2. Remove one key via null; others survive.
+        st3, body3 = _request("POST", "/api/projectbase/issues/bulk-update",
+                              {"ids": [issue["id"]], "data": {"custom_fields": {"client": None}}},
+                              headers=_hdr())
+        assert st3 == 200, f"custom_fields null removal failed: {st3} {body3}"
+        st4, rec2 = _request("GET", f"/api/collections/issues/records/{issue['id']}",
+                             headers=_hdr())
+        assert rec2["custom_fields"] == {"effort": 9, "qa": True}
+    finally:
+        _delete_issue(issue["id"])
+
+
+def test_bulk_update_custom_fields_validation():
+    pid = _get_any_project_id()
+    issue = _create_issue(pid, "Bulk CF Valid {_uid()}")
+    try:
+        # Non-object custom_fields must be rejected.
+        st, body = _request("POST", "/api/projectbase/issues/bulk-update",
+                            {"ids": [issue["id"]], "data": {"custom_fields": ["x", "y"]}},
+                            headers=_hdr())
+        assert st == 400 and "custom_fields" in str(body.get("error", ""))
+
+        # Legacy phantom custom_<key> columns are no longer accepted.
+        st2, body2 = _request("POST", "/api/projectbase/issues/bulk-update",
+                              {"ids": [issue["id"]], "data": {"custom_effort": 5}},
+                              headers=_hdr())
+        assert st2 == 400 and "custom_effort" in str(body2.get("error", ""))
+    finally:
+        _delete_issue(issue["id"])
+
+
 def test_bulk_update_custom_field_prefix_allowed():
+    # Legacy phantom custom_* column keys were silently accepted but never
+    # persisted (they targeted non-existent top-level columns). Since cycle 18
+    # the correct payload is a nested custom_fields object (see
+    # test_bulk_update_custom_fields_partial_merge); a bare custom_* key is now
+    # rejected so callers cannot silently lose data.
     pid = _get_any_project_id()
     issue = _create_issue(pid, f"Bulk Custom {_uid()}")
     try:
-        # Unknown custom_* keys pass field allow-listing (per-project defs are
-        # the drawer's responsibility); the value is stored on the JSON column.
         st, body = _request("POST", "/api/projectbase/issues/bulk-update",
                             {"ids": [issue["id"]], "data": {"custom_gate": "P1"}},
                             headers=_hdr())
-        assert st == 200 and body["updated"] == 1
+        assert st == 400 and "custom_gate" in str(body.get("error", ""))
     finally:
         _delete_issue(issue["id"])
 
@@ -360,6 +411,20 @@ def test_index_renders_bulk_actions_bar_and_wiring():
     assert "applyBulkField('priority'" in src
     assert ":selected-issue-ids=\"selectedIssueIds\"" in src
     assert "@toggle-issue-selection=\"toggleIssueSelection\"" in src
+
+    # Bulk custom-field picker (per-project schemas).
+    assert "currentFieldDefs" in src
+    assert "applyBulkCustomField" in src
+    assert "bulkCustomFieldKey" in src
+
+
+def test_root_app_wires_bulk_custom_field_state_and_merge():
+    src = _read("app/pb_public/js/app.js")
+    assert "bulkCustomFieldKey: ''" in src
+    assert "async applyBulkCustomField(field, value)" in src
+    # Optimistic local apply must merge custom_fields, not replace them.
+    assert "key === 'custom_fields'" in src
+    assert "{ ...cf, ...patch[key] }" in src
 
 
 def test_bulk_hook_registered_and_validated():

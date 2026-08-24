@@ -829,3 +829,59 @@ click, a shift, a click — no N taps.
 **Next:** bulk custom-field editing from the bulk bar (backend whitelist
 already accepts `custom_*`; needs the bar UI picker), then timeline/Gantt and
 portfolio dashboard per the v1.0 stabilization verdict.
+
+## Cycle-18 shipped (2026-08-24): bulk custom-field editing + backend merge fix
+
+**Goal (v1.1 feature 3, the roadmap's stated next item):** let the bulk bar
+edit per-project custom fields for every selected issue at once, mirroring the
+drawer's custom-field schema (text / number / select / checkbox / date).
+
+**Latent backend bug fixed first:** the bulk-update route accepted a bare
+`custom_<key>` in `data` and did `rec.set("custom_"+key, value)` — but the
+schema has no such top-level columns (custom values live in the `custom_fields`
+JSON object), so that path was a **silent no-op**. Passing `custom_fields`
+wholesale instead **replaced the entire object**, dropping unrelated values
+(verified empirically: `{effort:3, client:Acme}` bulk-set to `{effort:9}`
+lost `client:Acme`).
+
+**Shipped:**
+- `app/pb_hooks/31_bulk_actions.pb.js` — `bulk-update` now accepts a nested
+  `custom_fields` object and **merges** it into each record's existing
+  `custom_fields` JSON, preserving unrelated keys. A `null` / `''` value removes
+  that single key. Phantom `custom_*` keys are now rejected (400) instead of
+  silently ignored. The object shape is validated (`'custom_fields' must be an
+  object`, max key length 64).
+- `app/pb_public/js/app.js` — root state `bulkCustomFieldKey` /
+  `bulkCustomValue` / `bulkCustomChecked`; computed `currentFieldDefs` /
+  `selectedBulkCustomField`; `applyBulkCustomField(field, value)` sends a
+  partial `custom_fields` payload; the optimistic local apply in
+  `bulkUpdateSelected` now **merges** `custom_fields` instead of replacing.
+- `app/pb_public/index.html` — the bulk bar renders a "Custom" picker when the
+  active project defines custom fields: a field select (defs from
+  `currentProject.custom_field_defs`), the type-matched value control, and an
+  Apply button. Regex-free; driven entirely by the project's field schema.
+- `app/pb_public/css/style.css` — regenerated (`scripts/build_css.sh`) to add
+  `bg-indigo-600/80` used by the new Apply button.
+- `tests/test_bulk_actions.py` — new `test_bulk_update_custom_fields_partial_merge`
+  (merge preserves unrelated keys; null removal) and
+  `test_bulk_update_custom_fields_validation` (non-object and legacy `custom_*`
+  rejected). Updated `test_bulk_update_custom_field_prefix_allowed` to assert
+  the corrected behavior, plus source-level wiring tests.
+- `scripts/qa/render_dom_check.js` — new custom-field picker E2E: creates a temp
+  issue with `{effort, client, qa_signoff}`, selects it, chooses the `effort`
+  number field, applies `42` through the bulk bar, and proves via the API that
+  `effort=42` while `client`/`qa_signoff` survive (merge preserved).
+
+**Verification:**
+- `pytest tests/` → **168/168 passed** in ~19s.
+- `scripts/qa/qa-render.sh` → **RENDER QA PASS**; new custom-field E2E asserts
+  `pickerShown: true`, `updated: true`, `mergePreserved: true`.
+- `python3 -m flow.frontend_guard` → ALL FRONTEND FILES VERIFIED.
+- Security/adversarial: anon bulk-update `custom_fields` → 401; non-object
+  `custom_fields` → 400; 65-char custom key → 400; legacy `custom_effort` → 400.
+- iBrowse: homelab host cannot navigate to `127.0.0.1:8120` (same external
+  egress class as prior cycles); local render-QA fallback passed.
+
+**Next:** timeline/Gantt and portfolio dashboard per the v1.0 stabilization
+verdict.
+

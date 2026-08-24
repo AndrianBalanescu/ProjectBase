@@ -49,17 +49,17 @@ routerAdd("POST", "/api/projectbase/issues/bulk-update", (e) => {
         }
 
         const updates = {}
-        const customUpdates = {}
+        let customFieldUpdates = null
         for (const key of Object.keys(body.data)) {
             if (EDITABLE_FIELDS[key]) {
                 updates[key] = body.data[key]
-            } else if (key.startsWith("custom_")) {
-                customUpdates[key] = body.data[key]
+            } else if (key === "custom_fields") {
+                customFieldUpdates = body.data[key]
             } else {
                 return e.json(400, { error: `Field '${key}' is not allowed in bulk updates` })
             }
         }
-        if (Object.keys(updates).length === 0 && Object.keys(customUpdates).length === 0) {
+        if (Object.keys(updates).length === 0 && customFieldUpdates === null) {
             return e.json(400, { error: "No editable fields provided in 'data'" })
         }
 
@@ -112,6 +112,16 @@ routerAdd("POST", "/api/projectbase/issues/bulk-update", (e) => {
                 }
             }
         }
+        if (customFieldUpdates !== null) {
+            if (typeof customFieldUpdates !== "object" || customFieldUpdates === null || Array.isArray(customFieldUpdates)) {
+                return e.json(400, { error: "'custom_fields' must be an object of field value updates" })
+            }
+            for (const cfk of Object.keys(customFieldUpdates)) {
+                if (!cfk || cfk.length > 64) {
+                    return e.json(400, { error: "Invalid custom field key" })
+                }
+            }
+        }
 
         let updated = 0
         let missing = 0
@@ -128,7 +138,27 @@ routerAdd("POST", "/api/projectbase/issues/bulk-update", (e) => {
                 continue
             }
             for (const [k, v] of Object.entries(updates)) rec.set(k, v)
-            for (const [k, v] of Object.entries(customUpdates)) rec.set(k, v)
+            if (customFieldUpdates !== null) {
+                // Merge a partial object into the existing custom_fields JSON so
+                // unrelated custom values are preserved. A key explicitly set to
+                // null removes that single key.
+                let existing = rec.get("custom_fields")
+                if (Array.isArray(existing) && existing.length && typeof existing[0] === "number") {
+                    existing = String.fromCharCode.apply(null, existing)
+                }
+                if (typeof existing === "string") { try { existing = JSON.parse(existing) } catch (err) { existing = {} } }
+                if (!existing || typeof existing !== "object" || Array.isArray(existing)) existing = {}
+                const merged = Object.assign({}, existing)
+                for (const cfk of Object.keys(customFieldUpdates)) {
+                    const cfv = customFieldUpdates[cfk]
+                    if (cfv === null || cfv === undefined || cfv === "") {
+                        delete merged[cfk]
+                    } else {
+                        merged[cfk] = cfv
+                    }
+                }
+                rec.set("custom_fields", merged)
+            }
             e.app.save(rec)
             updated++
         }
