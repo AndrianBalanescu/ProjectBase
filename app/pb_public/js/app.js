@@ -672,7 +672,19 @@ const App = {
                 let cf = issue[key];
                 if (typeof cf === 'string') { try { cf = JSON.parse(cf); } catch (e) { cf = {}; } }
                 if (!cf || typeof cf !== 'object' || Array.isArray(cf)) cf = {};
-                issue[key] = { ...cf, ...patch[key] };
+                // Mirror the backend's partial-update semantics exactly: a
+                // null/undefined/'' value REMOVES that key (the backend deletes
+                // it from the custom_fields JSON); everything else is set.
+                const merged = { ...cf };
+                for (const cfk of Object.keys(patch[key] || {})) {
+                  const cfv = patch[key][cfk];
+                  if (cfv === null || cfv === undefined || cfv === '') {
+                    delete merged[cfk];
+                  } else {
+                    merged[cfk] = cfv;
+                  }
+                }
+                issue[key] = merged;
               } else {
                 issue[key] = patch[key];
               }

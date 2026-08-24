@@ -20,10 +20,12 @@ subscriptions, Stripe, or paid tiers.
   silent no-ops (phantom `custom_*` column keys) or wholesale-replaced the
   entire `custom_fields` object, dropping unrelated values. Bulk updates now
   **merge** into each record's `custom_fields` JSON (a `null`/`''` value clears
-  that single key), and the optimistic local apply mirrors that merge. Verified
-  by two new pytest cases (partial merge + validation) and a new render-QA E2E
-  that creates a temp issue with custom values, applies a number field through
-  the bulk-bar picker, and proves unrelated custom fields survive.
+  that single key), and the optimistic local apply mirrors that merge — a
+  `null`/`''`/empty value removes the key locally too, so the acting user's UI
+  never shows a stale empty value before realtime confirms it. Verified by two
+  new pytest cases (partial merge + validation) and a new render-QA E2E that
+  creates a temp issue with custom values, applies a number field through the
+  bulk-bar picker, and proves unrelated custom fields survive.
 - **Shift+click range selection (v1.1 feature 2)**: after anchoring with a
   selection toggle, Shift+clicking a later card/row selects every issue in
   between (Linear-style). Works on the board (column-by-column visible order)

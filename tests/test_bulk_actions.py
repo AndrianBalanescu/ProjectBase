@@ -422,9 +422,10 @@ def test_root_app_wires_bulk_custom_field_state_and_merge():
     src = _read("app/pb_public/js/app.js")
     assert "bulkCustomFieldKey: ''" in src
     assert "async applyBulkCustomField(field, value)" in src
-    # Optimistic local apply must merge custom_fields, not replace them.
+    # Optimistic local apply must merge custom_fields (mirroring the backend's
+    # partial-update + key-removal semantics), not replace the whole object.
     assert "key === 'custom_fields'" in src
-    assert "{ ...cf, ...patch[key] }" in src
+    assert "delete merged[cfk]" in src
 
 
 def test_bulk_hook_registered_and_validated():
