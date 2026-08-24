@@ -633,3 +633,31 @@ refresh.
   test). iBrowse remote host down (github.com ETIMEOUT, environmental) → local
   render QA used as the visual fallback.
 - Git clean, pushed to `origin/main`.
+
+## Cycle-10 shipped (2026-08-24): global cross-project sort index
+
+**Goal (strategic calibration item 2 — multi-project sync / real-time SSE
+performance):** close the one documented benchmark gap. `docs/BENCHMARKS.md`
+flagged the worst-case query — a cross-project `sort=-created` with no filter —
+as the only shape with no covering index (62.5 ms p50 at 10k issues).
+
+**Shipped this cycle:**
+- `app/pb_migrations/1710000017_global_created_index.js` — additive
+  `CREATE INDEX IF NOT EXISTS idx_issues_created ON issues (created DESC)`.
+  SQLite can now satisfy the global sort without a full table scan + temp
+  B-tree (verified via `EXPLAIN QUERY PLAN` after `ANALYZE`).
+- `tests/test_benchmarks.py` — regression test pinning the migration file and
+  its index DDL (guards against the index being dropped or renumbered).
+- `CHANGELOG.md` — `[Unreleased]` Added entry.
+- `docs/BENCHMARKS.md` — worst-case p50 updated 62.5 → 44.3 ms.
+
+**Validation (crime-scene audit):**
+- Migration applies cleanly on a fresh scratch instance (boot log shows
+  "Successfully created global created index"); `node --check` clean.
+- `EXPLAIN QUERY PLAN` on a seeded scratch DB confirms the planner uses
+  `idx_issues_created` for the global sort after `ANALYZE`.
+- Re-ran `scripts/bench/bench.py --issues 10000 --query-runs 20`: worst-case
+  p50 **44.3 ms** (was 62.5 ms), p95 93.0 ms. All project-scoped views remain
+  single-digit ms (board 2.2 ms, filter 2.5 ms, search 3.4 ms, count 1.2 ms).
+- `pytest tests/` → **143/143 passed** (142 + 1 new regression test).
+- No frontend touched → no iBrowse/render QA required this cycle.
