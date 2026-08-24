@@ -583,87 +583,106 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     // ---- Bulk custom-field picker (cycle 18): when the active project defines
     // custom fields, the bulk bar renders a Custom picker (field defs + typed
     // value) and applying it merges the value into every selected issue without
-    // clobbering unrelated custom fields. ----
+    // clobbering unrelated custom fields. This block is SELF-CONTAINED: it
+    // installs a temporary "effort" def on the probe project (saving any prior
+    // defs), exercises the picker, and restores the prior defs + deletes the
+    // temp issue so it never depends on ambient project config. ----
     customField.checked = true;
     const cfProbeTitle = 'CFPrb' + (Date.now() % 100000000) + ' ' + Date.now();
     let cfProbeId = null;
+    let cfPrevDefs = null;
+    let cfProjectId = null;
     try {
-      const cfTmp = await page.evaluate(async (title) => {
-        let token = null;
-        for (const k of ['pb_auth', 'pocketbase_auth']) {
-          try { token = JSON.parse(localStorage.getItem(k)).token; if (token) break; } catch (e) {}
-        }
+      // 1. Setup: read the probe project, back up its defs, install an "effort"
+      //    number def, and create a temp issue carrying unrelated custom values.
+      const cfSetup = await page.evaluate(async (title) => {
+        const token = (() => {
+          for (const k of ['pb_auth', 'pocketbase_auth']) {
+            try { const t = JSON.parse(localStorage.getItem(k)).token; if (t) return t; } catch (e) {}
+          }
+          return null;
+        })();
         const headers = { 'Content-Type': 'application/json' };
         if (token) headers.Authorization = token;
         const probeRes = await fetch('/api/collections/issues/records/ckat9ahso93piex', { headers });
         if (!probeRes.ok) return { error: 'probe fetch ' + probeRes.status };
         const probe = await probeRes.json();
+        const projId = probe.project;
+        const projRes = await fetch('/api/collections/projects/records/' + projId, { headers });
+        if (!projRes.ok) return { error: 'project fetch ' + projRes.status };
+        const proj = await projRes.json();
+        const prevDefs = proj.custom_field_defs || [];
+        // Install just an "effort" number field (merge not replace is tested via
+        // the issue's custom_fields below; the defs only need 'effort' present).
+        const putRes = await fetch('/api/projectbase/projects/' + projId + '/custom-fields', {
+          method: 'PUT', headers,
+          body: JSON.stringify({ fields: [{ key: 'effort', label: 'Effort', type: 'number', required: false, options: [] }] })
+        });
+        if (!putRes.ok) return { error: 'install defs ' + putRes.status };
+        // Create the temp issue with unrelated custom values so the merge can be
+        // proven to preserve them.
         const res = await fetch('/api/collections/issues/records', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ project: probe.project, title, status: 'todo',
+          method: 'POST', headers,
+          body: JSON.stringify({ project: projId, title, status: 'todo',
             custom_fields: { effort: 3, client: 'keep-me', qa_signoff: false } })
         });
         if (!res.ok) return { error: 'create ' + res.status };
-        return { id: (await res.json()).id };
+        return { id: (await res.json()).id, project: projId, prevDefs };
       }, cfProbeTitle);
-      if (cfTmp.id) cfProbeId = cfTmp.id;
-      if (!cfTmp.id) { customField.createError = cfTmp.error; }
+      if (cfSetup && cfSetup.id) {
+        cfProbeId = cfSetup.id;
+        cfProjectId = cfSetup.project;
+        cfPrevDefs = cfSetup.prevDefs;
+      } else {
+        customField.createError = (cfSetup && cfSetup.error) || 'setup failed';
+      }
     } catch (e) { customField.createError = String(e).slice(0, 120); }
     if (cfProbeId) ignoredCleanupUrls.add(BASE + '/api/collections/issues/records/' + cfProbeId);
+    if (cfProjectId) ignoredCleanupUrls.add(BASE + '/api/projectbase/projects/' + cfProjectId + '/custom-fields');
     if (cfProbeId) {
       try {
         await page.reload({ waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(3000);
-        // Ensure we're on the board for the active (ProjectBase Core) project.
         await page.evaluate(() => { location.hash = '#/pb/board'; });
         await page.waitForTimeout(1500);
-        customField.pickerRendered = await page.evaluate(() => {
-          const bar = document.querySelector('.fixed.bottom-5.left-1\\/2');
-          if (bar) return true; // bar may be hidden until a selection
-          // The picker markup should exist in the DOM only once something is
-          // selected; we just confirm the custom field defs reached the app.
-          return false;
-        });
-        // Select the temp card (it has a "Select for bulk actions" button).
         const cfCard = page.locator('.kanban-card-drag-handle:has-text("CFPrb")').first();
         if (await cfCard.count()) {
           await cfCard.locator('button[title^="Select for bulk actions"]').click();
           await page.waitForTimeout(400);
-          // Custom-field picker should now be visible in the bulk bar.
           customField.pickerShown = await page.evaluate(() => {
             const bar = document.querySelector('.fixed.bottom-5.left-1\\/2');
             if (!bar) return false;
             return /Custom/i.test(bar.textContent || '') &&
               Array.from(bar.querySelectorAll('select')).some((s) => Array.from(s.options).some((o) => o.value === 'effort'));
           });
-          // Choose 'effort' (number) field, type 42, click Apply.
-          const cfFieldSelect = page.locator('.fixed.bottom-5.left-1\\/2 select').filter({ has: page.locator('option[value="effort"]') }).first();
-          await cfFieldSelect.selectOption('effort');
-          await page.waitForTimeout(300);
-          const cfValue = page.locator('.fixed.bottom-5.left-1\\/2 input[type="number"]').first();
-          await cfValue.fill('42');
-          await page.locator('.fixed.bottom-5.left-1\\/2 button:has-text("Apply")').first().click();
-          await page.waitForTimeout(1200);
-          customField.updated = await page.evaluate(async (id) => {
-            let token = null;
-            for (const k of ['pb_auth', 'pocketbase_auth']) {
-              try { token = JSON.parse(localStorage.getItem(k)).token; if (token) break; } catch (e) {}
-            }
-            const h = {}; if (token) h.Authorization = token;
-            const r = await fetch('/api/collections/issues/records/' + id, { headers: h });
-            if (r.status !== 200) return null;
-            const rec = await r.json();
-            const cf = rec.custom_fields || {};
-            return cf.effort === 42 && cf.client === 'keep-me' && cf.qa_signoff === false;
-          }, cfProbeId);
-          customField.mergePreserved = customField.updated;
+          if (customField.pickerShown) {
+            const cfFieldSelect = page.locator('.fixed.bottom-5.left-1\\/2 select').filter({ has: page.locator('option[value="effort"]') }).first();
+            await cfFieldSelect.selectOption('effort');
+            await page.waitForTimeout(300);
+            const cfValue = page.locator('.fixed.bottom-5.left-1\\/2 input[type="number"]').first();
+            await cfValue.fill('42');
+            await page.locator('.fixed.bottom-5.left-1\\/2 button:has-text("Apply")').first().click();
+            await page.waitForTimeout(1200);
+            customField.updated = await page.evaluate(async (id) => {
+              let token = null;
+              for (const k of ['pb_auth', 'pocketbase_auth']) {
+                try { token = JSON.parse(localStorage.getItem(k)).token; if (token) break; } catch (e) {}
+              }
+              const h = {}; if (token) h.Authorization = token;
+              const r = await fetch('/api/collections/issues/records/' + id, { headers: h });
+              if (r.status !== 200) return null;
+              const rec = await r.json();
+              const cf = rec.custom_fields || {};
+              return cf.effort === 42 && cf.client === 'keep-me' && cf.qa_signoff === false;
+            }, cfProbeId);
+            customField.mergePreserved = customField.updated;
+          }
         } else {
           customField.cardNotFound = true;
         }
       } catch (e) { customField.error = String(e).slice(0, 200); }
     }
-    // Cleanup the temp CF issue.
+    // 2. Cleanup: delete the temp issue and restore the prior project defs.
     if (cfProbeId) {
       await page.evaluate(async (id) => {
         let token = null;
@@ -673,6 +692,21 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
         const h = {}; if (token) h.Authorization = token;
         try { await fetch('/api/collections/issues/records/' + id, { method: 'DELETE', headers: h }); } catch (e) {}
       }, cfProbeId);
+    }
+    if (cfProjectId && cfPrevDefs !== null) {
+      await page.evaluate(async ({ projectId, prevDefs }) => {
+        let token = null;
+        for (const k of ['pb_auth', 'pocketbase_auth']) {
+          try { token = JSON.parse(localStorage.getItem(k)).token; if (token) break; } catch (e) {}
+        }
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers.Authorization = token;
+        try {
+          await fetch('/api/projectbase/projects/' + projectId + '/custom-fields', {
+            method: 'PUT', headers, body: JSON.stringify({ fields: prevDefs })
+          });
+        } catch (e) { /* best effort */ }
+      }, { projectId: cfProjectId, prevDefs: cfPrevDefs });
     }
     await page.keyboard.press('1'); // back to board
     await page.waitForTimeout(500);
