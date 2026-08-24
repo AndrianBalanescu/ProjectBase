@@ -201,7 +201,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
         });
         focusMode.editorShown = await page.evaluate(() => {
           const ov = document.querySelector('.fixed.inset-0.z-\\[60\\]');
-          return !!ov && (ov.querySelector('textarea') || ov.querySelector('.milkdown'));
+          return !!ov && !!(ov.querySelector('textarea') || ov.querySelector('.milkdown'));
         });
         // Esc must close the overlay.
         await page.keyboard.press('Escape');
