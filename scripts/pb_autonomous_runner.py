@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ProjectBase Flow Autonomous Engine (Unified Research & Builder Runner)
+ProjectBase Autonomous Engine (Unified Research & Builder Runner)
 
 Executes continuous, non-stop autonomous cycles on ProjectBase:
 1. DISCOVER: Inspects project North Star, active Milestones, and backlog issues.
@@ -63,7 +63,7 @@ DB_PATH = os.path.join(REPO_DIR, "app", "pb_data", "data.db")
 if not os.path.exists(DB_PATH):
     DB_PATH = os.path.join(REPO_DIR, "pb_data", "data.db")
 
-class FlowRunner:
+class AutonomousRunner:
     def __init__(self, project_key: str = "PB", cycle_interval: int = 60, dry_run: bool = False):
         self.project_key = project_key.upper()
         self.cycle_interval = cycle_interval
@@ -278,7 +278,7 @@ class FlowRunner:
                 if target_issue.get("status") in ("backlog", "todo"):
                     claimed = self.claim_issue(issue_id)
                     self.log(f"{'✓' if claimed else '✗'} Claimed [{ident}] -> in_progress")
-                commented = self.add_comment(issue_id, f"🔄 Flow daemon picked up `{title}` for execution (cycle {self.cycle_count}).")
+                commented = self.add_comment(issue_id, f"🔄 Autonomous daemon picked up `{title}` for execution (cycle {self.cycle_count}).")
                 self.log(f"{'✓' if commented else '✗'} Claim audit comment on [{ident}] {'persisted' if commented else 'FAILED (check comments schema / auth)'}")
 
             # 1. Research Phase
@@ -316,7 +316,7 @@ class FlowRunner:
 
     def start_loop(self):
         """Starts non-stop continuous execution loop."""
-        self.log(f"Starting non-stop Flow Daemon (interval: {self.cycle_interval}s)...")
+        self.log(f"Starting non-stop Autonomous Daemon (interval: {self.cycle_interval}s)...")
         try:
             while True:
                 self.execute_builder_cycle()
@@ -333,7 +333,7 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Simulate execution without modifying files")
     args = parser.parse_args()
 
-    runner = FlowRunner(project_key=args.project, cycle_interval=args.interval, dry_run=args.dry_run)
+    runner = AutonomousRunner(project_key=args.project, cycle_interval=args.interval, dry_run=args.dry_run)
     if args.once:
         result = runner.execute_builder_cycle()
         print(json.dumps(result, indent=2))

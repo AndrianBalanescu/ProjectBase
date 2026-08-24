@@ -1,13 +1,13 @@
-"""Bidirectional Kanban sync tests for the Flow autonomous runner.
+"""Bidirectional Kanban sync tests for the autonomous runner.
 
-Cycle-20 milestone (PB-43): the autonomous daemon (`scripts/flow_runner.py`)
+Cycle-20 milestone (PB-43): the autonomous daemon (`scripts/pb_autonomous_runner.py`)
 must not only READ issues from the Kanban but WRITE back — authenticate against
 the API, claim a backlog/todo issue to `in_progress`, and post an agent audit
 comment — so agents and humans see exactly what the daemon is working on.
 
-These tests drive `flow_runner.py --once` against a scratch PocketBase instance
-spawned on a free port (same pattern as tests/test_selfhosting.py) and assert
-the write-back actually lands in the API (not just the SQLite read path).
+These tests drive `pb_autonomous_runner.py --once` against a scratch PocketBase
+instance spawned on a free port (same pattern as tests/test_selfhosting.py) and
+assert the write-back actually lands in the API (not just the SQLite read path).
 
 Uses only the stdlib (urllib) like the rest of the suite.
 """
@@ -25,14 +25,14 @@ import urllib.request
 import pytest
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-RUNNER = os.path.join(REPO, "scripts", "flow_runner.py")
+RUNNER = os.path.join(REPO, "scripts", "pb_autonomous_runner.py")
 
 # Scratch-instance protocol superuser (upserted below), same lifecycle as the
 # self-host restore tests.
 _SCRATCH_EMAIL = "selfhost@test.local"
 _SCRATCH_PASS = "selfhost-pass-1"
 
-_SCRATCH_ROOT = tempfile.mkdtemp(prefix="pb-flow-sync-test-")
+_SCRATCH_ROOT = tempfile.mkdtemp(prefix="pb-autonomous-sync-test-")
 SCRATCH_PORT = None  # resolved at spawn time
 _scratch_proc = None
 
@@ -150,7 +150,7 @@ def _seed_project(base, identifier="SYNC"):
 
 
 def _env(base):
-    """Env for running flow_runner against the scratch instance."""
+    """Env for running the autonomous runner against the scratch instance."""
     env = dict(os.environ)
     env["PROJECTBASE_URL"] = base
     env["PB_SUPERUSER_EMAIL"] = _SCRATCH_EMAIL
@@ -215,11 +215,11 @@ def test_runner_no_auth_guards_writebacks():
     False) instead of posting a partial/unauthenticated comment. This covers
     the honest `FAILED` branch of the claim/comment log."""
     import importlib.util
-    spec = importlib.util.spec_from_file_location("flow_runner_mod", RUNNER)
+    spec = importlib.util.spec_from_file_location("pb_autonomous_runner_mod", RUNNER)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
 
-    runner = mod.FlowRunner(project_key="NONE", cycle_interval=1, dry_run=True)
+    runner = mod.AutonomousRunner(project_key="NONE", cycle_interval=1, dry_run=True)
     runner.token = ""  # force the unauthenticated path
 
     assert runner.claim_issue("any-id") is False

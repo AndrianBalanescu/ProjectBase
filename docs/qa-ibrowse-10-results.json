@@ -1,0 +1,112 @@
+[
+  {
+    "id": 1,
+    "name": "01_kanban_board",
+    "job_id": "job_1ff60c58-f18",
+    "status": "blocked",
+    "result_status": "blocked",
+    "steps": 8,
+    "duration_ms": 132795,
+    "message": "max_replan_attempts_exceeded",
+    "error": ""
+  },
+  {
+    "id": 2,
+    "name": "02_list_view",
+    "job_id": "job_7129112f-fe1",
+    "status": "blocked",
+    "result_status": "blocked",
+    "steps": 6,
+    "duration_ms": 103621,
+    "message": "max_replan_attempts_exceeded",
+    "error": ""
+  },
+  {
+    "id": 3,
+    "name": "03_cycles_view",
+    "job_id": "job_0bcca58d-ded",
+    "status": "running",
+    "result_status": null,
+    "steps": 0,
+    "duration_ms": 0,
+    "message": "",
+    "error": ""
+  },
+  {
+    "id": 4,
+    "name": "04_projects_view",
+    "job_id": "job_a57393f4-64f",
+    "status": "failed",
+    "result_status": "error",
+    "steps": 0,
+    "duration_ms": 501,
+    "message": "TypeError: getaddrinfo ETIMEOUT github.com",
+    "error": "TypeError: getaddrinfo ETIMEOUT github.com"
+  },
+  {
+    "id": 5,
+    "name": "05_stats_view",
+    "job_id": "job_e2b24485-1d6",
+    "status": "failed",
+    "result_status": "error",
+    "steps": 0,
+    "duration_ms": 419,
+    "message": "TypeError: getaddrinfo ETIMEOUT github.com",
+    "error": "TypeError: getaddrinfo ETIMEOUT github.com"
+  },
+  {
+    "id": 6,
+    "name": "06_docs_view",
+    "job_id": "job_89247309-977",
+    "status": "failed",
+    "result_status": "error",
+    "steps": 0,
+    "duration_ms": 396,
+    "message": "TypeError: getaddrinfo ETIMEOUT github.com",
+    "error": "TypeError: getaddrinfo ETIMEOUT github.com"
+  },
+  {
+    "id": 7,
+    "name": "07_milestones_view",
+    "job_id": "job_ad86aa8f-63c",
+    "status": "failed",
+    "result_status": "error",
+    "steps": 0,
+    "duration_ms": 436,
+    "message": "TypeError: getaddrinfo ETIMEOUT github.com",
+    "error": "TypeError: getaddrinfo ETIMEOUT github.com"
+  },
+  {
+    "id": 8,
+    "name": "08_issue_drawer",
+    "job_id": "job_30200993-1af",
+    "status": "failed",
+    "result_status": "error",
+    "steps": 0,
+    "duration_ms": 369,
+    "message": "TypeError: getaddrinfo ETIMEOUT github.com",
+    "error": "TypeError: getaddrinfo ETIMEOUT github.com"
+  },
+  {
+    "id": 9,
+    "name": "09_new_issue_modal",
+    "job_id": "job_d0bfa2d1-1a3",
+    "status": "failed",
+    "result_status": "error",
+    "steps": 0,
+    "duration_ms": 440,
+    "message": "TypeError: getaddrinfo ETIMEOUT github.com",
+    "error": "TypeError: getaddrinfo ETIMEOUT github.com"
+  },
+  {
+    "id": 10,
+    "name": "10_header_and_command_palette",
+    "job_id": "job_20b38f15-34c",
+    "status": "failed",
+    "result_status": "error",
+    "steps": 0,
+    "duration_ms": 431,
+    "message": "TypeError: getaddrinfo ETIMEOUT github.com",
+    "error": "TypeError: getaddrinfo ETIMEOUT github.com"
+  }
+]
