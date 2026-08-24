@@ -467,9 +467,9 @@ def test_github_rate_limit_populated():
 
 
 def test_github_long_description_truncated():
-    """Bodies over the 5000-char description field limit must be truncated, not
+    """Bodies over the description field limit must be truncated, not
     dropped as errors. Uses a high-issue repo so a >5000-char body is likely, but
-    the guard (no errors + <=5000) holds regardless of which issues are returned."""
+    the guard (no errors + <=100000) holds regardless of which issues are returned."""
     pid = _get_any_project_id()
     status, body = _github_import(
         {"project_id": pid, "repo": "facebook/react", "state": "all", "max_issues": 80})
@@ -486,8 +486,8 @@ def test_github_long_description_truncated():
         sm = it.get("source_metadata") or {}
         if sm.get("importer") == "github" and sm.get("source_key", "").startswith("gh:"):
             desc = it.get("description") or ""
-            assert len(desc) <= 5000, (
-                f"description over 5000 chars on {it.get('identifier')}: {len(desc)}")
+            assert len(desc) <= 100000, (
+                f"description over 100000 chars on {it.get('identifier')}: {len(desc)}")
 
 
 
@@ -1813,3 +1813,22 @@ def test_notifications_read_all_requires_auth():
     """The read-all route rejects anonymous callers."""
     st, body = _request("POST", "/api/projectbase/notifications/read-all")
     assert st in (401, 403), f"read-all should require auth: {st} {body}"
+
+
+def test_long_description_saves_over_5000():
+    """Regression for the P0: the description field must accept >5000 chars.
+    Migrations 1710000014/1710000015 were silent no-ops (fields.find() detached
+    copy; field.type getter guard), so the focus-mode long-description feature
+    still rejected 8000-char bodies. 1710000016 fixed it; this test pins it."""
+    pid = _get_any_project_id()
+    long_desc = "x" * 8000
+    status, body = _request(
+        "POST", "/api/collections/issues/records",
+        {"identifier": f"PB-LONG-{_uid()}", "project": pid,
+         "title": "long description regression", "description": long_desc},
+        headers={"Authorization": _superuser_token()})
+    assert status == 200, f"8000-char description rejected: {status} {body}"
+    assert body.get("description") == long_desc, "description not persisted verbatim"
+    # Clean up the probe issue.
+    _request("DELETE", f"/api/collections/issues/records/{body['id']}",
+             headers={"Authorization": _superuser_token()})
