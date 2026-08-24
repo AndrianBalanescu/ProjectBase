@@ -111,9 +111,13 @@ const PortfolioViewComponent = {
         // count issues across all projects assigned to this milestone
         const mIssues = this.allIssues.filter(i => i.milestone === m.id);
         const done = mIssues.filter(i => i.status === 'done').length;
-        const percent = mIssues.length > 0 ? Math.round((done / mIssues.length) * 100) : 0;
-        const isOverdue = target !== null && target < now && m.status !== 'done';
-        const isDone = m.status === 'done';
+        // Achieved milestones are complete even when nothing is linked to them
+        // (matches MilestonesView: `achieved` => 100% when no issues).
+        const percent = mIssues.length > 0
+          ? Math.round((done / mIssues.length) * 100)
+          : (m.status === 'achieved' ? 100 : 0);
+        const isDone = m.status === 'done' || m.status === 'achieved';
+        const isOverdue = target !== null && target < now && !isDone;
         return { ...m, project: p, target, done, total: mIssues.length, percent, isOverdue, isDone };
       });
       // show overdue first, then upcoming (soonest target first), then done at the end
