@@ -132,7 +132,8 @@ const PortfolioViewComponent = {
   },
   template: `
     <div class="h-[calc(100vh-3.5rem)] overflow-y-auto p-6 bg-[#0b0f19]">
-      <div class="max-w-7xl mx-auto space-y-6">
+      <div v-if="!loaded" class="py-20 text-center text-gray-500 text-xs">Loading workspace snapshot…</div>
+      <div v-else class="max-w-7xl mx-auto space-y-6">
 
         <!-- Header -->
         <div>
