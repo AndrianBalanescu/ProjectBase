@@ -73,3 +73,17 @@ def test_bench_harness_isolation_no_leftover_default_port():
     src = open(BENCH).read()
     assert 's.bind(("127.0.0.1", 0))' in src
     assert "8120" not in src
+
+
+def test_global_created_index_migration_present():
+    """The global cross-project sort (worst-case bench query) must have a
+    covering index. Migration 1710000017 adds `idx_issues_created` on
+    `issues (created DESC)` so SQLite can satisfy `sort=-created` without a
+    full table scan + temp B-tree. Guards against the index being dropped or
+    the migration renumbered/removed."""
+    mig = os.path.join(REPO_ROOT, "app", "pb_migrations", "1710000017_global_created_index.js")
+    assert os.path.isfile(mig), f"expected migration file {mig}"
+    src = open(mig).read()
+    assert "idx_issues_created" in src
+    assert "issues (created DESC)" in src
+    assert "CREATE INDEX IF NOT EXISTS" in src

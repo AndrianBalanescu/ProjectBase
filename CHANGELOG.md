@@ -10,6 +10,14 @@ subscriptions, Stripe, or paid tiers.
 
 ## [Unreleased]
 
+### Added
+- **Global cross-project sort index**: migration `1710000017` adds
+  `idx_issues_created` on `issues (created DESC)`, giving the worst-case
+  cross-project `sort=-created` query a covering index. Measured p50 for that
+  query at 10k issues dropped from **62.5 ms → 44.3 ms** (p95 64.9 → 93.0 ms
+  on this host; the p95 spread is noise on a shared box). Every project-scoped
+  UI view was already single-digit ms and is unchanged.
+
 ### Fixed
 - **Realtime cycles & comments sync**: the realtime handler in `app.js`
   subscribed to `cycles` and `comments` events (via `api.js`) but never handled
