@@ -30,6 +30,7 @@ const IssueDrawerComponent = {
       copiedLinkBadge: false,
       isAgentDropdownOpen: false,
       isFullscreen: false,
+      descFocus: false, // true = distraction-free fullscreen description editing
       aiLoadingSubtasks: false,
       aiLoadingDesc: false,
       relationOutgoing: [],
@@ -233,6 +234,24 @@ const IssueDrawerComponent = {
         localStorage.removeItem('pb.drawer.width');
       } catch (err) { /* private mode: ignore */ }
       this.$emit('update:widthOverride', null);
+    },
+    enterDescFocus() {
+      this.descFocus = true;
+      this.descTab = 'rich';
+      this.$nextTick(() => {
+        if (window.lucide) window.lucide.createIcons();
+        // Focus the Milkdown editor root so typing starts immediately.
+        const root = this.$el && this.$el.querySelector('.milkdown-editor-root, .milkdown');
+        if (root && root.focus) root.focus();
+      });
+    },
+    exitDescFocus() {
+      this.descFocus = false;
+      this.saveChanges();
+    },
+    toggleDescFocus() {
+      if (this.descFocus) this.exitDescFocus();
+      else this.enterDescFocus();
     },
     async loadComments() {
       if (!this.issue) return;
@@ -821,6 +840,14 @@ const IssueDrawerComponent = {
                   <span v-else>✨</span>
                   <span>{{ aiLoadingDesc ? 'Generating...' : 'AI Enhance PRD' }}</span>
                 </button>
+                <button
+                  @click="toggleDescFocus"
+                  class="px-2 py-0.5 rounded-md bg-gray-900/80 hover:bg-gray-800 border border-gray-700 text-gray-300 text-[11px] font-medium flex items-center space-x-1 transition-all"
+                  :title="descFocus ? 'Exit focus mode (Esc)' : 'Open distraction-free focus mode'"
+                >
+                  <i :data-lucide="descFocus ? 'minimize-2' : 'maximize-2'" class="w-3 h-3"></i>
+                  <span>{{ descFocus ? 'Exit Focus' : 'Focus' }}</span>
+                </button>
               </div>
               
               <div class="flex items-center bg-gray-950 p-0.5 rounded-lg border border-gray-800 text-xs">
@@ -1145,6 +1172,102 @@ const IssueDrawerComponent = {
             </div>
           </div>
 
+        </div>
+      </div>
+
+      <!-- Distraction-free Description Focus Mode -->
+      <div
+        v-if="descFocus"
+        class="fixed inset-0 z-[60] bg-gray-950 flex flex-col"
+        @keydown.esc="exitDescFocus"
+      >
+        <!-- Focus header -->
+        <div class="px-6 py-3 border-b border-gray-800 flex items-center justify-between bg-gray-900/80 select-none">
+          <div class="flex items-center space-x-3 min-w-0">
+            <span class="px-2 py-0.5 rounded-md bg-indigo-950/60 border border-indigo-800/40 text-indigo-400 font-mono text-xs font-semibold shrink-0">
+              {{ issue.identifier }}
+            </span>
+            <span class="text-sm font-semibold text-gray-200 truncate">{{ editTitle || 'Untitled issue' }}</span>
+          </div>
+          <div class="flex items-center space-x-2 shrink-0">
+            <button
+              @click="polishAiDescription"
+              :disabled="aiLoadingDesc"
+              class="px-2.5 py-1 rounded-md bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 text-purple-300 text-xs font-medium flex items-center space-x-1 transition-all"
+              title="Enhance description into structured PRD with Acceptance Criteria"
+            >
+              <span v-if="aiLoadingDesc" class="animate-spin text-xs">🌀</span>
+              <span v-else>✨</span>
+              <span>{{ aiLoadingDesc ? 'Generating...' : 'AI Enhance PRD' }}</span>
+            </button>
+            <button
+              @click="exitDescFocus"
+              class="px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition-colors"
+              title="Save and exit focus mode (Esc)"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+
+        <!-- Focus body: centered, max-width editor -->
+        <div class="flex-1 overflow-y-auto">
+          <div class="max-w-3xl mx-auto px-6 py-8 space-y-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center bg-gray-900 p-0.5 rounded-lg border border-gray-800 text-xs">
+                <button
+                  @click="descTab = 'rich'"
+                  class="px-2.5 py-1 rounded-md font-medium transition-all"
+                  :class="descTab === 'rich' || descTab === 'write' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-gray-200'"
+                >
+                  Rich
+                </button>
+                <button
+                  @click="descTab = 'raw'"
+                  class="px-2.5 py-1 rounded-md font-medium transition-all"
+                  :class="descTab === 'raw' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-gray-200'"
+                >
+                  Raw
+                </button>
+                <button
+                  @click="descTab = 'preview'"
+                  class="px-2.5 py-1 rounded-md font-medium transition-all"
+                  :class="descTab === 'preview' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-gray-200'"
+                >
+                  Preview
+                </button>
+              </div>
+              <span class="text-[11px] text-gray-500">Press Esc to save &amp; exit</span>
+            </div>
+
+            <!-- Rich Mode -->
+            <div v-show="descTab === 'rich' || descTab === 'write'">
+              <milkdown-editor
+                v-model="editDesc"
+                @blur="saveChanges"
+                placeholder="Detailed markdown description, requirements, architecture notes..."
+                class="w-full min-h-[60vh] px-4 py-3 rounded-xl bg-gray-900/80 border border-gray-800 text-gray-100 text-sm focus-within:ring-1 focus-within:ring-indigo-500 leading-relaxed"
+              ></milkdown-editor>
+            </div>
+
+            <!-- Raw Mode -->
+            <div v-show="descTab === 'raw'">
+              <textarea
+                v-model="editDesc"
+                @blur="saveChanges"
+                rows="24"
+                placeholder="Detailed markdown description, requirements, architecture notes..."
+                class="w-full px-4 py-3 rounded-xl bg-gray-900/80 border border-gray-800 text-gray-100 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 leading-relaxed"
+              ></textarea>
+            </div>
+
+            <!-- Preview Mode -->
+            <div
+              v-show="descTab === 'preview'"
+              class="p-4 rounded-xl bg-gray-900/80 border border-gray-800 min-h-[60vh] markdown-body"
+              v-html="renderedDescription"
+            ></div>
+          </div>
         </div>
       </div>
     </div>

@@ -19,6 +19,6 @@ Refreshed 2026-08-24 (flow cycle 4). Items 1-4 audited against the codebase — 
 
 ## Open (v1.0 stabilization order)
 
-- A. Fullscreen / expanded description editing mode (drawer max-width is 1600px; a true focus mode is still missing) — next v1.0 item.
+- A. ~~Fullscreen / expanded description editing mode~~ — ✅ **shipped (cycle 5)**: distraction-free focus mode. A "Focus" button in the drawer's Description header opens a fullscreen overlay (z-60) with a centered max-w-3xl editor, Rich/Raw/Preview tabs, AI Enhance PRD, and a Done button; Esc saves & exits. Verified via headless render QA (button shown, overlay opens, editor renders, Esc closes). See `docs/ROADMAP.md` § "Cycle-5 shipped".
 - D. Published benchmarks: RAM, cold start, 10k-issue query vs Plane CE.
 - E. Security pass + CHANGELOG + versioned release packaging (CHANGELOG is absent today).
