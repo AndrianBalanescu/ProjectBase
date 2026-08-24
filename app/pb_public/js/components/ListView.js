@@ -2,7 +2,7 @@
 
 const ListViewComponent = {
   props: ['issues', 'projects', 'currentProject', 'cycles', 'labels', 'filterQuery', 'filterPriority', 'filterCycle', 'selectedIssueIds'],
-  emits: ['open-issue', 'update-issue', 'delete-issue', 'open-new-issue', 'toggle-issue-selection', 'select-all-visible'],
+  emits: ['open-issue', 'update-issue', 'delete-issue', 'open-new-issue', 'toggle-issue-selection', 'range-select-issue', 'select-all-visible'],
   data() {
     return {
       sortBy: 'created',
@@ -117,6 +117,13 @@ const ListViewComponent = {
     },
 
     handleRowClick(event, issue) {
+      // Shift+click selects the range from the last anchor to this row.
+      if (event.shiftKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        this.$emit('range-select-issue', this.processedIssues, issue);
+        return;
+      }
       // Cmd/Ctrl+click toggles multi-select without opening the drawer.
       if (event.ctrlKey || event.metaKey) {
         event.preventDefault();

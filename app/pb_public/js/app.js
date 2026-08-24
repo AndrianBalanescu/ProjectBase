@@ -42,6 +42,7 @@ const App = {
       labels: [],
       selectedIssue: null,
       selectedIssueIds: new Set(),
+      lastSelectedIssueId: null, // shift+click range anchor
       bulkStatus: '',
       bulkPriority: '',
       bulkCycle: '',
@@ -263,6 +264,9 @@ const App = {
             this.issues = this.issues.filter(i => i.id !== record.id);
             if (this.selectedIssueIds.has(record.id)) {
               this.selectedIssueIds.delete(record.id);
+            }
+            if (this.lastSelectedIssueId === record.id) {
+              this.lastSelectedIssueId = null;
             }
             if (this.selectedIssue && this.selectedIssue.id === record.id) {
               this.selectedIssue = null;
@@ -587,15 +591,49 @@ const App = {
       } else {
         this.selectedIssueIds.add(issue.id);
       }
+      // The last toggled issue becomes the anchor for shift+click ranges.
+      this.lastSelectedIssueId = issue.id;
+    },
+
+    rangeSelectIssue(orderedIssues, targetIssue) {
+      // Linear-style shift+click: select every issue between the anchor and
+      // the clicked one (inclusive) in the view's visible order, as a union
+      // with the current selection. Falls back to a single selection when the
+      // anchor is missing or no longer visible.
+      if (!targetIssue || !targetIssue.id) return;
+      const ordered = orderedIssues || [];
+      const targetIdx = ordered.findIndex(i => i.id === targetIssue.id);
+      if (targetIdx === -1) {
+        this.selectedIssueIds = new Set([targetIssue.id]);
+        this.lastSelectedIssueId = targetIssue.id;
+        return;
+      }
+      let anchorIdx = -1;
+      if (this.lastSelectedIssueId) {
+        anchorIdx = ordered.findIndex(i => i.id === this.lastSelectedIssueId);
+      }
+      if (anchorIdx === -1) {
+        this.selectedIssueIds = new Set([targetIssue.id]);
+      } else {
+        const lo = Math.min(anchorIdx, targetIdx);
+        const hi = Math.max(anchorIdx, targetIdx);
+        for (let i = lo; i <= hi; i++) {
+          this.selectedIssueIds.add(ordered[i].id);
+        }
+      }
+      this.lastSelectedIssueId = targetIssue.id;
     },
 
     selectAllVisibleIssues(issues) {
       // Replace the selection with the currently visible (filtered) set.
       this.selectedIssueIds = new Set((issues || []).map(i => i.id));
+      const last = issues && issues.length ? issues[issues.length - 1].id : null;
+      this.lastSelectedIssueId = last;
     },
 
     clearIssueSelection() {
       this.selectedIssueIds = new Set();
+      this.lastSelectedIssueId = null;
     },
 
     selectedIssuesList() {

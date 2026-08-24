@@ -11,6 +11,18 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **Shift+click range selection (v1.1 feature 2)**: after anchoring with a
+  selection toggle, Shift+clicking a later card/row selects every issue in
+  between (Linear-style). Works on the board (column-by-column visible order)
+  and the list view (current sort order), in both directions, as a union with
+  the current selection. The selection anchor (`lastSelectedIssueId`) is
+  tracked in the root app, resets with Esc / project switch, and is pruned if
+  the anchor record is deleted via realtime. No new API surface; verified by a
+  new 15-assertion render-QA range suite: board anchor, forward range, checked
+  count, no drawer on shift+click, Esc clear, cross-column span, list
+  forward/reverse, plus a full E2E that creates 3 temp issues, range-selects
+  them, applies status `todo` through the bulk bar, verifies all 3 moved via
+  API, and proves the temp issues are deleted (DELETE 204s).
 - **Batch multi-select + bulk actions (v1.1 feature 1)**: board cards and list
   rows now expose a selection checkbox (plus Cmd/Ctrl+click to toggle without
   opening the drawer). A floating action bar applies status / priority / cycle

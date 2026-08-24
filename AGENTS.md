@@ -22,6 +22,7 @@ app/
     css/style.css       <- compiled Tailwind (regenerate via build_css.sh)
     js/api.js           <- API client (PocketBase + custom routes + realtime)
     js/app.js           <- root Vue instance: auth gate, hash router, loadAllData, realtime, keyboard
+                           (selectedIssueIds + lastSelectedIssueId anchor for shift+click ranges)
     js/components/      <- Vue components: KanbanBoard, ListView, IssueDrawer, Header, NewIssueModal,
                            ProjectsView, CyclesView, MilestonesView, StatsView, DocsView, MarketplaceView,
                            MilkdownEditor (WYSIWYG), SearchableSelect, Multiselect, CommandPalette,
