@@ -24,7 +24,10 @@ subscriptions, Stripe, or paid tiers.
   cover the new asset. Verified by a new pytest wiring/drift-guard test and a
   render-QA E2E (view mounts, project rows render, shortcut works). Achieved
   milestones are treated as complete (100%, never overdue), matching the
-  MilestonesView convention.
+  MilestonesView convention. Also fixes a pre-existing deep-link gap: a shared
+  hash opened before login (e.g. `#/pb/portfolio`) now lands on that view after
+  sign-in instead of falling back to the board (`applyRoute()` re-applied after
+  auth in signIn/signUp).
 - **Timeline / Gantt view (v1.1 feature 4)**: a scrollable day-grid schedule
   of cycles (start→end bars), milestones (target-date markers) and issues
   (start→due bars, status-colored). New additive `issues.start_date` field

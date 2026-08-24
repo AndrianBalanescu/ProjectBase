@@ -958,6 +958,28 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   } catch (e) { portfolio.error = String(e).slice(0, 200); }
   portfolio.checked = true;
 
+  // ---- Deep-link after login (cycle 20 fix): a shared hash like #/pb/portfolio
+  // opened BEFORE auth must land on that view after sign-in, not fall back to
+  // the board. Regression guard for the applyRoute() call added to signIn. ----
+  const deepLink = { checked: false };
+  try {
+    const dlCtx = await browser.newContext();
+    const dlPage = await dlCtx.newPage();
+    await dlPage.goto(BASE + '/#/pb/portfolio');
+    await dlPage.waitForTimeout(2000);
+    const dlEmail = dlPage.locator('input[placeholder="Email"]');
+    if (await dlEmail.count()) {
+      await dlEmail.fill(process.env.QA_EMAIL || 'f@flow.com');
+      await dlPage.locator('input[placeholder="Password"]').fill(process.env.QA_PASSWORD || 'superdev123');
+      await dlPage.locator('button:has-text("Sign in")').first().click();
+      await dlPage.waitForTimeout(4000);
+    }
+    deepLink.landedOnPortfolio = await dlPage.evaluate(() =>
+      /Portfolio Dashboard/.test(document.querySelector('#app').textContent || ''));
+    await dlCtx.close();
+  } catch (e) { deepLink.error = String(e).slice(0, 200); }
+  deepLink.checked = true;
+
   const failures = [];
   // The browser's network logger emits a GENERIC "Failed to load resource ... 400"
   // console error without naming the URL. If every 4xx was the whitelisted auth
@@ -1077,8 +1099,14 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   } else if (!portfolio.checked) {
     failures.push('portfolio E2E not exercised');
   }
+  if (deepLink && deepLink.checked) {
+    if (deepLink.error) failures.push('deep-link E2E error: ' + deepLink.error);
+    if (deepLink.landedOnPortfolio === false) failures.push('deep link #/pb/portfolio did not land on portfolio after login');
+  } else if (!deepLink.checked) {
+    failures.push('deep-link E2E not exercised');
+  }
 
-  console.log(JSON.stringify({ checks, routing, resize, urlState, relations, focusMode, bulk, range, customField, timeline, portfolio, failures, all4xx }, null, 1));
+  console.log(JSON.stringify({ checks, routing, resize, urlState, relations, focusMode, bulk, range, customField, timeline, portfolio, deepLink, failures, all4xx }, null, 1));
   console.log(failures.length === 0 ? 'RENDER QA: PASS' : 'RENDER QA: FAIL');
   await browser.close();
   process.exit(failures.length === 0 ? 0 : 1);

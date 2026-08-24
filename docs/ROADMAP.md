@@ -980,6 +980,12 @@ workspace overview.
 - Adversarial fuzz: hostile portfolio hashes (encoded script tags, XSS-in-`?q=`,
   path-traversal `?cycle=`, bogus issue deep links, trailing slashes) → all
   render cleanly with zero page errors and zero raw-mustache leaks.
+- Deep-link after login (pre-existing routing gap, fixed): `applyRoute()`
+  bailed on mount while unauthenticated, so a shared hash like
+  `#/pb/portfolio` (or `#/pb/stats`) opened before sign-in fell back to the
+  board after login. signIn/signUp now re-apply the hash, so deep links land
+  on the intended view. Regression-guarded in render QA (isolated context,
+  fresh login).
 - iBrowse remote QA host was unreachable (Tailscale DNS/route, the documented
   cycle-39 fallback case); the local headless render QA is the designated
   fallback and passed.

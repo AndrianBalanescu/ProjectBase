@@ -166,6 +166,11 @@ const App = {
         this.loginPassword = '';
         await this.loadAllData();
         this.setupRealtime();
+        // Re-apply the URL hash after auth: a deep link opened before login
+        // (e.g. #/pb/portfolio shared with a collaborator) must land on that
+        // view, not fall back to the board. applyRoute() bailed on mount while
+        // unauthenticated, so the hash never got a chance to route.
+        await this.applyRoute();
       } catch (err) {
         this.authError = err?.response?.message || 'Unable to sign in with those credentials.';
       }
@@ -191,6 +196,8 @@ const App = {
         this.signupPasswordConfirm = '';
         await this.loadAllData();
         this.setupRealtime();
+        // Same deep-link handling as signIn: land on the hashed view.
+        await this.applyRoute();
         this.showToast('Welcome! You are in the shared demo workspace — press C to create an issue or I to import yours.', 'success');
       } catch (err) {
         this.authError = err?.response?.data?.email?.message
