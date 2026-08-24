@@ -91,6 +91,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   // selectedIssue when the route's issue id did not resolve). ----
   const routing = { checked: false };
   const resize = { checked: false };
+  const focusMode = { checked: false };
   const email = page.locator('input[placeholder="Email"]');
   if (await email.count()) {
     const qaEmail = process.env.QA_EMAIL || 'f@flow.com';
@@ -182,6 +183,34 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       await page.evaluate(() => { localStorage.removeItem('pb.drawer.width'); });
       await page.waitForTimeout(1500);
     }
+
+    // ---- Description focus mode (cycle 5): the Focus button in the drawer
+    // opens a distraction-free fullscreen editor, and Done/Esc closes it. ----
+    try {
+      await page.evaluate(() => { location.hash = '#/pb/board/issue/ckat9ahso93piex'; });
+      await page.waitForTimeout(2500);
+      const focusBtn = page.locator('button:has-text("Focus")').first();
+      if (await focusBtn.count()) {
+        focusMode.checked = true;
+        focusMode.buttonShown = true;
+        await focusBtn.click();
+        await page.waitForTimeout(1200);
+        focusMode.overlayShown = await page.evaluate(() => {
+          const ov = document.querySelector('.fixed.inset-0.z-\\[60\\]');
+          return !!ov && getComputedStyle(ov).display !== 'none';
+        });
+        focusMode.editorShown = await page.evaluate(() => {
+          const ov = document.querySelector('.fixed.inset-0.z-\\[60\\]');
+          return !!ov && (ov.querySelector('textarea') || ov.querySelector('.milkdown'));
+        });
+        // Esc must close the overlay.
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(800);
+        focusMode.escCloses = await page.evaluate(() => {
+          return !document.querySelector('.fixed.inset-0.z-\\[60\\]');
+        });
+      }
+    } catch (e) { focusMode.error = String(e).slice(0, 120); }
 
     // ---- URL deep-link state (cycle 4): filters (?q= &priority= &cycle=),
     // the Cycles view tab (?cycle=) and drawer width (?w=) must round-trip
@@ -449,8 +478,16 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     if (resize.resetWorks === false) failures.push('double-click did not reset drawer width to 768px');
     if (resize.checked && !resize.widthGrew && resize.widthGrew !== false) failures.push('drawer resize drag not exercised');
   }
+  if (focusMode.checked) {
+    if (!focusMode.buttonShown) failures.push('focus mode button missing');
+    if (!focusMode.overlayShown) failures.push('focus mode overlay did not open');
+    if (!focusMode.editorShown) failures.push('focus mode editor not rendered');
+    if (!focusMode.escCloses) failures.push('Esc did not close focus mode');
+  } else if (focusMode.error) {
+    failures.push(`focus mode not exercised: ${focusMode.error}`);
+  }
 
-  console.log(JSON.stringify({ checks, routing, resize, urlState, relations, failures, all4xx }, null, 1));
+  console.log(JSON.stringify({ checks, routing, resize, urlState, relations, focusMode, failures, all4xx }, null, 1));
   console.log(failures.length === 0 ? 'RENDER QA: PASS' : 'RENDER QA: FAIL');
   await browser.close();
   process.exit(failures.length === 0 ? 0 : 1);

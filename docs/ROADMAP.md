@@ -506,3 +506,28 @@ urlState checks + prior routing/resize/relations suites). Fuzzed hostile hashes
 page errors, no mustache leaks, app alive; `?q=` clamped to 200 chars, invalid
 values dropped. iBrowse remote QA host down (DNS ETIMEOUT, cycle-39 fallback
 case) → local `qa-render.sh` fallback used.
+
+## Cycle-5 shipped (2026-08-24): description focus mode
+
+**Goal (v1.0 build order item 2/4):** a true distraction-free editing mode for
+issue descriptions. The drawer already had a fullscreen toggle that expanded the
+whole panel, but there was no dedicated focus mode for writing long descriptions.
+
+**Shipped this cycle:**
+- `app/pb_public/js/components/IssueDrawer.js` — added a `descFocus` state and a
+  "Focus" button in the Description section header. Clicking it opens a fullscreen
+  overlay (`z-[60]`, above the drawer) with a centered `max-w-3xl` editor, the
+  Rich/Raw/Preview tabs, the AI Enhance PRD action, and a Done button. Esc saves
+  and exits; the overlay auto-focuses the Milkdown editor on open. The existing
+  drawer fullscreen toggle is unchanged.
+- `scripts/qa/render_dom_check.js` — 4 new `focusMode` assertions: Focus button
+  present, overlay opens, editor renders, Esc closes.
+
+**Validation:** `pytest tests/` → 140/140. `flow.frontend_guard` clean. Headless
+render QA → PASS (all 4 focusMode checks + prior routing/resize/urlState/relations
+suites). iBrowse remote QA host down (github.com ETIMEOUT, environmental) → local
+`qa-render.sh` fallback used. CSS rebuilt via `build_css.sh` (new utilities
+`z-[60]`, `min-h-[60vh]`, `max-w-3xl` compiled in).
+
+**Next (v1.0 item 3/4):** published benchmarks — RAM, cold start, 10k-issue query
+vs Plane CE.
