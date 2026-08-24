@@ -1,0 +1,69 @@
+{
+  "schema": "projectbase-bench-v1",
+  "generated_at": "2026-08-24T02:52:56-0500",
+  "host": {
+    "cpu": "AMD Ryzen 9 8945HX with Radeon Graphics",
+    "ram_gb": 28.6,
+    "kernel": "7.0.0-28-generic"
+  },
+  "versions": {
+    "pocketbase": "0.39.11"
+  },
+  "params": {
+    "issues": 10000,
+    "cold_starts": 5,
+    "query_runs": 30
+  },
+  "cold_start": {
+    "fresh_dir_with_migrations_ms": 96.0,
+    "warm_dir_median_ms": 36.0,
+    "warm_dir_samples_ms": [
+      31.0,
+      41.0,
+      31.0,
+      41.0
+    ]
+  },
+  "ram_mb": {
+    "idle_after_boot": 50.2,
+    "after_seed_and_queries": 98.1
+  },
+  "seed_writes_per_s": 2692.0,
+  "queries": {
+    "project_board_query": {
+      "p50_ms": 2.04,
+      "p95_ms": 3.07,
+      "min_ms": 1.91,
+      "max_ms": 3.09,
+      "runs": 30
+    },
+    "global_sort_created_worst_case": {
+      "p50_ms": 62.54,
+      "p95_ms": 64.85,
+      "min_ms": 59.91,
+      "max_ms": 64.98,
+      "runs": 30
+    },
+    "filter_status_priority": {
+      "p50_ms": 2.83,
+      "p95_ms": 4.81,
+      "min_ms": 2.23,
+      "max_ms": 4.89,
+      "runs": 30
+    },
+    "search_title": {
+      "p50_ms": 3.92,
+      "p95_ms": 5.73,
+      "min_ms": 3.39,
+      "max_ms": 5.87,
+      "runs": 30
+    },
+    "count_project": {
+      "p50_ms": 1.14,
+      "p95_ms": 1.34,
+      "min_ms": 1.09,
+      "max_ms": 1.5,
+      "runs": 30
+    }
+  }
+}
