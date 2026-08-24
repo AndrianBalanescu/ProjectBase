@@ -28,11 +28,11 @@
 | Filtered `status='todo' && priority='high'`, 50/page | 2.8 ms | 4.8 ms |
 | Title substring search `title~'regression'` (~10% hit rate) | 3.9 ms | 5.7 ms |
 | Count of project issues | 1.1 ms | 1.3 ms |
-| Worst case: global `sort=-created` across all projects, no filter | 44.3 ms | 93.0 ms |
+| Worst case: global `sort=-created` across all projects, no filter | 45.1 ms | 47.6 ms |
 
 The worst case is included on purpose: a cross-project sort with no filter. It
 now has a covering index (`idx_issues_created`, migration `1710000017`), which
-dropped its p50 from 62.5 ms → 44.3 ms at 10k issues. Every view the UI
+dropped its p50 from 62.5 ms → 45.1 ms at 10k issues. Every view the UI
 actually renders is project-scoped and lands in single-digit milliseconds at
 10k issues.
 
@@ -85,5 +85,5 @@ Machine-readable output is committed at
 (pre-index baseline) and
 [`docs/research/bench/bench-10k-2026-08-24-postindex.json`](research/bench/bench-10k-2026-08-24-postindex.json)
 (post-index, migration `1710000017`). The post-index run measured the
-worst-case global sort at **45.07 ms p50** (30 runs), consistent with the
-44.3 ms headline above.
+worst-case global sort at **45.07 ms p50 / 47.62 ms p95** (30 runs), consistent with the
+45.1 ms headline above.

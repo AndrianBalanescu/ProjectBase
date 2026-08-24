@@ -112,15 +112,34 @@ def test_stats_endpoint():
     assert "total_projects" in body
 
 
+# Every /api/projectbase/* custom route implemented in app/pb_hooks/*.pb.js
+# must be documented in openapi.json. Keep this list in sync when routes change
+# so agents discover the full surface (importers, AI assist, dispatch, etc.).
+DOCUMENTED_CUSTOM_ROUTES = [
+    "/projectbase/health",
+    "/projectbase/version",
+    "/projectbase/stats",
+    "/projectbase/quick-task",
+    "/projectbase/projects/{id}/custom-fields",
+    "/projectbase/projects/{id}/custom-fields/validate",
+    "/projectbase/issues/{id}/relations",
+    "/projectbase/import/csv",
+    "/projectbase/import/github",
+    "/projectbase/notifications/read-all",
+    "/projectbase/ai-assist",
+    "/projectbase/dispatch-agent",
+]
+
+
 def test_openapi_spec_valid():
     status, body = _get("/openapi.json")
     assert status == 200
     assert isinstance(body, dict)
     assert body.get("openapi", "").startswith("3.")
     assert "paths" in body
-    # Custom-fields endpoints must be discoverable for agents
-    assert "/projectbase/projects/{id}/custom-fields" in body["paths"]
-    assert "/projectbase/projects/{id}/custom-fields/validate" in body["paths"]
+    # Every implemented custom route must be discoverable by agents
+    for path in DOCUMENTED_CUSTOM_ROUTES:
+        assert path in body["paths"], f"custom route {path} missing from openapi.json"
 
 
 def test_llms_txt_served():
