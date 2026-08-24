@@ -42,6 +42,22 @@
     {
       "name": "System",
       "description": "Health monitoring and workspace velocity analytics"
+    },
+    {
+      "name": "Importers",
+      "description": "Bulk issue importers (CSV / GitHub)"
+    },
+    {
+      "name": "Notifications",
+      "description": "In-app notification inbox operations"
+    },
+    {
+      "name": "AI Assist",
+      "description": "AI copilot endpoints for subtask generation, description polish, and sprint summaries"
+    },
+    {
+      "name": "Agent Dispatch",
+      "description": "Autonomous agent dispatch and job triggers"
     }
   ],
   "paths": {
@@ -761,6 +777,489 @@
           },
           "400": {
             "description": "Invalid type or body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "404": {
+            "description": "Issue not found"
+          }
+        }
+      }
+    },
+    "/projectbase/version": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Service Version",
+        "responses": {
+          "200": {
+            "description": "Version information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "string",
+                      "example": "0.9.0"
+                    },
+                    "service": {
+                      "type": "string",
+                      "example": "ProjectBase"
+                    },
+                    "license": {
+                      "type": "string",
+                      "example": "MIT"
+                    },
+                    "open_source": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projectbase/import/csv": {
+      "post": {
+        "tags": [
+          "Importers"
+        ],
+        "summary": "Import Issues from CSV Rows",
+        "description": "Bulk-create issues from an array of row objects. Rows map loosely to issue fields (title, description, status, priority, assignee, due_date, estimate, labels, source_key). Idempotent on matching titles/source keys.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "project_id",
+                  "rows"
+                ],
+                "properties": {
+                  "project_id": {
+                    "type": "string",
+                    "description": "Project record id"
+                  },
+                  "rows": {
+                    "type": "array",
+                    "maxItems": 5000,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "example": "Fix checkout flow"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "backlog",
+                            "todo",
+                            "in_progress",
+                            "in_review",
+                            "done",
+                            "cancelled"
+                          ]
+                        },
+                        "priority": {
+                          "type": "string",
+                          "enum": [
+                            "urgent",
+                            "high",
+                            "medium",
+                            "low",
+                            "none"
+                          ]
+                        },
+                        "assignee": {
+                          "type": "string"
+                        },
+                        "due_date": {
+                          "type": "string"
+                        },
+                        "estimate": {
+                          "type": "integer"
+                        },
+                        "labels": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "source_key": {
+                          "type": "string"
+                        },
+                        "source_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "imported": {
+                      "type": "integer"
+                    },
+                    "skipped": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "project": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing/empty rows, or >5000 rows"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "404": {
+            "description": "Project not found"
+          }
+        }
+      }
+    },
+    "/projectbase/import/github": {
+      "post": {
+        "tags": [
+          "Importers"
+        ],
+        "summary": "Import Issues from a GitHub Repository",
+        "description": "Fetch issues from a public (or PAT-authenticated) GitHub repo and import them into a project. Idempotent: keyed by GitHub issue number via source_metadata.source_key. Optionally passes a GitHub Personal Access Token for private repos.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "project_id",
+                  "repo"
+                ],
+                "properties": {
+                  "project_id": {
+                    "type": "string"
+                  },
+                  "repo": {
+                    "type": "string",
+                    "example": "owner/repo"
+                  },
+                  "token": {
+                    "type": "string",
+                    "description": "Optional GitHub PAT for private repos"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "all",
+                      "open",
+                      "closed"
+                    ],
+                    "default": "all"
+                  },
+                  "max_issues": {
+                    "type": "integer",
+                    "maximum": 5000,
+                    "default": 1000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "imported": {
+                      "type": "integer"
+                    },
+                    "skipped": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "repo": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "rate_limit": {
+                      "type": "object",
+                      "properties": {
+                        "remaining": {
+                          "type": "integer"
+                        },
+                        "reset_at": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing project_id, invalid repo, or >5000 max_issues"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "404": {
+            "description": "Project not found"
+          }
+        }
+      }
+    },
+    "/projectbase/notifications/read-all": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Mark All Notifications Read",
+        "description": "Marks every unread notification for the current user as read. Returns the number of rows updated.",
+        "responses": {
+          "200": {
+            "description": "Number of notifications marked read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "updated": {
+                      "type": "integer",
+                      "example": 3
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        }
+      }
+    },
+    "/projectbase/ai-assist": {
+      "post": {
+        "tags": [
+          "AI Assist"
+        ],
+        "summary": "AI Copilot Assistance",
+        "description": "Generate subtasks, polish an issue description, or summarize a sprint cycle using a configured LLM. Falls back to deterministic heuristics when the LLM is unreachable.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "action"
+                ],
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "generate_subtasks",
+                      "polish_description",
+                      "summarize_cycle"
+                    ]
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "issues": {
+                    "type": "array",
+                    "description": "Required for summarize_cycle",
+                    "items": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "action": {
+                      "type": "string"
+                    },
+                    "used_llm": {
+                      "type": "boolean"
+                    },
+                    "subtasks": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "result": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Title or description required (for subtasks/polish)"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        }
+      }
+    },
+    "/projectbase/dispatch-agent": {
+      "post": {
+        "tags": [
+          "Agent Dispatch"
+        ],
+        "summary": "Dispatch an Autonomous Agent",
+        "description": "Mark an issue in_progress, assign it to the target agent, and optionally forward the task to a configured Windmill/agent webhook. Returns the updated issue state and whether it was dispatched externally.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "issue_id"
+                ],
+                "properties": {
+                  "issue_id": {
+                    "type": "string",
+                    "description": "Issue record id (10-20 alphanumeric chars)"
+                  },
+                  "agent_target": {
+                    "type": "string",
+                    "enum": [
+                      "flomaster",
+                      "hermes",
+                      "windmill",
+                      "custom"
+                    ],
+                    "default": "flomaster"
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "maxLength": 8000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Dispatch result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "issue": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "identifier": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "assignee": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "dispatched_external": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing/invalid issue_id, invalid agent_target, or prompt >8000 chars"
           },
           "401": {
             "description": "Authentication required"

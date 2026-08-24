@@ -649,7 +649,7 @@ as the only shape with no covering index (62.5 ms p50 at 10k issues).
 - `tests/test_benchmarks.py` — regression test pinning the migration file and
   its index DDL (guards against the index being dropped or renumbered).
 - `CHANGELOG.md` — `[Unreleased]` Added entry.
-- `docs/BENCHMARKS.md` — worst-case p50 updated 62.5 → 44.3 ms.
+- `docs/BENCHMARKS.md` — worst-case p50 updated 62.5 → 45.1 ms (p95 47.6 ms).
 
 **Validation (crime-scene audit):**
 - Migration applies cleanly on a fresh scratch instance (boot log shows
@@ -657,7 +657,43 @@ as the only shape with no covering index (62.5 ms p50 at 10k issues).
 - `EXPLAIN QUERY PLAN` on a seeded scratch DB confirms the planner uses
   `idx_issues_created` for the global sort after `ANALYZE`.
 - Re-ran `scripts/bench/bench.py --issues 10000 --query-runs 20`: worst-case
-  p50 **44.3 ms** (was 62.5 ms), p95 93.0 ms. All project-scoped views remain
+  p50 **45.1 ms** (was 62.5 ms), p95 47.6 ms. All project-scoped views remain
   single-digit ms (board 2.2 ms, filter 2.5 ms, search 3.4 ms, count 1.2 ms).
 - `pytest tests/` → **143/143 passed** (142 + 1 new regression test).
 - No frontend touched → no iBrowse/render QA required this cycle.
+
+## Cycle-11 shipped (2026-08-24): agent-surface OpenAPI coverage
+
+**Goal (strategic calibration item 3 — OpenAPI schemas / agentic workflows):**
+close the agent-discovery drift in the hand-maintained `openapi.json`. Six
+implemented `/api/projectbase/*` custom routes were not documented, so
+autonomous agents consuming the spec could not discover importers, AI assist,
+agent dispatch, or the notifications read-all endpoint.
+
+**Shipped this cycle:**
+- `app/pb_public/openapi.json` — added the six missing routes with full
+  request/response schemas: `/projectbase/version`, `/projectbase/import/csv`,
+  `/projectbase/import/github`, `/projectbase/notifications/read-all`,
+  `/projectbase/ai-assist`, and `/projectbase/dispatch-agent`. Added four tags
+  (Importers, Notifications, AI Assist, Agent Dispatch) so the spec groups them
+  for agents. The spec now covers all 12 custom routes (was 6).
+- `tests/test_api.py` — `DOCUMENTED_CUSTOM_ROUTES` list + `test_openapi_spec_valid`
+  now asserts every implemented custom route is present in `openapi.json`,
+  so any future route added to the hooks without a spec entry fails CI.
+- Corrected the cycle-10 P2 benchmark prose (from inspect audit): `CHANGELOG.md`,
+  `docs/BENCHMARKS.md`, and `docs/ROADMAP.md` claimed the worst-case global sort
+  was 44.3/93.0 ms, but the committed artifact
+  (`docs/research/bench/bench-10k-2026-08-24-postindex.json`) measures
+  **45.07/47.62 ms p50/p95**. All three docs now state 45.1/47.6 ms,
+  matching the committed raw result.
+
+**Validation (crime-scene audit):**
+- `openapi.json` parses as valid JSON 3.1.0; served live at `:8120/openapi.json`
+  (17 paths). Confirmed via curl that all six new routes are present in the
+  served spec.
+- `pytest tests/` → **146/146 passed** (added the strengthened openapi assertion;
+  the github importer suite passed in isolation after a transient external
+  github.com timeout on the first full run).
+- `node --check` clean on all touched JS (none touched this cycle).
+- No frontend UI code changed → no iBrowse/render QA required; the only served
+  artifact is `openapi.json`, verified via direct HTTP.
