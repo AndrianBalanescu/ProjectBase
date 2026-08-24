@@ -1,4 +1,14 @@
-# ProjectBase — Competitive Teardown (Cycle 1)
+# ProjectBase — Competitive Teardown (refreshed 2026-08-24, flow cycle 2)
+
+> **Live-verified 2026-08-24** (linear.app/pricing + plane.so/pricing fetched directly, GitHub API):
+> Linear Free = 250 issues / 2 teams / unlimited members incl. Agent platform + MCP;
+> Basic **$10/user/mo**, Business **$16/user/mo** (yearly), Enterprise custom.
+> Plane Free = 12 users + 500 AI credits; Pro **$6/seat/mo yearly** ($8 monthly),
+> Business ~$13/seat/mo; self-hosted + air-gapped editions. GitHub stars (API):
+> Plane **57.6k** (pushed 2026-08-23), Wekan 21.1k (active), Focalboard 26.4k
+> (maintenance mode, last push 2026-05), Kanboard 9.8k (active), Taiga upstream
+> dead since 2023-12. The OSS field is consolidating: Plane + lightweights survive;
+> Focalboard/Taiga are effectively exits — the lightweight-self-host niche is open.
 
 > Sources: Perplexity Sonar scouts 2026-08-22 (`docs/research/archive/raw/raw-sonar-competitors-cycle-1.md`, `raw-sonar-painpoints-cycle-1.md`), GitHub trending + proven-sources scouts. Grounded in cited threads; verify pricing before publishing marketing claims.
 
