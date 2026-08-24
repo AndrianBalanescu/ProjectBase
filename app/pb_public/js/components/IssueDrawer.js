@@ -396,9 +396,15 @@ const IssueDrawerComponent = {
       if (!this.editTitle) return;
       this.aiLoadingDesc = true;
       try {
+        const headers = { 'Content-Type': 'application/json' };
+        // The ai-assist route requires auth; send the PocketBase token.
+        // `pb` is a top-level const in api.js (global lexical scope, not window).
+        if (typeof pb !== 'undefined' && pb.authStore && pb.authStore.token) {
+          headers['Authorization'] = pb.authStore.token;
+        }
         const res = await fetch('/api/projectbase/ai-assist', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             action: 'polish_description',
             title: this.editTitle,
