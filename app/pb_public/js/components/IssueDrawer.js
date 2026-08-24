@@ -1179,7 +1179,7 @@ const IssueDrawerComponent = {
       <div
         v-if="descFocus"
         class="fixed inset-0 z-[60] bg-gray-950 flex flex-col"
-        @keydown.esc="exitDescFocus"
+        @keydown.esc.stop="exitDescFocus"
       >
         <!-- Focus header -->
         <div class="px-6 py-3 border-b border-gray-800 flex items-center justify-between bg-gray-900/80 select-none">
