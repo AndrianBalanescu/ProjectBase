@@ -20,5 +20,5 @@ Refreshed 2026-08-24 (flow cycle 4). Items 1-4 audited against the codebase — 
 ## Open (v1.0 stabilization order)
 
 - A. ~~Fullscreen / expanded description editing mode~~ — ✅ **shipped (cycle 5)**: distraction-free focus mode. A "Focus" button in the drawer's Description header opens a fullscreen overlay (z-60) with a centered max-w-3xl editor, Rich/Raw/Preview tabs, AI Enhance PRD, and a Done button; Esc saves & exits. Verified via headless render QA (button shown, overlay opens, editor renders, Esc closes). See `docs/ROADMAP.md` § "Cycle-5 shipped".
-- D. Published benchmarks: RAM, cold start, 10k-issue query vs Plane CE.
-- E. Security pass + CHANGELOG + versioned release packaging (CHANGELOG is absent today).
+- D. ~~Published benchmarks: RAM, cold start, 10k-issue query vs Plane CE.~~ — ✅ **shipped (cycle 6)**: reproducible stdlib harness `scripts/bench/bench.py` + published results in `docs/BENCHMARKS.md`. See `docs/ROADMAP.md` § "Cycle-6 status".
+- E. ~~Security pass + CHANGELOG + versioned release packaging~~ — ✅ **shipped (cycle 7)**: `CHANGELOG.md` created (Keep-a-Changelog + SemVer), stale `v0.8.0` header badge fixed to `v0.9.0`, `bump_version.sh` now keeps header badge + custom-routes version in sync, security pass verified (anon no-leak, member no-escalation, cross-tenant isolation). See `docs/ROADMAP.md` § "Cycle-7 shipped".

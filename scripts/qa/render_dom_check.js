@@ -100,6 +100,12 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     await page.locator('input[placeholder="Password"]').fill(qaPassword);
     await page.locator('button:has-text("Sign in")').first().click();
     await page.waitForTimeout(3500);
+    // Version badge: the header must show the current version (vX.Y.Z) and it
+    // must match the VERSION file so the UI never drifts from the release.
+    checks.headerBadge = await page.evaluate(() => {
+      const badge = document.querySelector('header span[class*="font-mono"]');
+      return badge ? badge.textContent.trim() : null;
+    });
     // Open a real issue first so a stale drawer could exist, then navigate
     // to a bogus issue id in the same project.
     await page.evaluate(() => { location.hash = '#/pb/board/issue/nonexistentid12345'; });
@@ -436,6 +442,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   if (failedReqs.length) failures.push(`failed requests: ${failedReqs.slice(0, 3)}`);
   if (!checks.appMounted) failures.push('Vue app did not mount');
   if (checks.rawMustaches > 0) failures.push(`${checks.rawMustaches} raw mustaches leaked`);
+  if (checks.headerBadge !== 'v0.9.0') failures.push(`header version badge ${checks.headerBadge} != v0.9.0`);
   if (checks.bodyBg !== 'rgb(11, 15, 25)') failures.push(`body bg ${checks.bodyBg} != rgb(11,15,25)`);
   if (checks.probe.paddingLeft !== '28px') failures.push(`pl-7 padding ${checks.probe.paddingLeft} != 28px`);
   if (checks.probe.marginLeft !== '6px') failures.push(`ml-1.5 margin ${checks.probe.marginLeft} != 6px`);
