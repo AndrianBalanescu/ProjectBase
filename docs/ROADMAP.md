@@ -1006,23 +1006,35 @@ full reload. This cycle makes it stay live.
   realtime SSE handler bumps it on every event for the workspace-scoped
   collections (`issues`, `milestones`, `projects`, `cycles`). Independent of
   the `commentRefreshKey` path used by the issue drawer.
-- `app/pb_public/index.html` — binds `:realtime-tick="realtimeTick"` on the
-  `<portfolio-view>` element so the shell tick reaches the component.
+- **SSE-independent hardening (found by render-QA fuzz):** SSE delivery is
+  unreliable (PB-56 documents the app "does not depend on the SSE realtime
+  event"), and the shell's optimistic `this.issues.unshift(created)` mutates
+  the array in place so the prop reference never changes and a prop watcher
+  would never fire. To keep the portfolio live in the SSE-missed case, the
+  tick is also bumped in the optimistic `handleCreateIssue`,
+  `handleUpdateIssue`, `handleDeleteIssue`, `bulkUpdateSelected` and
+  `bulkDeleteSelected` paths. This is the path render QA proves (a UI create
+  bumps the tick and the KPI increments).
 - `app/pb_public/js/components/PortfolioView.js` — accepts the `realtimeTick`
-  prop, `watch`es it, and debounces a single `refresh()` (400 ms) so a burst of
-  SSE events (e.g. a bulk edit) triggers exactly one refetch. `beforeUnmount`
-  clears the pending timer.
-- `tests/test_api.py` — new `test_portfolio_realtime_tick_wiring` drift-guard
-  asserting the tick is declared/bumped in app.js, bound in index.html, and
-  watched/refetched in PortfolioView.
+  prop, watches it and the `issues`/`milestones` props (belt-and-suspenders),
+  all routed through a shared `scheduleRefresh()` that debounces a single
+  `refresh()` (400 ms). `beforeUnmount` clears the pending timer.
+- `scripts/qa/render_dom_check.js` — new portfolio realtime E2E that creates
+  an issue via the actual NewIssueModal (keyboard C) while on the portfolio
+  view, waits past the debounce, and asserts the "Total Issues" KPI increments
+  with no navigation or reload.
+- `tests/test_api.py` — `test_portfolio_realtime_tick_wiring` extended to
+  assert the tick is bumped in the optimistic create/update/delete handlers
+  (SSE-independent path) as well as the realtime SSE handler.
 
 **Verification:**
-- `pytest tests/` → **174/174 passed** (was 173; +1 new drift-guard test).
-- `node --check` clean on `app.js` and `PortfolioView.js`.
+- `pytest tests/` → **174/174 passed** (was 173; +1 new drift-guard assertions
+  folded into the existing portfolio realtime test).
+- `node --check` clean on `app.js`, `PortfolioView.js`, `render_dom_check.js`.
 - `python3 -m flow.frontend_guard` → all frontend files verified.
-- Render QA (`scripts/qa/qa-render.sh`) → **RENDER QA: PASS**, zero failures
-  (portfolio view mounts, project rows render, shortcut works, deep link
-  lands). No console errors, no raw-mustache leaks.
+- Render QA (`scripts/qa/qa-render.sh`) → **RENDER QA: PASS**, zero failures.
+  The new realtime E2E proves the portfolio KPI increments (60 → 61) after a
+  real UI create, with no console errors and no raw-mustache leaks.
 - Remote iBrowse host was blocked (`max_replan_attempts_exceeded`, the
   documented cycle-39 fallback case); the local headless render QA is the
   designated fallback and passed.

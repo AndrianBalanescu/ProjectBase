@@ -18,8 +18,15 @@ subscriptions, Stripe, or paid tiers.
   reload. The shell now bumps a `realtimeTick` counter on every SSE event for
   those workspace-scoped collections and passes it down as a prop; the view
   watches it and debounces a single refetch (400 ms) so a burst of events
-  triggers exactly one refresh. Verified by a new pytest drift-guard test and
-  the local render-QA suite (zero console errors, no raw-mustache leaks).
+  triggers exactly one refresh. Because SSE delivery can be missed (PB-56),
+  the tick is also bumped on the optimistic create/update/delete/bulk paths
+  the shell performs in place (which would otherwise not change the prop
+  reference), and the view watches the `issues`/`milestones` props as a
+  belt-and-suspenders path — so the portfolio stays live in both the
+  SSE-delivered and SSE-missed cases. Verified by an extended pytest
+  drift-guard test and a render-QA E2E that creates an issue via the actual
+  NewIssueModal and asserts the portfolio "Total Issues" KPI increments with
+  no navigation or reload.
 - **Portfolio Dashboard (v1.1 feature 5)**: a cross-project workspace overview
   at `#/pb/portfolio` aggregating every project, issue and milestone. KPI cards
   (total issues, completion %, in-flight/open work, estimate load), a

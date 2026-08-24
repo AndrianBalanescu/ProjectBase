@@ -955,6 +955,68 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       const app = document.querySelector('#app');
       return !!(app && /Portfolio Dashboard/.test(app.textContent || ''));
     });
+
+    // ---- Realtime refresh (cycle 21): the portfolio must auto-refresh when a
+    // new issue is created. The shell updates its issues prop optimistically on
+    // create (PB-56 design: it does not depend on the SSE event), which the view
+    // watches and debounce-refetches from. We stay on the portfolio view, read
+    // the "Total Issues" KPI, create an issue via the app's own NewIssueModal
+    // (keyboard C), wait past the debounce, and assert the KPI increments
+    // without any navigation or reload. ----
+    portfolio.realtime = {};
+    const rtTitle = 'RTprobe' + (Date.now() % 100000000);
+    const rtBefore = await page.evaluate(() => {
+      const app = document.querySelector('#app');
+      const m = (app ? app.textContent : '').match(/Total Issues\s*([\d,]+)/);
+      return m ? parseInt(m[1].replace(/,/g, ''), 10) : null;
+    });
+    // Open the NewIssueModal via the keyboard and create an issue.
+    let rtStatus = 'skipped';
+    try {
+      await page.keyboard.press('c');
+      await page.waitForTimeout(1000);
+      const modalTitle = page.locator('input[placeholder="What needs to be done?"]').first();
+      if (await modalTitle.count()) {
+        await modalTitle.fill(rtTitle);
+        await page.keyboard.press('Enter');
+        rtStatus = 'created';
+      } else {
+        rtStatus = 'modal-not-found';
+      }
+    } catch (e) { rtStatus = 'create-error: ' + String(e).slice(0, 120); }
+    // Wait past the 400ms debounce + refetch, then read the KPI again.
+    await page.waitForTimeout(2500);
+    const rtAfter = await page.evaluate(() => {
+      const app = document.querySelector('#app');
+      const m = (app ? app.textContent : '').match(/Total Issues\s*([\d,]+)/);
+      return m ? parseInt(m[1].replace(/,/g, ''), 10) : null;
+    });
+    portfolio.realtime = {
+      before: rtBefore, created: rtStatus, after: rtAfter,
+      incremented: rtBefore !== null && rtAfter !== null && rtAfter === rtBefore + 1
+    };
+    // Cleanup the probe issue: register its id as an ignored cleanup URL BEFORE
+    // deleting so a client-side abort (the app's realtime path already removed
+    // the record) is not counted as a failure — same pattern as the range suite.
+    const probeIds = await page.evaluate(async (title) => {
+      let token = null;
+      for (const k of ['pb_auth', 'pocketbase_auth']) {
+        try { token = JSON.parse(localStorage.getItem(k)).token; if (token) break; } catch (e) {}
+      }
+      const h = {}; if (token) h.Authorization = token;
+      const list = await fetch('/api/collections/issues/records?filter=' + encodeURIComponent('(title="' + title + '")'), { headers: h });
+      const d = await list.json().catch(() => ({}));
+      return (d.items || []).map(it => it.id);
+    }, rtTitle);
+    for (const pid of probeIds) ignoredCleanupUrls.add(BASE + '/api/collections/issues/records/' + pid);
+    await page.evaluate(async (ids) => {
+      let token = null;
+      for (const k of ['pb_auth', 'pocketbase_auth']) {
+        try { token = JSON.parse(localStorage.getItem(k)).token; if (token) break; } catch (e) {}
+      }
+      const h = {}; if (token) h.Authorization = token;
+      for (const id of ids) await fetch('/api/collections/issues/records/' + id, { method: 'DELETE', headers: h });
+    }, probeIds);
   } catch (e) { portfolio.error = String(e).slice(0, 200); }
   portfolio.checked = true;
 
@@ -1096,6 +1158,11 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     if (portfolio.viewMounted === false) failures.push('portfolio view did not mount');
     if (portfolio.projectRowShown === false) failures.push('portfolio did not render project progress rows');
     if (portfolio.shortcutWorks === false) failures.push('keyboard 9 did not switch to the portfolio view');
+    const rt = portfolio.realtime || {};
+    if (rt.created && rt.created !== 'created') failures.push(`portfolio realtime: could not create probe issue (${rt.created})`);
+    if (rt.before !== null && rt.incremented === false) {
+      failures.push(`portfolio realtime KPI did not increment (before=${rt.before}, after=${rt.after}) — auto-refresh on create failed`);
+    }
   } else if (!portfolio.checked) {
     failures.push('portfolio E2E not exercised');
   }

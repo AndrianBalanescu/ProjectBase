@@ -1994,6 +1994,15 @@ def test_portfolio_realtime_tick_wiring():
     assert _re.search(r"realtimeTick\+\+", app_js), (
         "app.js must bump realtimeTick on a realtime event"
     )
+    # Optimistic (SSE-independent) bumps: the shell updates its issues prop
+    # in place on create/update/delete (PB-56: it does not depend on SSE), so
+    # the tick must also be bumped in those handlers for snapshot views to
+    # refetch even when the SSE event is missed. This is the path render QA
+    # exercises (a UI create bumps the tick and the portfolio KPI increments).
+    for handler in ("handleCreateIssue", "handleUpdateIssue", "handleDeleteIssue"):
+        assert _re.search(handler + r"[\s\S]{0,900}?realtimeTick\+\+", app_js), (
+            f"app.js must bump realtimeTick in {handler} (optimistic, SSE-independent)"
+        )
     # PortfolioView accepts the prop, watches it (debounced), and refetches.
     assert "'realtimeTick'" in pf or "realtimeTick" in pf, (
         "PortfolioView must declare the realtimeTick prop"
@@ -2006,4 +2015,17 @@ def test_portfolio_realtime_tick_wiring():
     )
     assert "refreshTimer" in pf, (
         "PortfolioView must debounce the realtime refetch"
+    )
+    # Resilient (SSE-independent) path: the shell updates its issues/milestones
+    # props optimistically on create/update/delete (PB-56), so the view must
+    # watch those props too and route both paths through a shared debounced
+    # refresh. This keeps the portfolio live even when the SSE event is missed.
+    assert "issues() { this.scheduleRefresh(); }" in pf, (
+        "PortfolioView must watch the issues prop and schedule a refresh"
+    )
+    assert "milestones() { this.scheduleRefresh(); }" in pf, (
+        "PortfolioView must watch the milestones prop and schedule a refresh"
+    )
+    assert "scheduleRefresh()" in pf and "realtimeTick()" in pf, (
+        "PortfolioView must route both realtimeTick and prop changes through scheduleRefresh"
     )

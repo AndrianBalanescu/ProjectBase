@@ -34,11 +34,20 @@ const PortfolioViewComponent = {
     // The shell bumps this on every realtime issue/milestone/project/cycle
     // event. Debounce so a burst of SSE events triggers a single refetch.
     realtimeTick() {
+      this.scheduleRefresh();
+    },
+    // The shell updates its issues/milestones props optimistically on
+    // create/update/delete even when the SSE event is dropped (PB-56 design),
+    // so watch them too. This keeps the portfolio live in both the
+    // SSE-delivered and SSE-missed paths.
+    issues() { this.scheduleRefresh(); },
+    milestones() { this.scheduleRefresh(); },
+  },
+  methods: {
+    scheduleRefresh() {
       if (this.refreshTimer) clearTimeout(this.refreshTimer);
       this.refreshTimer = setTimeout(() => this.refresh(), 400);
     },
-  },
-  methods: {
     async refresh() {
       try {
         // Portfolio aggregates across every project, regardless of the active

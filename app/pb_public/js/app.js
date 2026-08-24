@@ -545,6 +545,9 @@ const App = {
           const exists = this.issues.find(i => i.id === created.id);
           if (!exists) this.issues.unshift(created);
         }
+        // Optimistic (non-SSE) update path: bump the tick so snapshot views
+        // (PortfolioView) refetch even when the SSE event is missed (PB-56).
+        this.realtimeTick++;
         this.showToast(`Created issue ${created.identifier}`, 'success');
       } catch (err) {
         console.error('Issue create failed:', err);
@@ -566,6 +569,8 @@ const App = {
         if (idx !== -1) {
           this.issues[idx] = { ...this.issues[idx], ...updated };
         }
+        // Optimistic update path (SSE-independent, PB-56): keep snapshot views live.
+        this.realtimeTick++;
       } catch (err) {
         console.error('Issue update failed:', err);
         this.showToast('Failed to update issue', 'error');
@@ -611,6 +616,8 @@ const App = {
         if (this.selectedIssue && this.selectedIssue.id === issueId) {
           this.selectedIssue = null;
         }
+        // Optimistic delete path (SSE-independent, PB-56): keep snapshot views live.
+        this.realtimeTick++;
         this.showToast('Issue deleted', 'success');
       } catch (err) {
         console.error('Issue delete failed:', err);
@@ -716,6 +723,8 @@ const App = {
           }
         }
         this.clearIssueSelection();
+        // Optimistic bulk update path (SSE-independent): keep snapshot views live.
+        this.realtimeTick++;
         this.showToast(`Updated ${res.updated || count} issue${(res.updated || count) === 1 ? '' : 's'}`, 'success');
       } catch (err) {
         console.error('Bulk update failed:', err);
@@ -758,6 +767,8 @@ const App = {
           this.selectedIssue = null;
         }
         this.clearIssueSelection();
+        // Optimistic bulk delete path (SSE-independent): keep snapshot views live.
+        this.realtimeTick++;
         this.showToast(`Deleted ${res.deleted || ids.length} issue${(res.deleted || ids.length) === 1 ? '' : 's'}`, 'success');
       } catch (err) {
         console.error('Bulk delete failed:', err);
