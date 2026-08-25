@@ -2040,6 +2040,67 @@ def test_mcp_server_dispatch_agent_tool():
         _request("DELETE", f"/api/collections/issues/records/{iid}",
                  headers={"Authorization": _superuser_token()})
 
+def test_mcp_server_cycle_and_milestone_tools():
+    """The FastMCP server must expose cycle + milestone tools so agents can
+    query sprint and roadmap state directly (agent-surface gap closed in
+    cycle 51: previously the server had projects/issues/relations/notifications/
+    dispatch tools but no way to read cycles or milestones, even though both are
+    core collections with full UI views). Guards `list_cycles`,
+    `get_cycle_progress`, `list_milestones`, and `get_milestone_progress` by
+    compiling the module with a stub FastMCP and calling the tools against the
+    live instance. Purely read-only: no records are created or mutated."""
+    mcp_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                            "scripts", "mcp_server.py")
+    assert os.path.isfile(mcp_path), f"missing expected MCP server {mcp_path}"
+    with open(mcp_path, encoding="utf-8") as fh:
+        src = fh.read()
+    assert "def list_cycles(" in src, "MCP server lost list_cycles tool"
+    assert "def get_cycle_progress(" in src, "MCP server lost get_cycle_progress tool"
+    assert "def list_milestones(" in src, "MCP server lost list_milestones tool"
+    assert "def get_milestone_progress(" in src, "MCP server lost get_milestone_progress tool"
+
+    import types as _types
+    stub = _types.ModuleType("fastmcp")
+    stub.FastMCP = lambda name: _types.SimpleNamespace(
+        tool=lambda *a, **k: (a[0] if a else (lambda f: f)))
+    import sys as _sys
+    _sys.modules["fastmcp"] = stub
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("mcp_server", mcp_path)
+    mcp_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mcp_mod)
+    mcp_mod.BASE_URL = BASE_URL
+    mcp_mod.AUTH_EMAIL = SUPERUSER_EMAIL
+    mcp_mod.AUTH_PASSWORD = SUPERUSER_PASSWORD
+    mcp_mod.AUTH_TOKEN = ""
+
+    # list_cycles returns the real cycles collection
+    cycles = mcp_mod.list_cycles()
+    assert isinstance(cycles, list) and len(cycles) > 0, "expected at least one cycle"
+    first = cycles[0]
+    assert "id" in first and "name" in first, "cycle record missing id/name"
+    # Filter by project key works and returns a strict subset
+    pid = _first_project_id()
+    proj_cycles = mcp_mod.list_cycles(project=pid)
+    assert isinstance(proj_cycles, list), "project-filtered cycles must be a list"
+
+    # get_cycle_progress returns a deterministic numeric breakdown
+    prog = mcp_mod.get_cycle_progress(first["id"])
+    assert prog.get("total") >= 0 and prog.get("percent") is not None
+    assert "done" in prog and "in_progress" in prog and "todo" in prog
+    assert prog["done"] + prog["in_progress"] + prog["todo"] == prog["total"]
+
+    # list_milestones returns real milestones
+    milestones = mcp_mod.list_milestones()
+    assert isinstance(milestones, list) and len(milestones) > 0, "expected a milestone"
+    m_first = milestones[0]
+    assert "id" in m_first and "name" in m_first
+
+    # get_milestone_progress returns counts that add up
+    mprog = mcp_mod.get_milestone_progress(m_first["id"])
+    assert "milestone" in mprog and "total" in mprog and "done" in mprog
+    assert mprog["done"] <= mprog["total"]
+
 def test_ai_assist_corrupted_json_400():
     status, body = _request("POST", "/api/projectbase/ai-assist", b"{bad",
                             headers={"Authorization": _superuser_token()})

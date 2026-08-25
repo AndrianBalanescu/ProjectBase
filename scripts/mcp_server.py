@@ -311,6 +311,98 @@ def get_stats() -> Dict[str, Any]:
     return _request("/api/projectbase/stats")
 
 @mcp.tool()
+def list_cycles(project: Optional[str] = None) -> List[Dict[str, Any]]:
+    """List sprint cycles, optionally filtered to one project.
+
+    Args:
+        project: Optional project key (identifier, e.g. "PB"), name, or id.
+            Omit to list cycles across every project.
+    Returns each cycle with its name, dates, status, and the project it belongs to.
+    """
+    params = "sort=-start_date"
+    if project:
+        proj_id = _find_project_id(project)
+        params += f"&filter=(project='{proj_id}')"
+    res = _request(f"/api/collections/cycles/records?{params}&expand=project")
+    return res.get("items", [])
+
+@mcp.tool()
+def get_cycle_progress(identifier_or_id: str) -> Dict[str, Any]:
+    """Get a cycle's completion breakdown: total/done/in-progress issues,
+    percent complete, and story points (done vs total).
+
+    Args:
+        identifier_or_id: Cycle record id (e.g. "admzsfez5xsxyeu"). Cycles do
+            not have a friendly public identifier, so pass the record id.
+    Returns:
+        { cycle, total, done, in_progress, todo, percent, total_pts, done_pts }.
+    """
+    cycle = _request(f"/api/collections/cycles/records/{identifier_or_id}")
+    issues = _request(
+        f"/api/collections/issues/records?filter=(cycle='{cycle['id']}')&perPage=500")
+    items = issues.get("items", [])
+    total = len(items)
+    done = [i for i in items if i.get("status") == "done"]
+    in_progress = [i for i in items if i.get("status") in ("in_progress", "in_review")]
+    todo = [i for i in items if i.get("status") in ("todo", "backlog")]
+    total_pts = sum(float(i.get("estimate") or 0) for i in items)
+    done_pts = sum(float(i.get("estimate") or 0) for i in done)
+    percent = round((len(done) / total) * 100) if total else 0
+    return {
+        "cycle": cycle,
+        "total": total,
+        "done": len(done),
+        "in_progress": len(in_progress),
+        "todo": len(todo),
+        "percent": percent,
+        "total_pts": total_pts,
+        "done_pts": done_pts,
+    }
+
+@mcp.tool()
+def list_milestones(project: Optional[str] = None) -> List[Dict[str, Any]]:
+    """List all milestones, optionally filtered by one project.
+
+    Args:
+        project: Optional project key (identifier, e.g. "PB"), name, or id.
+    Returns each milestone with its name, description, status, and target date.
+    """
+    filters = "1=1"
+    if project:
+        proj_id = _find_project_id(project)
+        filters = f"project='{proj_id}'"
+    encoded = urllib.parse.quote(filters)
+    res = _request(f"/api/collections/milestones/records?filter={encoded}&sort=target_date&expand=project")
+    return res.get("items", [])
+
+@mcp.tool()
+def get_milestone_progress(identifier_or_id: str) -> Dict[str, Any]:
+    """Get a milestone's completion: linked-issue totals, done/in-progress
+    counts, and a percent complete.
+
+    Args:
+        identifier_or_id: Milestone record id (e.g. "vcqqto5pb6373u8").
+    Returns:
+        { milestone, total, done, in_progress, percent }.
+    """
+    milestone = _request(f"/api/collections/milestones/records/{identifier_or_id}")
+    issues = _request(
+        f"/api/collections/issues/records?filter=(milestone='{milestone['id']}')&perPage=100"
+    )
+    items = issues.get("items", [])
+    total = len(items)
+    done = len([i for i in items if i.get("status") == "done"])
+    in_progress = len([i for i in items if i.get("status") == "in_progress"])
+    percent = round((done / total) * 100) if total else (100 if milestone.get("status") == "achieved" else 0)
+    return {
+        "milestone": milestone,
+        "total": total,
+        "done": done,
+        "in_progress": in_progress,
+        "percent": percent,
+    }
+
+@mcp.tool()
 def dispatch_agent(
     identifier_or_id: str,
     agent_target: str = "flomaster",
