@@ -6,7 +6,8 @@ const HeaderComponent = {
   data() {
     return {
       dropdownOpen: false,
-      notifOpen: false
+      notifOpen: false,
+      moreOpen: false
     };
   },
   mounted() {
@@ -22,6 +23,9 @@ const HeaderComponent = {
       }
       if (this.$refs.notifDropdown && !this.$refs.notifDropdown.contains(e.target)) {
         this.notifOpen = false;
+      }
+      if (this.$refs.moreDropdown && !this.$refs.moreDropdown.contains(e.target)) {
+        this.moreOpen = false;
       }
     },
     selectProj(proj) {
@@ -228,20 +232,16 @@ const HeaderComponent = {
       </div>
 
       <!-- Right: Search, Actions, Live Status -->
-      <div class="flex items-center space-x-3 flex-shrink-0">
-        <!-- Live SSE Status Indicator -->
-        <div class="flex items-center space-x-1.5 px-2 py-1 rounded-full bg-emerald-950/40 border border-emerald-800/40 text-[11px] text-emerald-400 select-none" title="PocketBase Realtime SSE Active">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 live-pulse"></span>
-          <span class="hidden sm:inline font-mono font-medium">Live SSE</span>
-        </div>
-
-        <!-- Notification Channel Settings -->
+      <div class="flex items-center space-x-2 flex-shrink-0">
+        <!-- Omnibar Search Trigger -->
         <button
-          @click="$emit('open-notification-settings')"
-          class="relative p-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
-          title="Notification channel settings"
+          @click="$emit('open-omnibar')"
+          class="flex items-center space-x-2 px-2.5 py-1.5 rounded-lg bg-gray-950/80 hover:bg-gray-800 border border-gray-800 text-gray-400 hover:text-gray-200 text-xs transition-all"
+          title="Search across all issues (⌘K)"
         >
-          <i data-lucide="settings-2" class="w-4 h-4"></i>
+          <i data-lucide="search" class="w-3.5 h-3.5"></i>
+          <span class="hidden md:inline">Search...</span>
+          <kbd class="hidden md:inline-block px-1.5 py-0.5 rounded bg-gray-800/80 text-[10px] text-gray-400 font-mono border border-gray-700/60">⌘K</kbd>
         </button>
 
         <!-- Notifications Inbox Bell -->
@@ -295,36 +295,54 @@ const HeaderComponent = {
           </div>
         </div>
 
-        <!-- Omnibar Search Trigger -->
-        <button 
-          @click="$emit('open-omnibar')"
-          class="flex items-center space-x-2 px-2.5 py-1.5 rounded-lg bg-gray-950/80 hover:bg-gray-800 border border-gray-800 text-gray-400 hover:text-gray-200 text-xs transition-all"
-        >
-          <i data-lucide="search" class="w-3.5 h-3.5"></i>
-          <span class="hidden sm:inline">Search...</span>
-          <kbd class="hidden sm:inline-block px-1.5 py-0.5 rounded bg-gray-800/80 text-[10px] text-gray-400 font-mono border border-gray-700/60">⌘K</kbd>
-        </button>
+        <!-- More Actions Overflow Menu -->
+        <div class="relative" ref="moreDropdown">
+          <button
+            @click="moreOpen = !moreOpen"
+            class="p-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+            title="More actions (export, fields, admin)"
+          >
+            <i data-lucide="ellipsis-vertical" class="w-4 h-4"></i>
+          </button>
+          <div
+            v-if="moreOpen"
+            class="absolute right-0 mt-2 w-56 glass-dropdown rounded-xl shadow-2xl p-1.5 z-50 border border-gray-800 animate-in fade-in slide-in-from-top-2 duration-150"
+          >
+            <button
+              v-if="currentProject"
+              @click="$emit('open-custom-fields'); moreOpen = false;"
+              class="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-xs text-gray-300 hover:bg-gray-800/60 text-left transition-colors"
+            >
+              <i data-lucide="settings-2" class="w-4 h-4 text-gray-400"></i>
+              <span>Custom Fields</span>
+            </button>
+            <button
+              @click="$emit('open-export'); moreOpen = false;"
+              class="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-xs text-gray-300 hover:bg-gray-800/60 text-left transition-colors"
+            >
+              <i data-lucide="download" class="w-4 h-4 text-gray-400"></i>
+              <span>Export Issues</span>
+            </button>
+            <button
+              @click="$emit('open-notification-settings'); moreOpen = false;"
+              class="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-xs text-gray-300 hover:bg-gray-800/60 text-left transition-colors"
+            >
+              <i data-lucide="bell" class="w-4 h-4 text-gray-400"></i>
+              <span>Notification Settings</span>
+            </button>
+            <div class="my-1 border-t border-gray-800/60"></div>
+            <a
+              href="/_/"
+              target="_blank"
+              rel="noopener"
+              class="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-xs text-gray-400 hover:bg-gray-800/60 transition-colors"
+            >
+              <i data-lucide="database" class="w-4 h-4"></i>
+              <span>PocketBase Admin</span>
+            </a>
+          </div>
+        </div>
 
-        <!-- Custom Fields Manager -->
-        <button
-          v-if="currentProject"
-          @click="$emit('open-custom-fields')"
-          class="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-gray-950/80 hover:bg-gray-800 border border-gray-800 text-gray-400 hover:text-gray-200 text-xs transition-all"
-          title="Manage custom fields for this project"
-        >
-          <i data-lucide="settings-2" class="w-3.5 h-3.5"></i>
-          <span class="hidden sm:inline">Fields</span>
-        </button>
-
-        <!-- Export Issues Button -->
-        <button
-          @click="$emit('open-export')"
-          class="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-gray-950/80 hover:bg-gray-800 border border-gray-800 text-gray-400 hover:text-gray-200 text-xs transition-all"
-          title="Export issues as CSV or JSON"
-        >
-          <i data-lucide="download" class="w-3.5 h-3.5"></i>
-          <span class="hidden sm:inline">Export</span>
-        </button>
 
         <!-- New Issue Button -->
         <button 
@@ -336,16 +354,6 @@ const HeaderComponent = {
           <kbd class="hidden sm:inline-block px-1 py-0.5 rounded bg-indigo-700 text-[10px] font-mono ml-1">C</kbd>
         </button>
 
-        <!-- PocketBase Admin Dashboard Link -->
-        <a 
-          href="/_/" 
-          target="_blank" 
-          rel="noopener"
-          class="p-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
-          title="Open PocketBase Admin Dashboard"
-        >
-          <i data-lucide="database" class="w-4 h-4"></i>
-        </a>
       </div>
     </header>
   `

@@ -1083,10 +1083,14 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   } catch (e) { deepLink.error = String(e).slice(0, 200); }
   deepLink.checked = true;
 
-  // ---- Export modal (cycle 30): opens via header button, renders tabs and
-  // project select, and triggers a download. ----
+  // ---- Export modal (cycle 30): opens via the header More menu, renders tabs
+  // and project select, and triggers a download. ----
   try {
-    const headerExport = page.locator('header button[title*="Export"]');
+    // Open the More actions overflow menu (Export/Fields/Admin are grouped).
+    const moreBtn = page.locator('header button[title*="More actions"]');
+    if (await moreBtn.count()) await moreBtn.click();
+    await page.waitForTimeout(500);
+    const headerExport = page.locator('header .glass-dropdown button:has-text("Export Issues")');
     if (await headerExport.count()) {
       await headerExport.click();
       await page.waitForTimeout(800);
@@ -1109,10 +1113,14 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   } catch (e) { exportModal.error = String(e).slice(0, 200); }
   exportModal.checked = true;
 
-  // ---- Notification channel settings modal (cycle 33): opens via header gear
-  // button, renders all channel fields, and saves a webhook URL. ----
+  // ---- Notification channel settings modal (cycle 33): opens via the header
+  // More menu, renders all channel fields, and saves a webhook URL. ----
   try {
-    const headerNotif = page.locator('header button[title*="Notification channel settings"]');
+    // Ensure the More actions overflow menu is open (Export test may have closed it).
+    const moreBtn = page.locator('header button[title*="More actions"]');
+    if (await moreBtn.count()) await moreBtn.click();
+    await page.waitForTimeout(500);
+    const headerNotif = page.locator('header .glass-dropdown button:has-text("Notification Settings")');
     if (await headerNotif.count()) {
       await headerNotif.click();
       await page.waitForTimeout(800);
