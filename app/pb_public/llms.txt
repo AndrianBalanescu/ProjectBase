@@ -38,6 +38,7 @@ Add to ~/.cursor/mcp.json or ~/.flomaster/config.json:
    - Linear: POST /api/projectbase/import/linear  {"project_id":"<ID>","rows":[{ID,Title,Status,Priority,Labels,Assignee,"Due Date",Estimate,Description}]} OR {"project_id":"<ID>","csv":"<raw Linear workspace CSV export>"}
    - Plane:  POST /api/projectbase/import/plane   {"project_id":"<ID>","rows":[{Name,State,Priority,Labels,Assignees,"Start Date","Target Date",Estimate,Description}]} OR {"project_id":"<ID>","csv":"<raw Plane workspace CSV export>"}
    Each is idempotent (deduped by source_metadata.source_key) and returns { imported, skipped, total, errors }.
+5c. Autonomous Agent Dispatch: POST /api/projectbase/dispatch-agent {"issue_id":"<ID>","agent_target":"flomaster"|"hermes"|"windmill"|"custom","prompt?":"<optional instructions, max 8000 chars>"} — marks the issue in_progress, assigns the target agent (custom → "Custom Agent"), and forwards the task to a configured Windmill/agent webhook when present. Returns { success, message, issue:{ id, identifier, status, assignee }, dispatched_external }.
 6. Export Issues (data portability — mirrors the importer columns so an exported
    file can be re-imported into another ProjectBase or Linear/Plane/Trello):
    - CSV:  GET /api/projectbase/export/csv?project=<ID>   (attachment download)
