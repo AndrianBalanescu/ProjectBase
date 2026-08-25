@@ -163,10 +163,12 @@ routerAdd("POST", "/api/projectbase/import/github", (e) => {
             const issues = page.issues
             for (let i = 0; i < issues.length; i++) {
                 const it = issues[i]
+                // Skip pull requests (GitHub returns them in the issues endpoint).
+                // Do this BEFORE counting toward the max_issues cap so a page that
+                // leads with PRs does not starve real issues out of the import.
+                if (it.pull_request && it.pull_request.url) { skipped++; continue }
                 if (fetchedCount >= maxIssues) break
                 fetchedCount++
-                // Skip pull requests (GitHub returns them in the issues endpoint).
-                if (it.pull_request && it.pull_request.url) { skipped++; continue }
                 try {
                     const number = it.number
                     const title = String(it.title || "").trim()
