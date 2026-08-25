@@ -178,12 +178,7 @@
         v-else-if="currentView === 'docs'"
       ></docs-view>
 
-      <!-- 7. Plugin Marketplace View -->
-      <marketplace-view
-        v-else-if="currentView === 'marketplace'"
-      ></marketplace-view>
-
-      <!-- 8. Portfolio Dashboard View -->
+      <!-- 7. Portfolio Dashboard View -->
       <portfolio-view
         v-else-if="currentView === 'portfolio'"
         :projects="projects"
@@ -478,7 +473,6 @@
   <script src="/js/components/StatsView.js"></script>
   <script src="/js/components/PortfolioView.js"></script>
   <script src="/js/components/DocsView.js"></script>
-  <script src="/js/components/MarketplaceView.js"></script>
   <script src="/js/components/IssueDrawer.js"></script>
   <script src="/js/components/CommandPalette.js"></script>
   <script src="/js/components/NewIssueModal.js"></script>

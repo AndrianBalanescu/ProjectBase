@@ -220,14 +220,6 @@ const HeaderComponent = {
             <i data-lucide="book-open" class="w-3.5 h-3.5 text-indigo-400"></i>
             <span>Docs & API</span>
           </button>
-          <button 
-            @click="$emit('change-view', 'marketplace')" 
-            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all font-medium"
-            :class="currentView === 'marketplace' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'"
-          >
-            <i data-lucide="puzzle" class="w-3.5 h-3.5 text-purple-400"></i>
-            <span>Plugins</span>
-          </button>
         </div>
       </div>
 
