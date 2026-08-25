@@ -54,11 +54,25 @@ echo "$NEW_VERSION" > "$VERSION_FILE"
 # Update openapi.json if present
 if [ -f "$OPENAPI_FILE" ]; then
     python3 -c "
-import json
+import json, re
 with open('$OPENAPI_FILE', 'r', encoding='utf-8') as f:
     data = json.load(f)
 if 'info' in data:
     data['info']['version'] = '$NEW_VERSION'
+
+# Keep the /projectbase/version response schema example in sync too, so the
+# spec never drifts from VERSION (drift-guard: bump must update every ref).
+def _walk(o):
+    if isinstance(o, dict):
+        if isinstance(o.get('example'), str) and re.fullmatch(r'\d+\.\d+\.\d+', o['example']):
+            o['example'] = '$NEW_VERSION'
+        for v in o.values():
+            _walk(v)
+    elif isinstance(o, list):
+        for v in o:
+            _walk(v)
+_walk(data)
+
 with open('$OPENAPI_FILE', 'w', encoding='utf-8') as f:
     json.dump(data, f, indent=2)
 "
