@@ -10,6 +10,19 @@ subscriptions, Stripe, or paid tiers.
 
 ## [Unreleased]
 
+### Fixed
+- **Agent dispatch webhook payload now includes the issue title/description**
+  (`app/pb_hooks/80_agent_triggers.pb.js`): the external Windmill and generic
+  `AGENT_TRIGGER_WEBHOOK` payloads previously referenced `title`/`desc` that
+  were never read off the issue, so every external dispatch sent `undefined`
+  for the issue title and description. The hook now reads
+  `issue.get("title")` / `issue.get("description")` before building either
+  payload, and maps each allowed `agent_target` (`flomaster`, `hermes`,
+  `windmill`, `custom`) to a distinct, human-facing agent name so the audit
+  trail is unambiguous. A regression guard
+  (`test_dispatch_agent_webhook_payload_reads_title_description`) fails if the
+  field reads or the per-target mapping are removed.
+
 ### Added
 - **Plane issues importer** (`POST /api/projectbase/import/plane`): imports a
   Plane workspace CSV export (Workspace Settings > Exports > select project >
