@@ -87,7 +87,7 @@ def _cleanup_importer_artifacts():
                 break
             for it in items:
                 sm = it.get("source_metadata") or {}
-                if sm.get("importer") in ("csv", "github", "linear"):
+                if sm.get("importer") in ("csv", "github", "linear", "plane"):
                     _request("DELETE", f"/api/collections/issues/records/{it['id']}",
                              headers=hdr)
     except Exception:
@@ -261,6 +261,7 @@ DOCUMENTED_CUSTOM_ROUTES = [
     "/projectbase/import/csv",
     "/projectbase/import/github",
     "/projectbase/import/linear",
+    "/projectbase/import/plane",
     "/projectbase/export/csv",
     "/projectbase/export/json",
     "/projectbase/notifications/read-all",
@@ -693,6 +694,133 @@ def test_linear_importer_normalizes_status_and_priority():
     priorities = {i["priority"] for i in linear_items}
     assert "backlog" in statuses and "done" in statuses and "cancelled" in statuses
     assert "none" in priorities and "low" in priorities and "urgent" in priorities
+
+
+# ---------------------------------------------------------------------------
+# Plane importer (cycle 37): closes the feature-matrix Importers(Linear/Plane/GitHub)
+# ---------------------------------------------------------------------------
+
+def test_plane_importer_requires_authentication():
+    status, _ = _request("POST", "/api/projectbase/import/plane",
+                         {"project_id": "x", "rows": [{"Name": "y"}]})
+    assert status == 401
+
+
+def test_plane_importer_missing_project():
+    status, _ = _request("POST", "/api/projectbase/import/plane",
+                         {"rows": [{"Name": "y"}]},
+                         headers={"Authorization": _superuser_token()})
+    assert 400 <= status < 500
+
+
+def test_plane_importer_creates_issue_with_mapping():
+    """A Plane-style row maps State/Priority/Labels/Assignee/Start/Target Date."""
+    pid = _get_any_project_id()
+    status, body = _request(
+        "POST", "/api/projectbase/import/plane",
+        {"project_id": pid, "rows": [{
+            "ID": f"plan-{_uid()}",
+            "Name": f"Plane Test {_uid()}",
+            "Description": "from plane",
+            "State": "In Progress",
+            "Priority": "Urgent",
+            "Labels": "bug, auth",
+            "Assignee": "Alice",
+            "Start Date": "2026-08-01",
+            "Target Date": "2026-09-01",
+            "Estimate": "5"
+        }]},
+        headers={"Authorization": _superuser_token()})
+    assert status == 200, f"plane import failed: {status} {body}"
+    assert body["imported"] == 1
+    assert body["skipped"] == 0
+
+    from urllib.parse import quote
+    q = "/api/collections/issues/records?filter=" + quote(f"(title~'Plane Test')") + "&perPage=20"
+    st, recs = _get_authed(q)
+    assert st == 200
+    matches = [i for i in recs.get("items", [])
+               if (i.get("source_metadata") or {}).get("importer") == "plane"]
+    assert matches, "plane-imported issue not found"
+    rec = matches[0]
+    assert rec["status"] == "in_progress", rec["status"]
+    assert rec["priority"] == "urgent"
+    assert set(rec["labels"]) == {"bug", "auth"}
+    assert rec["assignee"] == "Alice"
+    assert rec["start_date"].startswith("2026-08-01")
+    assert rec["due_date"].startswith("2026-09-01")
+    assert rec["estimate"] == 5
+
+
+def test_plane_importer_accepts_raw_csv():
+    """The `csv` text form parses Plane's export server-side."""
+    pid = _get_any_project_id()
+    uid = _uid()
+    csv_text = (
+        "Name,State,Priority,Labels,Assignees,Start Date,Target Date\n"
+        f"Plane Csv Form {uid},In Review,High,\"perf, reg\",Bob,2026-08-05,2026-10-01\n"
+        f"Plane Csv Blank {uid},,,,,\n"
+    )
+    status, body = _request(
+        "POST", "/api/projectbase/import/plane",
+        {"project_id": pid, "csv": csv_text},
+        headers={"Authorization": _superuser_token()})
+    assert status == 200, f"csv plane import failed: {status} {body}"
+    assert body["imported"] == 2
+    assert body["total"] == 2
+
+    from urllib.parse import quote
+    q = "/api/collections/issues/records?filter=" + quote(f"(title~'Csv Form')") + "&perPage=5"
+    st, recs = _get_authed(q)
+    assert st == 200
+    matches = [i for i in recs.get("items", [])
+               if "Csv Form" in (i.get("title") or "")
+               and (i.get("source_metadata") or {}).get("importer") == "plane"]
+    assert matches
+    rec = matches[0]
+    assert rec["status"] == "in_review", rec["status"]
+    assert rec["priority"] == "high"
+    assert set(rec["labels"]) == {"perf", "reg"}
+
+
+def test_plane_importer_normalizes_status_and_priority():
+    """Plane status/priority strings normalize to ProjectBase enums."""
+    pid = _get_any_project_id()
+    rows = [
+        {"Name": f"Plane T {_uid()}", "State": "Backlog", "Priority": "No priority"},
+        {"Name": f"Plane T {_uid()}", "State": "Done", "Priority": "Low"},
+        {"Name": f"Plane T {_uid()}", "State": "Canceled", "Priority": "Critical"},
+    ]
+    status, body = _request(
+        "POST", "/api/projectbase/import/plane",
+        {"project_id": pid, "rows": rows},
+        headers={"Authorization": _superuser_token()})
+    assert status == 200 and body["imported"] == 3
+    from urllib.parse import quote
+    q = "/api/collections/issues/records?filter=" + quote("(title~'Plane T ')") + "&perPage=20"
+    st, recs = _get_authed(q)
+    assert st == 200
+    plane_items = [i for i in recs.get("items", [])
+                   if (i.get("source_metadata") or {}).get("importer") == "plane"]
+    statuses = {i["status"] for i in plane_items}
+    priorities = {i["priority"] for i in plane_items}
+    assert "backlog" in statuses and "done" in statuses and "cancelled" in statuses
+    assert "none" in priorities and "low" in priorities and "urgent" in priorities
+
+
+def test_plane_importer_idempotent_by_id():
+    """Re-importing the same Plane issue ID skips it even if the title changes."""
+    pid = _get_any_project_id()
+    uid = _uid()
+    key = f"plan-key-{uid}"
+    p1 = {"project_id": pid, "rows": [{"ID": key, "Name": f"Plane Idem A {uid}"}]}
+    p2 = {"project_id": pid, "rows": [{"ID": key, "Name": f"Plane Idem B {uid}"}]}
+    status, body = _request("POST", "/api/projectbase/import/plane", p1,
+                            headers={"Authorization": _superuser_token()})
+    assert status == 200 and body["imported"] == 1
+    status2, body2 = _request("POST", "/api/projectbase/import/plane", p2,
+                              headers={"Authorization": _superuser_token()})
+    assert status2 == 200 and body2["imported"] == 0 and body2["skipped"] == 1
 
 
 # ---------------------------------------------------------------------------

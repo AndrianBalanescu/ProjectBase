@@ -1370,3 +1370,41 @@ adds a dedicated Linear CSV importer.
 
 **Next:** remaining v1.1 backlog and North Star external-gated items (public
 demo domain + first-stranger onboarding) still need human input.
+
+## Cycle-37 shipped (2026-08-25): Plane issues importer
+
+**Goal:** close the last must-have importer gap in the feature matrix. The
+matrix claims `Importers (Linear/Plane/GitHub)` but only CSV + Linear + GitHub
+importers existed (Linear shipped cycle 36). Since the charter's target is a
+"Linear & Plane alternative" and Plane is the other named competitor, a Plane
+importer was the missing third leg.
+
+**Shipped this cycle:**
+- New backend route `POST /api/projectbase/import/plane`
+  (`app/pb_hooks/42_plane_importer.pb.js`) accepting either an array of row
+  objects keyed by Plane's export CSV columns or the raw Plane workspace CSV
+  export text (`csv`). Maps Plane state/priority/labels/assignees/start
+  date/target date/estimate/description to ProjectBase fields, is tolerant of
+  Plane version column drift (Name/Title, State/State Group/Status,
+  Start Date/Target Date), and is idempotent (keyed by Plane issue ID via
+  `source_metadata.source_key`).
+- New "Plane" tab in the Import modal (`ImportModal.js`): paste the Plane
+  workspace CSV export, pick a target project, and import in one click.
+- Agent surface kept in sync: `openapi.json` (`/projectbase/import/plane`),
+  `llms.txt` (import section), and the `DOCUMENTED_CUSTOM_ROUTES` drift guard
+  in `tests/test_api.py`.
+- CHANGELOG `[Unreleased]` entry + AGENTS.md + FEATURE_MATRIX updated.
+
+**Validation:**
+- `pytest tests/` → **214/214 passed** (+6 Plane importer tests: auth, mapping
+  incl. dates/labels/estimate, raw-CSV parsing, status/priority normalization,
+  idempotency-by-ID). The previously flaky
+  `test_github_long_description_truncated` passed this run (live GitHub rate
+  limit had lifted).
+- Headless render QA (`scripts/qa/qa-render.sh`) → **RENDER QA: PASS**, incl.
+  new assertions that the Import modal renders the Plane tab + textarea +
+  "Import from Plane" button with zero console errors.
+- `python3 -m flow.frontend_guard` → all frontend files verified clean.
+
+**Next:** remaining v1.1 backlog and North Star external-gated items (public
+demo domain + first-stranger onboarding) still need human input.

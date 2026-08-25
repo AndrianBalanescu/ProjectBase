@@ -1107,8 +1107,8 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   } catch (e) { notifSettings.error = String(e).slice(0, 200); }
   notifSettings.checked = true;
 
-  // ---- Import modal (cycle 36): opens via the 'i' shortcut and renders the
-  // Linear importer tab (the Linear workspace CSV exporter). ----
+  // ---- Import modal (cycle 36/37): opens via the 'i' shortcut and renders the
+  // Linear + Plane importer tabs (Linear/Plane workspace CSV exporters). ----
   try {
     // Ensure the app shell has focus (the 'i' shortcut is app-level).
     await page.locator('body').click({ position: { x: 5, y: 5 } }).catch(() => {});
@@ -1122,6 +1122,13 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       await page.waitForTimeout(400);
       importModal.linearField = await page.locator('textarea[placeholder*="ID,Title,Status"]').first().isVisible().catch(() => false);
       importModal.linearBtn = await page.locator('button:has-text("Import from Linear")').first().isVisible().catch(() => false);
+    }
+    importModal.planeTab = await page.locator('button:has-text("Plane")').first().isVisible().catch(() => false);
+    if (importModal.planeTab) {
+      await page.locator('button:has-text("Plane")').first().click();
+      await page.waitForTimeout(400);
+      importModal.planeField = await page.locator('textarea[placeholder*="Name,State,Priority"]').first().isVisible().catch(() => false);
+      importModal.planeBtn = await page.locator('button:has-text("Import from Plane")').first().isVisible().catch(() => false);
     }
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
@@ -1289,6 +1296,9 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     if (importModal.linearTab === false) failures.push('import modal Linear tab missing');
     if (importModal.linearTab && importModal.linearField === false) failures.push('Linear CSV textarea missing');
     if (importModal.linearTab && importModal.linearBtn === false) failures.push('Import from Linear button missing');
+    if (importModal.planeTab === false) failures.push('import modal Plane tab missing');
+    if (importModal.planeTab && importModal.planeField === false) failures.push('Plane CSV textarea missing');
+    if (importModal.planeTab && importModal.planeBtn === false) failures.push('Import from Plane button missing');
   } else if (!importModal || !importModal.checked) {
     failures.push('import modal E2E not exercised');
   }

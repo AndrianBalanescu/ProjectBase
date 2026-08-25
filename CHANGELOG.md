@@ -11,6 +11,16 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **Plane issues importer** (`POST /api/projectbase/import/plane`): imports a
+  Plane workspace CSV export (Workspace Settings > Exports > select project >
+  Export > CSV). Accepts either an array of row objects keyed by Plane's export
+  columns or the raw CSV export text (`csv`), maps State/Priority/Labels/
+  Assignees/Start Date/Target Date/Estimate/Description, and is idempotent
+  (keyed by Plane issue ID via `source_metadata.source_key`). This closes the
+  last must-have importer gap in the feature matrix, which claimed
+  `Importers (Linear/Plane/GitHub)` while only CSV + Linear + GitHub existed.
+  New "Plane" tab in the Import modal. Agent surface stays in sync:
+  `openapi.json` and `llms.txt`.
 - **Linear issues importer** (`POST /api/projectbase/import/linear`): imports a
   Linear workspace export (Settings > Administration > Import/Export > Export
   data). Accepts either an array of row objects keyed by Linear's CSV columns or

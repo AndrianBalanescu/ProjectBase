@@ -11,9 +11,10 @@ const ImportModalComponent = {
   data() {
     return {
       projectId: '',
-      mode: 'csv', // 'csv' | 'github' | 'linear'
+      mode: 'csv', // 'csv' | 'github' | 'linear' | 'plane'
       csvText: '',
       linearText: '',
+      planeText: '',
       rows: [],
       parsed: false,
       importing: false,
@@ -41,6 +42,7 @@ const ImportModalComponent = {
         this.projectId = this.currentProject ? this.currentProject.id : (this.projects[0] ? this.projects[0].id : '');
         this.csvText = '';
         this.linearText = '';
+        this.planeText = '';
         this.rows = [];
         this.parsed = false;
         this.importing = false;
@@ -243,6 +245,34 @@ const ImportModalComponent = {
         this.importing = false;
       }
     },
+    async importPlane() {
+      const csv = String(this.planeText || '').trim();
+      if (!this.projectId) { this.error = 'Select a target project.'; return; }
+      if (!csv) { this.error = 'Paste the Plane workspace CSV export first.'; return; }
+      this.importing = true;
+      this.error = '';
+      this.result = null;
+      try {
+        const token = (typeof API !== 'undefined' && API.client && API.client.authStore)
+          ? API.client.authStore.token : '';
+        const resp = await fetch('/api/projectbase/import/plane', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': token } : {})
+          },
+          body: JSON.stringify({ project_id: this.projectId, csv: csv })
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));
+        this.result = data;
+        this.$emit('imported', data);
+      } catch (err) {
+        this.error = 'Import failed: ' + String((err && err.message) || err);
+      } finally {
+        this.importing = false;
+      }
+    },
     close() {
       this.$emit('close');
     }
@@ -264,6 +294,7 @@ const ImportModalComponent = {
             <button @click="mode='csv'" class="px-3 py-1.5 rounded-lg font-medium" :class="mode==='csv' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'">CSV</button>
             <button @click="mode='github'" class="px-3 py-1.5 rounded-lg font-medium" :class="mode==='github' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'">GitHub</button>
             <button @click="mode='linear'" class="px-3 py-1.5 rounded-lg font-medium" :class="mode==='linear' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'">Linear</button>
+            <button @click="mode='plane'" class="px-3 py-1.5 rounded-lg font-medium" :class="mode==='plane' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'">Plane</button>
           </div>
 
           <!-- Target Project -->
@@ -333,6 +364,33 @@ const ImportModalComponent = {
               :disabled="importing || !linearText"
               class="w-full px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >{{ importing ? 'Importing...' : 'Import from Linear' }}</button>
+            <p v-if="error" class="text-xs text-red-400">{{ error }}</p>
+            <div v-if="result" class="text-xs space-y-1 rounded-lg bg-gray-950 border border-gray-800 p-3">
+              <p class="text-emerald-400 font-medium">Import complete</p>
+              <p class="text-gray-300">{{ result.imported }} imported, {{ result.skipped }} skipped, {{ result.total }} total</p>
+              <p v-if="result.errors && result.errors.length" class="text-amber-400">Warnings: {{ result.errors.length }} row(s) skipped (see first below)</p>
+              <p v-if="result.errors && result.errors.length" class="text-amber-400/80 font-mono">{{ result.errors.slice(0,3).map(e => 'row ' + e.row + ': ' + e.error).join('; ') }}</p>
+            </div>
+          </template>
+
+          <!-- Plane Import Fields -->
+          <template v-if="mode==='plane'">
+            <div>
+              <label class="text-xs font-medium text-gray-400 mb-1 block">Plane Workspace CSV Export</label>
+              <textarea
+                v-model="planeText"
+                @input="result=null"
+                rows="7"
+                placeholder="Name,State,Priority,Labels,Assignees,Start Date,Target Date&#10;Backend rewrite,In Progress,High,\"bug, perf\",Alice,2026-08-01,2026-09-01"
+                class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-y"
+              ></textarea>
+            </div>
+            <p class="text-[11px] text-gray-500">Paste the CSV from Plane: Workspace Settings &gt; Exports &gt; select your project &gt; Export &gt; CSV. Title, State, Priority, Labels, Assignees, Start Date, Target Date, Estimate and Description are mapped. Re-importing the same export is idempotent (keyed by Plane issue ID).</p>
+            <button
+              @click="importPlane"
+              :disabled="importing || !planeText"
+              class="w-full px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            >{{ importing ? 'Importing...' : 'Import from Plane' }}</button>
             <p v-if="error" class="text-xs text-red-400">{{ error }}</p>
             <div v-if="result" class="text-xs space-y-1 rounded-lg bg-gray-950 border border-gray-800 p-3">
               <p class="text-emerald-400 font-medium">Import complete</p>
