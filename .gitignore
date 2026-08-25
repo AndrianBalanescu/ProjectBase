@@ -10,3 +10,4 @@ prism-out/
 .pytest_cache/
 **/research/jobs/
 backups/
+pocketbase-types.ts
