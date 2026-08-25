@@ -11,6 +11,19 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **Self-hosting deployment-consistency guard (harden)**: new
+  `tests/test_deploy_consistency.py` statically locks the four deploy surfaces
+  — `Dockerfile`, `docker-compose.yml`, `deploy/projectbase.service` (systemd
+  template), `scripts/start.sh`, `Makefile`, and `deploy/Caddyfile` — to the
+  SAME public dir, hooks dir, migrations dir, data dir, and listen port. This
+  is the guard for the documented `pb_data` vs `app/pb_data` data-dir trap in
+  AGENTS.md (local run serves `--dir pb_data` from the repo root while the
+  containerized stack serves `--dir /app/app/pb_data`); if an edit drifts one
+  surface to a different data dir or port, CI fails instead of shipping a
+  demo that boots into a stale/empty database or points the Caddy reverse
+  proxy at the wrong port. Also documented and verified the full Docker
+  fresh-boot path (build, compose up, superuser seed, health) manually this
+  cycle.
 - **Secret/hardcoded-credential regression guard (harden)**: new
   `tests/test_secret_scan.py` scans every tracked source file for live-looking
   API keys, auth tokens, private keys, and long base64 secret assignments

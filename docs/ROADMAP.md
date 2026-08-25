@@ -1070,3 +1070,35 @@ again by a human at any time).
 
 **Next:** remaining v1.1 backlog and North Star external-gated items (public
 demo domain + first-stranger onboarding) still need human input.
+
+## Cycle-25 shipped (2026-08-25): self-hosting deployment-consistency guard + Docker fresh-boot verification
+
+**Context:** cycle 25 is a strategic-calibration cycle (5|cycle). North Star
+priority #1 is "full self-hosting Docker / Docker Compose / Caddy deployment".
+AGENTS.md warns about the classic PocketBase data-dir trap — the local run
+serves `--dir pb_data` from the repo root while the containerized stack serves
+`--dir /app/app/pb_data` (`app/pb_data`) — but no regression guard locked the
+deploy surfaces, so a stray edit could silently ship a demo that boots into a
+stale/empty database or points Caddy at the wrong port.
+
+**Shipped this cycle:**
+- `tests/test_deploy_consistency.py` (9 tests) — static drift guard locking
+  `Dockerfile`, `docker-compose.yml`, `deploy/projectbase.service` (systemd
+  template), `scripts/start.sh`, `Makefile`, and `deploy/Caddyfile` to the same
+  public/hooks/migrations/data dirs and the same listen port (8120). Mirrors the
+  `test_css_sync.py` drift-guard style; proven to fail on a real perturbation
+  (a `--dir /app/pb_data` edit fails immediately) then pass on restore.
+- Manually verified the full Docker fresh-boot path end-to-end: `docker build`,
+  `docker compose up` on a scratch instance, `superuser upsert`, `/api/health`,
+  superuser auth, and 6 seeded projects on a fresh container boot.
+
+**Verification:**
+- `pytest tests/` → **186/186 passed** (was 177; +9 new deploy-consistency
+  guard tests).
+- `python3 -m flow.frontend_guard` → ALL FRONTEND FILES VERIFIED.
+- Render QA (`scripts/qa/qa-render.sh 8120`) → **RENDER QA: PASS**, zero
+  failures (portfolio realtime KPI 57→58 E2E still green).
+- Docker fresh-boot e2e (scratch instance on :8123, teardown `-v` after) → healthy.
+
+**Next:** remaining v1.1 backlog and North Star external-gated items (public
+demo domain + first-stranger onboarding) still need human input.
