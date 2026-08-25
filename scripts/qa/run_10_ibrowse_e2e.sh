@@ -55,7 +55,7 @@ for i in "${!NAMES[@]}"; do
     -H "Content-Type: application/json" \
     -d "$body")
 
-  jid=$(echo "$resp" | jq -r .job_id // empty)
+  jid=$(echo "$resp" | jq -r '.job_id // empty')
   if [ -z "$jid" ]; then
     echo "  FAILED to submit job: $resp"
     continue
@@ -70,7 +70,7 @@ for i in "${!NAMES[@]}"; do
     sleep 8
     waited=$((waited+8))
     poll=$(curl -s "$HOST/v1/runs/$jid" -H "Authorization: Bearer $KEY")
-    status=$(echo "$poll" | jq -r .status // "unknown")
+    status=$(echo "$poll" | jq -r '.status // "unknown"')
     printf "  ... %ds [%s]\r" "$waited" "$status"
     if [ $waited -ge 240 ]; then
       echo "  TIMEOUT after 240s"
@@ -79,11 +79,11 @@ for i in "${!NAMES[@]}"; do
   done
   echo ""
 
-  result_status=$(echo "$poll" | jq -r .result.status // "none")
-  msg=$(echo "$poll" | jq -r .result.message // "")
-  err=$(echo "$poll" | jq -r .result.error // "")
-  steps=$(echo "$poll" | jq -r .result.steps // 0)
-  duration=$(echo "$poll" | jq -r .result.durationMs // 0)
+  result_status=$(echo "$poll" | jq -r '.result.status // "none"')
+  msg=$(echo "$poll" | jq -r '.result.message // ""')
+  err=$(echo "$poll" | jq -r '.result.error // ""')
+  steps=$(echo "$poll" | jq -r '.result.steps // 0')
+  duration=$(echo "$poll" | jq -r '.result.durationMs // 0')
 
   echo "  Outcome: status=$status | result=$result_status | steps=$steps | duration=${duration}ms"
   if [ -n "$err" ] && [ "$err" != "null" ]; then
