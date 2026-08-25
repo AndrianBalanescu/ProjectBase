@@ -32,7 +32,7 @@
 
 ## Where ProjectBase wins (positioning)
 
-- **Single binary + ~16 MB RAM** vs Plane CE ~2.7 GB — self-hosting stops being an ops project.
+- **Single binary + ~50 MB RAM** vs Plane CE ~2.7 GB — self-hosting stops being an ops project.
 - **MIT license** (vs AGPL Plane/Taiga) — embeddable in commercial products without license anxiety.
 - **Zero-build frontend** (vendored Vue 3 + Tailwind, offline-capable) — no CDN dependency, no npm pipeline.
 - **Native agent surface**: OpenAPI 3.1 + Scalar UI, `llms.txt`, FastMCP server — AI agents get first-class API access none of the five offer out of the box.

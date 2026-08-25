@@ -32,7 +32,7 @@ Must-Have = table stakes vs Linear/Plane. Moat = differentiators nobody in the l
 
 | Moat feature | Status | Why it wins |
 |---|---|---|
-| Single binary, ~16 MB RAM | ✅ shipped | Plane CE needs ~2.7 GB + Docker matrix; ProjectBase runs on a Raspberry Pi |
+| Single binary, ~50 MB RAM | ✅ shipped | Plane CE needs ~2.7 GB + Docker matrix; ProjectBase runs on a Raspberry Pi |
 | MIT license | ✅ shipped | Plane/Taiga AGPL blocks commercial embedding |
 | Zero-build, CDN-independent frontend | ✅ shipped (vendored bundles, verified by tests) | Air-gapped/self-host friendly; instant deploys |
 | `llms.txt` + OpenAPI for agents | ✅ shipped | Agent-discoverable API — unique in the set |

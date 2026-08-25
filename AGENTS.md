@@ -1,6 +1,6 @@
 # ProjectBase — Agent Rules & Technical Map
 
-ProjectBase = ultra-lightweight open-source Plane/Linear alternative. **MIT, 100% FOSS, self-hostable. Never add monetization, subscriptions, Stripe, or paid tiers.** ~16 MB RAM, single binary, zero-build frontend, real-time SSE, SQLite. Live app: `http://127.0.0.1:8120` (v1.0.0).
+ProjectBase = ultra-lightweight open-source Plane/Linear alternative. **MIT, 100% FOSS, self-hostable. Never add monetization, subscriptions, Stripe, or paid tiers.** ~50 MB RAM, single binary, zero-build frontend, real-time SSE, SQLite. Live app: `http://127.0.0.1:8120` (v1.0.0).
 
 ## Technical stack & how to run
 
