@@ -10,6 +10,22 @@ subscriptions, Stripe, or paid tiers.
 
 ## [Unreleased]
 
+### Added
+- **Custom Agent dispatch with custom instructions (agent dispatch UI)**
+  (`app/pb_public/js/components/IssueDrawer.js`): the drawer's Trigger Agent
+  dropdown now exposes a **Custom Agent** target plus an inline custom-instruction
+  prompt editor (8000-char cap mirrored from the backend). This makes the
+  charter's signature autonomous-dispatch moat fully reachable from the UI:
+  previously the backend accepted `agent_target: "custom"` with a `prompt` (and
+  OpenAPI documented it), but the frontend only offered `flomaster`/`hermes`/
+  `windmill` and never sent a prompt. The `dispatchAgent(target, prompt)` method
+  now sends the prompt to `POST /api/projectbase/dispatch-agent`, which marks the
+  issue `in_progress`, assigns **Custom Agent**, and echoes the instructions in
+  the audit comment. New pytest
+  (`test_dispatch_agent_custom_target_with_prompt`) and render-QA assertions cover
+  the custom target, prompt forwarding, and the dropdown's prompt editor +
+  char counter.
+
 ### Fixed
 - **Agent dispatch webhook payload now includes the issue title/description**
   (`app/pb_hooks/80_agent_triggers.pb.js`): the external Windmill and generic

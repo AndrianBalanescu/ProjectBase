@@ -31,6 +31,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   const exportModal = { checked: false };
   const notifSettings = { checked: false };
   const importModal = { checked: false };
+  const dispatchQA = { checked: false };
   // URLs whose requests are intentionally ignored from the failure list (the
   // range+apply E2E's cleanup DELETEs can abort client-side after the server
   // already processed them; the end state is verified instead).
@@ -1135,6 +1136,37 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   } catch (e) { importModal.error = String(e).slice(0, 200); }
   importModal.checked = true;
 
+  // ---- Autonomous agent dispatch (cycle 39): the drawer's Trigger Agent
+  // dropdown must render the Custom Agent control plus the custom-instruction
+  // prompt editor, so the charter's signature dispatch moat (custom target +
+  // 8000-char prompt) is reachable from the UI, not just the raw API. ----
+  dispatchQA.checked = true;
+  try {
+    // Open the drawer for a real issue already in the app's dataset (the same
+    // probe id the relations + resize QA blocks use, which demonstrably loads).
+    await page.evaluate(() => { location.hash = '#/pb/board/issue/ckat9ahso93piex'; });
+    await page.waitForTimeout(2500);
+    const trigger = page.locator('button[title="Dispatch this issue to an autonomous agent"]').first();
+    if (await trigger.count()) {
+      await trigger.click();
+      await page.waitForTimeout(600);
+      dispatchQA.customVisible = await page.locator('text=Custom Agent').first().isVisible().catch(() => false);
+      dispatchQA.promptEditor = await page.locator('textarea[placeholder*="custom instructions"]').first().isVisible().catch(() => false);
+      const prompt = page.locator('textarea[placeholder*="custom instructions"]').first();
+      if (await prompt.count()) {
+        await prompt.fill('Refactor the dispatch payload');
+        await page.waitForTimeout(300);
+        dispatchQA.counter = await page.evaluate(() => {
+          const el = [...document.querySelectorAll('span.font-mono')].find((s) => /\/8000/.test(s.textContent || ''));
+          return el ? el.textContent.trim() : null;
+        });
+        dispatchQA.counterHasLength = /\/8000/.test(dispatchQA.counter || '');
+      }
+    } else {
+      dispatchQA.triggerMissing = true;
+    }
+  } catch (e) { dispatchQA.error = String(e).slice(0, 200); }
+
   const failures = [];
   // The browser's network logger emits a GENERIC "Failed to load resource ... 400"
   // console error without naming the URL. If every 4xx was the whitelisted auth
@@ -1302,8 +1334,17 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   } else if (!importModal || !importModal.checked) {
     failures.push('import modal E2E not exercised');
   }
+  if (dispatchQA && dispatchQA.checked) {
+    if (dispatchQA.error) failures.push('agent dispatch E2E error: ' + dispatchQA.error);
+    if (dispatchQA.triggerMissing) failures.push('agent dispatch Trigger Agent button not found in drawer');
+    if (dispatchQA.customVisible === false) failures.push('Custom Agent row did not render in dispatch dropdown');
+    if (dispatchQA.promptEditor === false) failures.push('custom instruction prompt editor missing in dispatch dropdown');
+    if (dispatchQA.counterHasLength === false) failures.push('prompt char counter did not update after typing');
+  } else if (!dispatchQA || !dispatchQA.checked) {
+    failures.push('agent dispatch E2E not exercised');
+  }
 
-  console.log(JSON.stringify({ checks, routing, resize, urlState, relations, focusMode, bulk, range, customField, timeline, portfolio, deepLink, exportModal, notifSettings, importModal, failures, all4xx }, null, 1));
+  console.log(JSON.stringify({ checks, routing, resize, urlState, relations, focusMode, bulk, range, customField, timeline, portfolio, deepLink, exportModal, notifSettings, importModal, dispatchQA, failures, all4xx }, null, 1));
   console.log(failures.length === 0 ? 'RENDER QA: PASS' : 'RENDER QA: FAIL');
   await browser.close();
   process.exit(failures.length === 0 ? 0 : 1);

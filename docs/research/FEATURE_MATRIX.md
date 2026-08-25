@@ -38,7 +38,7 @@ Must-Have = table stakes vs Linear/Plane. Moat = differentiators nobody in the l
 | `llms.txt` + OpenAPI for agents | ✅ shipped | Agent-discoverable API — unique in the set |
 | FastMCP server | ✅ shipped | Claude/agent-native task ops; Linear has no MCP |
 | AI copilot (subtasks, PRD enhance) | ✅ shipped | Bring-your-own-gateway (OmniRoute/OpenAI-compatible) |
-| Autonomous flow daemon + agent dispatch | ✅ shipped | Self-driving sprint execution |
+| Autonomous flow daemon + agent dispatch | ✅ shipped | Self-driving sprint execution; dispatch UI exposes flomaster/hermes/windmill **+ Custom Agent with custom instructions** (8000-char prompt, in-drawer editor) |
 | Built-in cron automation hooks | ✅ shipped | No external scheduler needed |
 
 ## Cycle-1 verdict

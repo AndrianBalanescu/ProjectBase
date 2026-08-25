@@ -30,6 +30,7 @@ const IssueDrawerComponent = {
       copiedBadge: false,
       copiedLinkBadge: false,
       isAgentDropdownOpen: false,
+      agentPrompt: '', // custom instructions sent with an autonomous dispatch
       isFullscreen: false,
       descFocus: false, // true = distraction-free fullscreen description editing
       aiLoadingSubtasks: false,
@@ -355,18 +356,23 @@ const IssueDrawerComponent = {
         custom_fields: this.editCustomFields
       });
     },
-    async dispatchAgent(target = 'flomaster') {
+    async dispatchAgent(target = 'flomaster', prompt) {
       if (!this.issue) return;
       try {
+        const body = { issue_id: this.issue.id, agent_target: target };
+        // Send custom instructions (trimmed) when provided. Mirrors the
+        // backend's 8000-char cap so a huge paste cannot 400 on the wire.
+        if (prompt && String(prompt).trim()) body.prompt = String(prompt).trim().slice(0, 8000);
         const res = await fetch('/api/projectbase/dispatch-agent', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ issue_id: this.issue.id, agent_target: target })
+          body: JSON.stringify(body)
         });
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.error || 'Dispatch failed');
         this.editStatus = 'in_progress';
         this.editAssignee = data.issue.assignee;
+        this.agentPrompt = '';
         await this.loadComments();
       } catch (err) {
         console.error('Agent dispatch failed:', err);
@@ -619,7 +625,34 @@ const IssueDrawerComponent = {
                     <div class="text-[10px] text-gray-500">Scheduled worker</div>
                   </div>
                 </button>
-              </div>
+                <button
+                  @click="dispatchAgent('custom', agentPrompt); isAgentDropdownOpen = false;"
+                  class="w-full flex items-center space-x-2 text-left px-2 py-1.5 text-xs text-gray-200 hover:bg-purple-950/60 hover:text-purple-300 rounded-lg transition-colors"
+                  :class="{ 'bg-purple-950/30': agentPrompt && agentPrompt.trim() }"
+                >
+                  <span class="text-sm">🧠</span>
+                  <div>
+                    <div class="font-medium">Custom Agent</div>
+                    <div class="text-[10px] text-gray-500">Custom instructions</div>
+                  </div>
+                </button>
+                <!-- Custom instruction prompt editor (cycle 39) -->
+                <div v-if="isAgentDropdownOpen" class="mt-1.5 pt-1.5 border-t border-gray-800/80 space-y-1.5">
+                  <textarea
+                    v-model="agentPrompt"
+                    rows="3"
+                    placeholder="Optional custom instructions for the dispatched agent..."
+                    class="w-full px-2.5 py-1.5 rounded-lg bg-gray-950 border border-gray-800 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-y"
+                  ></textarea>
+                  <div class="flex items-center justify-between px-0.5">
+                    <span class="text-[9px] text-gray-500 font-mono">{{ agentPrompt.length }}/8000</span>
+                    <button
+                      type="button"
+                      @click="agentPrompt = ''"
+                      class="text-[10px] text-gray-400 hover:text-white transition-colors"
+                    >Clear</button>
+                  </div>
+                </div>
             </div>
 
             <!-- Agent cURL Helper -->

@@ -1833,6 +1833,38 @@ def test_dispatch_agent_webhook_payload_reads_title_description():
         assert f"{target}:" in code, f"agent_target '{target}' must be mapped to a distinct agent name"
 
 
+def test_dispatch_agent_custom_target_with_prompt():
+    """The `custom` target must accept an 8000-char prompt, mark the issue
+    in_progress, assign the distinct "Custom Agent" name, and echo the prompt
+    back in the audit comment. This closes the loop on the charter's
+    autonomous-dispatch moat: the frontend now exposes a Custom Agent control
+    that sends `agent_target=custom` + a prompt, but the backend previously
+    had the target only reachable via raw API."""
+    pid = _first_project_id()
+    status, created = _authed_json(
+        "POST", "/api/collections/issues/records",
+        {"title": "cycle39 custom dispatch", "project": pid, "status": "todo"})
+    assert status == 200, f"failed to create throwaway issue: {status} {created}"
+    iid = created["id"]
+    prompt = "Triage this issue: estimate the effort, suggest a milestone, and propose subtasks."
+    try:
+        status, body = _authed_json("POST", "/api/projectbase/dispatch-agent",
+                                    {"issue_id": iid, "agent_target": "custom", "prompt": prompt})
+        assert status == 200, f"custom dispatch should succeed: {status} {body}"
+        assert body.get("success") is True
+        assert body.get("issue", {}).get("assignee") == "Custom Agent"
+        # A prompt is forwarded for the custom agent; the audit trail should
+        # record the instructions so a human can see what was dispatched.
+        comments = _get_authed(f"/api/collections/comments/records?filter=issue='{iid}'&perPage=50")[1]
+        assert comments.get("items"), "dispatch must leave an audit comment"
+        joined = " ".join(c.get("content", "") for c in comments["items"])
+        assert "Custom Agent" in joined
+        assert "propose subtasks" in joined
+    finally:
+        _request("DELETE", f"/api/collections/issues/records/{iid}",
+                 headers={"Authorization": _superuser_token()})
+
+
 def test_quick_task_corrupted_json_400():
     status, body = _request("POST", "/api/projectbase/quick-task", b"{bad",
                             headers={"Authorization": _superuser_token()})

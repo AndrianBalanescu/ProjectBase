@@ -1446,3 +1446,43 @@ mapping was also collapsed to a single generic "Flomaster Agent" fallback for
 
 **Next:** remaining v1.1 backlog and North Star external-gated items (public
 demo domain + first-stranger onboarding) still need human input.
+
+## Cycle-39 shipped (2026-08-25): Custom Agent dispatch with custom instructions (UI)
+
+**Goal:** close the last UI gap in the charter's signature moat — autonomous
+agent dispatch. The backend (`app/pb_hooks/80_agent_triggers.pb.js`) already
+accepted `agent_target: "custom"` plus an 8000-char `prompt` (documented in
+OpenAPI), but the frontend IssueDrawer dropdown only exposed
+`flomaster`/`hermes`/`windmill` and never sent a prompt, so the custom-target +
+custom-instructions capability was unreachable from the UI.
+
+**Shipped this cycle:**
+- `app/pb_public/js/components/IssueDrawer.js` — the Trigger Agent dropdown now
+  renders a **Custom Agent** row and an inline custom-instruction prompt editor
+  with an 8000-char counter and Clear button. `dispatchAgent(target, prompt)`
+  now sends the prompt (trimmed, sliced to the backend's 8000 cap) to
+  `POST /api/projectbase/dispatch-agent`. The custom dispatch marks the issue
+  `in_progress`, assigns **Custom Agent**, and echoes the instructions in the
+  audit comment.
+- `tests/test_api.py` — new `test_dispatch_agent_custom_target_with_prompt`:
+  dispatches a throwaway issue with `agent_target=custom` + a prompt, asserts
+  success, the `Custom Agent` assignee, and that the prompt appears in the
+  audit comment.
+- `scripts/qa/render_dom_check.js` — new `dispatchQA` block opens the drawer
+  for a real issue, opens the Trigger dropdown, asserts the Custom Agent row +
+  prompt editor render, and that typing updates the char counter.
+- `app/pb_public/css/style.css` — rebuilt via `scripts/build_css.sh` to include
+  the new utility classes (`pt-1.5`, `px-0.5`, `px-2.5`, `py-1.5`,
+  `bg-purple-950/30`); `tests/test_css_sync.py` re-verified.
+- `CHANGELOG.md` `[Unreleased]` → `Added` entry.
+
+**Validation:**
+- `pytest tests/` → **216/216 passed** (+1 custom-dispatch test).
+- `scripts/qa/qa-render.sh 8120` → **RENDER QA: PASS** incl. the new `dispatchQA`
+  assertions (`customVisible`, `promptEditor`, `counterHasLength`, counter
+  `29/8000`), 0 console/network/layout errors.
+- `python3 -m flow.frontend_guard` → ALL FRONTEND FILES VERIFIED.
+- `node --check` clean on the changed JS files; `tests/test_css_sync.py` 3/3.
+
+**Next:** remaining v1.1 backlog and North Star external-gated items (public
+demo domain + first-stranger onboarding) still need human input.
