@@ -1239,3 +1239,47 @@ HOME-project issue "Deploy ProjectBase…" and opened its drawer). Health
 
 **Next:** remaining v1.1 backlog and North Star external-gated items (public
 demo domain + first-stranger onboarding) still need human input.
+
+## Cycle-33 shipped (2026-08-25): runtime-editable notification channel settings
+
+**Goal:** close the self-host zero-friction gap for external notifications. The
+dispatcher (`app/pb_hooks/60_notifications.pb.js`) only read channel config from
+process environment (`DISCORD_WEBHOOK_URL`, `TELEGRAM_BOT_TOKEN`,
+`TELEGRAM_CHAT_ID`, `PROJECTBASE_WEBHOOK_URL`), so changing a webhook meant
+editing env + restarting the binary. This cycle makes channels configurable
+in-app with immediate effect.
+
+**Shipped this cycle:**
+- `app/pb_migrations/1710000019_notification_settings.js` — additive, idempotent
+  `notification_settings` singleton collection (discord_webhook_url,
+  telegram_token, telegram_chat_id, generic_webhook_url). Locked API rules
+  (create/read/update/delete null) so only the admin-gated routes touch it.
+- `app/pb_hooks/30_custom_routes.pb.js` — `GET`/`PUT
+  /api/projectbase/notification-settings`, admin/manager/superuser-gated. Reads
+  the DB row (falling back to env on fresh installs). Helpers inlined per the
+  Goja module-scope function limitation.
+- `app/pb_hooks/60_notifications.pb.js` — dispatcher now reads the DB row first,
+  falling back to env, so configured channels apply without a restart.
+- `app/pb_public/js/components/NotificationSettingsModal.js` — new modal with
+  Discord webhook, Telegram token + chat ID, generic webhook fields, loading +
+  save states. Opened from a header gear button.
+- Wiring: `app.js` (component + `isNotificationSettingsOpen` +
+  `handleNotificationSettingsSaved`), `Header.js` (`open-notification-settings`
+  emit), `index.html` (binding + script include), `sw.js` precache.
+- Agent surface: `openapi.json` (`/projectbase/notification-settings` GET/PUT +
+  Notifications tag), `llms.txt` / `llms-full.txt`, and two FastMCP tools
+  (`get_notification_settings`, `update_notification_settings`).
+- Tests: `tests/test_api.py` — auth gate, GET/PUT roundtrip, frontend
+  drift-guard (`test_notification_settings_wired_in_frontend`). Headless
+  render-QA E2E added to `render_dom_check.js` (opens modal, asserts all four
+  fields, saves, asserts success message).
+
+**Validation:** `pytest tests/` → **202/202 passed** (199 + 3 new).
+`python3 -m flow.frontend_guard` → ALL FRONTEND FILES VERIFIED. Headless render
+QA (`scripts/qa/qa-render.sh`) → **PASS** with `notifSettings` all green
+(modal opens, all fields render, save shows the success toast). Health `:8120`
+OK. iBrowse visual QA was attempted but the homelab service timed out; the
+headless render-QA fallback (project AGENTS.md) covers the same surface.
+
+**Next:** remaining v1.1 backlog and North Star external-gated items (public
+demo domain + first-stranger onboarding) still need human input.

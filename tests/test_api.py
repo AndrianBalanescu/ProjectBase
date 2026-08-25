@@ -169,6 +169,71 @@ def test_search_returns_cross_project_identifier():
     assert hits[0]["project_id"] == pid
     assert hits[0]["project_identifier"]
 
+def test_notification_settings_requires_auth():
+    status, _ = _get("/api/projectbase/notification-settings")
+    assert status in (401, 403), f"notification-settings must not be public: {status}"
+
+def test_notification_settings_get_put_roundtrip():
+    """The self-hosted notification channel settings must be readable and
+    writable by the superuser, persisting a roundtrip through the PUT body."""
+    hdr = {"Authorization": _superuser_token()}
+    status, body = _get_authed("/api/projectbase/notification-settings")
+    assert status == 200, f"GET notification-settings failed: {status} {body}"
+    assert "discord_webhook_url" in body, "GET must return discord_webhook_url"
+    assert "telegram_token" in body
+    assert "telegram_chat_id" in body
+    assert "generic_webhook_url" in body
+
+    probe = f"https://example.invalid/hook-{_uid()}"
+    put_status, put_body = _request(
+        "PUT", "/api/projectbase/notification-settings",
+        {"discord_webhook_url": probe, "telegram_token": "", "telegram_chat_id": "", "generic_webhook_url": ""},
+        headers=hdr)
+    assert put_status == 200, f"PUT notification-settings failed: {put_status} {put_body}"
+    assert put_body.get("discord_webhook_url") == probe
+    # Roundtrip: a fresh GET returns the persisted value.
+    st2, body2 = _get_authed("/api/projectbase/notification-settings")
+    assert st2 == 200
+    assert body2.get("discord_webhook_url") == probe, "persisted discord webhook not returned on GET"
+    # Restore the previous value to keep the DB pristine for other tests.
+    _request("PUT", "/api/projectbase/notification-settings",
+             {"discord_webhook_url": body.get("discord_webhook_url", ""),
+              "telegram_token": body.get("telegram_token", ""),
+              "telegram_chat_id": body.get("telegram_chat_id", ""),
+              "generic_webhook_url": body.get("generic_webhook_url", "")},
+             headers=hdr)
+
+def test_notification_settings_wired_in_frontend():
+    """Drift-guard: the notification channel settings surface must be wired
+    end-to-end in the zero-build frontend and documented for agents."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    modal = open(os.path.join(root, "app", "pb_public", "js", "components", "NotificationSettingsModal.js")).read()
+    api_js = open(os.path.join(root, "app", "pb_public", "js", "api.js")).read()
+    app_js = open(os.path.join(root, "app", "pb_public", "js", "app.js")).read()
+    index = open(os.path.join(root, "app", "pb_public", "index.html")).read()
+    header = open(os.path.join(root, "app", "pb_public", "js", "components", "Header.js")).read()
+
+    # Modal must call the API client for read + write.
+    assert "API.getNotificationSettings" in modal, "Modal must load via API.getNotificationSettings()"
+    assert "API.updateNotificationSettings" in modal, "Modal must save via API.updateNotificationSettings()"
+    # api.js must expose both methods hitting the custom route.
+    assert "getNotificationSettings" in api_js
+    assert "updateNotificationSettings" in api_js
+    assert "/api/projectbase/notification-settings" in api_js
+    # app.js must register the modal + state + handler.
+    assert "notification-settings-modal" in app_js, "app.js must register the modal component"
+    assert "isNotificationSettingsOpen" in app_js
+    assert "handleNotificationSettingsSaved" in app_js
+    # index.html must include the component script + modal + header binding.
+    assert "NotificationSettingsModal.js" in index
+    assert "notification-settings-modal" in index
+    assert "@open-notification-settings" in index
+    # Header must emit the open event.
+    assert "open-notification-settings" in header
+    # The dispatcher must read the DB settings with env fallback.
+    dispatcher = open(os.path.join(root, "app", "pb_hooks", "60_notifications.pb.js")).read()
+    assert "notification_settings" in dispatcher, "dispatcher must read notification_settings collection"
+
 
 # Every /api/projectbase/* custom route implemented in app/pb_hooks/*.pb.js
 # must be documented in openapi.json. Keep this list in sync when routes change
@@ -189,6 +254,7 @@ DOCUMENTED_CUSTOM_ROUTES = [
     "/projectbase/export/csv",
     "/projectbase/export/json",
     "/projectbase/notifications/read-all",
+    "/projectbase/notification-settings",
     "/projectbase/ai-assist",
     "/projectbase/dispatch-agent",
 ]

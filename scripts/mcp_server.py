@@ -302,5 +302,34 @@ def mark_all_notifications_read() -> Dict[str, Any]:
     """Mark every unread in-app notification of the current user as read."""
     return _request("/api/projectbase/notifications/read-all", method="POST", data={})
 
+@mcp.tool()
+def get_notification_settings() -> Dict[str, Any]:
+    """Read the current Discord/Telegram/generic-webhook notification channel config.
+
+    Values come from the notification_settings collection, falling back to the
+    process environment. Admin/manager/superuser only. Returns
+    { discord_webhook_url, telegram_token, telegram_chat_id, generic_webhook_url }.
+    """
+    return _request("/api/projectbase/notification-settings")
+
+@mcp.tool()
+def update_notification_settings(
+    discord_webhook_url: str = "",
+    telegram_token: str = "",
+    telegram_chat_id: str = "",
+    generic_webhook_url: str = "",
+) -> Dict[str, Any]:
+    """Persist the notification channel config so it applies without a process restart.
+
+    Admin/superuser only. Blank fields fall back to the process environment (or
+    disable that channel entirely). Returns the updated values.
+    """
+    return _request("/api/projectbase/notification-settings", method="PUT", data={
+        "discord_webhook_url": discord_webhook_url,
+        "telegram_token": telegram_token,
+        "telegram_chat_id": telegram_chat_id,
+        "generic_webhook_url": generic_webhook_url,
+    })
+
 if __name__ == "__main__":
     mcp.run()

@@ -19,7 +19,7 @@ Must-Have = table stakes vs Linear/Plane. Moat = differentiators nobody in the l
 | Keyboard-first UX | ✅ | ⚠️ partial | ✅ CommandPalette + shortcuts | ✅ shipped |
 | Batch multi-select + bulk actions | ✅ | ⚠️ partial | ✅ board + list checkboxes, select-all, Esc clear, **Shift+click range selection (board column order + list sort order)**, floating status/priority/cycle bar + bulk delete (REST, admin/manager-gated delete) | ✅ shipped (cycle 16 + 17) |
 | Importers (Linear/Plane/GitHub) | export only | partial | ✅ CSV + GitHub API importers | ✅ shipped |
-| Notifications | ✅ | ✅ | ✅ Discord/Telegram/webhook + in-app inbox (assigned/mention/comment/status/priority), unread badge, mark-read, recipient-scoped rules | ✅ shipped |
+| Notifications | ✅ | ✅ | ✅ Discord/Telegram/webhook + in-app inbox (assigned/mention/comment/status/priority), unread badge, mark-read, recipient-scoped rules; **runtime-editable channel settings** (`notification_settings` singleton + admin-gated GET/PUT, applied without restart) | ✅ shipped (cycle 33) |
 | Roadmap view | ✅ | ✅ | ✅ milestones + North Star + progress, assign issues to milestones in create/edit drawer | ✅ shipped |
 | Timeline / Gantt | ✅ | ✅ | ✅ day-grid schedule of cycles, milestones & issues (`issues.start_date` + due dates), status-colored bars, click-to-open, header/palette/keyboard/route wiring | ✅ shipped (cycle 19) |
 | Portfolio dashboard | ✅ | ✅ | ✅ cross-project overview at `#/pb/portfolio` (KPI cards, per-project progress bars, milestones & roadmap-health panel with overdue surfacing), workspace snapshot, header/palette/keyboard `9`/route wiring | ✅ shipped (cycle 20) |

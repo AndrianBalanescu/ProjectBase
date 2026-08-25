@@ -56,9 +56,25 @@ onRecordAfterCreateSuccess((e) => {
         let status = e.record.get("status") || "todo"
         let assignee = e.record.get("assignee") || "Unassigned"
 
+        // Channel config is runtime-editable via notification_settings (singleton
+        // collection); env remains the fallback for fresh installs / Docker.
         let discordUrl = $os.getenv("DISCORD_WEBHOOK_URL")
         let telegramToken = $os.getenv("TELEGRAM_BOT_TOKEN")
         let telegramChatId = $os.getenv("TELEGRAM_CHAT_ID")
+        try {
+            const rows = e.app.findRecordsByFilter("notification_settings", "1=1", "", 1, 0)
+            if (rows.length > 0) {
+                const row = rows[0]
+                const dbDiscord = row.get("discord_webhook_url")
+                const dbToken = row.get("telegram_token")
+                const dbChat = row.get("telegram_chat_id")
+                if (dbDiscord) discordUrl = dbDiscord
+                if (dbToken) telegramToken = dbToken
+                if (dbChat) telegramChatId = dbChat
+            }
+        } catch (settingsErr) {
+            // notification_settings collection missing on old installs — env only.
+        }
 
         if (discordUrl) {
             sendDiscordNotification(
@@ -100,6 +116,19 @@ onRecordAfterUpdateSuccess((e) => {
 
         let discordUrl = $os.getenv("DISCORD_WEBHOOK_URL")
         let genericWebhookUrl = $os.getenv("PROJECTBASE_WEBHOOK_URL")
+        // Runtime-editable channel config from notification_settings (env fallback).
+        try {
+            const rows = e.app.findRecordsByFilter("notification_settings", "1=1", "", 1, 0)
+            if (rows.length > 0) {
+                const row = rows[0]
+                const dbDiscord = row.get("discord_webhook_url")
+                const dbWebhook = row.get("generic_webhook_url")
+                if (dbDiscord) discordUrl = dbDiscord
+                if (dbWebhook) genericWebhookUrl = dbWebhook
+            }
+        } catch (settingsErr) {
+            // notification_settings collection missing on old installs — env only.
+        }
 
         if (oldStatus !== newStatus) {
             let color = "#3b82f6"

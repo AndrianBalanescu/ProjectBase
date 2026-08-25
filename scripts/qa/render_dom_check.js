@@ -24,6 +24,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   const range = { checked: false };
   const customField = { checked: false };
   const exportModal = { checked: false };
+  const notifSettings = { checked: false };
   // URLs whose requests are intentionally ignored from the failure list (the
   // range+apply E2E's cleanup DELETEs can abort client-side after the server
   // already processed them; the end state is verified instead).
@@ -1074,6 +1075,32 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   } catch (e) { exportModal.error = String(e).slice(0, 200); }
   exportModal.checked = true;
 
+  // ---- Notification channel settings modal (cycle 33): opens via header gear
+  // button, renders all channel fields, and saves a webhook URL. ----
+  try {
+    const headerNotif = page.locator('header button[title*="Notification channel settings"]');
+    if (await headerNotif.count()) {
+      await headerNotif.click();
+      await page.waitForTimeout(800);
+      notifSettings.modalVisible = await page.locator('text=Notification Channels').first().isVisible().catch(() => false);
+      notifSettings.discordField = await page.locator('input[placeholder*="discord.com"]').first().isVisible().catch(() => false);
+      notifSettings.telegramToken = await page.locator('input[placeholder*="ABC"]').first().isVisible().catch(() => false);
+      notifSettings.telegramChat = await page.locator('input[placeholder*="-100"]').first().isVisible().catch(() => false);
+      notifSettings.genericField = await page.locator('input[placeholder*="hook"]').first().isVisible().catch(() => false);
+      const saveBtn = page.locator('button:has-text("Save Settings")').first();
+      if (await saveBtn.count()) {
+        await saveBtn.click();
+        await page.waitForTimeout(800);
+        notifSettings.savedMsg = await page.locator('text=Notification channels updated').first().isVisible().catch(() => false);
+      } else {
+        notifSettings.saveBtnMissing = true;
+      }
+    } else {
+      notifSettings.headerButtonMissing = true;
+    }
+  } catch (e) { notifSettings.error = String(e).slice(0, 200); }
+  notifSettings.checked = true;
+
   const failures = [];
   // The browser's network logger emits a GENERIC "Failed to load resource ... 400"
   // console error without naming the URL. If every 4xx was the whitelisted auth
@@ -1216,8 +1243,21 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   } else if (!exportModal || !exportModal.checked) {
     failures.push('export modal E2E not exercised');
   }
+  if (notifSettings && notifSettings.checked) {
+    if (notifSettings.error) failures.push('notification settings E2E error: ' + notifSettings.error);
+    if (notifSettings.headerButtonMissing) failures.push('notification settings header button not found');
+    if (notifSettings.modalVisible === false) failures.push('notification settings modal did not open');
+    if (notifSettings.discordField === false) failures.push('notification settings Discord field missing');
+    if (notifSettings.telegramToken === false) failures.push('notification settings Telegram token field missing');
+    if (notifSettings.telegramChat === false) failures.push('notification settings Telegram chat field missing');
+    if (notifSettings.genericField === false) failures.push('notification settings generic webhook field missing');
+    if (notifSettings.saveBtnMissing) failures.push('notification settings Save button missing');
+    if (notifSettings.savedMsg === false) failures.push('notification settings did not show saved message');
+  } else if (!notifSettings || !notifSettings.checked) {
+    failures.push('notification settings E2E not exercised');
+  }
 
-  console.log(JSON.stringify({ checks, routing, resize, urlState, relations, focusMode, bulk, range, customField, timeline, portfolio, deepLink, failures, all4xx }, null, 1));
+  console.log(JSON.stringify({ checks, routing, resize, urlState, relations, focusMode, bulk, range, customField, timeline, portfolio, deepLink, exportModal, notifSettings, failures, all4xx }, null, 1));
   console.log(failures.length === 0 ? 'RENDER QA: PASS' : 'RENDER QA: FAIL');
   await browser.close();
   process.exit(failures.length === 0 ? 0 : 1);

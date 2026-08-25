@@ -286,6 +286,27 @@ const API = {
     });
   },
 
+  // Notification channel settings (self-hosted, admin-gated)
+  async getNotificationSettings() {
+    const res = await fetch('/api/projectbase/notification-settings', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to load notification settings');
+    return data;
+  },
+
+  async updateNotificationSettings(payload) {
+    const res = await fetch('/api/projectbase/notification-settings', {
+      method: 'PUT',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to save notification settings');
+    return data;
+  },
+
   // Stats
   async getStats() {
     try {

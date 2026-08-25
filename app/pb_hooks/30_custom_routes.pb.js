@@ -248,3 +248,117 @@ routerAdd("GET", "/api/projectbase/search", (e) => {
         return e.json(500, { error: "Internal server error" })
     }
 })
+
+// ---------------------------------------------------------------------------
+// Notification channel settings (in-app, self-hosted). Reads/writes the
+// `notification_settings` singleton collection that 60_notifications.pb.js
+// dispatches to. GET returns the current values (DB row, falling back to env so
+// the UI reflects what is actually in use). PUT lets an admin update them at
+// runtime without restarting the process. Both are admin/superuser-gated.
+// ---------------------------------------------------------------------------
+
+// NOTE (critical): In the Goja runtime PocketBase uses, module-scope function
+// declarations are NOT resolvable from inside a route callback — every call
+// throws `ReferenceError: <fn> is not defined`. ALL logic is therefore inlined
+// directly inside each callback below.
+
+routerAdd("GET", "/api/projectbase/notification-settings", (e) => {
+    try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
+        let privileged = false
+        try {
+            const isSuperuser = e.auth.collection && e.auth.collection().name === "_superusers"
+            if (isSuperuser) { privileged = true } else {
+                const role = e.auth.get("role")
+                privileged = (role === "admin" || role === "manager")
+            }
+        } catch (privErr) { privileged = false }
+        if (!privileged) {
+            return e.forbiddenError("Admin or manager role required")
+        }
+
+        let rows = []
+        try { rows = e.app.findRecordsByFilter("notification_settings", "1=1", "", 1, 0) } catch (rErr) { rows = [] }
+        let row = rows.length > 0 ? rows[0] : null
+        if (!row) {
+            try {
+                const collection = e.app.findCollectionByNameOrId("notification_settings")
+                row = new Record(collection)
+                e.app.save(row)
+            } catch (cErr) {
+                row = null
+            }
+        }
+        if (!row) {
+            return e.json(200, {
+                discord_webhook_url: $os.getenv("DISCORD_WEBHOOK_URL") || "",
+                telegram_token: $os.getenv("TELEGRAM_BOT_TOKEN") || "",
+                telegram_chat_id: $os.getenv("TELEGRAM_CHAT_ID") || "",
+                generic_webhook_url: $os.getenv("PROJECTBASE_WEBHOOK_URL") || "",
+            })
+        }
+        return e.json(200, {
+            discord_webhook_url: row.get("discord_webhook_url") || "",
+            telegram_token: row.get("telegram_token") || "",
+            telegram_chat_id: row.get("telegram_chat_id") || "",
+            generic_webhook_url: row.get("generic_webhook_url") || "",
+        })
+    } catch (err) {
+        console.log(">>> [ProjectBase] notification-settings GET error:", JSON.stringify(String((err && err.message) || err)))
+        return e.json(500, { error: "Internal server error" })
+    }
+})
+
+routerAdd("PUT", "/api/projectbase/notification-settings", (e) => {
+    try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
+        let privileged = false
+        try {
+            const isSuperuser = e.auth.collection && e.auth.collection().name === "_superusers"
+            if (isSuperuser) { privileged = true } else {
+                const role = e.auth.get("role")
+                privileged = (role === "admin" || role === "manager")
+            }
+        } catch (privErr) { privileged = false }
+        if (!privileged) {
+            return e.forbiddenError("Admin or manager role required")
+        }
+
+        let body
+        try { body = e.requestInfo().body || {} } catch (bErr) { return e.json(400, { error: "Invalid JSON body" }) }
+
+        let rows = []
+        try { rows = e.app.findRecordsByFilter("notification_settings", "1=1", "", 1, 0) } catch (rErr) { rows = [] }
+        let row = rows.length > 0 ? rows[0] : null
+        if (!row) {
+            try {
+                const collection = e.app.findCollectionByNameOrId("notification_settings")
+                row = new Record(collection)
+            } catch (cErr) {
+                row = null
+            }
+        }
+        if (!row) {
+            return e.json(500, { error: "notification_settings collection unavailable" })
+        }
+        const clamp = (v, max) => (typeof v === "string" ? v.slice(0, max) : "")
+        row.set("discord_webhook_url", clamp(body.discord_webhook_url, 2048))
+        row.set("telegram_token", clamp(body.telegram_token, 512))
+        row.set("telegram_chat_id", clamp(body.telegram_chat_id, 128))
+        row.set("generic_webhook_url", clamp(body.generic_webhook_url, 2048))
+        e.app.save(row)
+        return e.json(200, {
+            discord_webhook_url: row.get("discord_webhook_url") || "",
+            telegram_token: row.get("telegram_token") || "",
+            telegram_chat_id: row.get("telegram_chat_id") || "",
+            generic_webhook_url: row.get("generic_webhook_url") || "",
+        })
+    } catch (err) {
+        console.log(">>> [ProjectBase] notification-settings PUT error:", JSON.stringify(String((err && err.message) || err)))
+        return e.json(500, { error: "Internal server error" })
+    }
+})

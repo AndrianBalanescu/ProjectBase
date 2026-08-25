@@ -96,6 +96,18 @@ curl -s ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/search \
 # Returns { query, count, results:[{ id, identifier, title, status, priority,
 #   project_id, project_name, project_identifier, project_color }] }.
 
+### Notification Channel Settings (admin/manager only, runtime-editable):
+# Read current Discord/Telegram/generic-webhook config (DB first, env fallback):
+curl -s ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/notification-settings \
+  -H "Authorization: <POCKETBASE_TOKEN>"
+# Persist channel config without a process restart:
+curl -s -X PUT ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/notification-settings \
+  -H "Authorization: <POCKETBASE_TOKEN>" -H "Content-Type: application/json" \
+  -d '{"discord_webhook_url":"https://discord.com/api/webhooks/...","telegram_token":"123:ABC","telegram_chat_id":"-100123","generic_webhook_url":"https://host/hook"}'
+# Returns { discord_webhook_url, telegram_token, telegram_chat_id, generic_webhook_url }.
+# The dispatcher reads these DB values first and falls back to process env, so
+# channels can be changed without restarting the binary.
+
 ### Append Execution Log:
 curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/collections/comments/records \
   -H "Content-Type: application/json" \
