@@ -1942,6 +1942,67 @@ def test_quick_task_valid_key_creates_and_cleans():
              headers={"Authorization": _superuser_token()})
 
 
+def test_mcp_server_dispatch_agent_tool():
+    """The FastMCP `dispatch_agent` tool must claim an issue end-to-end.
+
+    Cycle-46 modernization: the MCP server is the agent-facing moat, but it
+    exposed 16 tools while the charter's signature autonomous-dispatch endpoint
+    (`POST /api/projectbase/dispatch-agent`) was only reachable via raw REST.
+    This guards the added `dispatch_agent` tool: it resolves an identifier to a
+    record id, POSTs the right payload, and returns the claimed-issue summary
+    (in_progress + agent assignee) without mutating demo data.
+
+    The module itself needs `fastmcp`; rather than require that dependency in
+    the test env, we compile the tool's source with a stub FastMCP and call it
+    through the same module globals the real server uses."""
+    mcp_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                            "scripts", "mcp_server.py")
+    assert os.path.isfile(mcp_path), f"missing expected MCP server {mcp_path}"
+    with open(mcp_path, encoding="utf-8") as fh:
+        src = fh.read()
+
+    # Stub the fastmcp dependency: the tool function body only uses the
+    # stdlib helpers in this module, so a no-op decorator is sufficient.
+    import types as _types
+    stub = _types.ModuleType("fastmcp")
+    stub.FastMCP = lambda name: _types.SimpleNamespace(
+        tool=lambda *a, **k: (a[0] if a else (lambda f: f)))
+    import sys as _sys
+    _sys.modules["fastmcp"] = stub
+
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("mcp_server", mcp_path)
+    mcp_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mcp_mod)
+    # Point the module at this live instance with the protocol credentials.
+    mcp_mod.BASE_URL = BASE_URL
+    mcp_mod.AUTH_EMAIL = SUPERUSER_EMAIL
+    mcp_mod.AUTH_PASSWORD = SUPERUSER_PASSWORD
+    mcp_mod.AUTH_TOKEN = ""
+
+    pid = _first_project_id()
+    status, created = _authed_json(
+        "POST", "/api/collections/issues/records",
+        {"title": "cycle46 mcp dispatch tool", "project": pid, "status": "todo"})
+    assert status == 200, f"failed to create throwaway issue: {status} {created}"
+    iid = created["id"]
+    identifier = created.get("identifier")
+    try:
+        result = mcp_mod.dispatch_agent(identifier, agent_target="flomaster",
+                                        prompt="MCP tool smoke test")
+        assert result.get("success") is True
+        assert result.get("issue", {}).get("id") == iid
+        assert result.get("issue", {}).get("status") == "in_progress"
+        assert result.get("issue", {}).get("assignee") == "Flomaster Agent"
+        # Audit comment must exist so humans/agents can trace the claim.
+        comments = _get_authed(f"/api/collections/comments/records?filter=issue='{iid}'&perPage=50")[1]
+        assert comments.get("items"), "MCP dispatch must leave an audit comment"
+        joined = " ".join(c.get("content", "") for c in comments["items"])
+        assert "Autonomous Task Claimed" in joined
+    finally:
+        _request("DELETE", f"/api/collections/issues/records/{iid}",
+                 headers={"Authorization": _superuser_token()})
+
 def test_ai_assist_corrupted_json_400():
     status, body = _request("POST", "/api/projectbase/ai-assist", b"{bad",
                             headers={"Authorization": _superuser_token()})

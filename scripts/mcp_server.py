@@ -311,6 +311,33 @@ def get_stats() -> Dict[str, Any]:
     return _request("/api/projectbase/stats")
 
 @mcp.tool()
+def dispatch_agent(
+    identifier_or_id: str,
+    agent_target: str = "flomaster",
+    prompt: str = ""
+) -> Dict[str, Any]:
+    """Dispatch an issue to an autonomous agent for execution.
+
+    Claims the issue (marks it in_progress, assigns the target agent, posts an
+    audit comment) and forwards it to the configured external dispatcher
+    (Windmill webhook / agent trigger webhook) when set up.
+
+    Args:
+        identifier_or_id: Issue identifier (e.g. "PB-12") or record id.
+        agent_target: One of "flomaster" | "hermes" | "windmill" | "custom".
+        prompt: Optional custom instructions (max 8000 chars) for the target
+            agent. Required for agent_target="custom".
+
+    Returns the claimed issue summary plus whether an external dispatch fired:
+    { success, message, issue: {id, identifier, status, assignee},
+      dispatched_external }.
+    """
+    issue = _find_issue(identifier_or_id)
+    data = {"issue_id": issue["id"], "agent_target": agent_target, "prompt": prompt}
+    return _request("/api/projectbase/dispatch-agent", method="POST", data=data)
+
+
+@mcp.tool()
 def list_notifications(unread_only: bool = True, limit: int = 20) -> List[Dict[str, Any]]:
     """List the current user's in-app notifications (unread first).
 

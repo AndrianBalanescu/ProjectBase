@@ -27,6 +27,10 @@ Add to ~/.cursor/mcp.json or ~/.flomaster/config.json:
 }
 
 ## Core Agent Tools & Endpoints
+0. FastMCP `dispatch_agent(identifier_or_id, agent_target, prompt)` — native
+   MCP tool for autonomous dispatch (equivalent of endpoint 5c below): claims
+   the issue (status → in_progress, assignee → target agent) and posts the
+   audit comment. Preferred over raw REST when using the FastMCP server.
 1. Quick Task Creation: POST /api/projectbase/quick-task {"project_key":"LOAD","title":"Task name","status":"todo","priority":"high"}
 2. Query Issues: GET /api/collections/issues/records?filter=(project='<ID>')&sort=order,-created
 3. Update Status: PATCH /api/collections/issues/records/<ID> {"status":"in_progress" | "done"}

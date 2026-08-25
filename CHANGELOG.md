@@ -11,6 +11,18 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **FastMCP `dispatch_agent` tool** (`scripts/mcp_server.py`): the MCP server
+  now exposes the charter's signature autonomous-dispatch endpoint as a native
+  tool. Previously agents had 16 MCP tools covering projects/issues/cycles/
+  comments but had to fall back to raw REST to claim an issue for an agent
+  (`POST /api/projectbase/dispatch-agent`). `dispatch_agent(identifier_or_id,
+  agent_target, prompt)` resolves an identifier to a record id, claims the
+  issue (marks it `in_progress`, assigns the target agent), posts the
+  "Autonomous Task Claimed" audit comment, forwards external dispatcher
+  webhooks when configured, and returns the claimed-issue summary. New pytest
+  (`test_mcp_server_dispatch_agent_tool`) drives the tool against the live
+  instance end-to-end and asserts the persisted state + audit comment. 220 →
+  221 tests.
 - **Custom Agent dispatch with custom instructions (agent dispatch UI)**
   (`app/pb_public/js/components/IssueDrawer.js`): the drawer's Trigger Agent
   dropdown now exposes a **Custom Agent** target plus an inline custom-instruction
