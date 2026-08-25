@@ -2062,3 +2062,28 @@ def test_ai_cycle_summary_wired_in_cycles_view():
     assert "DOMPurify.sanitize" in cycles, (
         "renderCycleSummary must sanitize markdown output"
     )
+
+def test_ai_assist_summarize_cycle_fallback():
+    """summarize_cycle must return a non-empty rule-based summary when the LLM
+    gateway is offline/unauthenticated (cycle 28). The endpoint never returns
+    an empty result: with no model it computes achievements, WIP/blockers and
+    velocity from the issues payload."""
+    status, body = _request(
+        "POST", "/api/projectbase/ai-assist",
+        {"action": "summarize_cycle",
+         "title": "Fallback Sprint",
+         "issues": [
+             {"identifier": "PB-1", "title": "Done task", "status": "done", "priority": "high", "estimate": 3},
+             {"identifier": "PB-2", "title": "WIP task", "status": "in_progress", "priority": "medium", "estimate": 2},
+             {"identifier": "PB-3", "title": "Todo task", "status": "todo", "priority": "low", "estimate": 1}
+         ]},
+        headers={"Authorization": _superuser_token()}, timeout=60)
+    assert status == 200, f"summarize_cycle failed: {status} {body}"
+    assert body.get("success") is True
+    result = body.get("result") or ""
+    assert result.strip(), "summarize_cycle returned an empty result (LLM offline fallback missing)"
+    # The summary (LLM or rule-based fallback) must surface the cycle facts a
+    # human can act on; a summary that omits a listed task is a failure.
+    assert "Done task" in result, "summary must reference done work (achievements)"
+    assert "WIP task" in result, "summary must reference in-progress work"
+    assert "Todo task" in result, "summary must reference backlog work"

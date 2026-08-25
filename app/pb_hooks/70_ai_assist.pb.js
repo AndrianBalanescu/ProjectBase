@@ -100,6 +100,71 @@ Be direct, technical, concise.`
                     used_llm: false,
                     description: polished
                 })
+            } else if (action === "summarize_cycle") {
+                // Rule-based sprint summary when the LLM is offline/unauthenticated.
+                // The ai-assist route receives the cycle issues as body.issues;
+                // compute achievements, WIP/blockers and velocity without a model.
+                let issues = Array.isArray(body.issues) ? body.issues : []
+                let doneList = []
+                let wipList = []
+                let todoList = []
+                let totalPts = 0
+                let donePts = 0
+                for (let idx = 0; idx < issues.length; idx++) {
+                    let it = issues[idx] || {}
+                    let ident = it.identifier || ("#" + (idx + 1))
+                    let titleTxt = it.title || "Untitled"
+                    let statusTxt = it.status || "todo"
+                    let est = Number(it.estimate) || 0
+                    let entry = ident + " — " + titleTxt
+                    if (statusTxt === "done") {
+                        doneList.push(entry)
+                        donePts += est
+                    } else if (statusTxt === "in_progress" || statusTxt === "in_review") {
+                        wipList.push(entry)
+                    } else {
+                        todoList.push(entry)
+                    }
+                    totalPts += est
+                }
+                let pct = totalPts > 0 ? Math.round((donePts / totalPts) * 100) : 0
+                let lines = []
+                lines.push("## 🎯 Sprint Summary: " + (title || "Cycle"))
+                lines.push("")
+                lines.push("### ✅ Achievements (" + doneList.length + " done)")
+                if (doneList.length > 0) {
+                    lines.push("- " + doneList.join("\n- "))
+                } else {
+                    lines.push("- Nothing completed yet.")
+                }
+                lines.push("")
+                lines.push("### 🚧 In Progress / Blockers (" + wipList.length + ")")
+                if (wipList.length > 0) {
+                    lines.push("- " + wipList.join("\n- "))
+                } else {
+                    lines.push("- No work in progress.")
+                }
+                lines.push("")
+                lines.push("### 📋 Backlog / Todo (" + todoList.length + ")")
+                if (todoList.length > 0) {
+                    lines.push("- " + todoList.join("\n- "))
+                } else {
+                    lines.push("- Nothing in the backlog.")
+                }
+                lines.push("")
+                lines.push("### 📈 Velocity")
+                lines.push("- Points completed: " + donePts + " / " + totalPts + " (" + pct + "%)")
+                let rec = totalPts > 0 && donePts > 0
+                    ? (pct >= 80 ? "Strong pace — focus on closing the remaining items to finish the sprint." : "Moderate pace — prioritize the oldest in-progress items to avoid spillover.")
+                    : "No completed points yet — start with the highest-priority backlog items."
+                lines.push("- Recommendation: " + rec)
+                let fallbackSummary = lines.join("\n")
+                return e.json(200, {
+                    success: true,
+                    action: action,
+                    used_llm: false,
+                    result: fallbackSummary
+                })
             }
         }
 

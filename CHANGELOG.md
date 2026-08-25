@@ -22,6 +22,13 @@ subscriptions, Stripe, or paid tiers.
   OpenAPI entry already existed, but had no frontend UI. Wired purely in
   `app/pb_public/js/components/CyclesView.js`; Tailwind rebuilt for the new
   classes. No schema or API change.
+  - **Rule-based fallback for `summarize_cycle`**: when the LLM gateway is
+    offline or unauthenticated (401), the endpoint now returns a deterministic
+    sprint summary computed from the issues payload (achievements, in-progress /
+    blockers, backlog, points done/total, and a pacing recommendation) instead
+    of an empty `result`. The Cycles view surfaces an actionable error if the
+    response is still empty, and a new pytest (`test_ai_assist_summarize_cycle_fallback`)
+    locks the behavior. (`app/pb_hooks/70_ai_assist.pb.js`)
 
 - **First-run onboarding guide (welcome modal + empty-state)**: a fresh member
   now gets a 60-second path to value after sign-up. A welcome modal
