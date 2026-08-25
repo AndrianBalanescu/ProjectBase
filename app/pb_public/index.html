@@ -78,6 +78,7 @@
       @open-new-project="editingProject = null; isProjectModalOpen = true;"
       @open-custom-fields="isCustomFieldsOpen = true"
       @open-export="isExportOpen = true"
+      @open-notification-settings="isNotificationSettingsOpen = true"
       @toggle-notifications="loadNotifications"
       @notification-click="handleNotificationClick"
       @mark-all-read="handleMarkAllNotificationsRead"
@@ -399,6 +400,13 @@
       @exported="handleExportComplete"
     ></export-modal>
 
+    <!-- Notification Channel Settings Modal -->
+    <notification-settings-modal
+      :is-open="isNotificationSettingsOpen"
+      @close="isNotificationSettingsOpen = false"
+      @saved="handleNotificationSettingsSaved"
+    ></notification-settings-modal>
+
     <!-- Project Create/Edit Modal -->
     <project-modal 
       :is-open="isProjectModalOpen"
@@ -481,6 +489,7 @@
   <script src="/js/components/ProjectModal.js"></script>
   <script src="/js/components/CycleModal.js"></script>
   <script src="/js/components/CustomFieldsModal.js"></script>
+  <script src="/js/components/NotificationSettingsModal.js"></script>
   <script src="/js/components/WelcomeModal.js"></script>
   <script>
     // Offline-first app shell: register the Service Worker (progressive enhancement).

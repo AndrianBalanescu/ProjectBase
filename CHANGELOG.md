@@ -11,6 +11,21 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **Runtime-editable notification channel settings**: the webhook dispatcher
+  (`60_notifications.pb.js`) previously only read Discord/Telegram/generic-webhook
+  config from process environment (`DISCORD_WEBHOOK_URL`, `TELEGRAM_*`,
+  `PROJECTBASE_WEBHOOK_URL`). A new admin-gated
+  `/api/projectbase/notification-settings` GET/PUT route + `notification_settings`
+  singleton collection (migration 19) lets a self-hoster change channels in-app
+  and have them apply immediately, without restarting the binary. The dispatcher
+  reads the DB row first and falls back to env, so existing installs and Docker
+  deployments keep working unchanged. A header gear button opens a new
+  NotificationSettingsModal with fields for Discord webhook, Telegram token +
+  chat ID, and a generic webhook URL. Agent surface stays in sync: `openapi.json`,
+  `llms.txt`/`llms-full.txt`, and two FastMCP tools
+  (`get_notification_settings` / `update_notification_settings`). New pytest
+  coverage (auth, GET/PUT roundtrip, frontend drift-guard) and a render-QA E2E.
+  No behavior change when no channel is configured.
 - **Global cross-project search in the Cmd+K omnibox**: the command palette
   now searches issues across **every** project (title, identifier, status,
   priority) via a new `/api/projectbase/search` route, not just the currently

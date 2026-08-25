@@ -1607,6 +1607,77 @@
           }
         }
       }
+    },
+    "/projectbase/notification-settings": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Get Notification Channel Settings",
+        "description": "Read the current Discord/Telegram/generic-webhook notification channel configuration. Admin/manager/superuser only. Values come from the notification_settings collection, falling back to process environment.",
+        "responses": {
+          "200": {
+            "description": "Current channel settings"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Admin or manager role required"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Update Notification Channel Settings",
+        "description": "Persist Discord/Telegram/generic-webhook notification channel configuration so it applies immediately without a process restart. Admin/agent only.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "discord_webhook_url": {
+                    "type": "string"
+                  },
+                  "telegram_token": {
+                    "type": "string"
+                  },
+                  "telegram_chat_id": {
+                    "type": "string"
+                  },
+                  "generic_webhook_url": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated channel settings"
+          },
+          "400": {
+            "description": "Invalid JSON body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Admin or manager role required"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
     }
   }
 }

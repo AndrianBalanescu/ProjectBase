@@ -2,7 +2,7 @@
 
 const HeaderComponent = {
   props: ['projects', 'currentProject', 'currentView', 'realtimeConnected', 'notifications', 'unreadNotifications'],
-  emits: ['select-project', 'change-view', 'open-new-issue', 'open-omnibar', 'open-new-project', 'open-custom-fields', 'toggle-notifications', 'notification-click', 'mark-all-read'],
+  emits: ['select-project', 'change-view', 'open-new-issue', 'open-omnibar', 'open-new-project', 'open-custom-fields', 'open-notification-settings', 'toggle-notifications', 'notification-click', 'mark-all-read'],
   data() {
     return {
       dropdownOpen: false,
@@ -232,6 +232,15 @@ const HeaderComponent = {
           <span class="w-2 h-2 rounded-full bg-emerald-400 live-pulse"></span>
           <span class="hidden sm:inline font-mono font-medium">Live SSE</span>
         </div>
+
+        <!-- Notification Channel Settings -->
+        <button
+          @click="$emit('open-notification-settings')"
+          class="relative p-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+          title="Notification channel settings"
+        >
+          <i data-lucide="settings-2" class="w-4 h-4"></i>
+        </button>
 
         <!-- Notifications Inbox Bell -->
         <div class="relative" ref="notifDropdown">

@@ -57,6 +57,7 @@ const PRECACHE_PATHS = [
   './js/components/ProjectModal.js',
   './js/components/CycleModal.js',
   './js/components/CustomFieldsModal.js',
+  './js/components/NotificationSettingsModal.js',
   './js/components/WelcomeModal.js'
 ];
 
