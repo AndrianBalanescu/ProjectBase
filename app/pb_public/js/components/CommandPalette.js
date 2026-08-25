@@ -2,7 +2,7 @@
 
 const CommandPaletteComponent = {
   props: ['isOpen', 'issues', 'projects'],
-  emits: ['close', 'select-issue', 'select-project', 'change-view', 'open-new-issue', 'open-import', 'open-welcome'],
+  emits: ['close', 'select-issue', 'select-project', 'change-view', 'open-new-issue', 'open-import', 'open-export', 'open-welcome'],
   data() {
     return {
       query: '',
@@ -18,6 +18,7 @@ const CommandPaletteComponent = {
       const actions = [
         { type: 'action', id: 'act_new', title: 'Create New Issue', subtitle: 'Shortcut: C', action: () => this.$emit('open-new-issue'), icon: 'plus-circle' },
         { type: 'action', id: 'act_import', title: 'Import Issues (CSV or GitHub)', subtitle: 'Shortcut: I · migrate from Linear or GitHub', action: () => this.$emit('open-import'), icon: 'upload' },
+        { type: 'action', id: 'act_export', title: 'Export Issues (CSV or JSON)', subtitle: 'Shortcut: E · back up or migrate your issues', action: () => this.$emit('open-export'), icon: 'download' },
         { type: 'action', id: 'act_board', title: 'Switch to Board View', subtitle: 'View Kanban Board', action: () => this.$emit('change-view', 'board'), icon: 'kanban' },
         { type: 'action', id: 'act_list', title: 'Switch to List View', subtitle: 'View tabular task list', action: () => this.$emit('change-view', 'list'), icon: 'list-todo' },
         { type: 'action', id: 'act_cycles', title: 'Switch to Cycles View', subtitle: 'View Sprints & Velocity', action: () => this.$emit('change-view', 'cycles'), icon: 'refresh-cw' },
