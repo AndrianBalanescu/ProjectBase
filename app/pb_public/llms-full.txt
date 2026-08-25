@@ -5,10 +5,10 @@ ProjectBase is the central project management, Kanban, and sprint execution engi
 It provides zero-latency SQLite database backing, instant REST APIs, real-time Server-Sent Events (SSE), and direct FastMCP integration for AI agents (Cursor, Flomaster, Hermes, Claude, and Windmill).
 
 ## 2. Server Architecture
-- Base URL: ${PROJECTBASE_URL:-http://localhost:8120}
-- PocketBase Admin UI: ${PROJECTBASE_URL:-http://localhost:8120}/_/ (set via ADMIN_EMAIL and ADMIN_PASSWORD)
-- OpenAPI Specification: ${PROJECTBASE_URL:-http://localhost:8120}/openapi.json
-- Interactive Scalar Docs: ${PROJECTBASE_URL:-http://localhost:8120}/docs/
+- Base URL: http://localhost:8120
+- PocketBase Admin UI: http://localhost:8120/_/ (set via ADMIN_EMAIL and ADMIN_PASSWORD)
+- OpenAPI Specification: http://localhost:8120/openapi.json
+- Interactive Scalar Docs: http://localhost:8120/docs/
 - FastMCP Script: /data/projects/projectbase/scripts/mcp_server.py
 
 ## 3. Autonomous Agent Operating Loop
@@ -78,17 +78,17 @@ When an agent is assigned to work on a project:
 
 ## 5. cURL Snippets for Non-MCP Agents
 ### Create Task:
-curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/quick-task \
+curl -s -X POST http://localhost:8120/api/projectbase/quick-task \
   -H "Content-Type: application/json" \
   -d '{"project_key":"LOAD","title":"Add GPS tracker webhook","priority":"high","status":"todo","estimate":3}'
 
 ### Transition Status:
-curl -s -X PATCH ${PROJECTBASE_URL:-http://localhost:8120}/api/collections/issues/records/<ISSUE_ID> \
+curl -s -X PATCH http://localhost:8120/api/collections/issues/records/<ISSUE_ID> \
   -H "Content-Type: application/json" \
   -d '{"status":"done"}'
 
 ### Global Issue Search (cross-project):
-curl -s ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/search \
+curl -s http://localhost:8120/api/projectbase/search \
   -H "Authorization: <POCKETBASE_TOKEN>" \
   --data-urlencode "q=regression" \
   -G
@@ -98,10 +98,10 @@ curl -s ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/search \
 
 ### Notification Channel Settings (admin/manager only, runtime-editable):
 # Read current Discord/Telegram/generic-webhook config (DB first, env fallback):
-curl -s ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/notification-settings \
+curl -s http://localhost:8120/api/projectbase/notification-settings \
   -H "Authorization: <POCKETBASE_TOKEN>"
 # Persist channel config without a process restart:
-curl -s -X PUT ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/notification-settings \
+curl -s -X PUT http://localhost:8120/api/projectbase/notification-settings \
   -H "Authorization: <POCKETBASE_TOKEN>" -H "Content-Type: application/json" \
   -d '{"discord_webhook_url":"https://discord.com/api/webhooks/...","telegram_token":"123:ABC","telegram_chat_id":"-100123","generic_webhook_url":"https://host/hook"}'
 # Returns { discord_webhook_url, telegram_token, telegram_chat_id, generic_webhook_url }.
@@ -109,61 +109,61 @@ curl -s -X PUT ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/notific
 # channels can be changed without restarting the binary.
 
 ### Append Execution Log:
-curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/collections/comments/records \
+curl -s -X POST http://localhost:8120/api/collections/comments/records \
   -H "Content-Type: application/json" \
   -d '{"issue":"<ISSUE_ID>","author":"Flomaster Agent","author_type":"agent","content":"E2E browser QA passed with zero errors."}'
 
 ### Custom Fields (per-project definitions):
-curl -s -X PUT ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/projects/<PROJECT_ID>/custom-fields \
+curl -s -X PUT http://localhost:8120/api/projectbase/projects/<PROJECT_ID>/custom-fields \
   -H "Content-Type: application/json" \
   -d '{"fields":[{"label":"Client","type":"text"},{"label":"Gate","type":"select","options":["P0","P1","P2"]}]}'
 
 ### Validate custom field values:
-curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/projects/<PROJECT_ID>/custom-fields/validate \
+curl -s -X POST http://localhost:8120/api/projectbase/projects/<PROJECT_ID>/custom-fields/validate \
   -H "Content-Type: application/json" \
   -d '{"values":{"client":"Acme","gate":"P1"}}'
 
 ### Set custom fields on an issue (values keyed by field key):
-curl -s -X PATCH ${PROJECTBASE_URL:-http://localhost:8120}/api/collections/issues/records/<ISSUE_ID> \
+curl -s -X PATCH http://localhost:8120/api/collections/issues/records/<ISSUE_ID> \
   -H "Content-Type: application/json" \
   -d '{"custom_fields":{"client":"Acme","gate":"P1","effort":5}}'
 
 ### Bulk actions (board/list multi-select, up to 500 ids per call):
 # Update status/priority/cycle/labels/etc. on many issues at once:
-curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/issues/bulk-update \
+curl -s -X POST http://localhost:8120/api/projectbase/issues/bulk-update \
   -H "Content-Type: application/json" -H "Authorization: <USER_TOKEN>" \
   -d '{"ids":["<ISSUE_ID>","<ISSUE_ID2>"],"data":{"status":"in_progress","priority":"high"}}'
 # Allowed data fields: status, priority, cycle, milestone, estimate, due_date,
 # labels, order, plus per-project custom_* fields. Returns {"updated":N,"missing":N,"total":N}.
 # Delete many issues at once (admin/manager role only):
-curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/issues/bulk-delete \
+curl -s -X POST http://localhost:8120/api/projectbase/issues/bulk-delete \
   -H "Content-Type: application/json" -H "Authorization: <USER_TOKEN>" \
   -d '{"ids":["<ISSUE_ID>","<ISSUE_ID2>"]}'
 # Returns {"deleted":N,"missing":N,"total":N}.
 
 ### Issue relationships (blocks / blocked_by / related):
 # List resolved relations (outgoing + incoming) for an issue:
-curl -s ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/issues/<ISSUE_ID>/relations \
+curl -s http://localhost:8120/api/projectbase/issues/<ISSUE_ID>/relations \
   -H "Authorization: <USER_TOKEN>"
 # Add a relation (reciprocal edge is mirrored automatically):
-curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/issues/<ISSUE_ID>/relations \
+curl -s -X POST http://localhost:8120/api/projectbase/issues/<ISSUE_ID>/relations \
   -H "Content-Type: application/json" -H "Authorization: <USER_TOKEN>" \
   -d '{"issue":"<TARGET_ISSUE_ID>","type":"blocks"}'
 # Remove a relation (and its mirror):
-curl -s -X DELETE ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/issues/<ISSUE_ID>/relations \
+curl -s -X DELETE http://localhost:8120/api/projectbase/issues/<ISSUE_ID>/relations \
   -H "Content-Type: application/json" -H "Authorization: <USER_TOKEN>" \
   -d '{"issue":"<TARGET_ISSUE_ID>","type":"blocks"}'
 
 ### In-app notifications inbox:
 # List my notifications (only your own rows are visible):
-curl -s ${PROJECTBASE_URL:-http://localhost:8120}/api/collections/notifications/records?sort=-created \
+curl -s http://localhost:8120/api/collections/notifications/records?sort=-created \
   -H "Authorization: <USER_TOKEN>"
 # Mark one read:
-curl -s -X PATCH ${PROJECTBASE_URL:-http://localhost:8120}/api/collections/notifications/records/<NOTIF_ID> \
+curl -s -X PATCH http://localhost:8120/api/collections/notifications/records/<NOTIF_ID> \
   -H "Content-Type: application/json" -H "Authorization: <USER_TOKEN>" \
   -d '{"read":true}'
 # Mark all read:
-curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/notifications/read-all \
+curl -s -X POST http://localhost:8120/api/projectbase/notifications/read-all \
   -H "Authorization: <USER_TOKEN>"
 
 ### Autonomous agent dispatch:
@@ -171,7 +171,7 @@ curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/notifi
 # (flomaster | hermes | windmill | custom; prompt max 8000 chars). The issue is
 # marked in_progress, assigned to the target agent (custom → "Custom Agent"),
 # and forwarded to a configured Windmill/agent webhook when present.
-curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/dispatch-agent \
+curl -s -X POST http://localhost:8120/api/projectbase/dispatch-agent \
   -H "Content-Type: application/json" -H "Authorization: <USER_TOKEN>" \
   -d '{"issue_id":"<ISSUE_ID>","agent_target":"custom","prompt":"Break this issue into subtasks and propose a milestone"}'
 # Returns { success, message, issue:{ id, identifier, status, assignee }, dispatched_external }.

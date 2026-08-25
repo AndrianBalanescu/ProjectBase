@@ -1486,3 +1486,54 @@ custom-instructions capability was unreachable from the UI.
 
 **Next:** remaining v1.1 backlog and North Star external-gated items (public
 demo domain + first-stranger onboarding) still need human input.
+
+## Cycle-45 shipped (2026-08-25): harden — docs surface no longer leaks env placeholders
+
+**Goal:** resolve the audit veto chain (cycles 42/44 FAILED_AUDIT: false
+HAD_WORK + stale result consumption) with real, verifiable hardening work, and
+clean up the agent-facing docs surface.
+
+**Shipped this cycle:**
+- `app/pb_public/llms.txt` + `app/pb_public/llms-full.txt` — removed 26
+  unresolved `${PROJECTBASE_URL:-http://localhost:8120}` bash-style env
+  placeholders. These files are served statically from the zero-build
+  PocketBase install, so the default-value syntax was never substituted: every
+  agent and user reading them got a literal `${...}` string and a broken
+  copy-paste URL. Replaced with the concrete default `http://localhost:8120`.
+- `app/pb_public/js/components/DocsView.js` — the Docs view's **FastMCP Setup**
+  snippet hardcoded `"PROJECTBASE_URL": "${PROJECTBASE_URL:-http://localhost:8120}"`
+  in the copy-paste MCP server config. It now resolves `window.location.origin`
+  at runtime, so the config is correct on any host.
+- `tests/test_api.py` — hardened `test_llms_txt_served` and added
+  `test_llms_full_txt_no_env_placeholders` + `test_docs_surface_no_env_placeholders`:
+  any `${...}` re-leaking into the served docs surface fails the suite. 216 → 218.
+- `scripts/qa/render_dom_check.js` — new `docsQA` block: opens the Docs view,
+  reads the rendered MCP snippet, asserts a concrete `http://` origin and zero
+  `${` placeholders.
+- `docs/qa-ibrowse-10-results.json` — refreshed the stale cycle-10 E2E result
+  file with a fresh 10-scenario iBrowse run.
+- `AGENTS.md` / `CHANGELOG.md` — test count + changelog sync.
+
+**Validation:**
+- `pytest tests/` → **218/218 passed** (was 216).
+- `scripts/qa/qa-render.sh 8120` → **RENDER QA: PASS** including new `docsQA`
+  block (`snippetFound`, `noPlaceholder`, `hasOriginUrl` all true).
+- `python3 -m flow.frontend_guard` → ALL FRONTEND FILES VERIFIED.
+- **iBrowse 10-scenario E2E** (cycle-45 run): **5/10 succeeded**
+  (list view, projects view, docs view, milestones view, issue drawer),
+  **5/10 blocked** (kanban, cycles, stats, new issue modal, header/command
+  palette) with `max_replan_attempts_exceeded`. The blocked jobs are iBrowse
+  agent replan exhaustion (agent navigated to garbage `#/mem/board` hashes and
+  mangled the login form), not product failures: the only console error in any
+  blocked run was the whitelisted `auth-with-password` 400 probe, and render QA
+  independently shows zero console errors. Fresh raw results in
+  `docs/qa-ibrowse-10-results.json`.
+
+**Engine-side P0 note (out of builder scope — engine is read-only):**
+`/home/ubuntu/agents-hub/flow/results.py` `read_result()` still returns any
+`version:1` JSON without validating the `cycle` field, so `supervisor.run_builder`
+can consume a stale `/tmp/flow-builder-result.json` (the cycle-42 root cause).
+Builder mitigations this cycle: fresh `/tmp/flow-builder-result.json` (cycle 45)
+with real commits pushed to `origin/main`. The engine fix (pass/validate
+`expected_cycle` in `read_result` / `supervisor.run_builder`) needs a hub-side
+commit, which the builder phase is forbidden from making.

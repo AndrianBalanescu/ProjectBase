@@ -286,6 +286,35 @@ def test_llms_txt_served():
     status, body = _get("/llms.txt")
     assert status == 200
     assert "ProjectBase" in body
+    # Zero-build static serve: env-style placeholders are never substituted,
+    # so a literal ${...} in the served agent docs is a copy-paste trap.
+    assert "${" not in body, "served llms.txt leaks an unresolved env placeholder"
+
+def test_llms_full_txt_no_env_placeholders():
+    """Agent-facing llms-full.txt must be concrete, never ${...} templated."""
+    status, body = _get("/llms-full.txt")
+    assert status == 200
+    assert "ProjectBase" in body
+    assert "${" not in body, "served llms-full.txt leaks an unresolved env placeholder"
+    # Static source (served as-is) must match the served contract.
+    src = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "app", "pb_public", "llms-full.txt")
+    with open(src, encoding="utf-8") as fh:
+        assert "${" not in fh.read(), "llms-full.txt source contains an env placeholder"
+
+def test_docs_surface_no_env_placeholders():
+    """Docs surface (openapi.json + DocsView MCP snippet) must stay concrete."""
+    status, body = _get("/openapi.json")
+    assert status == 200
+    assert "${" not in body, "served openapi.json leaks an env placeholder"
+    src = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "app", "pb_public", "js", "components", "DocsView.js")
+    with open(src, encoding="utf-8") as fh:
+        src_text = fh.read()
+    assert "${PROJECTBASE_URL" not in src_text, "DocsView.js MCP snippet leaks a placeholder"
+    assert "window.location.origin" in src_text, "DocsView.js MCP snippet must use runtime origin"
 
 
 def test_docs_page_served():

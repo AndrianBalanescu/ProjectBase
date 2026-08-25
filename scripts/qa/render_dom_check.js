@@ -32,6 +32,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   const notifSettings = { checked: false };
   const importModal = { checked: false };
   const dispatchQA = { checked: false };
+  const docsQA = { checked: false };
   // URLs whose requests are intentionally ignored from the failure list (the
   // range+apply E2E's cleanup DELETEs can abort client-side after the server
   // already processed them; the end state is verified instead).
@@ -1202,6 +1203,26 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     }
   } catch (e) { dispatchQA.error = String(e).slice(0, 200); }
 
+  // ---- Docs surface (cycle 45): the Docs view must render the FastMCP setup
+  // snippet with a concrete runtime origin. The MCP snippet used to embed a
+  // literal ${PROJECTBASE_URL:-...} env placeholder that was never substituted
+  // in this zero-build app, producing a broken copy-paste config. ----
+  try {
+    await page.evaluate(() => { location.hash = '#/pb/docs'; });
+    await page.waitForTimeout(1800);
+    await page.locator('button:has-text("FastMCP Setup")').first().click().catch(() => {});
+    await page.waitForTimeout(500);
+    docsQA.tabOpened = await page.locator('button:has-text("FastMCP Setup")').first().isVisible().catch(() => false);
+    const snippet = await page.evaluate(() => {
+      const pre = Array.from(document.querySelectorAll('pre code')).find((el) => el.textContent.includes('mcpServers'));
+      return pre ? pre.textContent : '';
+    });
+    docsQA.snippetFound = Boolean(snippet);
+    docsQA.noPlaceholder = !snippet.includes('${');
+    docsQA.hasOriginUrl = /"PROJECTBASE_URL": "http:\/\//.test(snippet);
+  } catch (e) { docsQA.error = String(e).slice(0, 200); }
+  docsQA.checked = true;
+
   const failures = [];
   // The browser's network logger emits a GENERIC "Failed to load resource ... 400"
   // console error without naming the URL. If every 4xx was the whitelisted auth
@@ -1380,8 +1401,16 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   } else if (!dispatchQA || !dispatchQA.checked) {
     failures.push('agent dispatch E2E not exercised');
   }
+  if (docsQA && docsQA.checked) {
+    if (docsQA.error) failures.push('docs surface E2E error: ' + docsQA.error);
+    if (docsQA.snippetFound === false) failures.push('MCP snippet not found in Docs view');
+    if (docsQA.noPlaceholder === false) failures.push('MCP snippet leaks an unresolved ${...} placeholder');
+    if (docsQA.hasOriginUrl === false) failures.push('MCP snippet PROJECTBASE_URL is not a concrete http origin');
+  } else if (!docsQA || !docsQA.checked) {
+    failures.push('docs surface E2E not exercised');
+  }
 
-  console.log(JSON.stringify({ checks, routing, resize, urlState, relations, focusMode, bulk, range, customField, timeline, portfolio, deepLink, exportModal, notifSettings, importModal, dispatchQA, failures, all4xx }, null, 1));
+  console.log(JSON.stringify({ checks, routing, resize, urlState, relations, focusMode, bulk, range, customField, timeline, portfolio, deepLink, exportModal, notifSettings, importModal, dispatchQA, docsQA, failures, all4xx }, null, 1));
   console.log(failures.length === 0 ? 'RENDER QA: PASS' : 'RENDER QA: FAIL');
   await browser.close();
   process.exit(failures.length === 0 ? 0 : 1);

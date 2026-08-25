@@ -27,6 +27,18 @@ subscriptions, Stripe, or paid tiers.
   char counter.
 
 ### Fixed
+- **Agent-facing docs no longer leak unresolved `${PROJECTBASE_URL:-...}`
+  env placeholders** (`app/pb_public/llms.txt`, `app/pb_public/llms-full.txt`,
+  `app/pb_public/js/components/DocsView.js`): these files are served statically
+  from a zero-build PocketBase install, so the bash-style env-var default syntax
+  was never substituted — a copy-paste trap for agents and users alike. The
+  llms docs now contain the concrete default (`http://localhost:8120`), and the
+  Docs view's FastMCP setup snippet resolves `PROJECTBASE_URL` from
+  `window.location.origin` at runtime so the copy-paste MCP config is correct on
+  any host. Regression guards: `test_llms_full_txt_no_env_placeholders` and
+  `test_docs_surface_no_env_placeholders` fail on any `${...}` in the served
+  docs surface, plus a new `docsQA` render-QA block asserts the Docs view shows
+  a concrete origin with no placeholder. Test count: 216 → 218.
 - **Agent dispatch webhook payload now includes the issue title/description**
   (`app/pb_hooks/80_agent_triggers.pb.js`): the external Windmill and generic
   `AGENT_TRIGGER_WEBHOOK` payloads previously referenced `title`/`desc` that

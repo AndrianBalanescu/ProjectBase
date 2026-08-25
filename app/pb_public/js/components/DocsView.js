@@ -402,7 +402,7 @@ const DocsViewComponent = {
               "/data/projects/projectbase/scripts/mcp_server.py"
             ],
             env: {
-              PROJECTBASE_URL: "${PROJECTBASE_URL:-http://localhost:8120}"
+              PROJECTBASE_URL: window.location.origin
             }
           }
         }
