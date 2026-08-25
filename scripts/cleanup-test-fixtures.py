@@ -46,7 +46,10 @@ FIXTURE_TITLE_PREFIXES = (
     "Export CustomFields ",
     "Export Fixture ",
     "Search Identifier Probe ",
-    "Keyed ",
+    # test_importer_source_key_dedup_cross_request creates "Keyed A <uid>"
+    # and "Keyed B <uid>" (a bare "Keyed " prefix would match neither shape).
+    "Keyed A ",
+    "Keyed B ",
 )
 
 # The uid suffix is _uid() = uuid.uuid4().hex[:10] in tests/test_api.py.
