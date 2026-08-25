@@ -1585,3 +1585,35 @@ teardown deletes the shared `-wal`/`-shm` files, breaking the running server's
 view (API went to 0 records until `systemctl restart projectbase`). Use an
 isolated data dir (`pb_data.tmp` copy or a named volume pointing at a copied
 tree) for any fresh-boot/container test.
+
+## Cycle-51 shipped (2026-08-25): FastMCP cycle + milestone tools (agent-surface gap)
+
+**Goal:** close a real gap in the charter's agent-surface moat. The FastMCP
+server (`scripts/mcp_server.py`) exposed projects, issues, relations,
+notifications, and dispatch tools, but had **no** way for an agent to read
+cycles or milestones — even though both are core collections with full UI views
+(CyclesView / MilestonesView). Agents had to fall back to raw REST to query
+sprint or roadmap state.
+
+**Shipped this cycle:**
+- `scripts/mcp_server.py` — four new read-only tools:
+  - `list_cycles(project=None)` — sprint cycles, optionally project-filtered
+    (key/name/id), sorted by start date, with the expanded project.
+  - `get_cycle_progress(id)` — total/done/in_progress/todo issue counts,
+    percent complete, and done/total story points (mirrors the UI's
+    `cycleStats` derivation).
+  - `list_milestones(project=None)` — milestones sorted by target date,
+    optionally project-filtered.
+  - `get_milestone_progress(id)` — linked-issue total/done/in_progress counts
+    and percent (mirrors `MilestonesView`).
+- `tests/test_api.py` — new `test_mcp_server_cycle_and_milestone_tools` guard:
+  compiles the module with a stub FastMCP and drives all four tools against the
+  live instance (read-only; no records created/mutated). 230 → 231 tests.
+
+**Validation:**
+- `pytest tests/` → **231/231 passed** (guard proven: reverting any of the four
+  `def list_cycles/get_cycle_progress/list_milestones/get_milestone_progress`
+  fails the new test).
+- `python3 -m flow.frontend_guard` → ALL VERIFIED (no frontend files touched).
+- Live smoke: `list_cycles("PB")` → 2 cycles; `get_cycle_progress("admzsfez5xsxyeu")`
+  → {total 6, done 6, percent 100, done_pts 21/21}; milestones listed correctly.

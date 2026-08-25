@@ -11,6 +11,17 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **FastMCP cycle + milestone tools** (`scripts/mcp_server.py`): the agent-facing
+  FastMCP server previously exposed projects/issues/relations/notifications/
+  dispatch tools but had **no** way to read cycles or milestones, even though
+  both are core collections with full UI views. Added `list_cycles` (optionally
+  project-filtered), `get_cycle_progress` (total/done/in-progress/todo,
+  percent, story points), `list_milestones` (optionally project-filtered), and
+  `get_milestone_progress` (linked-issue totals + percent). Agents can now
+  query sprint and roadmap state directly instead of falling back to raw REST.
+  New pytest `test_mcp_server_cycle_and_milestone_tools` compiles the module
+  with a stub FastMCP and drives all four tools against the live instance
+  (read-only). 230 → 231 tests.
 - **FastMCP `dispatch_agent` tool** (`scripts/mcp_server.py`): the MCP server
   now exposes the charter's signature autonomous-dispatch endpoint as a native
   tool. Previously agents had 16 MCP tools covering projects/issues/cycles/
