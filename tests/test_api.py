@@ -72,7 +72,17 @@ def _get_authed(path):
 @pytest.fixture(scope="session", autouse=True)
 def _cleanup_importer_artifacts():
     """After the whole session, delete any issues the importer tests created so
-    they don't pollute the demo database. Keyed off source_metadata.importer."""
+    they don't pollute the demo database.
+
+    Two mechanisms, both best-effort:
+      1. Keyed off source_metadata.importer (csv/github/linear/plane), which
+         catches every importer-created fixture.
+      2. The canonical title-prefix sweep (scripts/cleanup-test-fixtures.py),
+         which catches direct-collection fixtures that carry no importer
+         metadata (e.g. "Export CustomFields <uid>" from
+         test_export_json_round_trips_custom_fields). Reusing the script keeps
+         one source of truth for the prefix list.
+    """
     yield
     try:
         hdr = {"Authorization": _superuser_token()}
@@ -90,6 +100,13 @@ def _cleanup_importer_artifacts():
                 if sm.get("importer") in ("csv", "github", "linear", "plane"):
                     _request("DELETE", f"/api/collections/issues/records/{it['id']}",
                              headers=hdr)
+        import subprocess
+        import sys as _sys
+        _script = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "scripts", "cleanup-test-fixtures.py")
+        subprocess.run([_sys.executable, _script, "--apply", "--json"],
+                       capture_output=True, timeout=180)
     except Exception:
         # Cleanup is best-effort; never fail the suite for it.
         pass
