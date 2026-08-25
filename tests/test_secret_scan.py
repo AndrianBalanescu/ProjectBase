@@ -165,3 +165,23 @@ def test_qa_scripts_do_not_hardcode_ibrowse_key():
         assert "sk_" not in src.replace("IBROWSE_API_KEY", ""), (
             f"{path} appears to hardcode an iBrowse key value"
         )
+
+def test_mcp_server_surface_is_english():
+    """Cycle-46 modernization: the FastMCP server is the agent-facing moat —
+    every tool error message is consumed verbatim by AI agents (Cursor,
+    Flomaster, Hermes, Claude). Non-English (Romanian) diacritics in those
+    messages degrade agent comprehension and violate the agents-hub invariant
+    that agent-facing surfaces stay English. This guard fails if any Romanian
+    diacritic re-leaks into scripts/mcp_server.py."""
+    mcp_path = os.path.join(REPO, "scripts", "mcp_server.py")
+    assert os.path.isfile(mcp_path), f"missing expected MCP server {mcp_path}"
+    with open(mcp_path, encoding="utf-8") as fh:
+        src = fh.read()
+    # Romanian-specific diacritics (ă â î ș ț and their uppercase forms).
+    diacritics = re.compile(r"[ăâîșțĂÂÎȘȚ]")
+    matches = [(i + 1, ln.strip()) for i, ln in enumerate(src.splitlines()) if diacritics.search(ln)]
+    assert not matches, (
+        "Non-English (Romanian) text leaked into the agent-facing MCP server "
+        "scripts/mcp_server.py (would degrade LLM consumption):\n"
+        + "\n".join(f"  line {no}: {line!r}" for no, line in matches)
+    )

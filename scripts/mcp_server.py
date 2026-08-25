@@ -51,12 +51,12 @@ def _get_token() -> str:
     return ""
 
 _AUTH_HELP = (
-    "Proiectele există, dar cererea a fost respinsă din cauza autentificării. "
-    "Configurează credențialele MCP astfel:\n"
-    "  - PROJECTBASE_URL (instanța, ex {base})\n"
-    "  - PROJECTBASE_EMAIL + PROJECTBASE_PASSWORD (cont user) SAU\n"
-    "  - PROJECTBASE_TOKEN (token PocketBase deja obținut)\n"
-    "Verifică sănătatea:  curl -s {base}/api/projectbase/health  -> trebuie 200."
+    "ProjectBase is reachable, but the request was rejected due to authentication. "
+    "Configure the MCP credentials as follows:\n"
+    "  - PROJECTBASE_URL (instance, e.g. {base})\n"
+    "  - PROJECTBASE_EMAIL + PROJECTBASE_PASSWORD (user account) OR\n"
+    "  - PROJECTBASE_TOKEN (an already-obtained PocketBase token)\n"
+    "Verify health:  curl -s {base}/api/projectbase/health  -> should return 200."
 )
 
 def _request(endpoint: str, method: str = "GET", data: Optional[Dict] = None) -> Any:
@@ -75,8 +75,8 @@ def _request(endpoint: str, method: str = "GET", data: Optional[Dict] = None) ->
                 detail = _AUTH_HELP.format(base=BASE_URL)
                 # We raise so agents/callers get the actionable message instead of silently seeing empty lists
                 raise RuntimeError(
-                    f"UNAUTHENTICATED: cererea pentru {endpoint} a returnat 0 elemente "
-                    f"pentru că apelul s-a făcut fără token de autentificare.\n"
+                    f"UNAUTHENTICATED: the request for {endpoint} returned 0 items "
+                    f"because it was made without an authentication token.\n"
                     f"{detail}"
                 )
             return data_res
@@ -85,17 +85,17 @@ def _request(endpoint: str, method: str = "GET", data: Optional[Dict] = None) ->
         if e.code in (401, 403):
             detail = _AUTH_HELP.format(base=BASE_URL)
             raise RuntimeError(
-                f"AUTH_REQUIRED (HTTP {e.code}) pentru {endpoint}.\n"
-                f"{detail}\nRăspuns server: {err_body}"
+                f"AUTH_REQUIRED (HTTP {e.code}) for {endpoint}.\n"
+                f"{detail}\nServer response: {err_body}"
             )
         raise RuntimeError(f"ProjectBase API error ({e.code}): {err_body}")
     except urllib.error.URLError as e:
         reason = getattr(e, "reason", str(e))
         raise RuntimeError(
-            f"CONNECTION_FAILED: nu am putut contacta ProjectBase la {BASE_URL} "
+            f"CONNECTION_FAILED: could not reach ProjectBase at {BASE_URL} "
             f"({reason}).\n"
-            f"Verifică că instanța rulează:  curl -s {BASE_URL}/api/projectbase/health\n"
-            f"Și că PROJECTBASE_URL e setat corect (ex http://127.0.0.1:8120)."
+            f"Verify the instance is running:  curl -s {BASE_URL}/api/projectbase/health\n"
+            f"And that PROJECTBASE_URL is set correctly (e.g. http://127.0.0.1:8120)."
         )
 
 def _find_project_id(identifier_or_id: str) -> str:
