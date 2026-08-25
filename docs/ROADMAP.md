@@ -1260,6 +1260,16 @@ in-app with immediate effect.
   Goja module-scope function limitation.
 - `app/pb_hooks/60_notifications.pb.js` — dispatcher now reads the DB row first,
   falling back to env, so configured channels apply without a restart.
+  **Deep-validation P0 fix (cycle 33):** live smoke probes during audit exposed
+  that the pre-existing dispatcher called module-scope helper functions
+  (`sendDiscordNotification` / `sendTelegramNotification`) from inside the
+  `onRecordAfter*Success` hooks, which PocketBase's Goja runtime cannot resolve —
+  every dispatch threw `ReferenceError: <fn> is not defined` and no external
+  notification was ever delivered. All dispatch logic is now inlined into the
+  callbacks (same bug class as the cycle-5 P0 in `15_signup_security.pb.js`).
+  Verified via live probes: creating an issue + changing its status no longer
+  produce the ReferenceError. The drift-guard test now asserts the dispatcher
+  must not call module-scope helper identifiers.
 - `app/pb_public/js/components/NotificationSettingsModal.js` — new modal with
   Discord webhook, Telegram token + chat ID, generic webhook fields, loading +
   save states. Opened from a header gear button.

@@ -233,6 +233,15 @@ def test_notification_settings_wired_in_frontend():
     # The dispatcher must read the DB settings with env fallback.
     dispatcher = open(os.path.join(root, "app", "pb_hooks", "60_notifications.pb.js")).read()
     assert "notification_settings" in dispatcher, "dispatcher must read notification_settings collection"
+    # Goja runtime: module-scope function declarations are NOT resolvable from
+    # inside a hook callback (throws ReferenceError, so external notifications
+    # never delivered). The dispatcher must inline all dispatch logic; it must
+    # NOT call a module-scope `sendDiscordNotification(...)` / `sendTelegram...`
+    # helper as a bare identifier.
+    assert "sendDiscordNotification(" not in dispatcher, "dispatcher must inline Discord dispatch (Goja scope bug)"
+    assert "sendTelegramNotification(" not in dispatcher, "dispatcher must inline Telegram dispatch (Goja scope bug)"
+    assert "onRecordAfterCreateSuccess" in dispatcher, "dispatcher must keep the create hook"
+    assert "onRecordAfterUpdateSuccess" in dispatcher, "dispatcher must keep the update hook"
 
 
 # Every /api/projectbase/* custom route implemented in app/pb_hooks/*.pb.js

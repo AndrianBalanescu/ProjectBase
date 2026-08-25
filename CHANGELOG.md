@@ -214,6 +214,18 @@ subscriptions, Stripe, or paid tiers.
   instead of the stale `v0.8.0`, and `scripts/bump_version.sh` now keeps the
   header badge and the custom-routes health/version endpoints in sync on every
   bump (previously only `VERSION` and `openapi.json` were updated).
+- **External notification dispatcher never delivered** (`60_notifications.pb.js`):
+  the dispatcher called module-scope helper functions
+  (`sendDiscordNotification` / `sendTelegramNotification`) from inside
+  `onRecordAfter*Success` hooks. PocketBase's Goja runtime cannot resolve
+  module-scope function declarations inside hook callbacks, so every dispatch
+  threw `ReferenceError: <fn> is not defined` and no Discord/Telegram/webhook
+  notification was ever sent. All dispatch logic is now inlined directly in the
+  callbacks (the same bug class as the cycle-5 P0 fix in `15_signup_security.pb.js`).
+  Verified via live smoke probes: creating an issue and changing its status no
+  longer produce the ReferenceError. The drift-guard test
+  (`test_notification_settings_wired_in_frontend`) now pins that the dispatcher
+  must not call module-scope helper identifiers.
 
 ## [0.9.0] - 2026-08-24
 
