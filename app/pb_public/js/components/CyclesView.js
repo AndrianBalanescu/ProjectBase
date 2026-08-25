@@ -87,6 +87,9 @@ const CyclesViewComponent = {
         if (!res.ok) {
           throw new Error(data.error || 'Failed to generate summary');
         }
+        if (!data.result || !String(data.result).trim()) {
+          throw new Error('The AI service returned an empty summary. Check that the AI gateway (AI_API_BASE / AI_API_KEY) is reachable, then try again.');
+        }
         this.aiSummary = data.result || '';
       } catch (err) {
         console.error('AI cycle summary error:', err);

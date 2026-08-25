@@ -1168,17 +1168,34 @@ to get an AI sprint summary in the Cycles view.
 - `tests/test_api.py` — new `test_ai_cycle_summary_wired_in_cycles_view`
   drift-guard pinning the wiring (panel, Generate, ai-assist route,
   summarize_cycle action, auth header, sanitized markdown renderer).
-- No schema or API change; the action and its OpenAPI entry already existed.
+- `app/pb_hooks/70_ai_assist.pb.js` — **rule-based fallback for
+  `summarize_cycle`**. While validating the UI end-to-end, the OmniRoute
+  gateway returned 401 (unauthenticated), and the endpoint replied with an
+  empty `result` — the UI would have shown nothing. The hook now computes a
+  deterministic sprint summary from the issues payload when the LLM is
+  offline/unauthenticated: ✅ Achievements (done list), 🚧 In Progress /
+  Blockers, 📋 Backlog / Todo, and 📈 Velocity (points done/total, %,
+  pacing recommendation). The frontend also surfaces an actionable error if a
+  response is ever empty instead of silently showing the placeholder.
+- `tests/test_api.py` — new `test_ai_assist_summarize_cycle_fallback`
+  asserting the endpoint never returns an empty result and always references
+  the listed work (gateway-agnostic, so it holds with or without a live LLM).
+- No schema change; the API contract is unchanged (still returns
+  `{success, action, used_llm, result}`).
 
-**Validation:** `pytest tests/` → **187/187 passed** (186 + 1 new wiring
-drift-guard). `python3 -m flow.frontend_guard` → ALL FRONTEND FILES VERIFIED.
-Headless render QA (`scripts/qa/qa-render.sh`) → **RENDER QA: PASS** (incl. the
-Cycles view suite). Visual QA via local Playwright E2E (the homelab iBrowse
-service was environmentally blocked with `max_replan_attempts_exceeded` on both
-attempts): the Cycles view mounts with the panel and Generate button, clicking
-Generate POSTs `summarize_cycle` with the cycle's issues payload and renders the
-returned summary inline, with no console errors beyond the pre-existing benign
-`auth-with-password` 400 probe.
+**Validation:** `pytest tests/` → **188/188 passed** (186 + 2 new). `python3 -m
+flow.frontend_guard` → ALL FRONTEND FILES VERIFIED. Headless render QA
+(`scripts/qa/qa-render.sh`) → **RENDER QA: PASS** (incl. the Cycles view
+suite). Visual QA via local Playwright E2E (the homelab iBrowse service was
+environmentally blocked with `max_replan_attempts_exceeded` on both attempts):
+the Cycles view mounts with the panel and Generate button; clicking Generate
+POSTs `summarize_cycle` with the cycle's issues payload and renders the returned
+summary inline (`Sprint Summary` heading, `Achievements (6 done)` with
+`PB-1…PB-6`, `Velocity`), with no console errors beyond the pre-existing benign
+`auth-with-password` 400 probe. The initial E2E pass claim was audited and
+corrected after it was found to match the static "sprint velocity" page
+subtitle — the fallback fix makes the summary render real content even when the
+LLM is down.
 
 **Next:** remaining v1.1 backlog and North Star external-gated items (public
 demo domain + first-stranger onboarding) still need human input.
