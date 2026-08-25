@@ -48,6 +48,17 @@ subscriptions, Stripe, or paid tiers.
   any mismatch between the AGENTS.md test count/file count and the real pytest
   surface, and fails if any `tests/test_*.py` is missing from the map. Test
   count: 227 → 229.
+- **Test fixtures no longer leak into the dogfooded live instance**
+  (`tests/test_api.py`, `tests/test_fixture_hygiene.py`,
+  `scripts/cleanup-test-fixtures.py`): `test_export_json_round_trips_custom_fields`
+  created a "Export CustomFields <uid>" issue via the direct collection API and
+  never deleted it, so every suite run added one more record to the real
+  backlog (147 stale records at cycle 50). The session cleanup now also sweeps
+  canonical fixture-title prefixes via the new
+  `scripts/cleanup-test-fixtures.py` (single source of truth for the prefix
+  list), and a new `test_fixture_hygiene.py` guard fails on any fixture
+  pollution the next time the suite runs. The existing 147 records were
+  removed from the live instance. Test count: 229 → 230.
 - **Docker image no longer bakes the local dev database into itself**
   (`.dockerignore`, `tests/test_deploy_consistency.py`): there was no
   `.dockerignore`, so `docker build` sent `app/pb_data` (the dev SQLite DB +
