@@ -67,14 +67,78 @@ deploy/                <- projectbase.service, Caddyfile
 
 `app/pb_public/js/app.js` `applyRoute()` parses `#/pb/board`, `#/pb/list`, `#/pb/cycles`, `#/pb/projects/.../issue/<id>` etc. It sets `currentProject`/`currentView` and **reloads project-scoped issues on project change** (a hard refresh on `#/pb/board` must show that project's tasks, not the all-projects snapshot).
 
-## 6. Working rules
+## 6. ProjectBase IS the source of truth — dogfooding (system-prompt guide)
+
+You are ProjectBase's own dogfood: every agent task runs **through** ProjectBase via MCP.
+ProjectBase is not an external project you might touch — it is the **living Kanban board
+you are assigned from and report to**. Treat it as a human would use Linear/Plane.
+
+**Never fall back to scratch markdown TODO files for tracked work.** If work matters, it
+has a ticket in ProjectBase. `docs/TODO` / `docs/ROADMAP` may record intent, but the
+**executable state of every task lives in the `issues` collection** and is driven through
+MCP tools.
+
+### 6.1 The natural MCP rhythm (follow this every cycle)
+
+1. **Orient** — `mcp__projectbase__list_projects` then `mcp__projectbase__list_issues`
+   (filter by your project + status `todo` / `backlog`). This is your backlog; never
+   invent work from memory.
+2. **Claim** — pick a ticket and `mcp__projectbase__update_issue` → `status: in_progress`.
+   Post a short comment saying what you're doing.
+3. **Work** — do the code/tests/QA. 
+4. **Verify** — run the full validation (6.2). Capture **numeric evidence**.
+5. **Prove on the ticket** — `mcp__projectbase__add_comment` with a **human-readable
+   summary** (see 6.3). Include the test count, iBrowse result, and any screenshot/evidence.
+6. **Ship** — `mcp__projectbase__update_issue` → `status: done` (or `in_review` if a human
+   should confirm). Never mark `done` without the evidence comment in step 5.
+
+Keep every ticket **human-readable**: one clear subject line, what changed, how it was
+verified (tests + iBrowse), and what a human needs to decide. This is a status update for
+people, not a dump of raw tool output.
+
+### 6.2 Mandatory validation before you call anything done
+
+- Backend: `python ~/.local/bin/pytest tests/` (or `uv run --with pytest pytest tests/`) — report **N passed / total**.
+- Frontend/UI: iBrowse QA `bash /home/ubuntu/flow/scripts/qa/flow-ibrowse.sh http://127.0.0.1:8120/`;
+  if the iBrowse host is unreachable, fall back to `scripts/qa/qa-render.sh` (headless
+  render + computed-style assertions).
+- **Record concrete numbers**, not "looks fine": overflow px, visible elements, page errors,
+  console errors = 0. These are the values you paste into the ticket.
+- Health: check `http://127.0.0.1:8120` returns 200; inspect diff/status/root layout.
+- If you ran iBrowse, drop a screenshot (e.g. `docs/qa/…`) and reference it in the comment.
+
+### 6.3 Ticket comment template (human-readable)
+
+```markdown
+## Done — <ticket title>
+**Commit:** `abcdef1` (pushed)
+**What changed:** <1-2 lines, plain language>
+**Verification:**
+- pytest: **N passed** (of total)
+- iBrowse/render QA: **PASS** — 0 overflow, 0 console errors (evidence link/screenshot)
+- health: 200 OK
+**Needs human decision:** <only if something requires you>
+```
+
+### 6.4 Dogfooding rules of thumb
+
+- **Every commit ends on a ProjectBase ticket.** If you changed code/tests, that work is
+  backed by an issue in ProjectBase that moved `in_progress → done`.
+- **One ticket per discrete unit of work.** No "Misc" sprawl; split with subtasks in the
+  description if needed.
+- **`done` only with proof.** A comment containing the pytest count + iBrowse/QA verdict
+  is the minimum proof of `done`.
+- **Never mark `cancelled` a ticket someone else owns** without a comment explaining why.
+- MCP + the REST API (`:8120`) are interchangeable for writes; prefer MCP for the happy path.
+
+## 7. Working rules
 
 - **Before editing:** inspect `git status`; read relevant README/docs; preserve unrelated work.
-- **Frontend:** keep zero-build PocketBase serving; vendor browser-ready FOSS bundles under `app/pb_public/vendor/`; preserve Markdown descriptions; rerun `build_css.sh` after template/class edits.
+- **Frontend:** keep `pb_public` zero-build; vendor browser-ready FOSS builds under `app/pb_public/vendor/`; preserve Markdown descriptions; rerun `build_css.sh` after template/class edits.
 - **Backend:** enforce validation/authorization in hooks/migrations. Additive migrations only. Never commit secrets or local data (`pb_data/`).
-- **Validate:** run `python ~/.local/bin/pytest tests/` (or `uv run --with pytest pytest tests/`), run iBrowse QA for UI/frontend changes (`bash /home/ubuntu/flow/scripts/qa/flow-ibrowse.sh http://127.0.0.1:8120/`); if the iBrowse host is unreachable, fall back to `scripts/qa/qa-render.sh` (headless render + computed-style assertions), verify zero console errors, check health `http://127.0.0.1:8120`, inspect diff/status/root layout.
-- **Docs:** research and plans in `docs/`; no loose root artifacts.
-- **Kanban & MCP:** use `mcp__projectbase__*` or API (`:8120`) to pick active issues, move to `in_progress`, mark `done` with audit comments.
+- **Docs:** research and plans in `docs/`; no loose root artifacts. (`docs/TODO` / `docs/ROADMAP` record intent only — executable state lives in ProjectBase issues, see §6.)
+- **Validate:** run `python ~/.local/bin/pytest tests/` (or `uv run --with pytest pytest tests/`), run iBrowse QA for UI/frontend changes (`bash /home/ubuntu/flow/scripts/qa/flow-ibrowse.sh http://127.0.0.1:8120/`); if the iBrowse host is unreachable, fall back to `scripts/qa/qa-render.sh` (headless render + computed-style assertions), verify zero console errors, check health `http://127.0.0.1:8120`, inspect diff/status/root layout. See **§6.2** for the full evidence standard.
+- **Kanban & MCP:** use `mcp__projectbase__*` or API (`:8120`) to pick active issues, move to `in_progress`, mark `done` with audit comments — see **§6** for the full rhythm.
 - **Commit & push:** ONE commit per work session, consolidating code + tests + docs + .gitignore together. Never open a new commit for a follow-up tweak/wording fix/doc note — fold it into the in-progress commit. If you already made several small commits, `git reset --soft` back and re-commit as one. **Push to origin at the end of the cycle when the work is real** (added/changed code or tests) and all checks pass. Do NOT push if the cycle produced only doc/roadmap/TODO/feature-matrix/.gitignore churn — fold that in with real work or leave it uncommitted. Never push broken/red work.
 - **No doc-only churn:** NEVER create a commit containing only docs/roadmap/TODO/feature-matrix markers or .gitignore edits. A commit that adds no code and no test is a mistake — fold it in or drop it.
 - **Done:** report what shipped, test count, and anything requiring human decision.
