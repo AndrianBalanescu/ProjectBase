@@ -27,6 +27,14 @@ subscriptions, Stripe, or paid tiers.
   char counter.
 
 ### Fixed
+- **FastMCP server error messages now in English**
+  (`scripts/mcp_server.py`): the MCP server is the agent-facing moat — every
+  tool error message is consumed verbatim by AI agents (Cursor, Flomaster,
+  Hermes, Claude). Several auth/connection error messages were written in
+  Romanian, degrading LLM comprehension. Translated `_AUTH_HELP` and the
+  `UNAUTHENTICATED` / `AUTH_REQUIRED` / `CONNECTION_FAILED` messages to English,
+  and added `test_mcp_server_surface_is_english`, a regression guard that fails
+  if Romanian diacritics (`ă â î ș ț`) re-leak into the file.
 - **Agent-facing docs no longer leak unresolved `${PROJECTBASE_URL:-...}`
   env placeholders** (`app/pb_public/llms.txt`, `app/pb_public/llms-full.txt`,
   `app/pb_public/js/components/DocsView.js`): these files are served statically
