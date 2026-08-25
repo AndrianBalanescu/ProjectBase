@@ -2029,3 +2029,36 @@ def test_portfolio_realtime_tick_wiring():
     assert "scheduleRefresh()" in pf and "realtimeTick()" in pf, (
         "PortfolioView must route both realtimeTick and prop changes through scheduleRefresh"
     )
+
+def test_ai_cycle_summary_wired_in_cycles_view():
+    """The Cycles & Sprints view must wire the AI Sprint Summary panel to the
+    existing /api/projectbase/ai-assist summarize_cycle action (cycle 28).
+    The backend action and its OpenAPI entry already existed; this drift-guard
+    pins the frontend UI that exposes it (panel, Generate button, auth header,
+    issues payload, markdown rendering)."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    cycles = open(os.path.join(root, "app", "pb_public", "js", "components", "CyclesView.js")).read()
+
+    # Panel state + Generate handler exist.
+    assert "aiSummary" in cycles, "CyclesView must track the AI summary text"
+    assert "aiSummaryLoading" in cycles, "CyclesView must track the loading state"
+    assert "generateCycleSummary" in cycles, "CyclesView must define generateCycleSummary()"
+    assert "AI Sprint Summary" in cycles, "CyclesView template must render the AI Sprint Summary panel"
+    assert "Generate" in cycles, "AI Sprint Summary panel must expose a Generate button"
+
+    # The handler must call the ai-assist route with summarize_cycle and auth.
+    assert "'/api/projectbase/ai-assist'" in cycles, (
+        "generateCycleSummary must POST to /api/projectbase/ai-assist"
+    )
+    assert "summarize_cycle" in cycles, (
+        "generateCycleSummary must request the summarize_cycle action"
+    )
+    assert "Authorization" in cycles, (
+        "generateCycleSummary must send the PocketBase auth token"
+    )
+    # The summary must be rendered as sanitized markdown (marked + DOMPurify),
+    # matching the IssueDrawer description rendering convention.
+    assert "renderCycleSummary" in cycles, "CyclesView must render the summary"
+    assert "DOMPurify.sanitize" in cycles, (
+        "renderCycleSummary must sanitize markdown output"
+    )

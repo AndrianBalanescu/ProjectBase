@@ -11,6 +11,18 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **AI Cycle Summary (summarize_cycle)**: the Cycles & Sprints view gains an
+  "AI Sprint Summary" panel. A Generate button POSTs the current cycle's issue
+  list (identifier/title/status/priority/estimate) to the existing
+  `/api/projectbase/ai-assist` `summarize_cycle` action, which returns a
+  concise executive summary (achievements, WIP/blockers, velocity analysis &
+  recommendations). The summary renders as sanitized Markdown (marked + DOMPurify)
+  inline in the cycle deep-dive, with a loading spinner and error state. This
+  closes the last gap in the AI copilot surface: the backend action and its
+  OpenAPI entry already existed, but had no frontend UI. Wired purely in
+  `app/pb_public/js/components/CyclesView.js`; Tailwind rebuilt for the new
+  classes. No schema or API change.
+
 - **First-run onboarding guide (welcome modal + empty-state)**: a fresh member
   now gets a 60-second path to value after sign-up. A welcome modal
   (`app/pb_public/js/components/WelcomeModal.js`) walks through the three real
