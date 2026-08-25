@@ -1199,3 +1199,43 @@ LLM is down.
 
 **Next:** remaining v1.1 backlog and North Star external-gated items (public
 demo domain + first-stranger onboarding) still need human input.
+
+## Cycle-31 shipped (2026-08-25): global cross-project search in the Cmd+K omnibox
+
+**Goal:** close the largest remaining search gap vs Linear/Plane. The command
+palette (Cmd+K) could only search the currently-selected project's loaded
+issues. Linear's iconic Cmd+K surfaces work from every workspace, which is the
+zero-friction promise this product makes. This cycle makes the omnibox
+cross-project.
+
+**Shipped this cycle:**
+- `app/pb_hooks/30_custom_routes.pb.js` — new `GET /api/projectbase/search?q=&limit=`
+  route (auth-required). Searches `title`, `identifier`, `status`, and
+  `priority` across every issue, and enriches each result with its project
+  (id/name/identifier/color). Bounded at 50 results.
+- `app/pb_public/js/api.js` — `API.searchIssues(query, limit)` calling the
+  route.
+- `app/pb_public/js/components/CommandPalette.js` — debounced (250ms) global
+  search. Results merge into the palette list after current-project matches
+  (deduped by id); cross-project results show a `• PROJECT` tag in the
+  subtitle and emit `select-global-issue`.
+- `app/pb_public/js/app.js` — `openGlobalIssue(issue)`: switches to the
+  result's project (if different), reloads its issues, then opens the full
+  issue drawer (refetched with relations/comments).
+- `app/pb_public/index.html` — wires `@select-global-issue`.
+- Agent surface: `openapi.json` (new `/projectbase/search` path + Search tag),
+  `llms.txt` / `llms-full.txt` (route + cURL), and a new `search_issues`
+  FastMCP tool in `scripts/mcp_server.py`.
+- Tests: `tests/test_api.py` — endpoint auth/empty/schema/identifier tests +
+  a `test_global_search_wired_in_command_palette` drift-guard. New headless
+  browser QA `scripts/qa/verify_global_search.js` (login → Cmd+K → cross-project
+  result shown → drawer opens).
+
+**Validation:** `pytest tests/` → **199/199 passed**. Headless render QA
+(`scripts/qa/qa-render.sh`) → PASS. Global-search QA
+(`scripts/qa/verify_global_search.js`) → PASS (search "ProjectBase" surfaced a
+HOME-project issue "Deploy ProjectBase…" and opened its drawer). Health
+`:8120` OK. No schema change.
+
+**Next:** remaining v1.1 backlog and North Star external-gated items (public
+demo domain + first-stranger onboarding) still need human input.

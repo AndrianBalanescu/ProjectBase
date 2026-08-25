@@ -569,6 +569,33 @@ const App = {
       this.syncRoute();
     },
 
+    // A global search result may live in a different project than the one
+    // currently selected. Switch to that project, load its issues, then open
+    // the issue so the drawer has the full record (relations, comments, etc.).
+    async openGlobalIssue(issue) {
+      const targetProjectId = issue.project_id;
+      if (targetProjectId && (!this.currentProject || this.currentProject.id !== targetProjectId)) {
+        const proj = this.projects.find(p => p.id === targetProjectId);
+        if (proj) {
+          this.currentProject = proj;
+          await this.loadIssues();
+          this.currentView = 'board';
+          this.clearIssueSelection();
+        }
+      }
+      // The search result carries the minimal fields we need to render the
+      // drawer header; refetch the full record so edits/comments/relations work.
+      try {
+        const full = await API.client.collection('issues').getOne(issue.id, {
+          expand: 'project,cycle,milestone'
+        });
+        this.selectedIssue = full;
+      } catch (err) {
+        this.selectedIssue = issue;
+      }
+      this.syncRoute();
+    },
+
     closeIssueDrawer() {
       this.selectedIssue = null;
       this.syncRoute();

@@ -62,6 +62,10 @@
     {
       "name": "Bulk Actions",
       "description": "Batch operations for the board/list multi-select workflow"
+    },
+    {
+      "name": "Search",
+      "description": "Global cross-project issue search"
     }
   ],
   "paths": {
@@ -1556,6 +1560,50 @@
           },
           "403": {
             "description": "Insufficient role (member)"
+          }
+        }
+      }
+    },
+    "/projectbase/search": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Global Cross-Project Issue Search",
+        "description": "Search issues across every project by title, identifier, status, or priority. Used by the Cmd+K omnibox.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search query (max 128 chars)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20
+            },
+            "description": "Max results (max 50)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "500": {
+            "description": "Internal server error"
           }
         }
       }

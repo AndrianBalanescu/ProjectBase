@@ -31,25 +31,26 @@ Add to ~/.cursor/mcp.json or ~/.flomaster/config.json:
 2. Query Issues: GET /api/collections/issues/records?filter=(project='<ID>')&sort=order,-created
 3. Update Status: PATCH /api/collections/issues/records/<ID> {"status":"in_progress" | "done"}
 4. Append Audit Comment: POST /api/collections/comments/records {"issue":"<ID>","author":"Flomaster Agent","author_type":"agent","content":"Summary"}
-5. Export Issues (data portability — mirrors the importer columns so an exported
+5. Global Issue Search (cross-project): GET /api/projectbase/search?q=<query>&limit=<n> — searches title, identifier, status, and priority across every project the user can see. Each result carries { id, identifier, title, status, priority, project_id, project_name, project_identifier, project_color }.
+6. Export Issues (data portability — mirrors the importer columns so an exported
    file can be re-imported into another ProjectBase or Linear/Plane/Trello):
    - CSV:  GET /api/projectbase/export/csv?project=<ID>   (attachment download)
    - JSON: GET /api/projectbase/export/json?project=<ID>  (machine-readable)
-6. Custom Fields (per-project, Linear-style properties):
+7. Custom Fields (per-project, Linear-style properties):
    - List defs:    GET  /api/projectbase/projects/<ID>/custom-fields
    - Replace defs: PUT  /api/projectbase/projects/<ID>/custom-fields {"fields":[{"label":"Client","type":"text"},{"label":"Gate","type":"select","options":["P0","P1"]}]}
    - Validate:     POST /api/projectbase/projects/<ID>/custom-fields/validate {"values":{"client":"Acme"}}
    - Types: text | number | select | checkbox | date
-7. Bulk Actions (board/list multi-select — up to 500 ids per call):
+8. Bulk Actions (board/list multi-select — up to 500 ids per call):
    - Bulk update: POST /api/projectbase/issues/bulk-update {"ids":["<ID>",...],"data":{"status":"in_progress","priority":"high","cycle":"<CYCLE_ID>"}}
      Allowed data fields: status, priority, cycle, milestone, estimate, start_date, due_date, labels, order + per-project custom_* fields. Returns {"updated":N,"missing":N,"total":N}.
    - Bulk delete: POST /api/projectbase/issues/bulk-delete {"ids":["<ID>",...]} (admin/manager only). Returns {"deleted":N,"missing":N,"total":N}.
-8. Issue Relationships (blocks / blocked_by / related — reciprocal edges auto-mirrored):
+9. Issue Relationships (blocks / blocked_by / related — reciprocal edges auto-mirrored):
    - List:   GET    /api/projectbase/issues/<ID>/relations
    - Add:    POST   /api/projectbase/issues/<ID>/relations {"issue":"<TARGET_ID>","type":"blocks"|"blocked_by"|"related"}
    - Remove: DELETE /api/projectbase/issues/<ID>/relations {"issue":"<TARGET_ID>","type":"blocks"|"blocked_by"|"related"}
-7. In-app Notifications (recipient-only inbox, hook-generated):
+10. In-app Notifications (recipient-only inbox, hook-generated):
    - List:   GET  /api/collections/notifications/records?sort=-created
    - Read:   PATCH /api/collections/notifications/records/<ID> {"read":true}
    - Read all: POST /api/projectbase/notifications/read-all
-8. Full Agent Guide: GET /llms-full.txt
+11. Full Agent Guide: GET /llms-full.txt

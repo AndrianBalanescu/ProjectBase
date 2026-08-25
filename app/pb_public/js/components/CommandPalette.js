@@ -2,11 +2,15 @@
 
 const CommandPaletteComponent = {
   props: ['isOpen', 'issues', 'projects'],
-  emits: ['close', 'select-issue', 'select-project', 'change-view', 'open-new-issue', 'open-import', 'open-export', 'open-welcome'],
+  emits: ['close', 'select-issue', 'select-global-issue', 'select-project', 'change-view', 'open-new-issue', 'open-import', 'open-export', 'open-welcome'],
   data() {
     return {
       query: '',
-      selectedIndex: 0
+      selectedIndex: 0,
+      globalResults: [],
+      globalLoading: false,
+      globalError: '',
+      _searchTimer: null
     };
   },
   computed: {
@@ -49,8 +53,11 @@ const CommandPaletteComponent = {
         }
       }
 
-      // Issues
+      // Issues: current-project matches first, then global cross-project
+      // matches (deduped by id) so a search surfaces items from every project.
+      const seen = new Set();
       for (const issue of this.issues) {
+        seen.add(issue.id);
         if (!q || issue.title.toLowerCase().includes(q) || (issue.identifier || '').toLowerCase().includes(q)) {
           items.push({
             type: 'issue',
@@ -63,8 +70,23 @@ const CommandPaletteComponent = {
           });
         }
       }
+      for (const g of this.globalResults) {
+        if (seen.has(g.id)) continue;
+        seen.add(g.id);
+        if (!q || g.title.toLowerCase().includes(q) || (g.identifier || '').toLowerCase().includes(q)) {
+          items.push({
+            type: 'issue',
+            id: g.id,
+            title: g.title,
+            subtitle: `${g.identifier} • ${g.status} • ${g.priority} • ${g.project_identifier || g.project_name}`,
+            icon: 'check-square',
+            data: g,
+            action: () => this.$emit('select-global-issue', g)
+          });
+        }
+      }
 
-      return items.slice(0, 20);
+      return items.slice(0, 30);
     }
   },
   watch: {
@@ -72,12 +94,19 @@ const CommandPaletteComponent = {
       if (newVal) {
         this.query = '';
         this.selectedIndex = 0;
+        this.globalResults = [];
+        this.globalLoading = false;
+        this.globalError = '';
         this.$nextTick(() => {
           const inp = this.$refs.searchInput;
           if (inp) inp.focus();
           if (window.lucide) window.lucide.createIcons();
         });
       }
+    },
+    query(newVal) {
+      this.selectedIndex = 0;
+      this.scheduleGlobalSearch(newVal);
     },
     results() {
       this.selectedIndex = 0;
@@ -87,6 +116,31 @@ const CommandPaletteComponent = {
     }
   },
   methods: {
+    scheduleGlobalSearch(raw) {
+      const q = (raw || '').trim();
+      if (this._searchTimer) { clearTimeout(this._searchTimer); this._searchTimer = null; }
+      // De-bounce so the fetch only fires after the user stops typing.
+      this._searchTimer = setTimeout(() => this.runGlobalSearch(q), 250);
+    },
+    async runGlobalSearch(q) {
+      this._searchTimer = null;
+      if (!q || (typeof API === 'undefined' || !API.searchIssues)) {
+        this.globalResults = [];
+        this.globalLoading = false;
+        return;
+      }
+      this.globalLoading = true;
+      this.globalError = '';
+      try {
+        const data = await API.searchIssues(q, 30);
+        this.globalResults = (data && data.results) || [];
+      } catch (err) {
+        this.globalError = (err && err.message) || 'Search failed';
+        this.globalResults = [];
+      } finally {
+        this.globalLoading = false;
+      }
+    },
     handleKey(e) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();

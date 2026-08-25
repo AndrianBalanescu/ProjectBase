@@ -111,6 +111,64 @@ def test_stats_endpoint():
     assert status == 200, f"stats requires auth (seeded superuser): {status} {body}"
     assert "total_projects" in body
 
+def test_search_requires_authentication():
+    status, _ = _get("/api/projectbase/search?q=anything")
+    assert status == 401
+
+def test_search_empty_query_ok():
+    status, body = _get_authed("/api/projectbase/search?q=")
+    assert status == 200
+    assert body["count"] == 0
+    assert body["results"] == []
+
+def test_search_returns_cross_project_matches():
+    """Searching a known seeded identifier must return the issue from ANY
+    project, and each result must carry project metadata for the UI."""
+    hdr = {"Authorization": _superuser_token()}
+    # The demo DB is seeded with issues whose titles contain well-known words
+    # (e.g. "ProjectBase"). Search for something broad and assert the schema.
+    status, body = _request("GET", "/api/projectbase/search?q=ProjectBase", headers=hdr)
+    assert status == 200
+    assert "results" in body
+    for r in body["results"]:
+        assert r["id"]
+        assert "identifier" in r
+        assert "project_id" in r
+        assert "project_identifier" in r
+        assert "title" in r
+
+def test_search_returns_cross_project_identifier():
+    """A search by issue identifier must find that issue and include the
+    project it belongs to (cross-project). Uses a uniquely-titled issue so the
+    match is unambiguous regardless of sort order."""
+    hdr = {"Authorization": _superuser_token()}
+    pid = _get_any_project_id()
+    title = f"Search Identifier Probe {_uid()}"
+    # Create an issue via the importer so it gains a stable identifier (e.g. PB-N).
+    st, body = _request(
+        "POST", "/api/projectbase/import/csv",
+        {"project_id": pid, "rows": [{"title": title, "status": "todo"}]},
+        headers=hdr)
+    assert st == 200, f"fixture create failed: {st} {body}"
+    # The importer response does not echo identifiers, so look the probe up by
+    # its unique title to get the assigned identifier (e.g. PB-N).
+    from urllib.parse import quote
+    ident_st, ident_body = _request(
+        "GET", f"/api/collections/issues/records?filter=(title='{quote(title)}')&sort=-created",
+        headers=hdr)
+    assert ident_st == 200
+    prob = ident_body.get("items", [{}])[0] if ident_body.get("items") else {}
+    identifier = prob.get("identifier")
+    assert identifier, f"no identifier found for probe: {title}"
+
+    # Search by the exact identifier; the probe issue must be returned.
+    st2, res = _request("GET", f"/api/projectbase/search?q={identifier}", headers=hdr)
+    assert st2 == 200
+    hits = [r for r in res["results"] if r["identifier"] == identifier]
+    assert hits, f"probe issue {identifier} not found in search results"
+    assert hits[0]["project_id"] == pid
+    assert hits[0]["project_identifier"]
+
 
 # Every /api/projectbase/* custom route implemented in app/pb_hooks/*.pb.js
 # must be documented in openapi.json. Keep this list in sync when routes change
@@ -119,6 +177,7 @@ DOCUMENTED_CUSTOM_ROUTES = [
     "/projectbase/health",
     "/projectbase/version",
     "/projectbase/stats",
+    "/projectbase/search",
     "/projectbase/quick-task",
     "/projectbase/projects/{id}/custom-fields",
     "/projectbase/projects/{id}/custom-fields/validate",
@@ -2177,3 +2236,36 @@ def test_ai_assist_summarize_cycle_fallback():
     assert "Done task" in result, "summary must reference done work (achievements)"
     assert "WIP task" in result, "summary must reference in-progress work"
     assert "Todo task" in result, "summary must reference backlog work"
+
+def test_global_search_wired_in_command_palette():
+    """The Cmd+K omnibox must wire global cross-project search to the
+    /api/projectbase/search route. This drift-guard pins the frontend surface:
+    the searchIssues API call, the debounced global search watcher, the global
+    results merge into the results list, and the cross-project selection path."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    cp = open(os.path.join(root, "app", "pb_public", "js", "components", "CommandPalette.js")).read()
+    app_js = open(os.path.join(root, "app", "pb_public", "js", "app.js")).read()
+    index = open(os.path.join(root, "app", "pb_public", "index.html")).read()
+
+    # CommandPalette must call the search route via the API client.
+    assert "searchIssues" in cp, "CommandPalette must call API.searchIssues()"
+    assert "scheduleGlobalSearch" in cp, "CommandPalette must debounce the global search"
+    assert "globalResults" in cp, "CommandPalette must track global search results"
+    # The results list must merge global results and emit a distinct event so
+    # cross-project issues can be opened.
+    assert "select-global-issue" in cp, "CommandPalette must emit select-global-issue"
+
+    # api.js must expose searchIssues hitting the /api/projectbase/search route.
+    api_js = open(os.path.join(root, "app", "pb_public", "js", "api.js")).read()
+    assert "async searchIssues" in api_js, "api.js must define searchIssues()"
+    assert "/api/projectbase/search" in api_js, "api.js must call the /api/projectbase/search route"
+
+    # app.js must handle select-global-issue by opening the cross-project issue.
+    assert "openGlobalIssue" in app_js, "app.js must define openGlobalIssue()"
+    # index.html must wire the select-global-issue event.
+    assert "select-global-issue" in index, "index.html must bind @select-global-issue"
+
+    # The live-served asset must exist and define the search wiring.
+    st, body = _get("/js/components/CommandPalette.js")
+    assert st == 200, f"CommandPalette.js not served: {st}"
+    assert "searchIssues" in body, "served CommandPalette.js must reference searchIssues"

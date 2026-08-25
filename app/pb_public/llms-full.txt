@@ -87,6 +87,15 @@ curl -s -X PATCH ${PROJECTBASE_URL:-http://localhost:8120}/api/collections/issue
   -H "Content-Type: application/json" \
   -d '{"status":"done"}'
 
+### Global Issue Search (cross-project):
+curl -s ${PROJECTBASE_URL:-http://localhost:8120}/api/projectbase/search \
+  -H "Authorization: <POCKETBASE_TOKEN>" \
+  --data-urlencode "q=regression" \
+  -G
+# Searches title, identifier, status, and priority across every project.
+# Returns { query, count, results:[{ id, identifier, title, status, priority,
+#   project_id, project_name, project_identifier, project_color }] }.
+
 ### Append Execution Log:
 curl -s -X POST ${PROJECTBASE_URL:-http://localhost:8120}/api/collections/comments/records \
   -H "Content-Type: application/json" \

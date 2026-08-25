@@ -181,3 +181,70 @@ routerAdd("POST", "/api/projectbase/quick-task", (e) => {
         return e.json(500, { error: "Internal server error" })
     }
 })
+
+routerAdd("GET", "/api/projectbase/search", (e) => {
+    try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
+
+        let q = e.requestInfo().query && e.requestInfo().query.q
+        q = String(q || "").trim()
+        if (!q) {
+            return e.json(200, { query: "", count: 0, results: [] })
+        }
+        if (q.length > 128) {
+            return e.badRequestError("Search query too long (max 128 chars)")
+        }
+
+        // Escape single quotes for the filter string.
+        const safe = q.replace(/'/g, "\\'")
+        const limit = Math.min(Number(e.requestInfo().query && e.requestInfo().query.limit) || 20, 50)
+
+        // Cross-project search across title, identifier, status, and priority.
+        const filter = `(title ~ '${safe}' || identifier ~ '${safe}' || status ~ '${safe}' || priority ~ '${safe}')`
+        let issues = e.app.findRecordsByFilter("issues", filter, "-created", limit, 0)
+
+        const results = []
+        const projectCache = {}
+        for (const rec of issues) {
+            const projectId = rec.get("project")
+            let projectName = ""
+            let projectIdentifier = ""
+            let projectColor = ""
+            if (projectId) {
+                if (projectCache[projectId]) {
+                    projectName = projectCache[projectId].name
+                    projectIdentifier = projectCache[projectId].identifier
+                    projectColor = projectCache[projectId].color
+                } else {
+                    try {
+                        const proj = e.app.findRecordById("projects", projectId)
+                        projectName = proj.get("name") || ""
+                        projectIdentifier = proj.get("identifier") || ""
+                        projectColor = proj.get("color") || ""
+                        projectCache[projectId] = { name: projectName, identifier: projectIdentifier, color: projectColor }
+                    } catch (pErr) {
+                        projectCache[projectId] = { name: "", identifier: "", color: "" }
+                    }
+                }
+            }
+            results.push({
+                id: rec.id,
+                identifier: rec.get("identifier") || "",
+                title: rec.get("title") || "",
+                status: rec.get("status") || "backlog",
+                priority: rec.get("priority") || "none",
+                project_id: projectId || "",
+                project_name: projectName,
+                project_identifier: projectIdentifier,
+                project_color: projectColor
+            })
+        }
+
+        return e.json(200, { query: q, count: results.length, results })
+    } catch (err) {
+        console.log(">>> [ProjectBase] search route error:", JSON.stringify(String((err && err.message) || err)))
+        return e.json(500, { error: "Internal server error" })
+    }
+})

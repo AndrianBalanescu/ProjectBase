@@ -117,6 +117,19 @@ const API = {
     return await pb.collection('issues').delete(id);
   },
 
+  // Global cross-project search (Cmd+K omnibox). Searches issue title,
+  // identifier, status, and priority across every project the user can see.
+  async searchIssues(query, limit = 20) {
+    const q = encodeURIComponent((query || '').trim());
+    if (!q) return { query: '', count: 0, results: [] };
+    const res = await fetch(`/api/projectbase/search?q=${q}&limit=${limit}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Search failed');
+    return data;
+  },
+
   // Bulk actions (board/list multi-select) — one request per action
   async bulkUpdateIssues(ids, data) {
     return await pb.send('/api/projectbase/issues/bulk-update', {

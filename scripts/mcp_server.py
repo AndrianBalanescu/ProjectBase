@@ -140,6 +140,19 @@ def list_issues(
     return res.get("items", [])
 
 @mcp.tool()
+def search_issues(query: str, limit: int = 20) -> List[Dict[str, Any]]:
+    """Search issues across every project by title, identifier, status, or priority.
+
+    Use this when you need to find an issue by name, phrase, or identifier without
+    knowing which project it lives in. Returns a cross-project list of matches,
+    each carrying { id, identifier, title, status, priority, project_id,
+    project_name, project_identifier, project_color }.
+    """
+    encoded = urllib.parse.quote(query)
+    res = _request(f"/api/projectbase/search?q={encoded}&limit={limit}")
+    return res.get("results", [])
+
+@mcp.tool()
 def get_issue(identifier_or_id: str) -> Dict[str, Any]:
     """Get full details of an issue including description, subtasks, and comments."""
     issue = _find_issue(identifier_or_id)

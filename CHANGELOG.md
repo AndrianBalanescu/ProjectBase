@@ -11,6 +11,18 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **Global cross-project search in the Cmd+K omnibox**: the command palette
+  now searches issues across **every** project (title, identifier, status,
+  priority) via a new `/api/projectbase/search` route, not just the currently
+  selected project. Typing a query surfaces matches from other workspaces with
+  a project tag, and selecting a cross-project result switches to that project
+  and opens the full issue drawer. Agent surface stays in sync: the route is
+  documented in `openapi.json`, `llms.txt`/`llms-full.txt`, and exposed as a
+  new `search_issues` FastMCP tool. Wired in `app/pb_hooks/30_custom_routes.pb.js`,
+  `CommandPalette.js`, `app.js` (`openGlobalIssue`), and `api.js`
+  (`searchIssues`). New pytest coverage for the endpoint + a wiring drift-guard
+  and a headless browser QA script (`scripts/qa/verify_global_search.js`).
+  No schema change.
 - **AI Cycle Summary (summarize_cycle)**: the Cycles & Sprints view gains an
   "AI Sprint Summary" panel. A Generate button POSTs the current cycle's issue
   list (identifier/title/status/priority/estimate) to the existing
