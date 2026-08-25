@@ -28,6 +28,7 @@ Environment:
 import argparse
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -48,6 +49,11 @@ FIXTURE_TITLE_PREFIXES = (
     "Keyed ",
 )
 
+# The uid suffix is _uid() = uuid.uuid4().hex[:10] in tests/test_api.py.
+# Matching ONLY a hex suffix (8-40 chars) prevents sweeping a human title that
+# merely starts with the same words (e.g. "Export CustomFields is a feature").
+_FIXTURE_UID_RE = re.compile(r"[0-9a-f]{8,40}\Z")
+
 _PAGE_SIZE = 200
 
 
@@ -67,6 +73,10 @@ def _request(method, path, body=None, token=None, timeout=20):
     except urllib.error.HTTPError as err:
         raw = err.read().decode(errors="replace")
         status = err.code
+    except urllib.error.URLError as err:
+        raise SystemExit(
+            f"cannot reach ProjectBase at {BASE_URL}: {err.reason}"
+        ) from err
     try:
         return status, json.loads(raw)
     except json.JSONDecodeError:
@@ -86,7 +96,10 @@ def _superuser_token():
 
 def _is_fixture(record):
     title = record.get("title") or ""
-    return any(title.startswith(p) for p in FIXTURE_TITLE_PREFIXES)
+    for prefix in FIXTURE_TITLE_PREFIXES:
+        if title.startswith(prefix) and _FIXTURE_UID_RE.fullmatch(title[len(prefix):]):
+            return True
+    return False
 
 
 def find_fixtures(token):
