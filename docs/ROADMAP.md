@@ -1332,3 +1332,41 @@ and the app still reported `0.9.0` despite a large `[Unreleased]` delta.
 **Next:** `v1.0.0` tag + GitHub release notes (this cycle). Remaining v1.1
 backlog and North Star external-gated items (public demo domain +
 first-stranger onboarding) still need human input.
+
+## Cycle-36 shipped (2026-08-25): Linear issues importer
+
+**Goal:** close the last must-have import gap flagged in the cycle-1 feature
+matrix verdict ("close importer gap first — it converts angry Linear migrants,
+the loudest audience"). The matrix claims `Importers (Linear/Plane/GitHub)` but
+only CSV + GitHub importers existed. Linear's official workspace export is a
+CSV (Settings > Administration > Import/Export > Export data), so this cycle
+adds a dedicated Linear CSV importer.
+
+**Shipped this cycle:**
+- New backend route `POST /api/projectbase/import/linear`
+  (`app/pb_hooks/41_linear_importer.pb.js`) accepting either an array of row
+  objects keyed by Linear's export column names or the raw CSV export text
+  (`csv`). Maps Linear status/priority/labels/assignee/due date/estimate/
+  description to ProjectBase fields, and is idempotent (keyed by Linear issue
+  ID via `source_metadata.source_key`, with a title fallback dedup).
+- New "Linear" tab in the Import modal (`ImportModal.js`): paste the Linear
+  workspace CSV export, pick a target project, and import in one click.
+- Agent surface kept in sync: `openapi.json` (`/projectbase/import/linear`),
+  `llms.txt` (import section), and the `DOCUMENTED_CUSTOM_ROUTES` drift guard
+  in `tests/test_api.py`.
+- CHANGELOG `[Unreleased]` entry + AGENTS.md + FEATURE_MATRIX updated.
+
+**Validation:**
+- `uv run --with pytest pytest tests/` → **207/207 passed** (+5 Linear importer
+  tests: auth, mapping, idempotency-by-ID, raw-CSV parsing, status/priority
+  normalization). One pre-existing live-network flake
+  (`test_github_long_description_truncated`, unauthenticated GitHub rate limit)
+  is unrelated to this change.
+- Headless render QA (`scripts/qa/qa-render.sh`) → **RENDER QA: PASS**, incl. a
+  new assertion that the Import modal opens via the `i` shortcut and renders the
+  Linear tab + textarea + "Import from Linear" button with zero console errors.
+- iBrowse visual QA run succeeded (console-error + render audit, 0 console
+  errors / 0 4xx reported).
+
+**Next:** remaining v1.1 backlog and North Star external-gated items (public
+demo domain + first-stranger onboarding) still need human input.

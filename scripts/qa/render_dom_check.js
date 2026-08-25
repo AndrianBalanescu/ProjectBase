@@ -30,6 +30,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   const customField = { checked: false };
   const exportModal = { checked: false };
   const notifSettings = { checked: false };
+  const importModal = { checked: false };
   // URLs whose requests are intentionally ignored from the failure list (the
   // range+apply E2E's cleanup DELETEs can abort client-side after the server
   // already processed them; the end state is verified instead).
@@ -1106,6 +1107,27 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   } catch (e) { notifSettings.error = String(e).slice(0, 200); }
   notifSettings.checked = true;
 
+  // ---- Import modal (cycle 36): opens via the 'i' shortcut and renders the
+  // Linear importer tab (the Linear workspace CSV exporter). ----
+  try {
+    // Ensure the app shell has focus (the 'i' shortcut is app-level).
+    await page.locator('body').click({ position: { x: 5, y: 5 } }).catch(() => {});
+    await page.waitForTimeout(300);
+    await page.keyboard.press('i');
+    await page.waitForTimeout(600);
+    importModal.opened = await page.locator('text=Import Issues').first().isVisible().catch(() => false);
+    importModal.linearTab = await page.locator('button:has-text("Linear")').first().isVisible().catch(() => false);
+    if (importModal.linearTab) {
+      await page.locator('button:has-text("Linear")').first().click();
+      await page.waitForTimeout(400);
+      importModal.linearField = await page.locator('textarea[placeholder*="ID,Title,Status"]').first().isVisible().catch(() => false);
+      importModal.linearBtn = await page.locator('button:has-text("Import from Linear")').first().isVisible().catch(() => false);
+    }
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+  } catch (e) { importModal.error = String(e).slice(0, 200); }
+  importModal.checked = true;
+
   const failures = [];
   // The browser's network logger emits a GENERIC "Failed to load resource ... 400"
   // console error without naming the URL. If every 4xx was the whitelisted auth
@@ -1261,8 +1283,17 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   } else if (!notifSettings || !notifSettings.checked) {
     failures.push('notification settings E2E not exercised');
   }
+  if (importModal && importModal.checked) {
+    if (importModal.error) failures.push('import modal E2E error: ' + importModal.error);
+    if (importModal.opened === false) failures.push('import modal did not open via i shortcut');
+    if (importModal.linearTab === false) failures.push('import modal Linear tab missing');
+    if (importModal.linearTab && importModal.linearField === false) failures.push('Linear CSV textarea missing');
+    if (importModal.linearTab && importModal.linearBtn === false) failures.push('Import from Linear button missing');
+  } else if (!importModal || !importModal.checked) {
+    failures.push('import modal E2E not exercised');
+  }
 
-  console.log(JSON.stringify({ checks, routing, resize, urlState, relations, focusMode, bulk, range, customField, timeline, portfolio, deepLink, exportModal, notifSettings, failures, all4xx }, null, 1));
+  console.log(JSON.stringify({ checks, routing, resize, urlState, relations, focusMode, bulk, range, customField, timeline, portfolio, deepLink, exportModal, notifSettings, importModal, failures, all4xx }, null, 1));
   console.log(failures.length === 0 ? 'RENDER QA: PASS' : 'RENDER QA: FAIL');
   await browser.close();
   process.exit(failures.length === 0 ? 0 : 1);

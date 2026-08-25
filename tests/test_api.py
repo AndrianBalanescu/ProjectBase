@@ -87,7 +87,7 @@ def _cleanup_importer_artifacts():
                 break
             for it in items:
                 sm = it.get("source_metadata") or {}
-                if sm.get("importer") in ("csv", "github"):
+                if sm.get("importer") in ("csv", "github", "linear"):
                     _request("DELETE", f"/api/collections/issues/records/{it['id']}",
                              headers=hdr)
     except Exception:
@@ -260,6 +260,7 @@ DOCUMENTED_CUSTOM_ROUTES = [
     "/projectbase/issues/bulk-delete",
     "/projectbase/import/csv",
     "/projectbase/import/github",
+    "/projectbase/import/linear",
     "/projectbase/export/csv",
     "/projectbase/export/json",
     "/projectbase/notifications/read-all",
@@ -554,6 +555,144 @@ def test_importer_persists_start_date():
     assert recs.get("items"), "imported issue not found"
     assert recs["items"][0].get("start_date", "").startswith("2026-09-05"), \
         f"importer did not persist start_date: {recs['items'][0].get('start_date')}"
+
+
+# ---------------------------------------------------------------------------
+# Linear importer (cycle 36): Linear workspace export -> ProjectBase issues
+# ---------------------------------------------------------------------------
+
+def test_linear_importer_requires_authentication():
+    status, _ = _request("POST", "/api/projectbase/import/linear",
+                         {"project_id": "x", "rows": [{"Title": "y"}]})
+    assert status == 401
+
+
+def test_linear_importer_missing_project():
+    status, _ = _request("POST", "/api/projectbase/import/linear",
+                         {"rows": [{"Title": "y"}]},
+                         headers={"Authorization": _superuser_token()})
+    assert 400 <= status < 500
+
+
+def test_linear_importer_creates_issue_with_mapping():
+    """A Linear-style row maps Status/Priority/Labels/Assignee/Due Date/Estimate."""
+    pid = _get_any_project_id()
+    status, body = _request(
+        "POST", "/api/projectbase/import/linear",
+        {"project_id": pid, "rows": [{
+            "ID": f"lin-{_uid()}",
+            "Title": f"Linear Test {_uid()}",
+            "Description": "from linear",
+            "Status": "In Progress",
+            "Priority": "Urgent",
+            "Labels": "bug, auth",
+            "Assignee": "Alice",
+            "Due Date": "2026-09-01",
+            "Estimate": "3"
+        }]},
+        headers={"Authorization": _superuser_token()})
+    assert status == 200, f"linear import failed: {status} {body}"
+    assert body["imported"] == 1
+    assert body["skipped"] == 0
+
+    # Verify the mapped record persisted with source_metadata.
+    from urllib.parse import quote
+    q = "/api/collections/issues/records?filter=" + quote(f"(title~'Linear Test')") + "&perPage=20"
+    st, recs = _get_authed(q)
+    assert st == 200
+    matches = [i for i in recs.get("items", [])
+               if (i.get("source_metadata") or {}).get("importer") == "linear"]
+    assert matches, "linear-imported issue not found"
+    rec = matches[0]
+    assert rec["status"] == "in_progress", rec["status"]
+    assert rec["priority"] == "urgent", rec["priority"]
+    assert rec["assignee"] == "Alice"
+    assert rec["due_date"].startswith("2026-09-01")
+    assert rec["estimate"] == 3
+    assert set(rec["labels"]) == {"bug", "auth"}
+    assert (rec["source_metadata"]["source_key"]).startswith("linear:")
+
+
+def test_linear_importer_idempotent_by_linear_id():
+    """Re-importing the same Linear ID is skipped even if the title changes."""
+    pid = _get_any_project_id()
+    lin_id = f"lin-{_uid()}"
+    hdr = {"Authorization": _superuser_token()}
+    payload = {"project_id": pid, "rows": [{
+        "ID": lin_id,
+        "Title": f"Linear Dedup {_uid()}",
+        "Status": "Todo",
+        "Priority": "Low"
+    }]}
+    status, body = _request("POST", "/api/projectbase/import/linear", payload, headers=hdr)
+    assert status == 200 and body["imported"] == 1
+    # Same Linear ID but a different title => must be skipped (keyed by ID).
+    payload2 = {"project_id": pid, "rows": [{
+        "ID": lin_id,
+        "Title": f"Linear Renamed {_uid()}",
+        "Status": "Done"
+    }]}
+    status2, body2 = _request("POST", "/api/projectbase/import/linear", payload2, headers=hdr)
+    assert status2 == 200
+    assert body2["imported"] == 0
+    assert body2["skipped"] == 1
+
+
+def test_linear_importer_accepts_raw_csv():
+    """The `csv` text form parses Linear's workspace export client/server-side."""
+    pid = _get_any_project_id()
+    uid = _uid()
+    csv_text = (
+        "ID,Title,Status,Priority,Labels,Assignee,Due Date\n"
+        f"lin-a{uid},Linear Csv Form {uid},In Review,High,\"perf, reg\","\
+        "Bob,2026-10-01\n"
+        f"lin-b{uid},,,,,\n"
+    )
+    status, body = _request(
+        "POST", "/api/projectbase/import/linear",
+        {"project_id": pid, "csv": csv_text},
+        headers={"Authorization": _superuser_token()})
+    assert status == 200, f"csv linear import failed: {status} {body}"
+    assert body["imported"] == 1
+    assert body["total"] == 2
+
+    from urllib.parse import quote
+    q = "/api/collections/issues/records?filter=" + quote(f"(title~'Csv Form')") + "&perPage=5"
+    st, recs = _get_authed(q)
+    assert st == 200
+    matches = [i for i in recs.get("items", [])
+               if "Csv Form" in (i.get("title") or "")
+               and (i.get("source_metadata") or {}).get("importer") == "linear"]
+    assert matches
+    rec = matches[0]
+    assert rec["status"] == "in_review", rec["status"]
+    assert rec["priority"] == "high"
+    assert set(rec["labels"]) == {"perf", "reg"}
+
+
+def test_linear_importer_normalizes_status_and_priority():
+    """Linear status/priority strings normalize to ProjectBase enums."""
+    pid = _get_any_project_id()
+    rows = [
+        {"ID": f"lin-{_uid()}", "Title": f"L T {_uid()}", "Status": "Backlog", "Priority": "No priority"},
+        {"ID": f"lin-{_uid()}", "Title": f"L T {_uid()}", "Status": "Done", "Priority": "Low"},
+        {"ID": f"lin-{_uid()}", "Title": f"L T {_uid()}", "Status": "Canceled", "Priority": "Critical"},
+    ]
+    status, body = _request(
+        "POST", "/api/projectbase/import/linear",
+        {"project_id": pid, "rows": rows},
+        headers={"Authorization": _superuser_token()})
+    assert status == 200 and body["imported"] == 3
+    from urllib.parse import quote
+    q = "/api/collections/issues/records?filter=" + quote("(title~'L T ')") + "&perPage=20"
+    st, recs = _get_authed(q)
+    assert st == 200
+    linear_items = [i for i in recs.get("items", [])
+                    if (i.get("source_metadata") or {}).get("importer") == "linear"]
+    statuses = {i["status"] for i in linear_items}
+    priorities = {i["priority"] for i in linear_items}
+    assert "backlog" in statuses and "done" in statuses and "cancelled" in statuses
+    assert "none" in priorities and "low" in priorities and "urgent" in priorities
 
 
 # ---------------------------------------------------------------------------

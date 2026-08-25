@@ -10,6 +10,15 @@ subscriptions, Stripe, or paid tiers.
 
 ## [Unreleased]
 
+### Added
+- **Linear issues importer** (`POST /api/projectbase/import/linear`): imports a
+  Linear workspace export (Settings > Administration > Import/Export > Export
+  data). Accepts either an array of row objects keyed by Linear's CSV columns or
+  the raw CSV export text (`csv`), maps Status/Priority/Labels/Assignee/Due
+  Date/Estimate/Description, and is idempotent (keyed by Linear issue ID via
+  `source_metadata.source_key`). New "Linear" tab in the Import modal. Agent
+  surface stays in sync: `openapi.json` and `llms.txt`.
+
 ## [1.0.0] - 2026-08-25
 
 ### Added

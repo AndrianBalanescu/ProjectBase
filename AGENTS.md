@@ -38,7 +38,7 @@ app/
     30_custom_routes.pb.js     <- /api/projectbase/* custom routes (health, version, stats, quick-task)
     31_bulk_actions.pb.js      <- /api/projectbase/issues/bulk-update + bulk-delete (multi-select)
     35_custom_fields.pb.js     <- per-project custom field validation
-    40_importers.pb.js / 45_github_importer.pb.js  <- CSV + GitHub importers
+    40_importers.pb.js / 41_linear_importer.pb.js / 45_github_importer.pb.js  <- CSV + Linear + GitHub importers
     50_cron_automation.pb.js   <- scheduled automations
     55_notifications.pb.js / 60_notifications.pb.js  <- Telegram/Discord/webhook + in-app inbox
     70_ai_assist.pb.js / 80_agent_triggers.pb.js      <- AI-assisted actions + agent dispatch

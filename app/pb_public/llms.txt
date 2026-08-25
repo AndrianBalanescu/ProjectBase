@@ -32,6 +32,11 @@ Add to ~/.cursor/mcp.json or ~/.flomaster/config.json:
 3. Update Status: PATCH /api/collections/issues/records/<ID> {"status":"in_progress" | "done"}
 4. Append Audit Comment: POST /api/collections/comments/records {"issue":"<ID>","author":"Flomaster Agent","author_type":"agent","content":"Summary"}
 5. Global Issue Search (cross-project): GET /api/projectbase/search?q=<query>&limit=<n> — searches title, identifier, status, and priority across every project the user can see. Each result carries { id, identifier, title, status, priority, project_id, project_name, project_identifier, project_color }.
+5b. Import Issues:
+   - CSV:    POST /api/projectbase/import/csv      {"project_id":"<ID>","rows":[{title,description?,status?,priority?,assignee?,due_date?,estimate?,labels?,source_key?}]}
+   - GitHub: POST /api/projectbase/import/github  {"project_id":"<ID>","repo":"owner/name","token?":"...","state?":"all","max_issues?":1000}
+   - Linear: POST /api/projectbase/import/linear  {"project_id":"<ID>","rows":[{ID,Title,Status,Priority,Labels,Assignee,"Due Date",Estimate,Description}]} OR {"project_id":"<ID>","csv":"<raw Linear workspace CSV export>"}
+   Each is idempotent (deduped by source_metadata.source_key) and returns { imported, skipped, total, errors }.
 6. Export Issues (data portability — mirrors the importer columns so an exported
    file can be re-imported into another ProjectBase or Linear/Plane/Trello):
    - CSV:  GET /api/projectbase/export/csv?project=<ID>   (attachment download)

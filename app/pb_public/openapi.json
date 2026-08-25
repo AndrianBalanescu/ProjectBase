@@ -1078,6 +1078,132 @@
         }
       }
     },
+    "/projectbase/import/linear": {
+      "post": {
+        "tags": [
+          "Importers"
+        ],
+        "summary": "Import Issues from a Linear Export",
+        "description": "Import issues from a Linear workspace export. Accepts either an array of row objects keyed by Linear's workspace-export CSV columns (ID, Title, Status, Priority, Labels, Assignee, Due Date, Estimate, Description, Parent issue) via `rows`, or the raw CSV export text via `csv`. Idempotent: keyed by Linear issue ID via source_metadata.source_key.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "project_id"
+                ],
+                "properties": {
+                  "project_id": {
+                    "type": "string",
+                    "description": "Project record id"
+                  },
+                  "rows": {
+                    "type": "array",
+                    "maxItems": 5000,
+                    "description": "Row objects keyed by Linear export column names",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "ID": {
+                          "type": "string",
+                          "example": "uuid"
+                        },
+                        "Title": {
+                          "type": "string",
+                          "example": "Backend rewrite"
+                        },
+                        "Status": {
+                          "type": "string",
+                          "example": "In Progress"
+                        },
+                        "Priority": {
+                          "type": "string",
+                          "example": "High"
+                        },
+                        "Labels": {
+                          "type": "string",
+                          "example": "bug, perf"
+                        },
+                        "Assignee": {
+                          "type": "string"
+                        },
+                        "Due Date": {
+                          "type": "string"
+                        },
+                        "Estimate": {
+                          "type": "number"
+                        },
+                        "Description": {
+                          "type": "string"
+                        },
+                        "Parent issue": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "csv": {
+                    "type": "string",
+                    "description": "Raw Linear workspace CSV export text (pasted directly). Parsed server-side."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "imported": {
+                      "type": "integer"
+                    },
+                    "skipped": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "project": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing project_id / empty rows / too many rows"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "404": {
+            "description": "Project not found"
+          }
+        }
+      }
+    },
     "/projectbase/export/json": {
       "get": {
         "tags": [
