@@ -128,6 +128,33 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       const badge = document.querySelector('header span[class*="font-mono"]');
       return badge ? badge.textContent.trim() : null;
     });
+    // Header layout guard: no horizontal overflow, and the primary "New Issue"
+    // CTA must be fully within the viewport. Catches the class of bug where the
+    // header accumulates so many tabs/actions that the right-side toolbar (and
+    // the primary creation button) get pushed off-screen.
+    checks.headerLayout = await page.evaluate(() => {
+      const header = document.querySelector('header');
+      if (!header) return { header: 'missing' };
+      const overflows = header.scrollWidth > header.clientWidth + 1;
+      const newIssue = [...header.querySelectorAll('button')]
+        .find(b => (b.textContent || '').includes('New Issue'));
+      let newIssueRect = null;
+      if (newIssue) {
+        const r = newIssue.getBoundingClientRect();
+        newIssueRect = {
+          left: Math.round(r.left),
+          right: Math.round(r.right),
+          width: Math.round(r.width),
+          visible: r.width > 0 && r.left >= 0 && r.right <= window.innerWidth
+        };
+      }
+      return {
+        scrollW: header.scrollWidth,
+        clientW: header.clientWidth,
+        overflows,
+        newIssue: newIssueRect
+      };
+    });
     // Open a real issue first so a stale drawer could exist, then navigate
     // to a bogus issue id in the same project.
     await page.evaluate(() => { location.hash = '#/pb/board/issue/nonexistentid12345'; });
@@ -1181,6 +1208,8 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   if (!checks.appMounted) failures.push('Vue app did not mount');
   if (checks.rawMustaches > 0) failures.push(`${checks.rawMustaches} raw mustaches leaked`);
   if (checks.headerBadge !== EXPECTED_BADGE) failures.push(`header version badge ${checks.headerBadge} != ${EXPECTED_BADGE} (VERSION file)`);
+  if (checks.headerLayout && checks.headerLayout.overflows) failures.push(`header horizontally overflows (scrollW ${checks.headerLayout.scrollW} > clientW ${checks.headerLayout.clientW})`);
+  if (checks.headerLayout && checks.headerLayout.newIssue && !checks.headerLayout.newIssue.visible) failures.push(`New Issue button off-screen: ${JSON.stringify(checks.headerLayout.newIssue)}`);
   if (checks.bodyBg !== 'rgb(11, 15, 25)') failures.push(`body bg ${checks.bodyBg} != rgb(11,15,25)`);
   if (checks.probe.paddingLeft !== '28px') failures.push(`pl-7 padding ${checks.probe.paddingLeft} != 28px`);
   if (checks.probe.marginLeft !== '6px') failures.push(`ml-1.5 margin ${checks.probe.marginLeft} != 6px`);
