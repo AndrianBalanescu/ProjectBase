@@ -29,6 +29,15 @@ body {
   background: #374151;
 }
 
+/* Hide scrollbars while keeping the element scrollable (compact tab strips) */
+.scrollbar-none {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none; /* Chromium/Safari */
+}
+
 /* Kanban Drag and Drop Styles */
 .sortable-ghost {
   opacity: 0.35;

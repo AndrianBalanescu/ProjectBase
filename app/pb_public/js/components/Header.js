@@ -59,14 +59,14 @@ const HeaderComponent = {
     }
   },
   template: `
-    <header class="h-14 border-b border-gray-800 bg-gray-900/90 backdrop-blur-md px-4 flex items-center justify-between sticky top-0 z-30 select-none">
+    <header class="h-14 border-b border-gray-800 bg-gray-900/90 backdrop-blur-md px-4 flex items-center gap-2 sticky top-0 z-30 select-none">
       <!-- Left: Logo & Project Switcher -->
-      <div class="flex items-center space-x-4">
+      <div class="flex items-center space-x-4 flex-shrink-0">
         <div class="flex items-center space-x-2 font-bold text-white tracking-tight cursor-pointer" @click="$emit('change-view', 'projects')">
           <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
             <i data-lucide="layers" class="w-4 h-4"></i>
           </div>
-          <span class="text-base font-semibold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">ProjectBase</span>
+          <span class="text-base font-semibold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">PBase</span>
           <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-gray-800/80 text-gray-400 border border-gray-700/50 select-none">v1.0.0</span>
         </div>
 
@@ -138,9 +138,11 @@ const HeaderComponent = {
             </button>
           </div>
         </div>
+      </div>
 
-        <!-- View Switcher Tabs -->
-        <div class="hidden md:flex items-center bg-gray-950/80 p-0.5 rounded-lg border border-gray-800/80 text-xs">
+      <!-- Center: View Switcher Tabs (flexible, shrinks/scrolls so right actions stay visible) -->
+      <div class="hidden md:flex items-center flex-1 min-w-0 justify-center px-2">
+        <div class="flex items-center bg-gray-950/80 p-0.5 rounded-lg border border-gray-800/80 text-xs overflow-x-auto scrollbar-none">
           <button 
             @click="$emit('change-view', 'board')" 
             class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all font-medium"
@@ -226,7 +228,7 @@ const HeaderComponent = {
       </div>
 
       <!-- Right: Search, Actions, Live Status -->
-      <div class="flex items-center space-x-3">
+      <div class="flex items-center space-x-3 flex-shrink-0">
         <!-- Live SSE Status Indicator -->
         <div class="flex items-center space-x-1.5 px-2 py-1 rounded-full bg-emerald-950/40 border border-emerald-800/40 text-[11px] text-emerald-400 select-none" title="PocketBase Realtime SSE Active">
           <span class="w-2 h-2 rounded-full bg-emerald-400 live-pulse"></span>

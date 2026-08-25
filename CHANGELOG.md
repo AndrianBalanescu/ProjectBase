@@ -58,6 +58,18 @@ subscriptions, Stripe, or paid tiers.
   `source_metadata.source_key`). New "Linear" tab in the Import modal. Agent
   surface stays in sync: `openapi.json` and `llms.txt`.
 
+### Fixed
+- **Header layout hardening + agent-prompt char cap** (`Header.js`,
+  `IssueDrawer.js`, `app.css`): the header now keeps the logo, view tabs, and
+  action cluster from squishing on narrow windows (`gap-2` + `flex-shrink-0`),
+  the view-switcher tab strip scrolls horizontally when crowded and hides its
+  scrollbar via a new `.scrollbar-none` utility, and the Custom Agent
+  instruction editor enforces the backend's 8000-char limit with
+  `maxlength="8000"`. The header logo renders as **PBase** to match the compact
+  brand. Also closes a CSS drift guard gap: `.scrollbar-none` is now a real
+  utility in `app.css` (the drift test was failing because the class was used
+  but not defined).
+
 ## [1.0.0] - 2026-08-25
 
 ### Added

@@ -641,6 +641,7 @@ const IssueDrawerComponent = {
                   <textarea
                     v-model="agentPrompt"
                     rows="3"
+                    maxlength="8000"
                     placeholder="Optional custom instructions for the dispatched agent..."
                     class="w-full px-2.5 py-1.5 rounded-lg bg-gray-950 border border-gray-800 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-y"
                   ></textarea>
