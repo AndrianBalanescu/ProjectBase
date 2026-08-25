@@ -39,6 +39,15 @@ subscriptions, Stripe, or paid tiers.
   char counter.
 
 ### Fixed
+- **AGENTS.md agent-facing technical map no longer drifts from the tree**
+  (`AGENTS.md`, `tests/test_agents_drift_guard.py`): the `**Tests:**` bullet
+  claimed "223 tests across 10 files" while the real suite was 227 tests across
+  11 files, and the `tests/` directory-map line listed only 5 of the 11 files.
+  Both are now corrected to the actual state (229 tests / 12 files) and a new
+  `test_agents_drift_guard.py` locks the two claims to the tree: it fails on
+  any mismatch between the AGENTS.md test count/file count and the real pytest
+  surface, and fails if any `tests/test_*.py` is missing from the map. Test
+  count: 227 → 229.
 - **Docker image no longer bakes the local dev database into itself**
   (`.dockerignore`, `tests/test_deploy_consistency.py`): there was no
   `.dockerignore`, so `docker build` sent `app/pb_data` (the dev SQLite DB +

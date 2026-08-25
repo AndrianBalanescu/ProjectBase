@@ -7,7 +7,7 @@ ProjectBase = ultra-lightweight open-source Plane/Linear alternative. **MIT, 100
 - **Backend:** PocketBase **0.39.11** single binary `./pocketbase` at repo root. Serve with `./pocketbase serve --dir pb_data --hooksDir app/pb_hooks --migrationsDir app/pb_migrations --http 127.0.0.1:8120`. Note: PB data dir is `pb_data/` at root for local run, but Docker mounts `./app/pb_data` — keep both consistent.
 - **Frontend:** Zero-build **Vue 3 UMD** + static Tailwind. All served straight from `app/pb_public/`. No `node_modules`, no bundler.
 - **Styling:** Tailwind is **compiled to static CSS** via `scripts/build_css.sh` → `app/pb_public/css/style.css`. After editing templates/classes, rerun it. Do NOT add a runtime Tailwind CDN.
-- **Tests:** `pytest tests/` (run via `uv run --with pytest pytest tests/` or the pytest binary at `~/.local/bin/pytest`; NOT in repo venv). Tests run against the live instance (default `PROJECTBASE_URL=http://127.0.0.1:8120`, superuser `f@flow.com` / `superdev123`). 223 tests across 10 files.
+- **Tests:** `pytest tests/` (run via `uv run --with pytest pytest tests/` or the pytest binary at `~/.local/bin/pytest`; NOT in repo venv). Tests run against the live instance (default `PROJECTBASE_URL=http://127.0.0.1:8120`, superuser `f@flow.com` / `superdev123`). 229 tests across 12 files.
 - **Docker:** `docker compose up` — builds `Dockerfile`, mounts `app/` subdirs, exposes 8120.
 - **Deploy:** `deploy/projectbase.service` (systemd) + `deploy/Caddyfile`. Helper scripts: `scripts/install-systemd.sh`, `scripts/backup.sh`, `scripts/restore.sh`, `scripts/deploy-demo.sh`, `scripts/reset-demo.sh`.
 
@@ -46,9 +46,12 @@ app/
   pb_data/             <- runtime SQLite data. NEVER commit.
 docs/                  <- research, ROADMAP, TODO, architecture, COMPETITORS, FEATURE_MATRIX
 scripts/               <- start.sh, build_css.sh, backup.sh, restore.sh, install-systemd.sh, deploy-demo.sh,
-                          reset-demo.sh, bump_version.sh, flow-cli (CLI wrapper), pb-cli, mcp_server.py,
-                          pb_autonomous_runner.py, pb-autonomous-daemon.sh, flow-cli, install.sh
-tests/                 <- test_api.py, test_selfhosting.py, test_autonomous_runner_sync.py, test_foss_schema.py, test_css_sync.py (CSS/template drift guard)
+                          reset-demo.sh, bump_version.sh, typegen.sh, flow-cli (CLI wrapper), pb-cli,
+                          mcp_server.py, pb_autonomous_runner.py, pb-autonomous-daemon.sh, install.sh, qa/, bench/
+tests/                 <- test_api.py, test_selfhosting.py, test_autonomous_runner_sync.py, test_foss_schema.py,
+                          test_css_sync.py (CSS/template drift guard), test_bulk_actions.py, test_issue_relations.py,
+                          test_deploy_consistency.py, test_benchmarks.py, test_openapi_drift.py, test_secret_scan.py,
+                          test_agents_drift_guard.py (locks the AGENTS.md test-count/file-map claims to the tree)
 deploy/                <- projectbase.service, Caddyfile
 .github/workflows/ci.yml  <- CI (seeds superuser, runs tests)
 ```
