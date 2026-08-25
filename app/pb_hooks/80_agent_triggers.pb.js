@@ -38,10 +38,17 @@ routerAdd("POST", "/api/projectbase/dispatch-agent", (e) => {
         }
 
         let identifier = issue.get("identifier")
+        let title = issue.get("title") || ""
+        let desc = issue.get("description") || ""
 
         // 1. Update task to in_progress and assign to agent
         issue.set("status", "in_progress")
-        let agentName = agentTarget === "hermes" ? "Hermes Agent" : "Flomaster Agent"
+        let agentName = {
+            flomaster: "Flomaster Agent",
+            hermes: "Hermes Agent",
+            windmill: "Windmill Agent",
+            custom: "Custom Agent"
+        }[agentTarget] || "Flomaster Agent"
         issue.set("assignee", agentName)
         e.app.save(issue)
 

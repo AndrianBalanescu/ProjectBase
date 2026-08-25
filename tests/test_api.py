@@ -1803,9 +1803,34 @@ def test_dispatch_agent_happy_path():
                                     {"issue_id": iid, "agent_target": "flomaster"})
         assert status == 200, f"dispatch should succeed after schema fix: {status} {body}"
         assert body.get("success") is True
+        # The dispatch must assign the human-facing agent name for the target
+        # (regression: flomaster must map to "Flomaster Agent", not a generic
+        # fallback that would make the audit trail ambiguous).
+        assert body.get("issue", {}).get("assignee") == "Flomaster Agent"
     finally:
         _request("DELETE", f"/api/collections/issues/records/{iid}",
                  headers={"Authorization": _superuser_token()})
+
+
+def test_dispatch_agent_webhook_payload_reads_title_description():
+    """P1 regression: the external Windmill/generic-webhook payload referenced
+    `title`/`desc` that were never assigned from the issue, so every external
+    dispatch sent `undefined` for the issue title/description. Guard that the
+    hook reads both fields off the issue before building either payload, and
+    maps each allowed agent_target to a distinct, human-facing agent name."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    hook = open(os.path.join(root, "app", "pb_hooks", "80_agent_triggers.pb.js")).read()
+    # Strip // line comments so a commented-out assignment (a plausible
+    # regression) can't satisfy the guard.
+    code = "\n".join(l.split("//", 1)[0] for l in hook.splitlines())
+    # The payloads must reference locally-defined title/desc, not bare
+    # (undeclared) identifiers that serialize to "undefined".
+    assert 'let title = issue.get("title")' in code, "hook must read issue title before building webhook payload"
+    assert 'let desc = issue.get("description")' in code, "hook must read issue description before building webhook payload"
+    # Every allowed target must resolve to a distinct agent name so an external
+    # dispatch's audit trail is not collapsed to a single generic fallback.
+    for target in ("flomaster", "hermes", "windmill", "custom"):
+        assert f"{target}:" in code, f"agent_target '{target}' must be mapped to a distinct agent name"
 
 
 def test_quick_task_corrupted_json_400():

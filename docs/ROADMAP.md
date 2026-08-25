@@ -1408,3 +1408,41 @@ importer was the missing third leg.
 
 **Next:** remaining v1.1 backlog and North Star external-gated items (public
 demo domain + first-stranger onboarding) still need human input.
+
+## Cycle-38 shipped (2026-08-25): fix agent-dispatch webhook payload (undefined title/desc)
+
+**Goal:** repair the charter's signature moat — autonomous AI agent dispatch.
+`app/pb_hooks/80_agent_triggers.pb.js` builds two external webhook payloads
+(Windmill + generic `AGENT_TRIGGER_WEBHOOK`) that referenced `title` and `desc`
+identifiers that were never assigned from the issue record, so every external
+dispatch sent `undefined` for the issue title/description. The `agent_target`
+mapping was also collapsed to a single generic "Flomaster Agent" fallback for
+`windmill`/`custom`.
+
+**Shipped this cycle:**
+- `app/pb_hooks/80_agent_triggers.pb.js` now reads `issue.get("title")` and
+  `issue.get("description")` before building either webhook payload, and maps
+  each allowed `agent_target` (`flomaster` → "Flomaster Agent", `hermes` →
+  "Hermes Agent", `windmill` → "Windmill Agent", `custom` → "Custom Agent") to a
+  distinct, human-facing agent name.
+- `tests/test_api.py` — new
+  `test_dispatch_agent_webhook_payload_reads_title_description` regression
+  guard (comment-stripped source scan) that fails if the title/description
+  reads or the per-target mapping are removed; the dispatch happy-path test now
+  also asserts the `flomaster` assignee maps to "Flomaster Agent".
+- `CHANGELOG.md` `[Unreleased]` → `Fixed` entry.
+
+**Validation:**
+- `pytest tests/test_api.py -k dispatch` → **6/6 passed** (incl. new guard).
+- Full suite → **214/214 passed** (deselected the documented network-flaky
+  `test_github_long_description_truncated`, which times out against live GitHub
+  rate limits and is unrelated to this backend-only change).
+- Guard proven: reverting the `title` read fails
+  `test_dispatch_agent_webhook_payload_reads_title_description`.
+- `python3 -m flow.frontend_guard` → ALL FRONTEND FILES VERIFIED (no frontend
+  change this cycle).
+- `scripts/qa/qa-render.sh 8120` → **RENDER QA: PASS** (no frontend change;
+  confirms no collateral breakage).
+
+**Next:** remaining v1.1 backlog and North Star external-gated items (public
+demo domain + first-stranger onboarding) still need human input.
