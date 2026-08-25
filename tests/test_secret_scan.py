@@ -36,10 +36,12 @@ REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 # Patterns for actual secrets. We look for long high-entropy-looking tokens
 # and the standard well-known prefix families.
 SECRET_PATTERNS = [
-    # Stripe-style live/test secret keys
-    re.compile(r"\bsk_live_[A-Za-z0-9]{10,}\b"),
-    re.compile(r"\bsk_test_[A-Za-z0-9]{10,}\b"),
-    re.compile(r"\bwhsec_[A-Za-z0-9]{10,}\b"),
+    # Stripe-style live/test secret keys. The body may contain `_`/`-`
+    # separators (e.g. iBrowse `sk_live_kAbz_...-...`), so the character class
+    # must not stop at the first separator.
+    re.compile(r"\bsk_live_[A-Za-z0-9_-]{10,}\b"),
+    re.compile(r"\bsk_test_[A-Za-z0-9_-]{10,}\b"),
+    re.compile(r"\bwhsec_[A-Za-z0-9_-]{10,}\b"),
     # Anthropic / OpenAI
     re.compile(r"\bsk-ant-[A-Za-z0-9]{10,}\b"),
     re.compile(r"\bsk-proj-[A-Za-z0-9]{10,}\b"),
@@ -131,6 +133,22 @@ def test_secret_pattern_is_well_formed():
     # Ensure the pattern list is non-trivial (catches accidental empties).
     assert SECRET_PATTERNS, "SECRET_PATTERNS must not be empty"
     assert all(hasattr(p, "pattern") for p in SECRET_PATTERNS)
+
+def test_sk_live_pattern_catches_separator_keys():
+    """Cycle-45 regression: `sk_live_` keys whose body contains `_`/`-`
+    separators must still be caught. A plain-alphanumeric-only class silently
+    missed them, which is the exact leak class the guard exists to block.
+    Probe keys are assembled by concatenation with clearly-fake bodies so the
+    guard file itself never contains a plaintext key-shaped literal."""
+    live = re.compile(r"\bsk_live_[A-Za-z0-9_-]{10,}\b")
+    plain = "sk_live_" + "AbCdEfGhIjKlMnOp123456"
+    sep = "sk_live_" + "SampleKey_1234_abcd_5678-xyz"
+    # Plain and separator-heavy forms both match.
+    assert live.search(plain)
+    assert live.search(sep)
+    # The old broken pattern (alphanumeric-only body) misses the separator form.
+    old = re.compile(r"\bsk_live_[A-Za-z0-9]{10,}\b")
+    assert not old.search(sep), "guard regressed to the alphanumeric-only pattern"
 
 
 def test_qa_scripts_do_not_hardcode_ibrowse_key():

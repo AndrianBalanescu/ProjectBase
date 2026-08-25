@@ -39,6 +39,16 @@ subscriptions, Stripe, or paid tiers.
   `test_docs_surface_no_env_placeholders` fail on any `${...}` in the served
   docs surface, plus a new `docsQA` render-QA block asserts the Docs view shows
   a concrete origin with no placeholder. Test count: 216 → 218.
+- **Secret-scan guard now catches `sk_live_`/`sk_test_`/`whsec_` keys with
+  `_`/`-` separators in the body** (`tests/test_secret_scan.py`): the old
+  alphanumeric-only pattern (`[A-Za-z0-9]{10,}`) silently missed separator-heavy
+  key formats such as the iBrowse `sk_live_kAbz_...-...` family — the exact leak
+  class the guard exists to block (cycle-12 P1 regression). The character class
+  now tolerates `_`/`-`, and a new regression test
+  (`test_sk_live_pattern_catches_separator_keys`) proves both plain and
+  separator-heavy forms match while the old pattern does not. Verified live: the
+  guard now fails when the real key is injected into any tracked file. Test
+  count: 218 → 219.
 - **Agent dispatch webhook payload now includes the issue title/description**
   (`app/pb_hooks/80_agent_triggers.pb.js`): the external Windmill and generic
   `AGENT_TRIGGER_WEBHOOK` payloads previously referenced `title`/`desc` that
