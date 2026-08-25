@@ -433,7 +433,7 @@ const App = {
           this.currentView = 'stats';
         } else if (e.key === '7') {
           this.currentView = 'docs';
-        } else if (e.key === '8') {
+        } else if (e.key === '8' || e.key === '9') {
           this.currentView = 'portfolio';
         }
       });
