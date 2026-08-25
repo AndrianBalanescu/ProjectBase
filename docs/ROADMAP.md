@@ -1537,3 +1537,51 @@ Builder mitigations this cycle: fresh `/tmp/flow-builder-result.json` (cycle 45)
 with real commits pushed to `origin/main`. The engine fix (pass/validate
 `expected_cycle` in `read_result` / `supervisor.run_builder`) needs a hub-side
 commit, which the builder phase is forbidden from making.
+
+## Cycle-47 shipped (2026-08-25): Docker fresh-boot hygiene — dev DB leak fixed
+
+**Finding (crime-scene audit of the CI docker job):** the repository had **no
+`.dockerignore`**. `docker build` therefore sent `app/pb_data` (the developer's
+SQLite DB + logs, ~180 MB) to the daemon, and `COPY app /app/app` baked it into
+the image. The Dockerfile declares `VOLUME ["/app/app/pb_data"]`, and Docker
+copies image content into any fresh volume it creates for that path — so a
+self-hosted deployment using a named or anonymous volume (`docker run -v`,
+k8s, Portainer, cloud run) got the developer's database: **170 issues**
+including "Export CustomFields" test probes instead of the clean seed. (The
+repo's own dev compose bind-mounts `./app/pb_data`, which masks the leak; the
+image itself still carried the dev DB.) Reproduced live: baseline image
+shipped `app/pb_data` (181 MB, full dev DB); a fresh named-volume boot showed
+170 issues and dev test noise.
+
+**Shipped:**
+- `.dockerignore` — excludes `pb_data/`, `app/pb_data/`, the root `pocketbase`
+  binary, `.git`, backups, tests, docs, deploy. Build context drops from
+  ~200 MB → **5.5 MB**; the image no longer contains any dev data.
+- `tests/test_deploy_consistency.py` — new `TestDockerignoreProtectsFreshBoots`
+  class (2 tests) that statically fails if `.dockerignore` is missing or stops
+  excluding the dev-data dirs. 221 → **223 tests**.
+
+**Validation:**
+- Rebuilt image: `/app/app/pb_data` empty (4 KB dir).
+- Fresh container boot with empty volume (CI docker-job steps run locally):
+  health 200, superuser seeded + auth works, **6 projects / 17 issues** — the
+  exact migration seed, zero dev probes leaked. Teardown done.
+- `pytest tests/` → **223/223 passed**.
+- `python3 -m flow.frontend_guard` → ALL VERIFIED.
+- `scripts/qa/qa-render.sh 8120` → **RENDER QA: PASS** (0 failures; only the
+  whitelisted anon-auth 400 probe).
+- CI note: GitHub Actions remains blocked by the account billing issue (see
+  `HUMAN_REQUIRED.md`, cycle 35) — the docker job cannot run on GitHub runners
+  until a human resolves it, so the full docker-job steps were executed locally.
+
+**Environment footgun (found during validation):** the deployed systemd
+instance (`WorkingDirectory=/data/projects/projectbase/app`, serves
+`/data/projects/projectbase/app/pb_data` on :8120) and the flow venture's
+`app/pb_data` are **the same files** (same inode — `/data/projects/projectbase`
+is the deployed view of this repo). Do **not** run a second PocketBase against
+`./app/pb_data` (e.g. `docker compose up` or `docker run` bind-mounting it) to
+test a fresh boot: it opens the live production DB with a second instance, and
+teardown deletes the shared `-wal`/`-shm` files, breaking the running server's
+view (API went to 0 records until `systemctl restart projectbase`). Use an
+isolated data dir (`pb_data.tmp` copy or a named volume pointing at a copied
+tree) for any fresh-boot/container test.

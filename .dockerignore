@@ -1,0 +1,28 @@
+# Runtime data — never bake the local dev database into the image.
+# Without this, `COPY app /app/app` ships app/pb_data (the dev SQLite DB +
+# logs) into the image, and Docker copies image content into fresh volumes on
+# first boot, so a stranger's first `docker compose up` gets the developer's
+# 100+ test/probe issues instead of the clean 6-project / 17-issue seed.
+pb_data/
+app/pb_data/
+
+# Local binaries / OS junk
+pocketbase
+*.log
+.DS_Store
+
+# VCS / CI / agent metadata
+.git
+.github/
+.flow/
+.flomaster/
+prism-out/
+.pytest_cache/
+__pycache__/
+*.pyc
+
+# Not needed inside the container (docs/tests/deploy live on the host)
+backups/
+docs/
+tests/
+deploy/

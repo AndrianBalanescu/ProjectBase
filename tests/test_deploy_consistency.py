@@ -107,5 +107,43 @@ class TestDeployConsistency(unittest.TestCase):
         self.assertIn("PROJECTBASE_PORT:-8120", COMPOSE)
 
 
+class TestDockerignoreProtectsFreshBoots(unittest.TestCase):
+    """Guard: the image must NEVER bake the local dev database into itself.
+
+    Without a .dockerignore, `COPY app /app/app` ships `app/pb_data` (the dev
+    SQLite DB + logs) into the image. The Dockerfile declares
+    `VOLUME ["/app/app/pb_data"]`, so on a fresh container boot Docker copies
+    that baked-in content into the new volume: a stranger's first
+    `docker compose up` then shows the developer's 100+ test/probe issues
+    instead of the clean 6-project / 17-issue migration seed. This was found
+    and fixed in cycle 47 (fresh-container boot leaked 170 issues; fixed by
+    adding .dockerignore; clean boot now seeds exactly 17).
+    """
+
+    def _dockerignore(self):
+        try:
+            return _read(".dockerignore")
+        except FileNotFoundError:
+            self.fail(".dockerignore missing — Docker builds now ship app/pb_data "
+                      "(the dev database) into the image and leak it into fresh "
+                      "self-hosted volumes. Add .dockerignore excluding pb_data/ "
+                      "and app/pb_data/.")
+
+    def test_dockerignore_exists_and_excludes_dev_data_dirs(self):
+        di = self._dockerignore()
+        for entry in ("app/pb_data/", "pb_data/"):
+            self.assertIn(entry, di,
+                          f".dockerignore must exclude '{entry}' so the dev DB "
+                          f"never enters the image build context")
+        self.assertIn("pocketbase", di)  # root binary: context weight, not data
+
+    def test_dockerignore_excludes_local_build_artifacts(self):
+        di = self._dockerignore()
+        for entry in (".git", "__pycache__/", "*.pyc", "*.log"):
+            self.assertIn(entry, di,
+                          f".dockerignore should exclude '{entry}' to keep the "
+                          f"build context lean")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -39,7 +39,20 @@ subscriptions, Stripe, or paid tiers.
   char counter.
 
 ### Fixed
-- **FastMCP server error messages now in English**
+- **Docker image no longer bakes the local dev database into itself**
+  (`.dockerignore`, `tests/test_deploy_consistency.py`): there was no
+  `.dockerignore`, so `docker build` sent `app/pb_data` (the dev SQLite DB +
+  logs, ~180 MB) to the daemon and `COPY app /app/app` baked it into the
+  image. The Dockerfile declares `VOLUME ["/app/app/pb_data"]`, and Docker
+  copies image content into any fresh volume it creates for that path — so a
+  self-hosted deployment using a named or anonymous volume (`docker run -v`,
+  k8s, Portainer, cloud run) booted into the developer's 100+ test/probe
+  issues instead of the clean 6-project / 17-issue migration seed. (The repo's
+  own dev compose bind-mounts `./app/pb_data` and masks the leak; the image
+  itself still carried the dev DB.) Added `.dockerignore` (build context drops
+  ~200 MB → 5.5 MB) and two static regression tests asserting the dev-data
+  dirs are excluded. Verified: a fresh named-volume boot now seeds exactly
+  6 projects / 17 issues with no leaked probes. Test count: 221 → 223.
   (`scripts/mcp_server.py`): the MCP server is the agent-facing moat — every
   tool error message is consumed verbatim by AI agents (Cursor, Flomaster,
   Hermes, Claude). Several auth/connection error messages were written in
