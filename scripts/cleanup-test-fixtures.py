@@ -181,4 +181,13 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except BrokenPipeError:
+        # stdout closed early (e.g. `cleanup-test-fixtures.py --json | head`).
+        # Exit quietly like standard CLI tools instead of printing a traceback.
+        try:
+            os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        except OSError:
+            pass
+        sys.exit(0)
