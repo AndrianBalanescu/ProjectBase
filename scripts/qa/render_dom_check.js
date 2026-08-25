@@ -1171,6 +1171,8 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   } else if (!portfolio.checked) {
     failures.push('portfolio E2E not exercised');
   }
+  if (exportModal && exportModal.checked) {
+    if (exportModal.headerButtonMissing) failures.push(export
   if (deepLink && deepLink.checked) {
     if (deepLink.error) failures.push('deep-link E2E error: ' + deepLink.error);
     if (deepLink.landedOnPortfolio === false) failures.push('deep link #/pb/portfolio did not land on portfolio after login');
@@ -1183,3 +1185,34 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   await browser.close();
   process.exit(failures.length === 0 ? 0 : 1);
 })().catch((e) => { console.error('FATAL', e); process.exit(2); });
+
+  // ---- Export modal (cycle 30): opens via header button, renders tabs and project select, and triggers a download ----
+  const exportModal = { checked: false };
+  try {
+    const headerExport = page.locator('header button[title*="Export"]');
+    if (await headerExport.count()) {
+      await headerExport.click();
+      await page.waitForTimeout(800);
+      exportModal.modalVisible = await page.locator('text=Export Issues').first().isVisible().catch(() => false);
+      exportModal.csvTab = await page.locator('button:has-text("CSV")').first().isVisible().catch(() => false);
+      exportModal.jsonTab = await page.locator('button:has-text("JSON")').first().isVisible().catch(() => false);
+      exportModal.projectSelect = await page.locator('select').first().isVisible().catch(() => false);
+      // Click Export and check success state
+      const exportBtn = page.locator('button:has-text("Export")').last();
+      if (await exportBtn.count()) {
+        await exportBtn.click();
+        await page.waitForTimeout(2500);
+        exportModal.exportClicked = true;
+        exportModal.successState = await page.locator('text=Exported').first().isVisible().catch(() => false);
+      }
+      // Close modal to clean up
+      await page.locator('button:has-text("Close")').first().click().catch(() => {});
+      await page.waitForTimeout(400);
+    } else {
+      exportModal.headerButtonMissing = true;
+    }
+    exportModal.checked = true;
+  } catch (e) {
+    exportModal.error = String(e).slice(0, 200);
+    exportModal.checked = true;
+  }

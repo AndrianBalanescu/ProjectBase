@@ -77,6 +77,7 @@
       @open-omnibar="isOmnibarOpen = true"
       @open-new-project="editingProject = null; isProjectModalOpen = true;"
       @open-custom-fields="isCustomFieldsOpen = true"
+      @open-export="isExportOpen = true"
       @toggle-notifications="loadNotifications"
       @notification-click="handleNotificationClick"
       @mark-all-read="handleMarkAllNotificationsRead"
@@ -363,6 +364,7 @@
       @change-view="changeView"
       @open-new-issue="isNewIssueOpen = true"
       @open-import="isImportOpen = true"
+      @open-export="isExportOpen = true"
       @open-welcome="isOmnibarOpen = false; isWelcomeOpen = true"
     ></command-palette>
 
@@ -386,6 +388,15 @@
       @close="isImportOpen = false"
       @imported="handleImportComplete"
     ></import-modal>
+
+    <!-- Export Issues Modal -->
+    <export-modal
+      :is-open="isExportOpen"
+      :projects="projects"
+      :current-project="currentProject"
+      @close="isExportOpen = false"
+      @exported="handleExportComplete"
+    ></export-modal>
 
     <!-- Project Create/Edit Modal -->
     <project-modal 
@@ -465,6 +476,7 @@
   <script src="/js/components/CommandPalette.js"></script>
   <script src="/js/components/NewIssueModal.js"></script>
   <script src="/js/components/ImportModal.js"></script>
+  <script src="/js/components/ExportModal.js"></script>
   <script src="/js/components/ProjectModal.js"></script>
   <script src="/js/components/CycleModal.js"></script>
   <script src="/js/components/CustomFieldsModal.js"></script>

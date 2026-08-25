@@ -20,6 +20,7 @@ const App = {
     'command-palette': CommandPaletteComponent,
     'new-issue-modal': NewIssueModalComponent,
     'import-modal': ImportModalComponent,
+    'export-modal': ExportModalComponent,
     'project-modal': ProjectModalComponent,
     'cycle-modal': CycleModalComponent,
     'custom-fields-modal': CustomFieldsModalComponent,
@@ -62,6 +63,7 @@ const App = {
       isOmnibarOpen: false,
       isNewIssueOpen: false,
       isImportOpen: false,
+      isExportOpen: false,
       isProjectModalOpen: false,
       editingProject: null,
       isCycleModalOpen: false,
@@ -405,7 +407,7 @@ const App = {
 
         // Ignore single-key shortcuts when typing, when modifiers are pressed (e.g. Cmd+C copy), or when a modal/drawer is open
         if (isInput || e.metaKey || e.ctrlKey || e.altKey) return;
-        if (this.isNewIssueOpen || this.isOmnibarOpen || this.isProjectModalOpen || this.isCycleModalOpen || this.isImportOpen || this.isWelcomeOpen || this.selectedIssue) return;
+        if (this.isNewIssueOpen || this.isOmnibarOpen || this.isProjectModalOpen || this.isCycleModalOpen || this.isImportOpen || this.isExportOpen || this.isWelcomeOpen || this.selectedIssue) return;
 
         if (e.key === 'c' || e.key === 'C') {
           e.preventDefault();
@@ -413,6 +415,9 @@ const App = {
         } else if (e.key === 'i' || e.key === 'I') {
           e.preventDefault();
           this.isImportOpen = true;
+        } else if (e.key === 'e' || e.key === 'E') {
+          e.preventDefault();
+          this.isExportOpen = true;
         } else if (e.key === '1') {
           this.currentView = 'board';
         } else if (e.key === '2') {
@@ -595,6 +600,11 @@ const App = {
       await this.loadIssues();
       this.showToast(`Imported ${result.imported} issue(s)`, 'success');
       this.isImportOpen = false;
+    },
+
+    async handleExportComplete(result) {
+      this.showToast(`Exported ${result.format.toUpperCase()} for ${result.project || 'project'}`, 'success');
+      this.isExportOpen = false;
     },
 
     async handleUpdateIssue(updateData) {

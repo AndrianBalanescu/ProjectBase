@@ -1074,6 +1074,68 @@
         }
       }
     },
+    "/projectbase/export/json": {
+      "get": {
+        "tags": [
+          "Export"
+        ],
+        "summary": "Export Issues (JSON)",
+        "description": "Download a project's issues as a machine-readable JSON document. Mirrors the importer fields so an exported file can be re-imported elsewhere.",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Project record id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/projectbase/export/csv": {
+      "get": {
+        "tags": [
+          "Export"
+        ],
+        "summary": "Export Issues (CSV)",
+        "description": "Download a project's issues as a CSV attachment. Header mirrors the importer columns (title,description,status,priority,assignee,start_date,due_date,estimate,labels,source_key,custom_fields) so the file can be re-imported.",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "required": "True",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Project record id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
     "/projectbase/notifications/read-all": {
       "post": {
         "tags": [

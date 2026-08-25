@@ -127,6 +127,8 @@ DOCUMENTED_CUSTOM_ROUTES = [
     "/projectbase/issues/bulk-delete",
     "/projectbase/import/csv",
     "/projectbase/import/github",
+    "/projectbase/export/csv",
+    "/projectbase/export/json",
     "/projectbase/notifications/read-all",
     "/projectbase/ai-assist",
     "/projectbase/dispatch-agent",
@@ -420,6 +422,94 @@ def test_importer_persists_start_date():
         f"importer did not persist start_date: {recs['items'][0].get('start_date')}"
 
 
+# ---------------------------------------------------------------------------
+# Flat-file exporter (cycle 29): data portability for the import loop
+# ---------------------------------------------------------------------------
+
+def _export_get(path):
+    return _request("GET", path, headers={"Authorization": _superuser_token()})
+
+
+def test_export_requires_authentication():
+    """Export endpoints must be gated behind an authenticated user."""
+    status, _ = _request("GET", "/api/projectbase/export/csv?project=x")
+    assert status == 401
+    status, _ = _request("GET", "/api/projectbase/export/json?project=x")
+    assert status == 401
+
+
+def test_export_missing_project_param():
+    status, _ = _export_get("/api/projectbase/export/csv")
+    assert 400 <= status < 500
+    status, _ = _export_get("/api/projectbase/export/json")
+    assert 400 <= status < 500
+
+
+def test_export_unknown_project_404():
+    status, _ = _export_get(f"/api/projectbase/export/csv?project={_uid()}")
+    assert status == 404
+    status, _ = _export_get(f"/api/projectbase/export/json?project={_uid()}")
+    assert status == 404
+
+
+def _export_fixture_issue(pid):
+    """Create a known issue via the importer so export has deterministic data."""
+    title = f"Export Fixture {_uid()}"
+    key = f"exp-{_uid()}"
+    status, _ = _request(
+        "POST", "/api/projectbase/import/csv",
+        {"project_id": pid, "rows": [{"title": title, "description": "export me",
+                                      "status": "in_progress", "priority": "medium",
+                                      "labels": ["export", "fixture"], "source_key": key}]},
+        headers={"Authorization": _superuser_token()})
+    assert status == 200, f"fixture import failed: {status}"
+    return title
+
+
+def test_export_json_contains_issue_data():
+    """JSON export must include the project's issues with their core fields."""
+    pid = _get_any_project_id()
+    title = _export_fixture_issue(pid)
+    status, body = _export_get(f"/api/projectbase/export/json?project={pid}")
+    assert status == 200, f"json export failed: {status} {body}"
+    assert body["exporter"] == "projectbase"
+    assert body["project"]["id"] == pid
+    hits = [i for i in body["issues"] if i.get("title") == title]
+    assert hits, f"exported issues missing fixture: {[i.get('title') for i in body['issues']]}"
+    assert hits[0]["status"] == "in_progress"
+    assert hits[0]["priority"] == "medium"
+    assert "fixture" in (hits[0].get("labels") or [])
+
+
+def test_export_json_round_trips_custom_fields():
+    """Custom-field JSON values survive export (not returned as byte arrays)."""
+    pid = _get_any_project_id()
+    title = f"Export CustomFields {_uid()}"
+    # custom_fields is applied via the collection API (the CSV importer does not
+    # persist it); create the issue there so the fixture carries a real value.
+    status, _ = _request(
+        "POST", "/api/collections/issues/records",
+        {"project": pid, "title": title, "status": "todo",
+         "custom_fields": {"severity": "high"}},
+        headers={"Authorization": _superuser_token()})
+    assert status == 200, f"custom_fields fixture create failed: {status}"
+    st, body = _export_get(f"/api/projectbase/export/json?project={pid}")
+    assert st == 200
+    hits = [i for i in body["issues"] if i.get("title") == title]
+    assert hits, "exported issue with custom_fields missing"
+    assert isinstance(hits[0].get("custom_fields"), dict)
+    assert hits[0]["custom_fields"].get("severity") == "high"
+
+
+def test_export_csv_has_header_and_rows():
+    """CSV export must start with the importer-mirroring header and include rows."""
+    pid = _get_any_project_id()
+    _export_fixture_issue(pid)
+    st, body = _export_get(f"/api/projectbase/export/csv?project={pid}")
+    assert st == 200, f"csv export failed: {st}"
+    text = body if isinstance(body, str) else str(body)
+    assert "title,description,status,priority" in text, "missing CSV header"
+    assert "Export Fixture" in text, "fixture not in CSV export"
 
 
 # ---------------------------------------------------------------------------

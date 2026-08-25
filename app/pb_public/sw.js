@@ -53,6 +53,7 @@ const PRECACHE_PATHS = [
   './js/components/CommandPalette.js',
   './js/components/NewIssueModal.js',
   './js/components/ImportModal.js',
+  './js/components/ExportModal.js',
   './js/components/ProjectModal.js',
   './js/components/CycleModal.js',
   './js/components/CustomFieldsModal.js',

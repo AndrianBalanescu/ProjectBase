@@ -305,6 +305,16 @@ const HeaderComponent = {
           <span class="hidden sm:inline">Fields</span>
         </button>
 
+        <!-- Export Issues Button -->
+        <button
+          @click="$emit('open-export')"
+          class="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-gray-950/80 hover:bg-gray-800 border border-gray-800 text-gray-400 hover:text-gray-200 text-xs transition-all"
+          title="Export issues as CSV or JSON"
+        >
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Export</span>
+        </button>
+
         <!-- New Issue Button -->
         <button 
           @click="$emit('open-new-issue')"
