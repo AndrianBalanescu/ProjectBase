@@ -1,53 +1,23 @@
 // pb_hooks/60_notifications.pb.js
-// Multi-channel notification dispatcher: Discord, Telegram, Slack, Email, and Generic Webhooks
+// Multi-channel notification dispatcher: Discord, Telegram, and Generic Webhooks.
+//
+// SCOPING NOTE (critical): In the Goja runtime PocketBase uses, module-scope
+// function declarations are NOT resolvable from inside a hook callback — every
+// call throws `ReferenceError: <fn> is not defined`. This is the same bug class
+// as the cycle-5 P0 fix in 15_signup_security.pb.js and the note in
+// 55_notifications.pb.js. ALL dispatch logic is therefore inlined directly
+// inside each callback (or defined as local `const` arrow functions at the top
+// of the callback, which Goja CAN resolve). Every path is wrapped in try/catch
+// so a broken notification never breaks the core write path.
+//
+// Channel config is runtime-editable via the `notification_settings` singleton
+// collection (see migration 19 + the admin-gated routes in 30_custom_routes.pb.js).
+// The dispatcher reads the DB row first and falls back to process environment
+// (DISCORD_WEBHOOK_URL, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID,
+// PROJECTBASE_WEBHOOK_URL), so existing installs and Docker deployments keep
+// working unchanged.
 
-function sendDiscordNotification(webhookUrl, title, description, colorHex, fields = []) {
-    if (!webhookUrl) return
-    try {
-        let decimalColor = parseInt(colorHex.replace("#", ""), 16) || 65280
-        $http.send({
-            url: webhookUrl,
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                username: "ProjectBase Bot",
-                avatar_url: "https://raw.githubusercontent.com/pocketbase/pocketbase/master/examples/base/pb_public/images/logo.png",
-                embeds: [{
-                    title: title,
-                    description: description,
-                    color: decimalColor,
-                    fields: fields,
-                    footer: { text: "ProjectBase • Homelab" },
-                    timestamp: new Date().toISOString()
-                }]
-            }),
-            timeout: 5
-        })
-    } catch (err) {
-        console.warn(">>> [ProjectBase] Discord notification error:", err)
-    }
-}
-
-function sendTelegramNotification(botToken, chatId, messageText) {
-    if (!botToken || !chatId) return
-    try {
-        $http.send({
-            url: `https://api.telegram.org/bot${botToken}/sendMessage`,
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                chat_id: chatId,
-                text: messageText,
-                parse_mode: "Markdown"
-            }),
-            timeout: 5
-        })
-    } catch (err) {
-        console.warn(">>> [ProjectBase] Telegram notification error:", err)
-    }
-}
-
-// 1. Hook on Issue Created
+// 1. Hook on Issue Created — posts to Discord (rich embed) and/or Telegram.
 onRecordAfterCreateSuccess((e) => {
     try {
         let identifier = e.record.get("identifier")
@@ -77,25 +47,51 @@ onRecordAfterCreateSuccess((e) => {
         }
 
         if (discordUrl) {
-            sendDiscordNotification(
-                discordUrl,
-                `✨ New Work Item: ${identifier}`,
-                `**${title}**`,
-                "#6366f1",
-                [
-                    { name: "Status", value: status, inline: true },
-                    { name: "Priority", value: priority, inline: true },
-                    { name: "Assignee", value: assignee, inline: true }
-                ]
-            )
+            try {
+                let decimalColor = parseInt("#6366f1".replace("#", ""), 16) || 65280
+                $http.send({
+                    url: discordUrl,
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        username: "ProjectBase Bot",
+                        avatar_url: "https://raw.githubusercontent.com/pocketbase/pocketbase/master/examples/base/pb_public/images/logo.png",
+                        embeds: [{
+                            title: `✨ New Work Item: ${identifier}`,
+                            description: `**${title}**`,
+                            color: decimalColor,
+                            fields: [
+                                { name: "Status", value: status, inline: true },
+                                { name: "Priority", value: priority, inline: true },
+                                { name: "Assignee", value: assignee, inline: true }
+                            ],
+                            footer: { text: "ProjectBase • Homelab" },
+                            timestamp: new Date().toISOString()
+                        }]
+                    }),
+                    timeout: 5
+                })
+            } catch (discordErr) {
+                console.warn(">>> [ProjectBase] Discord notification error:", discordErr)
+            }
         }
 
         if (telegramToken && telegramChatId) {
-            sendTelegramNotification(
-                telegramToken,
-                telegramChatId,
-                `⚡ *New Task in ProjectBase*\n*ID:* \`${identifier}\`\n*Title:* ${title}\n*Priority:* ${priority}\n*Assignee:* ${assignee}`
-            )
+            try {
+                $http.send({
+                    url: `https://api.telegram.org/bot${telegramToken}/sendMessage`,
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        chat_id: telegramChatId,
+                        text: `⚡ *New Task in ProjectBase*\n*ID:* \`${identifier}\`\n*Title:* ${title}\n*Priority:* ${priority}\n*Assignee:* ${assignee}`,
+                        parse_mode: "Markdown"
+                    }),
+                    timeout: 5
+                })
+            } catch (telegramErr) {
+                console.warn(">>> [ProjectBase] Telegram notification error:", telegramErr)
+            }
         }
     } catch (err) {
         console.warn(">>> [ProjectBase] create-channel notification failed:", err)
@@ -103,7 +99,7 @@ onRecordAfterCreateSuccess((e) => {
     e.next()
 }, "issues")
 
-// 2. Hook on Issue Status / Priority Updated
+// 2. Hook on Issue Status / Priority Updated — Discord embed + generic webhook.
 onRecordAfterUpdateSuccess((e) => {
     try {
         // NOTE: this PocketBase JSVM has no `originalCopy()`; use `original()`.
@@ -137,38 +133,58 @@ onRecordAfterUpdateSuccess((e) => {
             if (newStatus === "in_review") color = "#eab308"
 
             if (discordUrl) {
-                sendDiscordNotification(
-                    discordUrl,
-                    `🔄 Status Changed: ${identifier} -> ${newStatus.toUpperCase()}`,
-                    `**${title}**`,
-                    color,
-                    [
-                        { name: "From", value: oldStatus, inline: true },
-                        { name: "To", value: newStatus, inline: true },
-                        { name: "Assignee", value: assignee, inline: true }
-                    ]
-                )
+                try {
+                    let decimalColor = parseInt(color.replace("#", ""), 16) || 65280
+                    $http.send({
+                        url: discordUrl,
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            username: "ProjectBase Bot",
+                            avatar_url: "https://raw.githubusercontent.com/pocketbase/pocketbase/master/examples/base/pb_public/images/logo.png",
+                            embeds: [{
+                                title: `🔄 Status Changed: ${identifier} -> ${newStatus.toUpperCase()}`,
+                                description: `**${title}**`,
+                                color: decimalColor,
+                                fields: [
+                                    { name: "From", value: oldStatus, inline: true },
+                                    { name: "To", value: newStatus, inline: true },
+                                    { name: "Assignee", value: assignee, inline: true }
+                                ],
+                                footer: { text: "ProjectBase • Homelab" },
+                                timestamp: new Date().toISOString()
+                            }]
+                        }),
+                        timeout: 5
+                    })
+                } catch (discordErr) {
+                    console.warn(">>> [ProjectBase] Discord notification error:", discordErr)
+                }
             }
 
             if (genericWebhookUrl) {
-                $http.send({
-                    url: genericWebhookUrl,
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        event: "issue.status_changed",
-                        issue: {
-                            id: e.record.id,
-                            identifier: identifier,
-                            title: title,
-                            old_status: oldStatus,
-                            new_status: newStatus,
-                            assignee: assignee
-                        },
-                        timestamp: new Date().toISOString()
-                    }),
-                    timeout: 5
-                })
+                try {
+                    $http.send({
+                        url: genericWebhookUrl,
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            event: "issue.status_changed",
+                            issue: {
+                                id: e.record.id,
+                                identifier: identifier,
+                                title: title,
+                                old_status: oldStatus,
+                                new_status: newStatus,
+                                assignee: assignee
+                            },
+                            timestamp: new Date().toISOString()
+                        }),
+                        timeout: 5
+                    })
+                } catch (webhookErr) {
+                    console.warn(">>> [ProjectBase] generic webhook notification error:", webhookErr)
+                }
             }
         }
     } catch (err) {
