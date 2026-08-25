@@ -119,7 +119,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     }
 
     // Select an issue result. The result rows carry a type chip whose text is
-    // exactly "issue"; the version badge reads "v0.9.0" so we filter precisely.
+    // exactly "issue"; the version badge reads "vX.Y.Z" so we filter precisely.
     const issueRows = page.locator('div.cursor-pointer').filter({
       has: page.locator('span[class*="text-[10px]"]').filter({ hasText: /^issue$/ })
     });

@@ -10,6 +10,8 @@ subscriptions, Stripe, or paid tiers.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-25
+
 ### Added
 - **Runtime-editable notification channel settings**: the webhook dispatcher
   (`60_notifications.pb.js`) previously only read Discord/Telegram/generic-webhook
@@ -348,7 +350,8 @@ subscriptions, Stripe, or paid tiers.
   and the custom-routes health/version endpoints in sync.
 - `app/pb_hooks/30_custom_routes.pb.js` exposes `/api/projectbase/version`.
 
-[Unreleased]: https://github.com/AndrianBalanescu/ProjectBase/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/AndrianBalanescu/ProjectBase/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/AndrianBalanescu/ProjectBase/releases/tag/v1.0.0
 [0.9.0]: https://github.com/AndrianBalanescu/ProjectBase/releases/tag/v0.9.0
 [0.8.0]: https://github.com/AndrianBalanescu/ProjectBase/releases/tag/v0.8.0
 [0.7.0]: https://github.com/AndrianBalanescu/ProjectBase/releases/tag/v0.7.0

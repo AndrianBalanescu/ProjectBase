@@ -1293,3 +1293,42 @@ headless render-QA fallback (project AGENTS.md) covers the same surface.
 
 **Next:** remaining v1.1 backlog and North Star external-gated items (public
 demo domain + first-stranger onboarding) still need human input.
+
+## Cycle-35 shipped (2026-08-25): v1.0.0 release packaging
+
+**Goal:** finalize and ship the v1.0 release, the remaining item from the
+decided v1.0 stabilization direction (cycle-4 debate, confidence 0.62). All
+stabilization items (URL deep-link state, focus mode, published benchmarks,
+security pass, CHANGELOG) shipped in cycles 4-7; the actual release cut
+(version bump, tag, GitHub release) had never happened — no git tags existed
+and the app still reported `0.9.0` despite a large `[Unreleased]` delta.
+
+**Shipped this cycle:**
+- Version bumped `0.9.0 → 1.0.0` via `scripts/bump_version.sh major`, keeping
+  `VERSION`, `app/pb_public/openapi.json` (`info.version` + response example),
+  the `Header.js` UI badge, and the `/api/projectbase/{health,version}` hook
+  all in sync.
+- `CHANGELOG.md`: `[Unreleased]` cut as `[1.0.0] - 2026-08-25` with a fresh
+  `[Unreleased]` section, and compare links updated
+  (`compare/v1.0.0...HEAD`, `releases/tag/v1.0.0`).
+- `AGENTS.md` refreshed for the release: version `v1.0.0` and current suite
+  size (202 tests across 10 files, was 125/5).
+- Drift-guard hardening: `scripts/qa/render_dom_check.js` header-badge
+  assertion now reads the expected `vX.Y.Z` from the `VERSION` file instead of
+  a hardcoded `v0.9.0` (the comment already promised this; the code didn't).
+  Also updated the stale `0.9.0` example in `openapi.json` and a comment in
+  `scripts/qa/verify_global_search.js`.
+- Service restarted; `/api/projectbase/health` and `/version` report `1.0.0`.
+
+**Validation:**
+- `uv run --with pytest pytest tests/` → **202/202 passed** after the bump.
+- Docker image build (`docker build`) → success.
+- Headless render QA (`scripts/qa/qa-render.sh`) → **RENDER QA: PASS** (badge
+  asserted against VERSION file = `v1.0.0`, zero console/page errors, zero
+  failed same-origin requests, Vue mounted).
+- iBrowse visual QA (`flow-ibrowse.sh`) → run succeeded: app opened, login
+  with `f@flow.com`, health/header check completed, no errors reported.
+
+**Next:** `v1.0.0` tag + GitHub release notes (this cycle). Remaining v1.1
+backlog and North Star external-gated items (public demo domain +
+first-stranger onboarding) still need human input.

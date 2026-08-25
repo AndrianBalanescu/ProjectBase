@@ -4,8 +4,13 @@
 //  - compiled Tailwind utilities actually apply (computed styles)
 //  - new entrance animations registered
 const { chromium } = require('playwright');
+const fs = require('fs');
+const path = require('path');
 
 const BASE = process.env.QA_BASE || 'http://127.0.0.1:8120';
+// Expected UI version badge must always match the VERSION file (release truth).
+const EXPECTED_VERSION = fs.readFileSync(path.join(__dirname, '..', '..', 'VERSION'), 'utf8').trim();
+const EXPECTED_BADGE = `v${EXPECTED_VERSION}`;
 const EXE = process.env.QA_CHROME || require('child_process').execSync(
   `find "${process.env.HOME}/.cache/ms-playwright" -path '*chrome-linux*/chrome' -type f 2>/dev/null | sort -V | tail -1`
 ).toString().trim();
@@ -1114,7 +1119,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   if (failedReqs.length) failures.push(`failed requests: ${failedReqs.slice(0, 3)}`);
   if (!checks.appMounted) failures.push('Vue app did not mount');
   if (checks.rawMustaches > 0) failures.push(`${checks.rawMustaches} raw mustaches leaked`);
-  if (checks.headerBadge !== 'v0.9.0') failures.push(`header version badge ${checks.headerBadge} != v0.9.0`);
+  if (checks.headerBadge !== EXPECTED_BADGE) failures.push(`header version badge ${checks.headerBadge} != ${EXPECTED_BADGE} (VERSION file)`);
   if (checks.bodyBg !== 'rgb(11, 15, 25)') failures.push(`body bg ${checks.bodyBg} != rgb(11,15,25)`);
   if (checks.probe.paddingLeft !== '28px') failures.push(`pl-7 padding ${checks.probe.paddingLeft} != 28px`);
   if (checks.probe.marginLeft !== '6px') failures.push(`ml-1.5 margin ${checks.probe.marginLeft} != 6px`);
