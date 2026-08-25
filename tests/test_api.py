@@ -1097,13 +1097,15 @@ def test_sqlite_performance_indexes_exist():
     assert not missing, f"Missing required performance indexes: {missing}"
 
 
+def _read_version_file():
+    """Read the VERSION file at repo root (single source of truth)."""
+    version_path = os.path.join(os.path.dirname(__file__), "..", "VERSION")
+    with open(version_path, "r", encoding="utf-8") as f:
+        return f.read().strip()
+
 def test_version_endpoint():
     """Verify version endpoint returns semver matching VERSION file, service name, and open-source flag."""
-    expected = "0.9.0"
-    try:
-        expected = open(os.path.join(os.path.dirname(__file__), "..", "VERSION")).read().strip()
-    except Exception:
-        pass
+    expected = _read_version_file()
     st, body = _get("/api/projectbase/version")
     assert st == 200, f"version endpoint failed: {st} {body}"
     assert body.get("service") == "ProjectBase"
@@ -1114,11 +1116,7 @@ def test_version_endpoint():
 
 def test_health_includes_version_and_license():
     """Verify health endpoint includes version and open source license."""
-    expected = "0.9.0"
-    try:
-        expected = open(os.path.join(os.path.dirname(__file__), "..", "VERSION")).read().strip()
-    except Exception:
-        pass
+    expected = _read_version_file()
     st, body = _get("/api/projectbase/health")
     assert st == 200, f"health endpoint failed: {st} {body}"
     assert body.get("version") == expected
