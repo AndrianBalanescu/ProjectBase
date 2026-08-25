@@ -331,12 +331,32 @@ def test_index_served():
 
 def test_vendor_assets_local():
     """Zero-build frontend must serve vendored bundles offline."""
-    for asset in ("/vendor/vue.global.prod.js", "/vendor/tailwindcss.js",
+    for asset in ("/vendor/vue.global.prod.js",
                   "/vendor/pocketbase.umd.js", "/vendor/sortable.min.js",
-                  "/vendor/milkdown.js", "/vendor/milkdown.css", "/css/style.css"):
+                  "/vendor/marked.min.js", "/vendor/purify.min.js",
+                  "/css/style.css", "/css/app.css"):
         status, body = _request("GET", asset)
         assert status == 200, f"{asset} missing"
         assert len(body) > 1000, f"{asset} suspiciously small"
+
+
+def test_vendor_assets_no_milkdown_or_dead_tailwind():
+    """Milkdown WYSIWYG was replaced by the lightweight split editor; dead
+    tailwindcss.js was removed. PocketBase returns the SPA index.html fallback
+    for missing asset paths (never the removed bundle), so assert the served
+    body is NOT the deleted Milkdown/Tailwind library."""
+    for asset in ("/vendor/milkdown.js", "/vendor/milkdown.css",
+                  "/vendor/tailwindcss.js"):
+        status, body = _request("GET", asset)
+        # PocketBase serves the SPA index.html fallback for missing asset
+        # paths (200). A real, un-removed bundle would contain its library
+        # marker (window.Milkdown / Crepe / tailwind runtime). The app shell
+        # legitimately references "MilkdownEditor.js" as a component name, so
+        # match on the actual bundle symbols, not the filename string.
+        assert "window.Milkdown" not in body, f"{asset} still serves the Milkdown runtime"
+        assert "tailwindcss" not in body.lower(), f"{asset} still serves the Tailwind runtime"
+        # The fallback app shell is much smaller than the removed 2.7MB bundle.
+        assert len(body) < 100000, f"{asset} unexpectedly large"
 
 
 # ---------------------------------------------------------------------------

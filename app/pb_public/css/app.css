@@ -204,3 +204,99 @@ body {
   animation-timing-function: ease-out;
   animation-fill-mode: both;
 }
+
+/* ---------------------------------------------------------------------------
+ * Lightweight Markdown Editor (replaces Milkdown 2.7MB WYSIWYG)
+ * Split view: Write textarea + Preview tab, plus read-only rendering.
+ * Code fences render as styled blocks with a language badge + copy button.
+ * ------------------------------------------------------------------------- */
+.md-editor-shell {
+  display: flex;
+  flex-direction: column;
+}
+.md-editor-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem 0.25rem 0.5rem;
+  border-bottom: 1px solid #1f2937;
+  margin-bottom: 0.5rem;
+}
+.md-tab {
+  padding: 0.15rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #6b7280;
+  background: transparent;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.md-tab:hover { color: #d1d5db; }
+.md-tab.active {
+  background: #1f2937;
+  color: #f9fafb;
+}
+.md-editor-ta {
+  width: 100%;
+  resize: vertical;
+  border-radius: 10px;
+  border: 1px solid #1f2937;
+  background: rgba(2, 6, 23, 0.85);
+  color: #e5e7eb;
+  padding: 0.6rem 0.75rem;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  outline: none;
+  min-height: 140px;
+}
+.md-editor-ta:focus { border-color: #6366f1; box-shadow: 0 0 0 1px #6366f1; }
+.md-editor-ta::placeholder { color: #4b5563; }
+
+.md-preview {
+  min-height: 140px;
+  padding: 0.5rem 0.25rem;
+}
+
+/* Code block cards */
+.md-codeblock {
+  margin: 0.75rem 0;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0b1020;
+}
+.md-code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.3rem 0.6rem;
+  background: #111a2e;
+  border-bottom: 1px solid #1e293b;
+}
+.md-code-lang {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #818cf8;
+}
+.md-code-copy {
+  padding: 0.1rem 0.5rem;
+  font-size: 0.65rem;
+  color: #9ca3af;
+  background: transparent;
+  border: 1px solid #2b364c;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.md-code-copy:hover { color: #e5e7eb; border-color: #6366f1; }
+.md-code-copy.copied { color: #34d399; border-color: #34d399; }
+.md-codeblock pre {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow-x: auto;
+}

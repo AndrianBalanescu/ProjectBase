@@ -45,6 +45,14 @@ BOUND_CLASS_LITERAL_RE = re.compile(r"""(["'])([a-z0-9\-\s]+)\1""")
 MARKER_CLASSES = {
     # SortableJS drag handle selector (KanbanBoard.js), styled via utilities.
     "kanban-card-drag-handle",
+    # `<html class="dark ...">` ancestor hook for Tailwind dark-mode variant.
+    # It is a state toggle on the root element, not a styled utility class.
+    "dark",
+    # Regex/template fragments in MilkdownEditor.js code-block enhancement:
+    # `language-*` matches the class that marked.js emits on `<code>`; these
+    # literals are JS patterns, not real template classes.
+    "language-([^",
+    "language-x",
 }
 
 

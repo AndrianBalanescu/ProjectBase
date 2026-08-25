@@ -1,8 +1,10 @@
 // app/pb_public/js/components/MilkdownEditor.js
-// Vue 3 adapter for the vendored Milkdown Crepe browser bundle.
-// The editor stores Markdown, so existing PocketBase descriptions remain compatible.
+// Lightweight zero-dependency Markdown editor (replaces the 2.7MB Milkdown WYSIWYG bundle).
+// Split view: live textarea (Write) + rendered preview (using vendored `marked` + DOMPurify).
+// Code fences render as styled blocks with a language badge and a one-click copy button.
+// The component keeps the same tag/registration (`<milkdown-editor>`) so IssueDrawer is untouched.
 
-const MilkdownEditorComponent = {
+const MdEditorComponent = {
   props: {
     modelValue: { type: String, default: '' },
     placeholder: { type: String, default: 'Write a detailed Markdown description…' },
@@ -11,94 +13,112 @@ const MilkdownEditorComponent = {
   emits: ['update:modelValue', 'blur', 'ready', 'error'],
   data() {
     return {
-      editor: null,
-      syncing: false,
-      errorMessage: ''
+      draft: this.modelValue || '',
+      live: true,            // live split preview (false = preview-only tab)
+      copiedId: null
     };
   },
-  mounted() {
-    this.mountEditor();
-  },
-  beforeUnmount() {
-    this.destroyEditor();
+  computed: {
+    rendered() {
+      if (!window.marked) return '';
+      const src = this.draft || '';
+      try {
+        let html = window.marked.parse(src);
+        html = this.enhanceCodeBlocks(html);
+        return window.DOMPurify ? window.DOMPurify.sanitize(html) : html;
+      } catch (_) {
+        return '';
+      }
+    }
   },
   watch: {
     modelValue(value) {
-      if (!this.editor || this.syncing) return;
-      // The Crepe instance exposes getMarkdown, but crepe.create() may resolve
-      // to a wrapper without it. Guard so an external modelValue update never
-      // throws an uncaught TypeError (pre-existing console error).
-      let current;
-      try {
-        current = typeof this.editor.getMarkdown === 'function' ? this.editor.getMarkdown() : null;
-      } catch (_) {
-        current = null;
-      }
-      if (current === null || value === current) return;
-      this.syncing = true;
-      try {
-        this.editor.editor.action((ctx) => {
-          const editorView = ctx.get(Milkdown.EditorViewCtx);
-          const state = editorView.state;
-          const tr = state.tr.replaceWith(0, state.doc.content.size,
-            state.schema.text(value || ''));
-          editorView.dispatch(tr);
-        });
-      } catch (_) {
-        // Milkdown owns the document model; avoid disrupting typing on a stale update.
-      } finally {
-        this.syncing = false;
-      }
-    },
-    readonly(value) {
-      if (this.editor) this.editor.setReadonly(value);
+      if (this.draft !== (value || '')) this.draft = value || '';
+    }
+  },
+  mounted() {
+    this.$emit('ready', this);
+    if (!window.marked) {
+      this.$emit('error', new Error('Markdown renderer unavailable'));
     }
   },
   methods: {
-    async mountEditor() {
-      if (!window.Milkdown || !window.Milkdown.Crepe) {
-        this.errorMessage = 'Milkdown bundle is unavailable.';
-        this.$emit('error', new Error(this.errorMessage));
-        return;
-      }
-      try {
-        const crepe = new window.Milkdown.Crepe({
-          root: this.$refs.editor,
-          defaultValue: this.modelValue || ''
-        });
-        crepe.setReadonly(this.readonly);
-        crepe.on((listener) => {
-          listener.markdownUpdated((_ctx, markdown) => {
-            if (this.syncing) return;
-            this.$emit('update:modelValue', markdown);
-          });
-        });
-        this.editor = await crepe.create();
-        this.$emit('ready', this.editor);
-      } catch (error) {
-        this.errorMessage = 'Unable to initialize the Markdown editor.';
-        this.$emit('error', error);
-      }
+    // Re-annotate fenced code blocks with a language label + copy button.
+    // Marked renders ```lang as <pre><code class="language-x">...</code></pre>.
+    enhanceCodeBlocks(html) {
+      if (!html || !html.includes('<pre>')) return html;
+      return html.replace(
+        /<pre>[\s\S]*?<code( class="language-([^"]*)")?>[\s\S]*?<\/code><\/pre>/g,
+        (block, cls, lang) => {
+          const label = (lang || 'code').trim();
+          const id = 'mdcode-' + Math.random().toString(36).slice(2, 9);
+          const btn = `<button type="button" data-copy-id="${id}" class="md-code-copy" title="Copy code">Copy</button>`;
+          const badge = `<span class="md-code-lang">${label}</span>`;
+          const head = `<div class="md-code-head">${badge}${btn}</div>`;
+          return `<div class="md-codeblock" data-code-id="${id}">${head}${block}</div>`;
+        }
+      );
     },
-    async destroyEditor() {
-      if (!this.editor) return;
-      try {
-        await this.editor.destroy();
-      } catch (_) {
-        // Teardown should never prevent the drawer from closing.
+    onInput() {
+      this.$emit('update:modelValue', this.draft);
+    },
+    // Handle copy-button clicks via delegation (DOMPurify strips inline handlers).
+    onCopyClick(ev) {
+      const btn = ev.target && ev.target.closest ? ev.target.closest('[data-copy-id]') : null;
+      if (!btn) return;
+      const wrap = btn.closest('.md-codeblock');
+      const code = wrap && wrap.querySelector('code');
+      if (!code) return;
+      const text = code.innerText || code.textContent || '';
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => this.flashCopied(btn)).catch(() => {});
+      } else {
+        this.fallbackCopy(text);
+        this.flashCopied(btn);
       }
-      this.editor = null;
+      ev.preventDefault();
+    },
+    flashCopied(btn) {
+      const old = btn.textContent;
+      btn.textContent = 'Copied';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = old; btn.classList.remove('copied'); }, 1200);
+    },
+    fallbackCopy(text) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch (_) {}
     },
     emitBlur() {
       this.$emit('blur');
     }
   },
   template: `
-    <div class="milkdown-editor-shell" @focusout="emitBlur">
-      <div ref="editor" class="milkdown-editor" :aria-label="placeholder"></div>
-      <p v-if="errorMessage" class="mt-2 text-[11px] text-amber-400">{{ errorMessage }} Falling back to Markdown preview is recommended.</p>
+    <div class="md-editor-shell" @focusout="emitBlur" @click="onCopyClick">
+      <template v-if="!readonly">
+        <div class="md-editor-tabs">
+          <button type="button" class="md-tab" :class="live ? 'active' : ''" @click="live = true">Write</button>
+          <button type="button" class="md-tab" :class="!live ? 'active' : ''" @click="live = false">Preview</button>
+        </div>
+        <textarea
+          v-if="live"
+          :value="draft"
+          @input="draft = $event.target.value; onInput()"
+          :placeholder="placeholder"
+          class="md-editor-ta"
+        ></textarea>
+        <div v-else class="md-preview markdown-body" v-html="rendered"></div>
+      </template>
+      <div v-else class="md-preview markdown-body" v-html="rendered"></div>
     </div>
   `
 };
 
-window.MilkdownEditorComponent = MilkdownEditorComponent;
+window.MilkdownEditorComponent = MdEditorComponent;

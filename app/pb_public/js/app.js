@@ -383,7 +383,7 @@ const App = {
         const isInput = target && (
           ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) ||
           target.isContentEditable ||
-          (target.closest && (target.closest('[contenteditable="true"]') || target.closest('.ProseMirror') || target.closest('.milkdown')))
+          (target.closest && (target.closest('[contenteditable="true"]') || target.closest('.ProseMirror') || target.closest('.md-editor-shell')))
         );
 
         if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
