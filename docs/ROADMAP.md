@@ -1143,3 +1143,42 @@ ProjectModal opens — all without console errors.
 
 **Next:** remaining v1.1 backlog and North Star external-gated items (public demo
 domain + first-stranger onboarding) still need human input.
+
+## Cycle-28 shipped (2026-08-25): AI Cycle Summary (summarize_cycle UI)
+
+**Goal:** close the last gap in the AI copilot surface. The
+`/api/projectbase/ai-assist` backend already exposed a `summarize_cycle`
+action (and it was documented in OpenAPI), but no frontend UI ever called it —
+users could generate subtasks and polish PRDs from the drawer, yet had no way
+to get an AI sprint summary in the Cycles view.
+
+**Shipped this cycle:**
+- `app/pb_public/js/components/CyclesView.js` — new "AI Sprint Summary" panel
+  in the selected-cycle deep-dive. A Generate button POSTs the current cycle's
+  issue list (identifier/title/status/priority/estimate) to
+  `/api/projectbase/ai-assist` with `action: summarize_cycle` and the
+  PocketBase auth token (same pattern as `IssueDrawer.polishAiDescription`).
+  The returned executive summary (achievements, WIP/blockers, velocity analysis
+  & recommendations) renders inline as sanitized Markdown via
+  `marked` + `DOMPurify`, matching the IssueDrawer description convention.
+  Includes a loading spinner (`aiSummaryLoading`), an error state, and a
+  guard so a second click while loading is a no-op.
+- `app/pb_public/css/style.css` — rebuilt via `scripts/build_css.sh` for the
+  new utilities (`animate-spin`, `border-indigo-700/40`, `disabled:opacity-40`).
+- `tests/test_api.py` — new `test_ai_cycle_summary_wired_in_cycles_view`
+  drift-guard pinning the wiring (panel, Generate, ai-assist route,
+  summarize_cycle action, auth header, sanitized markdown renderer).
+- No schema or API change; the action and its OpenAPI entry already existed.
+
+**Validation:** `pytest tests/` → **187/187 passed** (186 + 1 new wiring
+drift-guard). `python3 -m flow.frontend_guard` → ALL FRONTEND FILES VERIFIED.
+Headless render QA (`scripts/qa/qa-render.sh`) → **RENDER QA: PASS** (incl. the
+Cycles view suite). Visual QA via local Playwright E2E (the homelab iBrowse
+service was environmentally blocked with `max_replan_attempts_exceeded` on both
+attempts): the Cycles view mounts with the panel and Generate button, clicking
+Generate POSTs `summarize_cycle` with the cycle's issues payload and renders the
+returned summary inline, with no console errors beyond the pre-existing benign
+`auth-with-password` 400 probe.
+
+**Next:** remaining v1.1 backlog and North Star external-gated items (public
+demo domain + first-stranger onboarding) still need human input.

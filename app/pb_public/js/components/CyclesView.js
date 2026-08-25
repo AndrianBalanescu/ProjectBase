@@ -4,7 +4,11 @@ const CyclesViewComponent = {
   props: ['cycles', 'issues', 'projects', 'currentProject', 'selectedCycleId'],
   emits: ['open-issue', 'open-new-cycle', 'update-cycle', 'delete-cycle', 'update:selectedCycleId'],
   data() {
-    return {};
+    return {
+      aiSummary: '',
+      aiSummaryLoading: false,
+      aiSummaryError: ''
+    };
   },
   computed: {
     activeCycle() {
@@ -40,6 +44,56 @@ const CyclesViewComponent = {
       const s = new Date(start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       const e = end ? new Date(end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Ongoing';
       return `${s} – ${e}`;
+    },
+    renderCycleSummary() {
+      if (!this.aiSummary) return '<p class="text-gray-500 italic text-xs">No summary yet. Generate one to see sprint insights.</p>';
+      if (window.marked && window.DOMPurify) {
+        return window.DOMPurify.sanitize(window.marked.parse(this.aiSummary));
+      }
+      return this.aiSummary.replace(/\n/g, '<br>');
+    },
+    async generateCycleSummary() {
+      if (!this.currentCycle) return;
+      if (this.aiSummaryLoading) return;
+      const list = this.cycleIssues;
+      this.aiSummary = '';
+      this.aiSummaryError = '';
+      this.aiSummaryLoading = true;
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        // The ai-assist route requires auth; send the PocketBase token.
+        // `pb` is a top-level const in api.js (global lexical scope, not window).
+        if (typeof pb !== 'undefined' && pb.authStore && pb.authStore.token) {
+          headers['Authorization'] = pb.authStore.token;
+        }
+        const issuesPayload = list.map(i => ({
+          identifier: i.identifier || '',
+          title: i.title || '',
+          status: i.status || '',
+          priority: i.priority || '',
+          estimate: i.estimate || null
+        }));
+        const res = await fetch('/api/projectbase/ai-assist', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            action: 'summarize_cycle',
+            title: this.currentCycle.name,
+            description: this.currentCycle.description || '',
+            issues: issuesPayload
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to generate summary');
+        }
+        this.aiSummary = data.result || '';
+      } catch (err) {
+        console.error('AI cycle summary error:', err);
+        this.aiSummaryError = err.message || 'Failed to generate summary';
+      } finally {
+        this.aiSummaryLoading = false;
+      }
     }
   },
   template: `
@@ -158,6 +212,35 @@ const CyclesViewComponent = {
                   <div class="bg-emerald-500 h-full transition-all" :style="{ width: cycleStats.percent + '%' }"></div>
                   <div class="bg-blue-500 h-full transition-all" :style="{ width: (cycleStats.total > 0 ? (cycleStats.inProgress/cycleStats.total)*100 : 0) + '%' }"></div>
                 </div>
+              </div>
+
+              <!-- AI Cycle Summary -->
+              <div class="pt-4 border-t border-gray-800">
+                <div class="flex items-center justify-between mb-3">
+                  <h4 class="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center space-x-2">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5 text-indigo-400"></i>
+                    <span>AI Sprint Summary</span>
+                  </h4>
+                  <button
+                    @click="generateCycleSummary"
+                    :disabled="aiSummaryLoading"
+                    class="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 text-[11px] font-semibold border border-indigo-700/40 transition-all disabled:opacity-40"
+                  >
+                    <i data-lucide="wand-2" class="w-3 h-3"></i>
+                    <span>{{ aiSummaryLoading ? 'Generating…' : 'Generate' }}</span>
+                  </button>
+                </div>
+
+                <div v-if="aiSummaryLoading" class="flex items-center space-x-2 text-xs text-gray-400 py-3">
+                  <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i>
+                  <span>Analyzing sprint issues…</span>
+                </div>
+
+                <div v-else-if="aiSummaryError" class="p-3 rounded-lg bg-red-950/40 border border-red-800/40 text-red-300 text-xs">
+                  {{ aiSummaryError }}
+                </div>
+
+                <div v-else class="text-xs text-gray-300 markdown-body" v-html="renderCycleSummary()"></div>
               </div>
 
               <!-- Cycle Issues List -->
