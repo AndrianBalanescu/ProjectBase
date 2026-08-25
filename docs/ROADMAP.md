@@ -1102,3 +1102,44 @@ stale/empty database or points Caddy at the wrong port.
 
 **Next:** remaining v1.1 backlog and North Star external-gated items (public
 demo domain + first-stranger onboarding) still need human input.
+
+## Cycle-27 shipped (2026-08-25): first-run onboarding guide (welcome modal + empty-state)
+
+**Goal:** close the last first-run UX gap — a brand-new self-hoster signing up
+was dropped into a (possibly empty) workspace with no idea of the 60-second path
+to value. Linear/Plane-class products onboard the first project immediately.
+
+**Shipped this cycle:**
+- `app/pb_public/js/components/WelcomeModal.js` — first-run onboarding checklist
+  shown once per browser after sign-up. Three actionable rows each perform the
+  real UI action: "Create your first project" opens the Project modal, "Create
+  an issue" opens the New Issue modal, "Open board" switches to the board view.
+  Steps 2-3 are disabled until at least one project exists (fresh self-host
+  install), with an inline tip telling the user to create a project first.
+- Trigger + guard: `app.js signUp()` shows the modal when
+  `localStorage.pb_welcome_seen` is unset, then sets it; `signOut()` clears it
+  so a later account on the same browser sees the guide again. Escape closes it;
+  the single-key shortcut guard and the Escape-reset path now include
+  `isWelcomeOpen`.
+- Command palette: new "Show Welcome Guide" action re-opens the modal any time
+  (`open-welcome` emit wired in `index.html`).
+- Projects view empty state: when the workspace has zero projects, the grid is
+  replaced by a centered welcome card (icon + three-step onboarding cards:
+  create a project → add an issue → drag it to done) with a create-project CTA.
+- Wiring: `index.html` script import + `<welcome-modal>` render; `app.js` state +
+  methods; `CommandPalette.js` emit + action; `sw.js` precache entry.
+- Tailwind rebuilt for the new arbitrary classes (`z-[60]`, `bg-[#0d1220]`,
+  `disabled:opacity-40`), verified by `tests/test_css_sync.py`.
+
+**Validation:** `pytest tests/` → **186/186 passed** (incl. the SW-precache
+regression that now asserts `WelcomeModal.js` is in the precache list).
+`python3 -m flow.frontend_guard` → ALL FRONTEND FILES VERIFIED. iBrowse visual QA
+→ **SUCCEEDED** (zero console errors, zero 4xx/5xx). Headless render QA
+(`scripts/qa/qa-render.sh`) → **RENDER QA: PASS**. New
+`scripts/qa/verify_welcome_modal.js` drives the real user flow end-to-end: logs
+in, opens the palette, selects "Show Welcome Guide", asserts the modal renders
+(title + all three rows), clicks "Create your first project", and asserts the
+ProjectModal opens — all without console errors.
+
+**Next:** remaining v1.1 backlog and North Star external-gated items (public demo
+domain + first-stranger onboarding) still need human input.

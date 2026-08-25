@@ -55,7 +55,8 @@ const PRECACHE_PATHS = [
   './js/components/ImportModal.js',
   './js/components/ProjectModal.js',
   './js/components/CycleModal.js',
-  './js/components/CustomFieldsModal.js'
+  './js/components/CustomFieldsModal.js',
+  './js/components/WelcomeModal.js'
 ];
 
 self.addEventListener('install', (event) => {

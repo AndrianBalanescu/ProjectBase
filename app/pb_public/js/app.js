@@ -22,7 +22,8 @@ const App = {
     'import-modal': ImportModalComponent,
     'project-modal': ProjectModalComponent,
     'cycle-modal': CycleModalComponent,
-    'custom-fields-modal': CustomFieldsModalComponent
+    'custom-fields-modal': CustomFieldsModalComponent,
+    'welcome-modal': WelcomeModalComponent
   },
   data() {
     return {
@@ -65,6 +66,7 @@ const App = {
       editingProject: null,
       isCycleModalOpen: false,
       isCustomFieldsOpen: false,
+      isWelcomeOpen: false,
 
       // Filters (URL-synced: shared as ?q=&priority=&cycle= hash params)
       filterQuery: '',
@@ -202,6 +204,12 @@ const App = {
         // Same deep-link handling as signIn: land on the hashed view.
         await this.applyRoute();
         this.showToast('Welcome! You are in the shared demo workspace — press C to create an issue or I to import yours.', 'success');
+        // First-run onboarding: show the welcome guide once per browser after
+        // a successful sign-up, and re-allow it when the session signs out.
+        if (!localStorage.getItem('pb_welcome_seen')) {
+          this.isWelcomeOpen = true;
+          localStorage.setItem('pb_welcome_seen', '1');
+        }
       } catch (err) {
         this.authError = err?.response?.data?.email?.message
           || err?.response?.data?.password?.message
@@ -221,6 +229,11 @@ const App = {
       this.labels = [];
       this.currentProject = null;
       this.selectedIssue = null;
+      this.isWelcomeOpen = false;
+      // Re-allow the welcome guide for a later account on this browser.
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('pb_welcome_seen');
+      }
     },
     async loadAllData() {
       try {
@@ -381,6 +394,7 @@ const App = {
           this.isProjectModalOpen = false;
           this.isCycleModalOpen = false;
           this.isImportOpen = false;
+          this.isWelcomeOpen = false;
           if (this.selectedIssue) {
             this.selectedIssue = null;
           } else if (this.selectedIssueIds.size > 0) {
@@ -391,7 +405,7 @@ const App = {
 
         // Ignore single-key shortcuts when typing, when modifiers are pressed (e.g. Cmd+C copy), or when a modal/drawer is open
         if (isInput || e.metaKey || e.ctrlKey || e.altKey) return;
-        if (this.isNewIssueOpen || this.isOmnibarOpen || this.isProjectModalOpen || this.isCycleModalOpen || this.isImportOpen || this.selectedIssue) return;
+        if (this.isNewIssueOpen || this.isOmnibarOpen || this.isProjectModalOpen || this.isCycleModalOpen || this.isImportOpen || this.isWelcomeOpen || this.selectedIssue) return;
 
         if (e.key === 'c' || e.key === 'C') {
           e.preventDefault();
@@ -432,6 +446,27 @@ const App = {
     changeView(view) {
       this.currentView = view;
       this.syncRoute();
+    },
+
+    // First-run welcome guide actions — each performs the real UI action.
+    closeWelcome() {
+      this.isWelcomeOpen = false;
+    },
+    openWelcomeCreateProject() {
+      this.isWelcomeOpen = false;
+      this.editingProject = null;
+      this.isProjectModalOpen = true;
+    },
+    openWelcomeCreateIssue() {
+      this.isWelcomeOpen = false;
+      this.isNewIssueOpen = true;
+    },
+    openWelcomeBoard() {
+      this.isWelcomeOpen = false;
+      if (this.projects.length) {
+        this.currentView = 'board';
+        this.syncRoute();
+      }
     },
 
     handleRouteChange() {

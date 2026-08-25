@@ -34,7 +34,7 @@ const ProjectsViewComponent = {
         </div>
 
         <!-- Projects Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div v-if="projects.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           <div 
             v-for="p in projects" 
             :key="p.id"
@@ -123,6 +123,52 @@ const ProjectsViewComponent = {
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- First-run empty state (fresh self-host install / no projects yet) -->
+        <div v-else class="flex flex-col items-center justify-center py-20 text-center space-y-6">
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-600/20">
+            <i data-lucide="folder-plus" class="w-8 h-8 text-white"></i>
+          </div>
+
+          <div class="space-y-1.5">
+            <h3 class="text-lg font-bold text-white tracking-tight">Welcome to ProjectBase</h3>
+            <p class="text-xs text-gray-400 max-w-md mx-auto">
+              Your workspace is empty. Create your first project to start tracking issues, sprints, and milestones.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl w-full">
+            <div class="p-4 rounded-xl bg-gray-900/60 border border-gray-800 text-left space-y-2">
+              <div class="w-7 h-7 rounded-lg bg-indigo-500/15 text-indigo-300 flex items-center justify-center">
+                <i data-lucide="folder-plus" class="w-3.5 h-3.5"></i>
+              </div>
+              <p class="text-xs font-semibold text-white">1. Create a project</p>
+              <p class="text-[11px] text-gray-400 leading-relaxed">Name it and give it a short identifier like PB or DEV.</p>
+            </div>
+            <div class="p-4 rounded-xl bg-gray-900/60 border border-gray-800 text-left space-y-2">
+              <div class="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-300 flex items-center justify-center">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+              </div>
+              <p class="text-xs font-semibold text-white">2. Add your first issue</p>
+              <p class="text-[11px] text-gray-400 leading-relaxed">Press C anywhere to open the quick-create modal.</p>
+            </div>
+            <div class="p-4 rounded-xl bg-gray-900/60 border border-gray-800 text-left space-y-2">
+              <div class="w-7 h-7 rounded-lg bg-purple-500/15 text-purple-300 flex items-center justify-center">
+                <i data-lucide="kanban" class="w-3.5 h-3.5"></i>
+              </div>
+              <p class="text-xs font-semibold text-white">3. Drag it to done</p>
+              <p class="text-[11px] text-gray-400 leading-relaxed">Move cards between lanes on the Kanban board.</p>
+            </div>
+          </div>
+
+          <button
+            @click="$emit('open-new-project')"
+            class="flex items-center space-x-1.5 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/20 transition-all"
+          >
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            <span>Create your first project</span>
+          </button>
         </div>
 
       </div>

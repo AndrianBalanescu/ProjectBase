@@ -11,6 +11,21 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **First-run onboarding guide (welcome modal + empty-state)**: a fresh member
+  now gets a 60-second path to value after sign-up. A welcome modal
+  (`app/pb_public/js/components/WelcomeModal.js`) walks through the three real
+  actions — create a project, add an issue, drag it on the Kanban — and each row
+  performs the actual UI action (opens the project / new-issue modal or the
+  board) instead of just telling the user about it. It is triggered once per
+  browser after sign-up (`pb_welcome_seen` localStorage guard, reset on sign-out
+  so a later account sees it again) and re-openable any time from the command
+  palette ("Show Welcome Guide"). The Projects view also gains a first-run
+  empty state (icon + three-step onboarding cards + CTA) when the workspace has
+  no projects yet. Wired into `app.js` (state + shortcut guard + Esc + sign-out
+  reset), `index.html` (script + modal render), the command palette, and the
+  service-worker precache; Tailwind rebuilt for the new arbitrary classes
+  (`z-[60]`, `bg-[#0d1220]`).
+
 - **Self-hosting deployment-consistency guard (harden)**: new
   `tests/test_deploy_consistency.py` statically locks the four deploy surfaces
   — `Dockerfile`, `docker-compose.yml`, `deploy/projectbase.service` (systemd

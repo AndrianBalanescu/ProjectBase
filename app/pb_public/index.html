@@ -363,6 +363,7 @@
       @change-view="changeView"
       @open-new-issue="isNewIssueOpen = true"
       @open-import="isImportOpen = true"
+      @open-welcome="isOmnibarOpen = false; isWelcomeOpen = true"
     ></command-palette>
 
     <!-- New Issue Modal -->
@@ -411,6 +412,16 @@
       @saved="handleCustomFieldsSaved"
     ></custom-fields-modal>
 
+    <!-- First-run Welcome Modal -->
+    <welcome-modal
+      :is-open="isWelcomeOpen"
+      :has-projects="projects.length > 0"
+      @close="closeWelcome"
+      @create-project="openWelcomeCreateProject"
+      @create-issue="openWelcomeCreateIssue"
+      @go-board="openWelcomeBoard"
+    ></welcome-modal>
+
     <!-- Floating Toasts -->
     <div class="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none">
       <div 
@@ -457,6 +468,7 @@
   <script src="/js/components/ProjectModal.js"></script>
   <script src="/js/components/CycleModal.js"></script>
   <script src="/js/components/CustomFieldsModal.js"></script>
+  <script src="/js/components/WelcomeModal.js"></script>
   <script>
     // Offline-first app shell: register the Service Worker (progressive enhancement).
     if ('serviceWorker' in navigator) {

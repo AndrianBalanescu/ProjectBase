@@ -2,7 +2,7 @@
 
 const CommandPaletteComponent = {
   props: ['isOpen', 'issues', 'projects'],
-  emits: ['close', 'select-issue', 'select-project', 'change-view', 'open-new-issue', 'open-import'],
+  emits: ['close', 'select-issue', 'select-project', 'change-view', 'open-new-issue', 'open-import', 'open-welcome'],
   data() {
     return {
       query: '',
@@ -23,7 +23,8 @@ const CommandPaletteComponent = {
         { type: 'action', id: 'act_cycles', title: 'Switch to Cycles View', subtitle: 'View Sprints & Velocity', action: () => this.$emit('change-view', 'cycles'), icon: 'refresh-cw' },
         { type: 'action', id: 'act_timeline', title: 'Switch to Timeline View', subtitle: 'View Gantt schedule of cycles, milestones & issues', action: () => this.$emit('change-view', 'timeline'), icon: 'calendar' },
         { type: 'action', id: 'act_stats', title: 'View Analytics & Activity', subtitle: 'System statistics', action: () => this.$emit('change-view', 'stats'), icon: 'bar-chart-2' },
-        { type: 'action', id: 'act_portfolio', title: 'View Portfolio Dashboard', subtitle: 'Cross-project progress & roadmap health', action: () => this.$emit('change-view', 'portfolio'), icon: 'layout-dashboard' }
+        { type: 'action', id: 'act_portfolio', title: 'View Portfolio Dashboard', subtitle: 'Cross-project progress & roadmap health', action: () => this.$emit('change-view', 'portfolio'), icon: 'layout-dashboard' },
+        { type: 'action', id: 'act_welcome', title: 'Show Welcome Guide', subtitle: 'Re-open the first-run onboarding checklist', action: () => this.$emit('open-welcome'), icon: 'sparkles' }
       ];
 
       for (const act of actions) {
