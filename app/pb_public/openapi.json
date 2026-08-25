@@ -45,7 +45,7 @@
     },
     {
       "name": "Importers",
-      "description": "Bulk issue importers (CSV / GitHub)"
+      "description": "Bulk issue importers (CSV / Linear / Plane / GitHub)"
     },
     {
       "name": "Notifications",
