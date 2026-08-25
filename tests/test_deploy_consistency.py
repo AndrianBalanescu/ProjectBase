@@ -139,7 +139,10 @@ class TestDockerignoreProtectsFreshBoots(unittest.TestCase):
 
     def test_dockerignore_excludes_local_build_artifacts(self):
         di = self._dockerignore()
-        for entry in (".git", "__pycache__/", "*.pyc", "*.log"):
+        # Depth-safe (**) patterns: Docker's matcher is root-anchored, so a
+        # bare `__pycache__/` / `*.pyc` would still ship scripts/__pycache__
+        # and tests/__pycache__ bytecode into the image.
+        for entry in (".git", "**/__pycache__/", "**/*.pyc", "**/*.log"):
             self.assertIn(entry, di,
                           f".dockerignore should exclude '{entry}' to keep the "
                           f"build context lean")

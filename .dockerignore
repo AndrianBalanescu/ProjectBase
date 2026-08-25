@@ -8,8 +8,8 @@ app/pb_data/
 
 # Local binaries / OS junk
 pocketbase
-*.log
-.DS_Store
+**/*.log
+**/.DS_Store
 
 # VCS / CI / agent metadata
 .git
@@ -18,8 +18,8 @@ pocketbase
 .flomaster/
 prism-out/
 .pytest_cache/
-__pycache__/
-*.pyc
+**/__pycache__/
+**/*.pyc
 
 # Not needed inside the container (docs/tests/deploy live on the host)
 backups/
