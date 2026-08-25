@@ -23,6 +23,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   const bulk = { checked: false };
   const range = { checked: false };
   const customField = { checked: false };
+  const exportModal = { checked: false };
   // URLs whose requests are intentionally ignored from the failure list (the
   // range+apply E2E's cleanup DELETEs can abort client-side after the server
   // already processed them; the end state is verified instead).
@@ -1047,6 +1048,32 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   } catch (e) { deepLink.error = String(e).slice(0, 200); }
   deepLink.checked = true;
 
+  // ---- Export modal (cycle 30): opens via header button, renders tabs and
+  // project select, and triggers a download. ----
+  try {
+    const headerExport = page.locator('header button[title*="Export"]');
+    if (await headerExport.count()) {
+      await headerExport.click();
+      await page.waitForTimeout(800);
+      exportModal.modalVisible = await page.locator('text=Export Issues').first().isVisible().catch(() => false);
+      exportModal.csvTab = await page.locator('button:has-text("CSV")').first().isVisible().catch(() => false);
+      exportModal.jsonTab = await page.locator('button:has-text("JSON")').first().isVisible().catch(() => false);
+      exportModal.projectSelect = await page.locator('select').first().isVisible().catch(() => false);
+      const exportBtn = page.locator('button:has-text("Export")').last();
+      if (await exportBtn.count()) {
+        await exportBtn.click();
+        await page.waitForTimeout(2500);
+        exportModal.exportClicked = true;
+        exportModal.successState = await page.locator('text=Exported').first().isVisible().catch(() => false);
+      }
+      await page.locator('button:has-text("Close")').first().click().catch(() => {});
+      await page.waitForTimeout(400);
+    } else {
+      exportModal.headerButtonMissing = true;
+    }
+  } catch (e) { exportModal.error = String(e).slice(0, 200); }
+  exportModal.checked = true;
+
   const failures = [];
   // The browser's network logger emits a GENERIC "Failed to load resource ... 400"
   // console error without naming the URL. If every 4xx was the whitelisted auth
@@ -1171,13 +1198,23 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   } else if (!portfolio.checked) {
     failures.push('portfolio E2E not exercised');
   }
-  if (exportModal && exportModal.checked) {
-    if (exportModal.headerButtonMissing) failures.push(export
   if (deepLink && deepLink.checked) {
     if (deepLink.error) failures.push('deep-link E2E error: ' + deepLink.error);
     if (deepLink.landedOnPortfolio === false) failures.push('deep link #/pb/portfolio did not land on portfolio after login');
   } else if (!deepLink.checked) {
     failures.push('deep-link E2E not exercised');
+  }
+  if (exportModal && exportModal.checked) {
+    if (exportModal.error) failures.push('export modal E2E error: ' + exportModal.error);
+    if (exportModal.headerButtonMissing) failures.push('export modal header button not found');
+    if (exportModal.modalVisible === false) failures.push('export modal did not open');
+    if (exportModal.csvTab === false) failures.push('export modal CSV tab missing');
+    if (exportModal.jsonTab === false) failures.push('export modal JSON tab missing');
+    if (exportModal.projectSelect === false) failures.push('export modal project select missing');
+    if (exportModal.exportClicked === false) failures.push('export modal Export button not clickable');
+    if (exportModal.successState === false) failures.push('export modal did not show success state');
+  } else if (!exportModal || !exportModal.checked) {
+    failures.push('export modal E2E not exercised');
   }
 
   console.log(JSON.stringify({ checks, routing, resize, urlState, relations, focusMode, bulk, range, customField, timeline, portfolio, deepLink, failures, all4xx }, null, 1));
@@ -1185,34 +1222,3 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   await browser.close();
   process.exit(failures.length === 0 ? 0 : 1);
 })().catch((e) => { console.error('FATAL', e); process.exit(2); });
-
-  // ---- Export modal (cycle 30): opens via header button, renders tabs and project select, and triggers a download ----
-  const exportModal = { checked: false };
-  try {
-    const headerExport = page.locator('header button[title*="Export"]');
-    if (await headerExport.count()) {
-      await headerExport.click();
-      await page.waitForTimeout(800);
-      exportModal.modalVisible = await page.locator('text=Export Issues').first().isVisible().catch(() => false);
-      exportModal.csvTab = await page.locator('button:has-text("CSV")').first().isVisible().catch(() => false);
-      exportModal.jsonTab = await page.locator('button:has-text("JSON")').first().isVisible().catch(() => false);
-      exportModal.projectSelect = await page.locator('select').first().isVisible().catch(() => false);
-      // Click Export and check success state
-      const exportBtn = page.locator('button:has-text("Export")').last();
-      if (await exportBtn.count()) {
-        await exportBtn.click();
-        await page.waitForTimeout(2500);
-        exportModal.exportClicked = true;
-        exportModal.successState = await page.locator('text=Exported').first().isVisible().catch(() => false);
-      }
-      // Close modal to clean up
-      await page.locator('button:has-text("Close")').first().click().catch(() => {});
-      await page.waitForTimeout(400);
-    } else {
-      exportModal.headerButtonMissing = true;
-    }
-    exportModal.checked = true;
-  } catch (e) {
-    exportModal.error = String(e).slice(0, 200);
-    exportModal.checked = true;
-  }
