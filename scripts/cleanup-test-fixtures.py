@@ -144,13 +144,18 @@ def main(argv=None):
         backup_path = args.backup or (
             f"/tmp/projectbase-fixture-sweep-{uuid.uuid4().hex[:12]}.json"
         )
-        with open(backup_path, "w", encoding="utf-8") as fh:
-            json.dump(
-                [{"id": m["id"], "identifier": m.get("identifier"),
-                  "title": m.get("title"), "project": m.get("project")}
-                 for m in matches],
-                fh, indent=2,
-            )
+        try:
+            with open(backup_path, "w", encoding="utf-8") as fh:
+                json.dump(
+                    [{"id": m["id"], "identifier": m.get("identifier"),
+                      "title": m.get("title"), "project": m.get("project")}
+                     for m in matches],
+                    fh, indent=2,
+                )
+        except OSError as err:
+            raise SystemExit(
+                f"cannot write backup file {backup_path}: {err}"
+            ) from err
         if not args.json:
             print(f"backup written: {backup_path}")
 
