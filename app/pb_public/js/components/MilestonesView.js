@@ -113,9 +113,9 @@ const MilestonesViewComponent = {
     }
   },
   template: `
-    <div class="h-full overflow-y-auto bg-gray-950 p-6 space-y-8">
+    <div class="h-full overflow-y-auto bg-gray-950 p-2.5 space-y-3">
       <!-- 1. North Star Banner -->
-      <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-950/60 via-purple-950/40 to-gray-900 border border-indigo-500/20 p-6 shadow-2xl">
+      <div class="relative overflow-hidden rounded-xl bg-gradient-to-r from-indigo-950/60 via-purple-950/40 to-gray-900 border border-indigo-500/20 p-3 shadow-xl">
         <div class="absolute top-0 right-0 p-6 pointer-events-none opacity-10">
           <i data-lucide="compass" class="w-48 h-48 text-indigo-300"></i>
         </div>

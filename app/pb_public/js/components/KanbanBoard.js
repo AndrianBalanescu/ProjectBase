@@ -1,10 +1,11 @@
 // pb_public/js/components/KanbanBoard.js
 
 const KanbanBoardComponent = {
-  props: ['issues', 'projects', 'currentProject', 'cycles', 'labels', 'filterQuery', 'filterPriority', 'filterCycle', 'selectedIssueIds'],
+  props: ['issues', 'projects', 'currentProject', 'cycles', 'labels', 'filterQuery', 'filterPriority', 'filterCycle', 'selectedIssueIds', 'agents'],
   emits: ['open-issue', 'create-issue', 'update-issue', 'delete-issue', 'open-shortcuts-modal', 'toggle-issue-selection', 'range-select-issue', 'update:filterQuery', 'update:filterPriority', 'update:filterCycle'],
   data() {
     return {
+      agentFilter: '',
       columns: [
         { key: 'backlog', name: 'Backlog', color: '#6b7280', icon: 'circle-dot' },
         { key: 'todo', name: 'Todo', color: '#8b5cf6', icon: 'circle' },
@@ -61,6 +62,11 @@ const KanbanBoardComponent = {
           return false;
         }
 
+        // Agent filter (assignee matches a known agent)
+        if (this.agentFilter && !(issue.assignee || '').toLowerCase().includes(this.agentFilter.toLowerCase())) {
+          return false;
+        }
+
         return true;
       });
     },
@@ -87,6 +93,11 @@ const KanbanBoardComponent = {
       this.$emit('update:filterQuery', '');
       this.$emit('update:filterPriority', '');
       this.$emit('update:filterCycle', '');
+    },
+
+    agentAvatar(agent) {
+      const a = (this.agents || []).find(x => x.name === agent);
+      return a ? a.avatar : null;
     },
 
     isSelected(issue) {
@@ -305,6 +316,16 @@ const KanbanBoardComponent = {
             <option v-for="c in cycles" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
 
+          <!-- Agent Filter -->
+          <select
+            v-if="agents && agents.length > 0"
+            v-model="agentFilter"
+            class="px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-xs text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[150px]"
+          >
+            <option value="">All Agents</option>
+            <option v-for="a in agents" :key="a.name" :value="a.name">{{ a.avatar }} {{ a.name }}</option>
+          </select>
+
           <!-- Clear Filters -->
           <button 
             v-if="activeFilterCount > 0"
@@ -332,8 +353,8 @@ const KanbanBoardComponent = {
       </div>
 
       <!-- Kanban Columns Horizontal Scroll Area -->
-      <div class="flex-1 overflow-x-auto overflow-y-hidden p-4">
-        <div class="flex items-start space-x-4 h-full min-w-max pb-2">
+      <div class="flex-1 overflow-x-auto overflow-y-hidden p-2">
+        <div class="flex items-start space-x-2 h-full min-w-max pb-2">
           
           <!-- Column Loop -->
           <div 
@@ -502,12 +523,13 @@ const KanbanBoardComponent = {
                       <span>{{ formatDueDate(issue.due_date).text }}</span>
                     </span>
 
-                    <div 
-                      v-if="issue.assignee" 
+                    <div
+                      v-if="issue.assignee"
                       class="w-5 h-5 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-[10px] font-bold text-white shadow-sm"
                       :title="'Assignee: ' + issue.assignee"
                     >
-                      {{ issue.assignee.charAt(0).toUpperCase() }}
+                      <template v-if="agentAvatar(issue.assignee)">{{ agentAvatar(issue.assignee) }}</template>
+                      <template v-else>{{ issue.assignee.charAt(0).toUpperCase() }}</template>
                     </div>
                   </div>
                 </div>

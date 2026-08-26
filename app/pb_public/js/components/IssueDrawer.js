@@ -5,7 +5,7 @@ const IssueDrawerComponent = {
     'milkdown-editor': window.MilkdownEditorComponent || MilkdownEditorComponent,
     'searchable-select': window.SearchableSelectComponent || SearchableSelectComponent
   },
-  props: ['issue', 'projects', 'cycles', 'labels', 'fieldDefs', 'milestones', 'issues', 'widthOverride', 'commentRefreshKey'],
+  props: ['issue', 'projects', 'cycles', 'labels', 'fieldDefs', 'milestones', 'issues', 'widthOverride', 'commentRefreshKey', 'agents'],
   emits: ['close', 'update-issue', 'delete-issue', 'relations-changed', 'update:widthOverride'],
   data() {
     return {
@@ -356,6 +356,10 @@ const IssueDrawerComponent = {
         custom_fields: this.editCustomFields
       });
     },
+    agentAvatar(agent) {
+      const a = (this.agents || []).find(x => x.name === agent);
+      return a ? a.avatar : null;
+    },
     async dispatchAgent(target = 'flomaster', prompt) {
       if (!this.issue) return;
       try {
@@ -589,50 +593,56 @@ const IssueDrawerComponent = {
               </button>
               <div
                 v-show="isAgentDropdownOpen"
-                class="absolute right-0 top-full mt-1.5 w-48 p-1.5 rounded-xl bg-gray-900/95 border border-gray-700 shadow-2xl backdrop-blur-md z-30 space-y-0.5"
+                class="absolute right-0 top-full mt-1.5 w-56 p-1.5 rounded-xl bg-gray-900/95 border border-gray-700 shadow-2xl backdrop-blur-md z-30 space-y-0.5"
                 @click.stop
               >
-                <div class="px-2 py-1 text-[10px] text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-800/80 mb-1">
-                  Autonomous Dispatch
+                <div class="px-2 py-1 text-[10px] text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-800/80 mb-1 flex items-center justify-between">
+                  <span>Dispatch Agent</span>
+                  <span class="text-[9px] text-purple-400 font-mono">Multica 2.0</span>
                 </div>
-                <button
-                  @click="dispatchAgent('flomaster'); isAgentDropdownOpen = false;"
-                  class="w-full flex items-center space-x-2 text-left px-2 py-1.5 text-xs text-gray-200 hover:bg-purple-950/60 hover:text-purple-300 rounded-lg transition-colors"
-                >
-                  <span class="text-sm">⚡</span>
-                  <div>
-                    <div class="font-medium">Flomaster</div>
-                    <div class="text-[10px] text-gray-500">Autonomous loop</div>
-                  </div>
-                </button>
-                <button
-                  @click="dispatchAgent('hermes'); isAgentDropdownOpen = false;"
-                  class="w-full flex items-center space-x-2 text-left px-2 py-1.5 text-xs text-gray-200 hover:bg-purple-950/60 hover:text-purple-300 rounded-lg transition-colors"
-                >
-                  <span class="text-sm">🪽</span>
-                  <div>
-                    <div class="font-medium">Hermes</div>
-                    <div class="text-[10px] text-gray-500">Subtask solver</div>
-                  </div>
-                </button>
-                <button
-                  @click="dispatchAgent('windmill'); isAgentDropdownOpen = false;"
-                  class="w-full flex items-center space-x-2 text-left px-2 py-1.5 text-xs text-gray-200 hover:bg-purple-950/60 hover:text-purple-300 rounded-lg transition-colors"
-                >
-                  <span class="text-sm">🌬️</span>
-                  <div>
-                    <div class="font-medium">Windmill Flow</div>
-                    <div class="text-[10px] text-gray-500">Scheduled worker</div>
-                  </div>
-                </button>
+                <!-- Dynamic Detected Agents -->
+                <div v-if="agents && agents.length > 0">
+                  <button
+                    v-for="a in agents"
+                    :key="a.name"
+                    @click="dispatchAgent(a.name, agentPrompt); isAgentDropdownOpen = false;"
+                    class="w-full flex items-center space-x-2 text-left px-2 py-1.5 text-xs text-gray-200 hover:bg-purple-950/60 hover:text-purple-300 rounded-lg transition-colors"
+                  >
+                    <span class="text-sm">{{ a.avatar }}</span>
+                    <div class="min-w-0 flex-1">
+                      <div class="font-medium capitalize truncate flex items-center justify-between">
+                        <span>{{ a.name }}</span>
+                        <span v-if="a.session_count > 0" class="text-[9px] px-1 rounded bg-purple-900/50 text-purple-300 font-mono">{{ a.session_count }} live</span>
+                      </div>
+                      <div class="text-[10px] text-gray-500 truncate">{{ a.runtime || a.provider }}</div>
+                    </div>
+                  </button>
+                </div>
+                <!-- Fallback defaults if no dynamic agents loaded -->
+                <div v-else>
+                  <button
+                    @click="dispatchAgent('flomaster'); isAgentDropdownOpen = false;"
+                    class="w-full flex items-center space-x-2 text-left px-2 py-1.5 text-xs text-gray-200 hover:bg-purple-950/60 hover:text-purple-300 rounded-lg transition-colors"
+                  >
+                    <span class="text-sm">🧠</span>
+                    <div>
+                      <div class="font-medium">Flomaster</div>
+                      <div class="text-[10px] text-gray-500">Autonomous loop</div>
+                    </div>
+                  </button>
+                </div>
+                <div class="border-t border-gray-800/80 my-1"></div>
                 <button
                   @click="dispatchAgent('custom', agentPrompt); isAgentDropdownOpen = false;"
                   class="w-full flex items-center space-x-2 text-left px-2 py-1.5 text-xs text-gray-200 hover:bg-purple-950/60 hover:text-purple-300 rounded-lg transition-colors"
                   :class="{ 'bg-purple-950/30': agentPrompt && agentPrompt.trim() }"
                 >
-                  <span class="text-sm">🧠</span>
+                  <span class="text-sm">✨</span>
                   <div>
-                    <div class="font-medium">Custom Agent</div>
+                    <div class="font-medium">Custom Prompt</div>
+                    <div class="text-[10px] text-gray-500">With instructions below</div>
+                  </div>
+                </button>
                     <div class="text-[10px] text-gray-500">Custom instructions</div>
                   </div>
                 </button>
@@ -803,6 +813,20 @@ const IssueDrawerComponent = {
                 placeholder="Assign to agent or user..."
                 class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
+              <div v-if="agents && agents.length > 0" class="flex flex-wrap items-center gap-1.5 pt-1">
+                <span class="text-[9px] text-gray-500 uppercase tracking-wider font-semibold">Agents:</span>
+                <button
+                  v-for="a in agents"
+                  :key="a.name"
+                  @click="editAssignee = a.name; saveChanges()"
+                  class="flex items-center space-x-1 px-1.5 py-0.5 rounded-md border text-[10px] font-medium transition-colors"
+                  :class="editAssignee === a.name ? 'bg-purple-950/50 border-purple-700 text-purple-300' : 'bg-gray-900 border-gray-800 text-gray-400 hover:border-purple-700/60 hover:text-gray-200'"
+                  :title="'Assign to ' + a.name"
+                >
+                  <span>{{ a.avatar }}</span>
+                  <span>{{ a.name }}</span>
+                </button>
+              </div>
             </div>
           </div>
 

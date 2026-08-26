@@ -12,3 +12,4 @@ prism-out/
 backups/
 pocketbase-types.ts
 /bin/
+scripts/agent_bridge/bin/

@@ -13,7 +13,7 @@
  * air-gapped LAN / Raspberry Pi — no CDN round-trips, no network requirement.
  */
 
-const CACHE_NAME = 'projectbase-shell-v6';
+const CACHE_NAME = 'projectbase-shell-v8';
 
 // The complete app shell. Keep in sync with index.html's asset list.
 const PRECACHE_PATHS = [

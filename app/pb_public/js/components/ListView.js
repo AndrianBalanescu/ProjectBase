@@ -1,12 +1,13 @@
 // pb_public/js/components/ListView.js
 
 const ListViewComponent = {
-  props: ['issues', 'projects', 'currentProject', 'cycles', 'labels', 'filterQuery', 'filterPriority', 'filterCycle', 'selectedIssueIds'],
+  props: ['issues', 'projects', 'currentProject', 'cycles', 'labels', 'filterQuery', 'filterPriority', 'filterCycle', 'selectedIssueIds', 'agents'],
   emits: ['open-issue', 'update-issue', 'delete-issue', 'open-new-issue', 'toggle-issue-selection', 'range-select-issue', 'select-all-visible'],
   data() {
     return {
       sortBy: 'created',
-      sortDesc: true
+      sortDesc: true,
+      agentFilter: ''
     };
   },
   computed: {
@@ -21,6 +22,7 @@ const ListViewComponent = {
         }
         if (this.filterPriority && issue.priority !== this.filterPriority) return false;
         if (this.filterCycle && issue.cycle !== this.filterCycle) return false;
+        if (this.agentFilter && !(issue.assignee || '').toLowerCase().includes(this.agentFilter.toLowerCase())) return false;
         return true;
       });
 
@@ -42,6 +44,10 @@ const ListViewComponent = {
     }
   },
   methods: {
+    agentAvatar(agent) {
+      const a = (this.agents || []).find(x => x.name === agent);
+      return a ? a.avatar : null;
+    },
     toggleSort(col) {
       if (this.sortBy === col) {
         this.sortDesc = !this.sortDesc;
@@ -135,8 +141,8 @@ const ListViewComponent = {
     },
   },
   template: `
-    <div class="h-[calc(100vh-3.5rem)] overflow-y-auto p-6 bg-[#0b0f19]">
-      <div class="max-w-7xl mx-auto space-y-4">
+    <div class="h-[calc(100vh-3.5rem)] overflow-y-auto p-2 bg-[#0b0f19]">
+      <div class="w-full space-y-2">
         
         <!-- Action Header -->
         <div class="flex items-center justify-between">
@@ -147,13 +153,23 @@ const ListViewComponent = {
             </span>
           </div>
 
-          <button 
-            @click="$emit('open-new-issue')"
-            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/20 transition-all"
-          >
-            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-            <span>Add Task</span>
-          </button>
+          <div class="flex items-center space-x-2">
+            <select
+              v-if="agents && agents.length > 0"
+              v-model="agentFilter"
+              class="px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-xs text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[150px]"
+            >
+              <option value="">All Agents</option>
+              <option v-for="a in agents" :key="a.name" :value="a.name">{{ a.avatar }} {{ a.name }}</option>
+            </select>
+            <button
+              @click="$emit('open-new-issue')"
+              class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/20 transition-all"
+            >
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+              <span>Add Task</span>
+            </button>
+          </div>
         </div>
 
         <!-- Table Container -->
@@ -308,7 +324,8 @@ const ListViewComponent = {
                 <td class="py-3 px-4 text-gray-300 truncate">
                   <div v-if="issue.assignee" class="flex items-center space-x-1.5">
                     <div class="w-4 h-4 rounded-full bg-indigo-600 flex items-center justify-center text-[9px] font-bold text-white">
-                      {{ issue.assignee.charAt(0).toUpperCase() }}
+                      <template v-if="agentAvatar(issue.assignee)">{{ agentAvatar(issue.assignee) }}</template>
+                      <template v-else>{{ issue.assignee.charAt(0).toUpperCase() }}</template>
                     </div>
                     <span class="truncate">{{ issue.assignee }}</span>
                   </div>

@@ -55,8 +55,8 @@ type Agent struct {
 }
 
 // Session is a lightweight, sanitized view of one flomaster session. It carries
-// only public metadata + a short intent/plan line, never message bodies or
-// secrets.
+// only public metadata + a short intent/plan line + recent tool-call names,
+// never message bodies, tool outputs, or secrets.
 type Session struct {
 	Agent        string `json:"agent"`
 	ID           string `json:"id"`
@@ -67,9 +67,29 @@ type Session struct {
 	WorkingDir   string `json:"working_dir"`
 	LastActiveAt string `json:"last_active_at"`
 	UpdatedAt    string `json:"updated_at"`
-	Intention    string `json:"intention"`
-	MessageCount int    `json:"message_count"`
-	Avatar       string `json:"avatar"`
+	Intention    string     `json:"intention"`
+	LastText     string     `json:"last_text,omitempty"`
+	RecentTools  []Tool     `json:"recent_tools,omitempty"`
+	Todos        []TodoItem `json:"todos,omitempty"`
+	MessageCount int        `json:"message_count"`
+	Avatar       string     `json:"avatar"`
+}
+
+// Tool is one sanitized tool invocation: name + a short input summary (never
+// output, never file contents).
+type Tool struct {
+	Name      string `json:"name"`
+	Input     string `json:"input,omitempty"`
+	Timestamp string `json:"timestamp,omitempty"`
+}
+
+// TodoItem is one entry in a session's active checklist (the -goals.json
+// snapshot). Only content + status are published; confidence history is not.
+type TodoItem struct {
+	Content  string `json:"content"`
+	Status   string `json:"status"`
+	Priority string `json:"priority,omitempty"`
+	ID       string `json:"id,omitempty"`
 }
 
 var agentDefs = []Agent{
@@ -223,6 +243,40 @@ func collectSessions(dir, avatar string) []Session {
 				s.Intention = pl.UserIntention
 			}
 		}
+		// Active checklist from the todos/<base>.json snapshot: publish only
+		// content + status so the Agents cockpit can render a live "working on"
+		// list. Falls back to -goals.json if the primary file is absent.
+		goalsPaths := []string{
+			filepath.Join(todosDir, base+".json"),
+			filepath.Join(todosDir, base+"-goals.json"),
+		}
+		for _, goalsPath := range goalsPaths {
+			b, err := os.ReadFile(goalsPath)
+			if err != nil {
+				continue
+			}
+			var todos []TodoItem
+			if json.Unmarshal(b, &todos) != nil || len(todos) == 0 {
+				continue
+			}
+			// Keep it small: only items that are still actionable/in progress.
+			var active []TodoItem
+			for _, t := range todos {
+				st := strings.ToLower(strings.TrimSpace(t.Status))
+				if st == "" || st == "pending" || st == "in_progress" || st == "in-progress" {
+					if t.Content != "" {
+						active = append(active, t)
+					}
+				}
+				if len(active) >= 6 {
+					break
+				}
+			}
+			if len(active) > 0 {
+				s.Todos = active
+				break
+			}
+		}
 		out = append(out, s)
 	}
 	return out
@@ -252,6 +306,67 @@ func parseSessionJSON(path, avatar string) Session {
 	if raw.ID == "" && raw.ShortName == "" {
 		return Session{}
 	}
+	// Walk messages from the tail (most recent first) to collect sanitized
+	// tool calls + last assistant text. Cap at ~40 recent tools per session.
+	var tools []Tool
+	lastText := ""
+	scan := raw.Messages
+	if len(scan) > 120 {
+		scan = scan[len(scan)-120:]
+	}
+	for i := len(scan) - 1; i >= 0; i-- {
+		if len(tools) >= 40 {
+			break
+		}
+		msg, ok := scan[i].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		role, _ := msg["role"].(string)
+		if lastText == "" && role == "assistant" {
+			if t, ok2 := msg["content"].(string); ok2 && strings.TrimSpace(t) != "" {
+				lastText = strings.TrimSpace(t)
+				if len(lastText) > 220 {
+					lastText = lastText[:220]
+				}
+			}
+		}
+		if role != "assistant" {
+			continue
+		}
+		// tool_calls is used by OpenAI-style schemas.
+		if tcs, ok2 := msg["tool_calls"].([]interface{}); ok2 {
+			for _, tc := range tcs {
+				if tcObj, ok3 := tc.(map[string]interface{}); ok3 {
+					fn, _ := tcObj["function"].(map[string]interface{})
+					name, _ := fn["name"].(string)
+					if name != "" {
+						tools = append(tools, Tool{Name: name})
+					}
+				}
+			}
+			continue
+		}
+		// Anthropic-style content blocks with tool_use.
+		if blocks, ok2 := msg["content"].([]interface{}); ok2 {
+			for _, blk := range blocks {
+				b, ok3 := blk.(map[string]interface{})
+				if !ok3 {
+					continue
+				}
+				btype, _ := b["type"].(string)
+				if btype != "tool_use" {
+					continue
+				}
+				name, _ := b["name"].(string)
+				if name == "" {
+					continue
+				}
+				inp := toolInputSummary(b["input"])
+				tools = append(tools, Tool{Name: name, Input: inp})
+			}
+		}
+	}
 	return Session{
 		Agent:        "flomaster",
 		ID:           raw.ID,
@@ -264,7 +379,53 @@ func parseSessionJSON(path, avatar string) Session {
 		UpdatedAt:    raw.UpdatedAt,
 		MessageCount: len(raw.Messages),
 		Avatar:       avatar,
+		LastText:     lastText,
+		RecentTools:  tools,
 	}
+}
+
+// toolInputSummary renders a short, single-line summary of a tool_use input,
+// prioritizing common keys (file_path, command, query, title, selector, url).
+// It strips anything that looks like a secret value. Output is truncated.
+func toolInputSummary(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	obj, ok := v.(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	prefer := []string{"file_path", "command", "query", "title", "selector", "url", "target", "intent", "path"}
+	for _, k := range prefer {
+		val, exists := obj[k]
+		if !exists {
+			continue
+		}
+		s, ok2 := val.(string)
+		if !ok2 || s == "" {
+			continue
+		}
+		return truncateString(s, 60)
+	}
+	// fallback: join all scalar values
+	var parts []string
+	for k, val := range obj {
+		if strings.EqualFold(k, "password") || strings.EqualFold(k, "token") || strings.EqualFold(k, "api_key") || strings.EqualFold(k, "secret") {
+			continue
+		}
+		if s, ok2 := val.(string); ok2 && s != "" {
+			parts = append(parts, k+"="+truncateString(s, 30))
+		}
+	}
+	sort.Strings(parts)
+	return truncateString(strings.Join(parts, " "), 70)
+}
+
+func truncateString(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "…"
 }
 
 func fail(format string, args ...any) {

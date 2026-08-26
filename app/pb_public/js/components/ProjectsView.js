@@ -14,8 +14,8 @@ const ProjectsViewComponent = {
     }
   },
   template: `
-    <div class="h-[calc(100vh-3.5rem)] overflow-y-auto p-6 bg-[#0b0f19]">
-      <div class="max-w-7xl mx-auto space-y-6">
+    <div class="h-[calc(100vh-3.5rem)] overflow-y-auto p-2.5 bg-[#0b0f19]">
+      <div class="w-full space-y-3">
         
         <!-- Header -->
         <div class="flex items-center justify-between">
