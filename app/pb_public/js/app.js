@@ -3,6 +3,45 @@
 
 const { createApp, ref, reactive, computed, onMounted, nextTick } = Vue;
 
+// ---------------------------------------------------------------------------
+// Data cache: persist the last-known-good workspace snapshot to localStorage so
+// a page refresh keeps content on screen while the fresh fetch resolves (no
+// blank flash). The cache is a best-effort mirror, never the source of truth.
+// ---------------------------------------------------------------------------
+const DATA_CACHE_KEY = 'projectbase_data_cache_v1';
+
+function readDataCache() {
+  try {
+    const raw = localStorage.getItem(DATA_CACHE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return {};
+    return parsed;
+  } catch (e) {
+    return {};
+  }
+}
+
+function writeDataCache(snapshot) {
+  try {
+    // Only persist the workspace snapshot fields (never auth/session state).
+    const slim = {
+      currentProject: snapshot.currentProject || null,
+      projects: snapshot.projects || [],
+      issues: snapshot.issues || [],
+      cycles: snapshot.cycles || [],
+      milestones: snapshot.milestones || [],
+      labels: snapshot.labels || [],
+      agents: snapshot.agents || [],
+      agentSessions: snapshot.agentSessions || [],
+      agentSource: snapshot.agentSource || 'bridge'
+    };
+    localStorage.setItem(DATA_CACHE_KEY, JSON.stringify(slim));
+  } catch (e) {
+    // Quota / private-mode: cache is best-effort, ignore failures.
+  }
+}
+
 const App = {
   components: {
     'header-bar': HeaderComponent,
@@ -28,6 +67,9 @@ const App = {
     'welcome-modal': WelcomeModalComponent
   },
   data() {
+    // Restore the last-known-good snapshot from localStorage so a page refresh
+    // keeps content on screen while the fresh fetch resolves (no blank flash).
+    const cache = readDataCache();
     return {
       theme: 'dark',
       currentView: 'board', // 'board', 'list', 'cycles', 'timeline', 'projects', 'stats', 'portfolio'
@@ -40,16 +82,16 @@ const App = {
       signupPasswordConfirm: '',
       signingUp: false,
       authError: '',
-      currentProject: null,
-      projects: [],
-      issues: [],
-      cycles: [],
-      milestones: [],
-      labels: [],
-      agents: [], // Agentic-native: detected local AI agents (board teammates)
-      agentSessions: [], // Sanitized live flomaster/agent sessions
+      currentProject: cache.currentProject || null,
+      projects: cache.projects || [],
+      issues: cache.issues || [],
+      cycles: cache.cycles || [],
+      milestones: cache.milestones || [],
+      labels: cache.labels || [],
+      agents: cache.agents || [], // Agentic-native: detected local AI agents (board teammates)
+      agentSessions: cache.agentSessions || [], // Sanitized live flomaster/agent sessions
       activeAgentName: null, // Selected agent name on the Agents view (or null -> team list)
-      agentSource: 'bridge',
+      agentSource: cache.agentSource || 'bridge',
       agentSyncing: false,
       selectedIssue: null,
       selectedIssueIds: new Set(),
@@ -302,6 +344,9 @@ const App = {
         this.agentSessions = (agents && agents.sessions) || [];
         this.agentSource = (agents && agents.source) || 'bridge';
 
+        // Persist the fresh snapshot so a later refresh keeps content on screen.
+        writeDataCache(this);
+
         // Auto-select first favorite project if none selected
         if (!this.currentProject && this.projects.length > 0) {
           const fav = this.projects.find(p => p.is_favorite);
@@ -319,6 +364,7 @@ const App = {
         this.issues = await API.getIssues(this.currentProject ? this.currentProject.id : null);
         this.cycles = await API.getCycles(this.currentProject ? this.currentProject.id : null);
         this.milestones = await API.getMilestones(this.currentProject ? this.currentProject.id : null);
+        writeDataCache(this);
       } catch (err) {
         console.error('Error loading issues:', err);
       }
@@ -332,6 +378,7 @@ const App = {
           this.agents = live.agents;
           this.agentSessions = live.sessions || [];
           this.agentSource = live.source || 'bridge';
+          writeDataCache(this);
         }
       } catch (e) {
         // silent background poll
