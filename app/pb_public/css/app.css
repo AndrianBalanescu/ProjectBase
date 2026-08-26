@@ -1,48 +1,178 @@
-/* pb_public/css/app.css */
+/* pb_public/css/app.css — ProjectBase Minimalist Design System & Theme Engine */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-:root {
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+/* ---------------------------------------------------------------------------
+ * 1. Minimalist Theme Variables (Dark default & Light mode)
+ * ------------------------------------------------------------------------- */
+:root, html.dark {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Surfaces & Canvas */
+  --bg-app: #09090b;
+  --bg-surface: #121215;
+  --bg-surface-elevated: #18181b;
+  --bg-card: #18181b;
+  --bg-card-hover: #222226;
+  --bg-subtle: #1c1c20;
+  --bg-overlay: rgba(9, 9, 11, 0.85);
+
+  /* Borders & Dividers */
+  --border-app: #27272a;
+  --border-subtle: #1f1f23;
+  --border-hover: #3f3f46;
+  --border-focus: #52525b;
+
+  /* Typography */
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --text-dim: #52525b;
+
+  /* Minimalist Accents */
+  --accent-btn-bg: #27272a;
+  --accent-btn-text: #f4f4f5;
+  --accent-btn-hover: #3f3f46;
+  --accent-btn-border: #3f3f46;
+
+  /* Soft Status Tints */
+  --status-todo-bg: #18181b;
+  --status-todo-text: #d4d4d8;
+  --status-todo-border: #27272a;
+
+  --status-progress-bg: rgba(59, 130, 246, 0.1);
+  --status-progress-text: #93c5fd;
+  --status-progress-border: rgba(59, 130, 246, 0.2);
+
+  --status-review-bg: rgba(245, 158, 11, 0.1);
+  --status-review-text: #fcd34d;
+  --status-review-border: rgba(245, 158, 11, 0.2);
+
+  --status-done-bg: rgba(16, 185, 129, 0.1);
+  --status-done-text: #6ee7b7;
+  --status-done-border: rgba(16, 185, 129, 0.2);
+
+  --status-cancel-bg: #18181b;
+  --status-cancel-text: #71717a;
+  --status-cancel-border: #27272a;
+
+  /* Scrollbars */
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: #27272a;
+  --scrollbar-thumb-hover: #3f3f46;
+
+  color-scheme: dark;
 }
 
+html.light {
+  /* Surfaces & Canvas */
+  --bg-app: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f1f5f9;
+  --bg-subtle: #f4f4f5;
+  --bg-overlay: rgba(255, 255, 255, 0.9);
+
+  /* Borders & Dividers */
+  --border-app: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --border-hover: #cbd5e1;
+  --border-focus: #94a3b8;
+
+  /* Typography */
+  --text-primary: #09090b;
+  --text-secondary: #52525b;
+  --text-muted: #71717a;
+  --text-dim: #94a3b8;
+
+  /* Minimalist Accents */
+  --accent-btn-bg: #09090b;
+  --accent-btn-text: #ffffff;
+  --accent-btn-hover: #27272a;
+  --accent-btn-border: #09090b;
+
+  /* Soft Status Tints */
+  --status-todo-bg: #f1f5f9;
+  --status-todo-text: #334155;
+  --status-todo-border: #e2e8f0;
+
+  --status-progress-bg: #eff6ff;
+  --status-progress-text: #1d4ed8;
+  --status-progress-border: #bfdbfe;
+
+  --status-review-bg: #fffbeb;
+  --status-review-text: #b45309;
+  --status-review-border: #fde68a;
+
+  --status-done-bg: #ecfdf5;
+  --status-done-text: #047857;
+  --status-done-border: #a7f3d0;
+
+  --status-cancel-bg: #f1f5f9;
+  --status-cancel-text: #94a3b8;
+  --status-cancel-border: #e2e8f0;
+
+  /* Scrollbars */
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
+
+  color-scheme: light;
+}
+
+/* ---------------------------------------------------------------------------
+ * 2. Base Typography & Body
+ * ------------------------------------------------------------------------- */
 body {
   font-family: var(--font-sans);
-  background-color: #0b0f19;
-  color: #f3f4f6;
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   overflow-x: hidden;
+  transition: background-color 150ms ease, color 150ms ease;
 }
 
-/* Custom Scrollbars */
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: -0.02em;
+}
+
+/* ---------------------------------------------------------------------------
+ * 3. Custom Scrollbars
+ * ------------------------------------------------------------------------- */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--scrollbar-track);
 }
 ::-webkit-scrollbar-thumb {
-  background: #1f293d;
+  background: var(--scrollbar-thumb);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #374151;
+  background: var(--scrollbar-thumb-hover);
 }
 
-/* Hide scrollbars while keeping the element scrollable (compact tab strips) */
 .scrollbar-none {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 .scrollbar-none::-webkit-scrollbar {
-  display: none; /* Chromium/Safari */
+  display: none;
 }
 
-/* Kanban Drag and Drop Styles */
+/* ---------------------------------------------------------------------------
+ * 4. Kanban Drag and Drop Styles
+ * ------------------------------------------------------------------------- */
 .sortable-ghost {
-  opacity: 0.35;
-  background-color: #1e293b !important;
-  border: 2px dashed #6366f1 !important;
+  opacity: 0.4;
+  background-color: var(--bg-card-hover) !important;
+  border: 1px dashed var(--border-hover) !important;
   transform: scale(0.98);
 }
 
@@ -52,79 +182,91 @@ body {
 
 .sortable-drag {
   opacity: 0.95;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3) !important;
-  transform: rotate(1deg) scale(1.02);
+  box-shadow: 0 12px 24px -4px rgba(0, 0, 0, 0.25) !important;
+  transform: rotate(0.5deg) scale(1.01);
 }
 
-/* Glassmorphism */
+/* ---------------------------------------------------------------------------
+ * 5. Glassmorphism & Overlays
+ * ------------------------------------------------------------------------- */
 .glass-panel {
-  background: rgba(17, 24, 39, 0.85);
+  background: var(--bg-surface);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-app);
 }
 
 .glass-dropdown {
-  background: rgba(15, 23, 42, 0.95);
+  background: var(--bg-surface-elevated);
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-app);
 }
 
-/* Pulse animation for live SSE */
+/* ---------------------------------------------------------------------------
+ * 6. Pulse animation for live SSE
+ * ------------------------------------------------------------------------- */
 @keyframes pulse-dot {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.4); opacity: 0.6; }
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.25); opacity: 0.4; }
 }
 
 .live-pulse {
-  animation: pulse-dot 2s infinite ease-in-out;
+  animation: pulse-dot 2.5s infinite ease-in-out;
 }
 
-/* Priority Indicator Colors */
-.priority-urgent { color: #ef4444; }
-.priority-high { color: #f97316; }
-.priority-medium { color: #eab308; }
-.priority-low { color: #3b82f6; }
-.priority-none { color: #6b7280; }
+/* ---------------------------------------------------------------------------
+ * 7. Priority Indicators (Clean Minimalist Low-Contrast)
+ * ------------------------------------------------------------------------- */
+.priority-urgent { color: #f87171; }
+.priority-high { color: #fb923c; }
+.priority-medium { color: #facc15; }
+.priority-low { color: #60a5fa; }
+.priority-none { color: #71717a; }
 
-/* Status Column Highlights */
-.status-col-backlog { border-top-color: #6b7280; }
-.status-col-todo { border-top-color: #8b5cf6; }
-.status-col-in_progress { border-top-color: #3b82f6; }
-.status-col-in_review { border-top-color: #eab308; }
-.status-col-done { border-top-color: #10b981; }
-.status-col-cancelled { border-top-color: #ef4444; }
+/* ---------------------------------------------------------------------------
+ * 8. Status Column Header Borders
+ * ------------------------------------------------------------------------- */
+.status-col-backlog { border-top-color: #52525b; }
+.status-col-todo { border-top-color: #71717a; }
+.status-col-in_progress { border-top-color: #60a5fa; }
+.status-col-in_review { border-top-color: #fbbf24; }
+.status-col-done { border-top-color: #34d399; }
+.status-col-cancelled { border-top-color: #52525b; }
 
-/* Markdown Styles inside drawer */
+/* ---------------------------------------------------------------------------
+ * 9. Markdown Styles inside drawer & docs
+ * ------------------------------------------------------------------------- */
 .markdown-body {
-  font-size: 0.925rem;
+  font-size: 0.875rem;
   line-height: 1.6;
-  color: #d1d5db;
+  color: var(--text-secondary);
 }
 .markdown-body h1, .markdown-body h2, .markdown-body h3 {
-  color: #f9fafb;
+  color: var(--text-primary);
   font-weight: 600;
   margin-top: 1rem;
   margin-bottom: 0.5rem;
 }
-.markdown-body h1 { font-size: 1.35rem; }
-.markdown-body h2 { font-size: 1.15rem; }
-.markdown-body h3 { font-size: 1.05rem; }
+.markdown-body h1 { font-size: 1.25rem; }
+.markdown-body h2 { font-size: 1.1rem; }
+.markdown-body h3 { font-size: 0.975rem; }
 .markdown-body p { margin-bottom: 0.75rem; }
 .markdown-body ul, .markdown-body ol { padding-left: 1.25rem; margin-bottom: 0.75rem; }
 .markdown-body ul { list-style-type: disc; }
 .markdown-body ol { list-style-type: decimal; }
 .markdown-body code {
-  background: #1e293b;
-  color: #38bdf8;
+  background: var(--bg-subtle);
+  color: var(--text-primary);
   padding: 0.15rem 0.35rem;
   border-radius: 4px;
   font-family: var(--font-mono);
   font-size: 0.85em;
+  border: 1px solid var(--border-app);
 }
 .markdown-body pre {
-  background: #0f172a;
-  border: 1px solid #1e293b;
+  background: var(--bg-app);
+  border: 1px solid var(--border-app);
   padding: 0.75rem;
   border-radius: 6px;
   overflow-x: auto;
@@ -133,21 +275,19 @@ body {
 .markdown-body pre code {
   background: transparent;
   padding: 0;
-  color: #e2e8f0;
+  border: none;
+  color: var(--text-primary);
 }
 .markdown-body blockquote {
-  border-left: 3px solid #6366f1;
+  border-left: 2px solid var(--border-hover);
   padding-left: 0.75rem;
-  color: #9ca3af;
+  color: var(--text-muted);
   font-style: italic;
   margin-bottom: 0.75rem;
 }
 
 /* ---------------------------------------------------------------------------
- * Entrance animations — hand-rolled tailwindcss-animate equivalents.
- * Stock Tailwind (compiled via scripts/build_css.sh) cannot generate the
- * `animate-in` family; these utilities are used by modals, the command
- * palette, dropdowns, and the toast. Keep in sync with template usage.
+ * 10. Entrance animations (lightweight)
  * ------------------------------------------------------------------------- */
 @keyframes pb-fade-in {
   from { opacity: 0; }
@@ -171,127 +311,103 @@ body {
 }
 
 .animate-in,
-.fade-in {
-  animation-name: pb-fade-in;
+.animate-in-fade-in,
+.animate-in-fade-in-slide-in-from-top-2,
+.animate-in-fade-in-zoom-in-95 {
   animation-duration: 150ms;
-  animation-timing-function: ease-out;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
   animation-fill-mode: both;
 }
-
-/* Motion variants declared after .fade-in so combined usage
- * (e.g. "animate-in fade-in zoom-in-95") resolves to the richer motion. */
-.zoom-in-95 {
-  animation-name: pb-zoom-in-95;
-  animation-duration: 150ms;
-  animation-timing-function: ease-out;
-  animation-fill-mode: both;
-}
-.slide-in-from-top-2 {
-  animation-name: pb-slide-in-top-2;
-  animation-duration: 150ms;
-  animation-timing-function: ease-out;
-  animation-fill-mode: both;
-}
-.slide-in-from-bottom-2 {
-  animation-name: pb-slide-in-bottom-2;
-  animation-duration: 150ms;
-  animation-timing-function: ease-out;
-  animation-fill-mode: both;
-}
-.slide-in-from-right {
-  animation-name: pb-slide-in-right;
-  animation-duration: 200ms;
-  animation-timing-function: ease-out;
-  animation-fill-mode: both;
-}
+.animate-in { animation-name: pb-fade-in; }
+.fade-in { animation-name: pb-fade-in; }
+.zoom-in-95 { animation-name: pb-zoom-in-95; }
+.slide-in-from-top-2 { animation-name: pb-slide-in-top-2; }
+.slide-in-from-bottom-2 { animation-name: pb-slide-in-bottom-2; }
+.slide-in-from-right { animation-name: pb-slide-in-right; }
+.duration-150 { animation-duration: 150ms; }
+.duration-200 { animation-duration: 200ms; }
 
 /* ---------------------------------------------------------------------------
- * Lightweight Markdown Editor (replaces Milkdown 2.7MB WYSIWYG)
- * Split view: Write textarea + Preview tab, plus read-only rendering.
- * Code fences render as styled blocks with a language badge + copy button.
+ * 11. Minimalist Markdown Editor Tabs
  * ------------------------------------------------------------------------- */
-.md-editor-shell {
+.md-tab-bar {
   display: flex;
-  flex-direction: column;
-}
-.md-editor-tabs {
-  display: flex;
+  align-items: center;
   gap: 0.25rem;
   padding: 0.25rem 0.25rem 0.5rem;
-  border-bottom: 1px solid #1f2937;
+  border-bottom: 1px solid var(--border-app);
   margin-bottom: 0.5rem;
 }
 .md-tab {
-  padding: 0.15rem 0.7rem;
-  border-radius: 6px;
+  padding: 0.15rem 0.6rem;
+  border-radius: 4px;
   font-size: 0.72rem;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--text-muted);
   background: transparent;
   cursor: pointer;
   transition: all 120ms ease;
 }
-.md-tab:hover { color: #d1d5db; }
+.md-tab:hover { color: var(--text-primary); }
 .md-tab.active {
-  background: #1f2937;
-  color: #f9fafb;
+  background: var(--bg-subtle);
+  color: var(--text-primary);
 }
 .md-editor-ta {
   width: 100%;
   resize: vertical;
-  border-radius: 10px;
-  border: 1px solid #1f2937;
-  background: rgba(2, 6, 23, 0.85);
-  color: #e5e7eb;
+  border-radius: 8px;
+  border: 1px solid var(--border-app);
+  background: var(--bg-app);
+  color: var(--text-primary);
   padding: 0.6rem 0.75rem;
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-family: var(--font-mono);
   font-size: 0.8rem;
   line-height: 1.6;
   outline: none;
   min-height: 140px;
 }
-.md-editor-ta:focus { border-color: #6366f1; box-shadow: 0 0 0 1px #6366f1; }
-.md-editor-ta::placeholder { color: #4b5563; }
+.md-editor-ta:focus { border-color: var(--border-focus); }
+.md-editor-ta::placeholder { color: var(--text-dim); }
 
 .md-preview {
   min-height: 140px;
   padding: 0.5rem 0.25rem;
 }
 
-/* Code block cards */
 .md-codeblock {
   margin: 0.75rem 0;
-  border: 1px solid #1e293b;
-  border-radius: 8px;
+  border: 1px solid var(--border-app);
+  border-radius: 6px;
   overflow: hidden;
-  background: #0b1020;
+  background: var(--bg-app);
 }
 .md-code-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0.3rem 0.6rem;
-  background: #111a2e;
-  border-bottom: 1px solid #1e293b;
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border-app);
 }
 .md-code-lang {
   font-size: 0.65rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #818cf8;
+  color: var(--text-muted);
 }
 .md-code-copy {
   padding: 0.1rem 0.5rem;
   font-size: 0.65rem;
-  color: #9ca3af;
+  color: var(--text-muted);
   background: transparent;
-  border: 1px solid #2b364c;
-  border-radius: 5px;
+  border: 1px solid var(--border-app);
+  border-radius: 4px;
   cursor: pointer;
   transition: all 120ms ease;
 }
-.md-code-copy:hover { color: #e5e7eb; border-color: #6366f1; }
+.md-code-copy:hover { color: var(--text-primary); border-color: var(--border-hover); }
 .md-code-copy.copied { color: #34d399; border-color: #34d399; }
 .md-codeblock pre {
   margin: 0;
@@ -300,3 +416,23 @@ body {
   background: transparent;
   overflow-x: auto;
 }
+
+.md-editor-shell {
+  display: flex;
+  flex-direction: column;
+}
+
+.md-editor-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.shadow-2xs {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.shadow-xs {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+}
+

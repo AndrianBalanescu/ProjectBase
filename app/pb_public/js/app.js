@@ -29,6 +29,7 @@ const App = {
   },
   data() {
     return {
+      theme: 'dark',
       currentView: 'board', // 'board', 'list', 'cycles', 'timeline', 'projects', 'stats', 'portfolio'
       authReady: false,
       isAuthenticated: false,
@@ -130,6 +131,7 @@ const App = {
     currentView() { this.syncRoute(); }
   },
   async mounted() {
+    this.initTheme();
     this.isAuthenticated = !!API.client.authStore.isValid;
     this.authReady = true;
     if (this.isAuthenticated) {
@@ -161,6 +163,39 @@ const App = {
     });
   },
   methods: {
+    initTheme() {
+      try {
+        const saved = localStorage.getItem('projectbase_theme');
+        if (saved === 'light' || saved === 'dark') {
+          this.theme = saved;
+        } else {
+          this.theme = 'dark';
+        }
+      } catch (e) {
+        this.theme = 'dark';
+      }
+      this.applyTheme();
+    },
+    setTheme(t) {
+      this.theme = t;
+      try {
+        localStorage.setItem('projectbase_theme', t);
+      } catch (e) {}
+      this.applyTheme();
+    },
+    toggleTheme() {
+      this.setTheme(this.theme === 'dark' ? 'light' : 'dark');
+    },
+    applyTheme() {
+      const root = document.documentElement;
+      if (this.theme === 'dark') {
+        root.classList.add('dark');
+        root.classList.remove('light');
+      } else {
+        root.classList.remove('dark');
+        root.classList.add('light');
+      }
+    },
     handleOnline() {
       this.isOnline = true;
     },

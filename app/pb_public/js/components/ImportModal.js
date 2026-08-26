@@ -1,9 +1,5 @@
 // pb_public/js/components/ImportModal.js
-// CSV importer UI for ProjectBase (cycle 2). Users paste or select a CSV file,
-// preview the parsed rows, pick a target project, and import. Duplicate rows are
-// reported by the backend. Format:
-//   title,description,status,priority,assignee,due_date,estimate,labels
-// Supports a flexible CSV parser (quoted fields, commas in fields).
+// Minimalist Issue Importer (CSV, GitHub, Linear, Plane) supporting Dark and Light themes.
 
 const ImportModalComponent = {
   props: ['isOpen', 'projects', 'currentProject'],
@@ -52,9 +48,8 @@ const ImportModalComponent = {
         this.ghToken = '';
         this.ghState = 'all';
         this.ghMax = 1000;
+
         this.$nextTick(() => {
-          const inp = this.$refs.csvInput;
-          if (inp) inp.focus();
           if (window.lucide) window.lucide.createIcons();
         });
       }
@@ -94,9 +89,6 @@ const ImportModalComponent = {
       let row = [];
       let field = '';
       let inQuotes = false;
-      const lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
-      // Handle multiline quoted fields by joining lines, but keep simple: split on \n.
-      // We iterate char-by-char to properly handle quotes and embedded commas.
       const all = String(text || '');
       for (let i = 0; i < all.length; i++) {
         const c = all[i];
@@ -112,70 +104,86 @@ const ImportModalComponent = {
         } else if (c === ',') {
           row.push(field);
           field = '';
-        } else if (c === '\n' || c === '\r') {
-          if (c === '\r' && all[i + 1] === '\n') i++;
+        } else if (c === '\n' || (c === '\r' && all[i + 1] === '\n')) {
+          if (c === '\r') i++;
           row.push(field);
           field = '';
-          if (row.some(x => x.trim() !== '')) rows.push(row);
+          if (row.some(f => f.trim() !== '')) rows.push(row);
           row = [];
         } else {
           field += c;
         }
       }
-      // flush last row
-      if (field !== '' || row.length > 0) {
+      if (field || row.length > 0) {
         row.push(field);
-        if (row.some(x => x.trim() !== '')) rows.push(row);
+        if (row.some(f => f.trim() !== '')) rows.push(row);
       }
-      return this._mapHeaders(rows);
-    },
-    _mapHeaders(parsed) {
-      if (parsed.length === 0) return [];
-      const header = parsed[0].map(h => h.trim().toLowerCase());
-      const map = (row) => {
-        const obj = {};
-        header.forEach((h, idx) => {
-          const val = row[idx] != null ? String(row[idx]).trim() : '';
-          if (h === 'labels') {
-            obj[h] = val ? val.split(/[;|]/).map(s => s.trim()).filter(Boolean) : [];
-          } else {
-            obj[h] = val;
-          }
-        });
-        return obj;
-      };
-      return parsed.slice(1).map(map).filter(r => r.title);
+      if (rows.length === 0) return [];
+      const headers = rows[0].map(h => h.trim().toLowerCase().replace(/\s+/g, '_'));
+      const titleIdx = headers.indexOf('title');
+      if (titleIdx === -1) {
+        throw new Error('CSV must contain a "title" column in the header row');
+      }
+      const descIdx = headers.indexOf('description');
+      const statusIdx = headers.indexOf('status');
+      const prioIdx = headers.indexOf('priority');
+      const assignIdx = headers.indexOf('assignee');
+      const dueIdx = headers.indexOf('due_date');
+      const estIdx = headers.indexOf('estimate');
+      const labelsIdx = headers.indexOf('labels');
+      const out = [];
+      for (let r = 1; r < rows.length; r++) {
+        const line = rows[r];
+        const title = (line[titleIdx] || '').trim();
+        if (!title) continue;
+        const rowObj = { title };
+        if (descIdx !== -1 && line[descIdx]) rowObj.description = line[descIdx].trim();
+        if (statusIdx !== -1 && line[statusIdx]) rowObj.status = line[statusIdx].trim().toLowerCase();
+        if (prioIdx !== -1 && line[prioIdx]) rowObj.priority = line[prioIdx].trim().toLowerCase();
+        if (assignIdx !== -1 && line[assignIdx]) rowObj.assignee = line[assignIdx].trim();
+        if (dueIdx !== -1 && line[dueIdx]) rowObj.due_date = line[dueIdx].trim();
+        if (estIdx !== -1 && line[estIdx]) {
+          const num = parseInt(line[estIdx], 10);
+          if (!isNaN(num)) rowObj.estimate = num;
+        }
+        if (labelsIdx !== -1 && line[labelsIdx]) {
+          rowObj.labels = line[labelsIdx].split(/[;,|]/).map(s => s.trim()).filter(Boolean);
+        }
+        out.push(rowObj);
+      }
+      return out;
     },
     async importCsv() {
       if (!this.parsed || this.rows.length === 0) {
-        this.error = 'Parse the CSV first.';
+        this.error = 'No parsed rows to import.';
         return;
       }
       if (!this.projectId) {
-        this.error = 'Select a target project.';
+        this.error = 'Select a target project first.';
         return;
       }
       this.importing = true;
       this.error = '';
       this.result = null;
       try {
-        // API is a top-level `const` in a classic script (global lexical scope),
-        // NOT a window property — so reference it bare like the other components.
         const token = (typeof API !== 'undefined' && API.client && API.client.authStore)
-          ? API.client.authStore.token
-          : '';
+          ? API.client.authStore.token : '';
         const resp = await fetch('/api/projectbase/import/csv', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             ...(token ? { 'Authorization': token } : {})
           },
-          body: JSON.stringify({ project_id: this.projectId, rows: this.rows })
+          body: JSON.stringify({
+            project_id: this.projectId,
+            rows: this.rows
+          })
         });
         const data = await resp.json();
-        if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));
+        if (!resp.ok) {
+          throw new Error(data.error || ('HTTP ' + resp.status));
+        }
         this.result = data;
-        this.parsed = false;
         this.$emit('imported', data);
       } catch (err) {
         this.error = 'Import failed: ' + String((err && err.message) || err);
@@ -220,7 +228,7 @@ const ImportModalComponent = {
     async importLinear() {
       const csv = String(this.linearText || '').trim();
       if (!this.projectId) { this.error = 'Select a target project.'; return; }
-      if (!csv) { this.error = 'Paste the Linear workspace CSV export first.'; return; }
+      if (!csv) { this.error = 'Paste your Linear CSV export first.'; return; }
       this.importing = true;
       this.error = '';
       this.result = null;
@@ -233,7 +241,10 @@ const ImportModalComponent = {
             'Content-Type': 'application/json',
             ...(token ? { 'Authorization': token } : {})
           },
-          body: JSON.stringify({ project_id: this.projectId, csv: csv })
+          body: JSON.stringify({
+            project_id: this.projectId,
+            csv: csv
+          })
         });
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));
@@ -248,7 +259,7 @@ const ImportModalComponent = {
     async importPlane() {
       const csv = String(this.planeText || '').trim();
       if (!this.projectId) { this.error = 'Select a target project.'; return; }
-      if (!csv) { this.error = 'Paste the Plane workspace CSV export first.'; return; }
+      if (!csv) { this.error = 'Paste your Plane CSV export first.'; return; }
       this.importing = true;
       this.error = '';
       this.result = null;
@@ -261,7 +272,10 @@ const ImportModalComponent = {
             'Content-Type': 'application/json',
             ...(token ? { 'Authorization': token } : {})
           },
-          body: JSON.stringify({ project_id: this.projectId, csv: csv })
+          body: JSON.stringify({
+            project_id: this.projectId,
+            csv: csv
+          })
         });
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));
@@ -278,201 +292,200 @@ const ImportModalComponent = {
     }
   },
   template: `
-    <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" @click.self="close">
-      <div class="w-full max-w-2xl rounded-2xl bg-gray-900 border border-gray-800 shadow-2xl overflow-hidden">
-        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-800">
+    <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 select-none" @click.self="close">
+      <div class="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-sm transition-opacity" @click="close"></div>
+
+      <div class="relative w-full max-w-2xl rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-5 py-3.5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
           <div class="flex items-center space-x-2">
-            <i data-lucide="upload" class="w-4 h-4 text-indigo-400"></i>
-            <h2 class="text-sm font-semibold text-white">Import Issues</h2>
+            <div class="w-6 h-6 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center border border-zinc-200 dark:border-zinc-700/60">
+              <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+            </div>
+            <h2 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">Import Issues</h2>
           </div>
-          <button @click="close" class="text-gray-400 hover:text-white transition-colors"><i data-lucide="x" class="w-4 h-4"></i></button>
+          <button @click="close" class="p-1 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
         </div>
 
-        <div class="p-5 space-y-4">
+        <div class="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
           <!-- Source Mode Tabs -->
-          <div class="flex items-center space-x-2 text-xs">
-            <button @click="mode='csv'" class="px-3 py-1.5 rounded-lg font-medium" :class="mode==='csv' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'">CSV</button>
-            <button @click="mode='github'" class="px-3 py-1.5 rounded-lg font-medium" :class="mode==='github' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'">GitHub</button>
-            <button @click="mode='linear'" class="px-3 py-1.5 rounded-lg font-medium" :class="mode==='linear' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'">Linear</button>
-            <button @click="mode='plane'" class="px-3 py-1.5 rounded-lg font-medium" :class="mode==='plane' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'">Plane</button>
+          <div class="flex items-center space-x-1 p-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-fit">
+            <button @click="mode='csv'" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors" :class="mode==='csv' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'">CSV</button>
+            <button @click="mode='github'" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors" :class="mode==='github' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'">GitHub</button>
+            <button @click="mode='linear'" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors" :class="mode==='linear' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'">Linear</button>
+            <button @click="mode='plane'" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors" :class="mode==='plane' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'">Plane</button>
           </div>
 
           <!-- Target Project -->
-          <div>
-            <label class="text-xs font-medium text-gray-400 mb-1 block">Target Project</label>
-            <select v-model="projectId" class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500">
+          <div class="space-y-1">
+            <label class="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block">Target Project</label>
+            <select v-model="projectId" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 cursor-pointer">
               <option v-for="p in validProjects" :key="p.id" :value="p.id">{{ p.name }} ({{ p.identifier }})</option>
             </select>
           </div>
 
           <!-- GitHub Import Fields -->
           <template v-if="mode==='github'">
-            <div>
-              <label class="text-xs font-medium text-gray-400 mb-1 block">GitHub Repository</label>
+            <div class="space-y-1">
+              <label class="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block">GitHub Repository</label>
               <input v-model="ghRepo" @input="result=null" placeholder="owner/repo (e.g. AndrianBalanescu/ProjectBase)"
-                class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600" />
             </div>
             <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="text-xs font-medium text-gray-400 mb-1 block">State</label>
-                <select v-model="ghState" class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500">
+              <div class="space-y-1">
+                <label class="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block">State</label>
+                <select v-model="ghState" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 cursor-pointer">
                   <option value="all">All</option>
                   <option value="open">Open</option>
                   <option value="closed">Closed</option>
                 </select>
               </div>
-              <div>
-                <label class="text-xs font-medium text-gray-400 mb-1 block">Max Issues</label>
-                <input v-model.number="ghMax" type="number" min="1" max="5000"
-                  class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+              <div class="space-y-1">
+                <label class="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block">Max Issues</label>
+                <input v-model.number="ghMax" type="number" min="1"
+                  class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600" />
               </div>
             </div>
-            <div>
-              <label class="text-xs font-medium text-gray-400 mb-1 block">Personal Access Token <span class="text-gray-500">(optional, raises rate limit)</span></label>
+            <div class="space-y-1">
+              <label class="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block">Personal Access Token <span class="text-zinc-400 font-normal">(optional, raises rate limit)</span></label>
               <input v-model="ghToken" type="password" placeholder="ghp_... or github_pat_..."
-                class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600" />
             </div>
             <button
               @click="importGithub"
               :disabled="importing"
-              class="w-full px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              class="w-full px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs transition-colors cursor-pointer"
             >{{ importing ? 'Importing...' : 'Import from GitHub' }}</button>
-            <p v-if="error" class="text-xs text-red-400">{{ error }}</p>
-            <div v-if="result" class="text-xs space-y-1 rounded-lg bg-gray-950 border border-gray-800 p-3">
-              <p class="text-emerald-400 font-medium">Import complete</p>
-              <p class="text-gray-300">{{ result.imported }} imported, {{ result.skipped }} skipped, {{ result.total }} total ({{ result.repo }})</p>
-              <p v-if="result.rate_limit" class="text-gray-500">Rate limit remaining: {{ result.rate_limit.remaining ?? 'n/a' }}</p>
-              <p v-if="result.errors && result.errors.length" class="text-amber-400">{{ result.errors.length }} error(s): {{ result.errors.slice(0,3).map(e => (e.gh!=null ? '#' + e.gh : 'page ' + e.page) + ': ' + e.error).join('; ') }}</p>
+            <p v-if="error" class="text-xs text-rose-500">{{ error }}</p>
+            <div v-if="result" class="text-xs space-y-1 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3">
+              <p class="text-emerald-600 dark:text-emerald-400 font-medium">Import complete</p>
+              <p class="text-zinc-600 dark:text-zinc-300">{{ result.imported }} imported, {{ result.skipped }} skipped, {{ result.total }} total ({{ result.repo }})</p>
+              <p v-if="result.rate_limit" class="text-zinc-400">Rate limit remaining: {{ result.rate_limit.remaining ?? 'n/a' }}</p>
             </div>
           </template>
 
           <!-- Linear Import Fields -->
           <template v-if="mode==='linear'">
-            <div>
-              <label class="text-xs font-medium text-gray-400 mb-1 block">Linear Workspace CSV Export</label>
+            <div class="space-y-1">
+              <label class="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block">Linear CSV Export</label>
               <textarea
                 v-model="linearText"
                 @input="result=null"
-                rows="7"
+                rows="6"
                 placeholder="ID,Title,Status,Priority,Labels,Assignee,Due Date&#10;abc123,Backend rewrite,In Progress,High,\"bug, perf\",Alice,2026-09-01"
-                class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-y"
+                class="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 resize-y"
               ></textarea>
             </div>
-            <p class="text-[11px] text-gray-500">Paste the CSV from Linear: Settings &gt; Administration &gt; Import/Export &gt; Export data. Title, Status, Priority, Labels, Assignee, Due Date, Estimate and Description are mapped. Re-importing the same export is idempotent (keyed by Linear issue ID).</p>
             <button
               @click="importLinear"
               :disabled="importing || !linearText"
-              class="w-full px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              class="w-full px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs transition-colors cursor-pointer"
             >{{ importing ? 'Importing...' : 'Import from Linear' }}</button>
-            <p v-if="error" class="text-xs text-red-400">{{ error }}</p>
-            <div v-if="result" class="text-xs space-y-1 rounded-lg bg-gray-950 border border-gray-800 p-3">
-              <p class="text-emerald-400 font-medium">Import complete</p>
-              <p class="text-gray-300">{{ result.imported }} imported, {{ result.skipped }} skipped, {{ result.total }} total</p>
-              <p v-if="result.errors && result.errors.length" class="text-amber-400">Warnings: {{ result.errors.length }} row(s) skipped (see first below)</p>
-              <p v-if="result.errors && result.errors.length" class="text-amber-400/80 font-mono">{{ result.errors.slice(0,3).map(e => 'row ' + e.row + ': ' + e.error).join('; ') }}</p>
+            <p v-if="error" class="text-xs text-rose-500">{{ error }}</p>
+            <div v-if="result" class="text-xs space-y-1 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3">
+              <p class="text-emerald-600 dark:text-emerald-400 font-medium">Import complete</p>
+              <p class="text-zinc-600 dark:text-zinc-300">{{ result.imported }} imported, {{ result.skipped }} skipped, {{ result.total }} total</p>
             </div>
           </template>
 
           <!-- Plane Import Fields -->
           <template v-if="mode==='plane'">
-            <div>
-              <label class="text-xs font-medium text-gray-400 mb-1 block">Plane Workspace CSV Export</label>
+            <div class="space-y-1">
+              <label class="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block">Plane Workspace CSV Export</label>
               <textarea
                 v-model="planeText"
                 @input="result=null"
-                rows="7"
+                rows="6"
                 placeholder="Name,State,Priority,Labels,Assignees,Start Date,Target Date&#10;Backend rewrite,In Progress,High,\"bug, perf\",Alice,2026-08-01,2026-09-01"
-                class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-y"
+                class="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 resize-y"
               ></textarea>
             </div>
-            <p class="text-[11px] text-gray-500">Paste the CSV from Plane: Workspace Settings &gt; Exports &gt; select your project &gt; Export &gt; CSV. Title, State, Priority, Labels, Assignees, Start Date, Target Date, Estimate and Description are mapped. Re-importing the same export is idempotent (keyed by Plane issue ID).</p>
             <button
               @click="importPlane"
               :disabled="importing || !planeText"
-              class="w-full px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              class="w-full px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs transition-colors cursor-pointer"
             >{{ importing ? 'Importing...' : 'Import from Plane' }}</button>
-            <p v-if="error" class="text-xs text-red-400">{{ error }}</p>
-            <div v-if="result" class="text-xs space-y-1 rounded-lg bg-gray-950 border border-gray-800 p-3">
-              <p class="text-emerald-400 font-medium">Import complete</p>
-              <p class="text-gray-300">{{ result.imported }} imported, {{ result.skipped }} skipped, {{ result.total }} total</p>
-              <p v-if="result.errors && result.errors.length" class="text-amber-400">Warnings: {{ result.errors.length }} row(s) skipped (see first below)</p>
-              <p v-if="result.errors && result.errors.length" class="text-amber-400/80 font-mono">{{ result.errors.slice(0,3).map(e => 'row ' + e.row + ': ' + e.error).join('; ') }}</p>
+            <p v-if="error" class="text-xs text-rose-500">{{ error }}</p>
+            <div v-if="result" class="text-xs space-y-1 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3">
+              <p class="text-emerald-600 dark:text-emerald-400 font-medium">Import complete</p>
+              <p class="text-zinc-600 dark:text-zinc-300">{{ result.imported }} imported, {{ result.skipped }} skipped, {{ result.total }} total</p>
             </div>
           </template>
 
           <!-- CSV Import Fields -->
           <template v-if="mode==='csv'">
-          <!-- Input Mode Tabs -->
-          <div class="flex items-center space-x-2 text-xs">
-            <button @click="inputType='paste'" class="px-3 py-1.5 rounded-lg font-medium" :class="inputType==='paste' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'">Paste CSV</button>
-            <button @click="inputType='upload'" class="px-3 py-1.5 rounded-lg font-medium" :class="inputType==='upload' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'">Upload file</button>
-          </div>
-
-
-          <textarea
-            v-if="inputType==='paste'"
-            ref="csvInput"
-            v-model="csvText"
-            @input="parsed=false; result=null"
-            rows="6"
-            placeholder="title,description,status,priority,assignee,labels&#10;Fix login bug,Description here,todo,high,Alice,bug;auth"
-            class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-y"
-          ></textarea>
-          <div v-else class="flex items-center gap-3">
-            <label class="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs text-gray-200 cursor-pointer border border-gray-700/60">
-              <i data-lucide="file-up" class="w-3.5 h-3.5 inline mr-1"></i> Choose CSV file
-              <input type="file" accept=".csv,text/csv" class="hidden" @change="handleFile" />
-            </label>
-            <span v-if="inputType==='upload' && csvText" class="text-xs text-gray-400">Loaded file ({{ csvText.length }} chars)</span>
-          </div>
-
-          <button
-            @click="parseCsv"
-            class="w-full px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs text-gray-200 border border-gray-700/60"
-          >Parse CSV</button>
-
-          <!-- Error / Result -->
-          <p v-if="error" class="text-xs text-red-400">{{ error }}</p>
-          <div v-if="result" class="text-xs space-y-1 rounded-lg bg-gray-950 border border-gray-800 p-3">
-            <p class="text-emerald-400 font-medium">Import complete</p>
-            <p class="text-gray-300">{{ result.imported }} imported, {{ result.skipped }} skipped, {{ result.total }} total</p>
-            <p v-if="result.errors && result.errors.length" class="text-amber-400">Warnings: {{ result.errors.length }} row(s) skipped (see first below)</p>
-            <p v-if="result.errors && result.errors.length" class="text-amber-400/80 font-mono">{{ result.errors.slice(0,3).map(e => 'row ' + e.row + ': ' + e.error).join('; ') }}</p>
-          </div>
-
-          <!-- Preview -->
-          <div v-if="parsed">
-            <div class="text-xs font-medium text-gray-400 mb-1">Preview ({{ rows.length }} rows)</div>
-            <div class="overflow-x-auto rounded-lg border border-gray-800">
-              <table class="w-full text-xs text-left">
-                <thead class="bg-gray-950 text-gray-400">
-                  <tr>
-                    <th class="px-3 py-2 font-medium">Title</th>
-                    <th class="px-3 py-2 font-medium">Status</th>
-                    <th class="px-3 py-2 font-medium">Priority</th>
-                    <th class="px-3 py-2 font-medium">Assignee</th>
-                  </tr>
-                </thead>
-                <tbody class="bg-gray-900/50">
-                  <tr v-for="(r, idx) in previewRows" :key="idx" class="border-t border-gray-800/60">
-                    <td class="px-3 py-2 text-gray-200">{{ r.title }}</td>
-                    <td class="px-3 py-2 text-gray-400">{{ r.status || 'todo' }}</td>
-                    <td class="px-3 py-2 text-gray-400">{{ r.priority || 'none' }}</td>
-                    <td class="px-3 py-2 text-gray-400">{{ r.assignee || '-' }}</td>
-                  </tr>
-                </tbody>
-              </table>
+            <div class="flex items-center space-x-1 p-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-fit">
+              <button @click="inputType='paste'" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors" :class="inputType==='paste' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'">Paste CSV</button>
+              <button @click="inputType='upload'" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors" :class="inputType==='upload' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'">Upload file</button>
             </div>
-          </div>
+
+            <textarea
+              v-if="inputType==='paste'"
+              ref="csvInput"
+              v-model="csvText"
+              @input="parsed=false; result=null"
+              rows="6"
+              placeholder="title,description,status,priority,assignee,labels&#10;Fix login bug,Description here,todo,high,Alice,bug;auth"
+              class="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 resize-y"
+            ></textarea>
+            <div v-else class="flex items-center gap-3">
+              <label class="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-xs text-zinc-700 dark:text-zinc-200 cursor-pointer border border-zinc-200 dark:border-zinc-700">
+                <i data-lucide="file-up" class="w-3.5 h-3.5 inline mr-1"></i> Choose CSV file
+                <input type="file" accept=".csv,text/csv" class="hidden" @change="handleFile" />
+              </label>
+              <span v-if="inputType==='upload' && csvText" class="text-xs text-zinc-400">Loaded file ({{ csvText.length }} chars)</span>
+            </div>
+
+            <button
+              v-if="inputType==='paste'"
+              @click="parseCsv"
+              class="w-full px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-xs font-medium text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 transition-colors cursor-pointer"
+            >Parse CSV</button>
+
+            <!-- Error / Result -->
+            <p v-if="error" class="text-xs text-rose-500">{{ error }}</p>
+            <div v-if="result" class="text-xs space-y-1 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3">
+              <p class="text-emerald-600 dark:text-emerald-400 font-medium">Import complete</p>
+              <p class="text-zinc-600 dark:text-zinc-300">{{ result.imported }} imported, {{ result.skipped }} skipped, {{ result.total }} total</p>
+            </div>
+
+            <!-- Preview -->
+            <div v-if="parsed">
+              <div class="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">Preview ({{ rows.length }} rows)</div>
+              <div class="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+                <table class="w-full text-xs text-left">
+                  <thead class="bg-zinc-50 dark:bg-zinc-900 text-zinc-500">
+                    <tr>
+                      <th class="px-3 py-1.5 font-medium">Title</th>
+                      <th class="px-3 py-1.5 font-medium">Status</th>
+                      <th class="px-3 py-1.5 font-medium">Priority</th>
+                      <th class="px-3 py-1.5 font-medium">Assignee</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800">
+                    <tr v-for="(r, idx) in previewRows" :key="idx" class="bg-white dark:bg-zinc-900/40">
+                      <td class="px-3 py-1.5 text-zinc-900 dark:text-zinc-100">{{ r.title }}</td>
+                      <td class="px-3 py-1.5 text-zinc-500 font-mono">{{ r.status || 'todo' }}</td>
+                      <td class="px-3 py-1.5 text-zinc-500 font-mono">{{ r.priority || 'none' }}</td>
+                      <td class="px-3 py-1.5 text-zinc-500">{{ r.assignee || '-' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </template>
         </div>
 
-        <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-800 bg-gray-950/50">
-          <button @click="close" class="px-3 py-2 rounded-lg text-xs text-gray-300 hover:bg-gray-800">Cancel</button>
+        <!-- Footer -->
+        <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
+          <button @click="close" class="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">Cancel</button>
           <button
+            v-if="mode==='csv'"
             @click="importCsv"
             :disabled="importing || !parsed"
-            class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs transition-colors cursor-pointer"
           >{{ importing ? 'Importing...' : 'Import' }}</button>
         </div>
       </div>

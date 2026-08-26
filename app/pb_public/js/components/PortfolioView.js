@@ -1,15 +1,5 @@
 // pb_public/js/components/PortfolioView.js
-// ProjectBase — Portfolio Dashboard component (v1.1 "Next" after the Timeline view)
-//
-// Zero-build Vue 3 cross-project overview. Aggregates every project, issue,
-// cycle and milestone into one at-a-glance dashboard:
-//   - KPI cards: total issues, overall completion, open work, project count.
-//   - A per-project progress list (done / in-progress / open) with a color
-//     completion bar; clicking a row opens that project's board.
-//   - A milestones panel that surfaces upcoming target dates and overdue
-//     targets before they slip.
-// All analytics are derived client-side from the same props the other views
-// already receive (no extra backend round-trip), matching ProjectsView.
+// Minimalist, high-density Portfolio Dashboard supporting Dark and Light themes.
 
 const PortfolioViewComponent = {
   props: ['projects', 'issues', 'milestones', 'realtimeTick'],
@@ -31,67 +21,62 @@ const PortfolioViewComponent = {
   },
   watch: {
     projects(v) { this.allProjects = v || []; },
-    // The shell bumps this on every realtime issue/milestone/project/cycle
-    // event. Debounce so a burst of SSE events triggers a single refetch.
     realtimeTick() {
       this.scheduleRefresh();
     },
-    // The shell updates its issues/milestones props optimistically on
-    // create/update/delete even when the SSE event is dropped (PB-56 design),
-    // so watch them too. This keeps the portfolio live in both the
-    // SSE-delivered and SSE-missed paths.
     issues() { this.scheduleRefresh(); },
-    milestones() { this.scheduleRefresh(); },
+    milestones() { this.scheduleRefresh(); }
   },
   methods: {
     scheduleRefresh() {
       if (this.refreshTimer) clearTimeout(this.refreshTimer);
-      this.refreshTimer = setTimeout(() => this.refresh(), 400);
+      this.refreshTimer = setTimeout(() => this.refresh(), 200);
     },
     async refresh() {
       try {
-        // Portfolio aggregates across every project, regardless of the active
-        // project the shell scopes its `issues`/`milestones` to. Fetch a fresh
-        // workspace snapshot (null project = all projects).
-        const [issues, milestones] = await Promise.all([
-          API.getIssues(null),
-          API.getMilestones(null)
+        const [projRes, issRes, msRes] = await Promise.all([
+          API.getProjects().catch(() => this.projects || []),
+          API.getIssues(null).catch(() => this.issues || []),
+          API.getMilestones(null).catch(() => this.milestones || [])
         ]);
-        this.allIssues = issues;
-        this.allMilestones = milestones;
-        this.loaded = true;
+        this.allProjects = Array.isArray(projRes) ? projRes : (projRes?.items || this.projects || []);
+        this.allIssues = Array.isArray(issRes) ? issRes : (issRes?.items || this.issues || []);
+        this.allMilestones = Array.isArray(msRes) ? msRes : (msRes?.items || this.milestones || []);
       } catch (err) {
-        console.error('Portfolio load error:', err);
+        console.error('PortfolioView refresh error:', err);
+        this.allProjects = this.projects || [];
+        this.allIssues = this.issues || [];
+        this.allMilestones = this.milestones || [];
+      } finally {
+        this.loaded = true;
+        this.$nextTick(() => {
+          if (window.lucide) window.lucide.createIcons();
+        });
       }
     },
-    openProject(p) {
-      this.$emit('select-project', p);
+    mergeScopedIssues(projId, scoped) {
+      const rest = this.allIssues.filter(i => i.project !== projId);
+      this.allIssues = [...rest, ...scoped];
     },
-    projectColor(p) {
-      return p && p.color ? p.color : '#6366f1';
+    mergeScopedMilestones(projId, scoped) {
+      const rest = this.allMilestones.filter(m => m.project && m.project !== projId);
+      this.allMilestones = [...rest, ...scoped];
+    },
+    openProject(p) {
+      if (p) this.$emit('select-project', p);
+    },
+    fmtTarget(t) {
+      if (!t) return '—';
+      const d = new Date(t);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     },
     statusDot(m) {
       if (m.isDone) return 'bg-emerald-500';
-      if (m.isOverdue) return 'bg-red-500';
-      if (m.percent >= 100) return 'bg-emerald-500';
-      if (m.percent >= 60) return 'bg-indigo-500';
-      if (m.percent > 0) return 'bg-amber-500';
-      return 'bg-gray-500';
-    },
-    fmtTarget(ts) {
-      if (!ts) return '';
-      const d = new Date(ts);
-      const today = new Date(); today.setHours(0, 0, 0, 0);
-      const diff = Math.round((d - today) / 86400000);
-      if (diff === 0) return 'Today';
-      if (diff === 1) return 'Tomorrow';
-      if (diff === -1) return 'Yesterday';
-      if (diff < 0) return `${Math.abs(diff)}d overdue`;
-      return `in ${diff}d · ${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
-    },
+      if (m.isOverdue) return 'bg-rose-500';
+      return 'bg-zinc-400 dark:bg-zinc-600';
+    }
   },
   computed: {
-    // ---- Workspace-wide KPIs ------------------------------------------------
     totalIssues() {
       return this.allIssues.length;
     },
@@ -104,13 +89,15 @@ const PortfolioViewComponent = {
     openCount() {
       return this.allIssues.filter(i => i.status !== 'done' && i.status !== 'cancelled').length;
     },
-    completionPercent() {
-      return this.totalIssues > 0 ? Math.round((this.doneCount / this.totalIssues) * 100) : 0;
-    },
     totalEstimate() {
-      return this.allIssues.reduce((s, i) => s + (Number(i.estimate) || 0), 0);
+      return this.allIssues
+        .filter(i => i.status === 'in_progress' || i.status === 'in_review' || i.status === 'todo')
+        .reduce((sum, i) => sum + (Number(i.estimate) || 0), 0);
     },
-    // ---- Per-project rows ----
+    completionPercent() {
+      if (this.totalIssues === 0) return 0;
+      return Math.round((this.doneCount / this.totalIssues) * 100);
+    },
     projectRows() {
       return this.allProjects.map(p => {
         const pIssues = this.allIssues.filter(i => i.project === p.id);
@@ -121,17 +108,13 @@ const PortfolioViewComponent = {
         return { ...p, total, done, inFlight, percent };
       }).sort((a, b) => b.total - a.total || b.percent - a.percent);
     },
-    // ---- Milestones: upcoming & overdue, sorted by target date ----------
     milestoneRows() {
       const now = Date.now();
       const mapped = this.allMilestones.map(m => {
         const p = this.allProjects.find(x => x.id === m.project);
         const target = m.target_date ? new Date(m.target_date).getTime() : null;
-        // count issues across all projects assigned to this milestone
         const mIssues = this.allIssues.filter(i => i.milestone === m.id);
         const done = mIssues.filter(i => i.status === 'done').length;
-        // Achieved milestones are complete even when nothing is linked to them
-        // (matches MilestonesView: `achieved` => 100% when no issues).
         const percent = mIssues.length > 0
           ? Math.round((done / mIssues.length) * 100)
           : (m.status === 'achieved' ? 100 : 0);
@@ -139,7 +122,6 @@ const PortfolioViewComponent = {
         const isOverdue = target !== null && target < now && !isDone;
         return { ...m, project: p, target, done, total: mIssues.length, percent, isOverdue, isDone };
       });
-      // show overdue first, then upcoming (soonest target first), then done at the end
       return mapped
         .filter(m => !m.isDone || m.total > 0)
         .sort((a, b) => {
@@ -147,141 +129,149 @@ const PortfolioViewComponent = {
           if (a.isDone !== b.isDone) return a.isDone ? 1 : -1;
           return (a.target || Infinity) - (b.target || Infinity);
         });
-    },
+    }
   },
   template: `
-    <div class="h-[calc(100vh-3.5rem)] overflow-y-auto p-2.5 bg-[#0b0f19]">
-      <div v-if="!loaded" class="py-20 text-center text-gray-500 text-xs">Loading workspace snapshot…</div>
-      <div v-else class="w-full space-y-3">
+    <div class="pb-portfolio h-[calc(100vh-3.5rem)] overflow-y-auto p-4 bg-zinc-50 dark:bg-[#09090b] select-none">
+      <div v-if="!loaded" class="py-16 text-center text-zinc-400 text-xs">Loading workspace snapshot…</div>
+      <div v-else class="w-full space-y-4">
 
         <!-- Header -->
         <div>
-          <h2 class="text-xl font-bold text-white tracking-tight">Portfolio Dashboard</h2>
-          <p class="text-xs text-gray-400">Cross-project progress, capacity and roadmap health at a glance</p>
+          <h2 class="text-base font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">Portfolio Dashboard</h2>
+          <p class="text-xs text-zinc-500 dark:text-zinc-400">Cross-project progress, capacity and roadmap health at a glance</p>
         </div>
 
         <!-- KPI Cards -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div class="p-4 rounded-2xl bg-gray-900/60 border border-gray-800 shadow-lg">
-            <div class="flex items-center justify-between text-xs text-gray-400 font-medium">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div class="p-3.5 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+            <div class="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 font-medium">
               <span>Total Issues</span>
-              <i data-lucide="layers" class="w-4 h-4 text-indigo-400"></i>
+              <i data-lucide="layers" class="w-4 h-4 text-zinc-400"></i>
             </div>
-            <div class="text-2xl font-bold text-white mt-2 font-mono">{{ totalIssues }}</div>
-            <div class="text-[11px] text-gray-500 mt-1">Across {{ allProjects.length }} projects</div>
+            <div class="text-xl font-bold text-zinc-900 dark:text-zinc-100 mt-1 font-mono">{{ totalIssues }}</div>
+            <div class="text-[10px] text-zinc-400 mt-0.5">Across {{ allProjects.length }} projects</div>
           </div>
 
-          <div class="p-4 rounded-2xl bg-gray-900/60 border border-gray-800 shadow-lg">
-            <div class="flex items-center justify-between text-xs text-gray-400 font-medium">
+          <div class="p-3.5 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+            <div class="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 font-medium">
               <span>Completion</span>
-              <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+              <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500"></i>
             </div>
-            <div class="text-2xl font-bold text-white mt-2 font-mono">{{ completionPercent }}%</div>
-            <div class="text-[11px] text-gray-500 mt-1">{{ doneCount }} of {{ totalIssues }} done</div>
+            <div class="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1 font-mono">{{ completionPercent }}%</div>
+            <div class="text-[10px] text-zinc-400 mt-0.5">{{ doneCount }} of {{ totalIssues }} done</div>
           </div>
 
-          <div class="p-4 rounded-2xl bg-gray-900/60 border border-gray-800 shadow-lg">
-            <div class="flex items-center justify-between text-xs text-gray-400 font-medium">
+          <div class="p-3.5 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+            <div class="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 font-medium">
               <span>In Flight</span>
-              <i data-lucide="loader" class="w-4 h-4 text-sky-400"></i>
+              <i data-lucide="loader" class="w-4 h-4 text-sky-500"></i>
             </div>
-            <div class="text-2xl font-bold text-white mt-2 font-mono">{{ inFlightCount }}</div>
-            <div class="text-[11px] text-gray-500 mt-1">{{ openCount }} total open</div>
+            <div class="text-xl font-bold text-sky-600 dark:text-sky-400 mt-1 font-mono">{{ inFlightCount }}</div>
+            <div class="text-[10px] text-zinc-400 mt-0.5">{{ openCount }} total open</div>
           </div>
 
-          <div class="p-4 rounded-2xl bg-gray-900/60 border border-gray-800 shadow-lg">
-            <div class="flex items-center justify-between text-xs text-gray-400 font-medium">
+          <div class="p-3.5 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+            <div class="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 font-medium">
               <span>Estimate Load</span>
-              <i data-lucide="gauge" class="w-4 h-4 text-amber-400"></i>
+              <i data-lucide="gauge" class="w-4 h-4 text-amber-500"></i>
             </div>
-            <div class="text-2xl font-bold text-white mt-2 font-mono">{{ totalEstimate }}</div>
-            <div class="text-[11px] text-gray-500 mt-1">story points in flight</div>
+            <div class="text-xl font-bold text-amber-600 dark:text-amber-400 mt-1 font-mono">{{ totalEstimate }}</div>
+            <div class="text-[10px] text-zinc-400 mt-0.5">points in flight</div>
           </div>
         </div>
 
         <!-- Per-project progress -->
-        <div class="p-5 rounded-2xl bg-gray-900/60 border border-gray-800 shadow-lg">
-          <div class="flex items-center justify-between mb-4">
-            <h3 class="text-sm font-semibold text-white tracking-tight">Project Progress</h3>
-            <span class="text-[11px] text-gray-500">Click a project to open its board</span>
+        <div class="p-4 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-2xs space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Project Progress</h3>
+            <span class="text-[10px] text-zinc-400">Click a project to open its board</span>
           </div>
 
-          <div v-if="projectRows.length === 0" class="py-8 text-center text-gray-500 text-xs">
+          <div v-if="projectRows.length === 0" class="py-6 text-center text-zinc-400 text-xs">
             No projects yet. Create a project to start tracking work.
           </div>
 
-          <div
-            v-for="p in projectRows"
-            :key="p.id"
-            @click="openProject(p)"
-            role="button"
-            tabindex="0"
-            @keydown.enter="openProject(p)"
-            class="group flex items-center gap-4 px-3 py-2.5 rounded-xl hover:bg-gray-800/50 transition-colors cursor-pointer"
-          >
-            <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ backgroundColor: projectColor(p) }"></span>
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2">
-                <span class="text-sm font-medium text-gray-200 truncate">{{ p.name }}</span>
-                <span class="text-[10px] font-mono text-gray-500">{{ p.identifier }}</span>
+          <div class="space-y-1.5">
+            <div
+              v-for="p in projectRows"
+              :key="p.id"
+              @click="openProject(p)"
+              role="button"
+              tabindex="0"
+              @keydown.enter="openProject(p)"
+              class="group flex items-center gap-3 px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-800 transition-colors cursor-pointer"
+            >
+              <div class="w-6 h-6 rounded-md flex items-center justify-center text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/60 shadow-2xs shrink-0">
+                {{ p.icon || '📁' }}
               </div>
-              <div class="flex items-center gap-3 mt-1.5">
-                <div class="flex-1 h-1.5 rounded-full bg-gray-800 overflow-hidden">
-                  <div
-                    class="h-full rounded-full transition-all"
-                    :style="{ width: p.percent + '%', backgroundColor: projectColor(p) }"
-                  ></div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-semibold text-zinc-900 dark:text-zinc-100 truncate">{{ p.name }}</span>
+                  <span class="text-[10px] font-mono text-zinc-400 border border-zinc-200 dark:border-zinc-700/60 px-1 rounded bg-white dark:bg-zinc-800">{{ p.identifier }}</span>
                 </div>
-                <span class="text-[11px] font-mono text-gray-400 w-9 text-right">{{ p.percent }}%</span>
+                <div class="flex items-center gap-2 mt-1">
+                  <div class="flex-1 h-1 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+                    <div
+                      class="h-full rounded-full transition-all bg-zinc-800 dark:bg-zinc-200"
+                      :style="{ width: p.percent + '%' }"
+                    ></div>
+                  </div>
+                  <span class="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 w-8 text-right">{{ p.percent }}%</span>
+                </div>
               </div>
-            </div>
-            <div class="hidden sm:flex items-center gap-3 text-[11px] text-gray-500 font-mono shrink-0">
-              <span class="flex items-center gap-1"><i data-lucide="circle" class="w-3 h-3 text-emerald-400"></i>{{ p.done }}</span>
-              <span class="flex items-center gap-1"><i data-lucide="loader" class="w-3 h-3 text-sky-400"></i>{{ p.inFlight }}</span>
-              <span class="flex items-center gap-1"><i data-lucide="square" class="w-3 h-3 text-gray-400"></i>{{ p.total }}</span>
+              <div class="hidden sm:flex items-center gap-2 text-[10px] text-zinc-400 font-mono shrink-0">
+                <span>{{ p.done }} done</span>
+                <span>·</span>
+                <span>{{ p.inFlight }} active</span>
+                <span>·</span>
+                <span>{{ p.total }} total</span>
+              </div>
             </div>
           </div>
         </div>
 
         <!-- Milestones panel -->
-        <div class="p-5 rounded-2xl bg-gray-900/60 border border-gray-800 shadow-lg">
-          <h3 class="text-sm font-semibold text-white tracking-tight mb-4">Milestones & Roadmap Health</h3>
+        <div class="p-4 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-2xs space-y-3">
+          <h3 class="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Milestones & Roadmap Health</h3>
 
-          <div v-if="milestoneRows.length === 0" class="py-6 text-center text-gray-500 text-xs">
+          <div v-if="milestoneRows.length === 0" class="py-6 text-center text-zinc-400 text-xs">
             No milestones scheduled yet.
           </div>
 
-          <div
-            v-for="m in milestoneRows"
-            :key="m.id"
-            class="flex items-center gap-4 px-1 py-2.5 border-b border-gray-800/50 last:border-0"
-          >
-            <span class="w-2.5 h-2.5 rounded-full shrink-0" :class="statusDot(m)"></span>
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2">
-                <span class="text-sm font-medium text-gray-200 truncate">{{ m.name }}</span>
-                <span
-                  v-if="m.project"
-                  class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-gray-800 text-gray-400"
-                >{{ m.project.identifier }}</span>
-              </div>
-              <div class="flex items-center gap-3 mt-1.5">
-                <div class="flex-1 h-1.5 rounded-full bg-gray-800 overflow-hidden">
-                  <div
-                    class="h-full rounded-full transition-all"
-                    :class="m.isOverdue ? 'bg-red-500' : (m.percent >= 100 ? 'bg-emerald-500' : 'bg-indigo-500')"
-                    :style="{ width: Math.max(m.percent, 3) + '%' }"
-                  ></div>
+          <div class="space-y-1.5">
+            <div
+              v-for="m in milestoneRows"
+              :key="m.id"
+              class="flex items-center gap-3 p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-xs"
+            >
+              <span class="w-2 h-2 rounded-full shrink-0" :class="statusDot(m)"></span>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-semibold text-zinc-900 dark:text-zinc-100 truncate">{{ m.name }}</span>
+                  <span
+                    v-if="m.project"
+                    class="text-[10px] font-mono px-1 py-0.5 rounded bg-white dark:bg-zinc-800 text-zinc-500 border border-zinc-200 dark:border-zinc-700/60"
+                  >{{ m.project.identifier }}</span>
                 </div>
-                <span class="text-[11px] font-mono text-gray-400 w-9 text-right">{{ m.percent }}%</span>
+                <div class="flex items-center gap-2 mt-1">
+                  <div class="flex-1 h-1 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+                    <div
+                      class="h-full rounded-full transition-all"
+                      :class="m.isOverdue ? 'bg-rose-500' : 'bg-zinc-800 dark:bg-zinc-200'"
+                      :style="{ width: Math.max(m.percent, 3) + '%' }"
+                    ></div>
+                  </div>
+                  <span class="text-[10px] font-mono text-zinc-400 w-8 text-right">{{ m.percent }}%</span>
+                </div>
               </div>
-            </div>
-            <div class="hidden sm:block shrink-0 text-[11px] font-mono">
-              <span
-                :class="m.isOverdue ? 'text-red-400' : 'text-gray-400'"
-                v-if="!m.isDone"
-              >{{ fmtTarget(m.target) }}</span>
-              <span v-else class="text-emerald-400 flex items-center gap-1"><i data-lucide="check" class="w-3 h-3"></i>Done</span>
+              <div class="hidden sm:block shrink-0 text-[10px] font-mono">
+                <span
+                  :class="m.isOverdue ? 'text-rose-500' : 'text-zinc-400'"
+                  v-if="!m.isDone"
+                >{{ fmtTarget(m.target) }}</span>
+                <span v-else class="text-emerald-600 dark:text-emerald-400 flex items-center gap-1"><i data-lucide="check" class="w-3 h-3"></i>Done</span>
+              </div>
             </div>
           </div>
         </div>

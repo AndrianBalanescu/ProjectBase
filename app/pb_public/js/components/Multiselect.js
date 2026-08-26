@@ -1,5 +1,5 @@
 // app/pb_public/js/components/Multiselect.js
-// Reusable, keyboard-accessible multi-select component with search, chips and badges.
+// Reusable, keyboard-accessible multi-select component supporting Dark and Light themes.
 
 const MultiselectComponent = {
   props: {
@@ -45,56 +45,65 @@ const MultiselectComponent = {
       );
     },
     selectedObjects() {
-      return this.normalizedOptions.filter(o => this.modelValue.includes(o.value));
+      const vals = this.modelValue || [];
+      return this.normalizedOptions.filter(o => vals.includes(o.value));
+    },
+    displayedSelections() {
+      return this.selectedObjects.slice(0, this.maxDisplay);
     },
     hiddenCount() {
-      return Math.max(0, this.selectedObjects.length - this.maxDisplay);
-    }
-  },
-  watch: {
-    isOpen(nv) {
-      if (nv) { this.searchQuery = ''; this.highlightedIndex = 0; this.$nextTick(() => this.$refs.searchInput && this.$refs.searchInput.focus()); }
+      const diff = this.selectedObjects.length - this.maxDisplay;
+      return diff > 0 ? diff : 0;
     }
   },
   mounted() {
-    document.addEventListener('click', this.handleDocClick);
+    document.addEventListener('click', this.handleClickOutside);
   },
   beforeUnmount() {
-    document.removeEventListener('click', this.handleDocClick);
+    document.removeEventListener('click', this.handleClickOutside);
   },
   methods: {
-    handleDocClick(e) {
-      if (!this.$el || !this.$el.contains(e.target)) this.isOpen = false;
-    },
-    toggle() {
-      if (!this.disabled) this.isOpen = !this.isOpen;
-    },
-    isSelected(v) {
-      return this.modelValue.includes(v);
-    },
-    toggleOption(opt) {
-      const vals = Array.isArray(this.modelValue) ? [...this.modelValue] : [];
-      const idx = vals.indexOf(opt.value);
-      if (idx >= 0) vals.splice(idx, 1);
-      else vals.push(opt.value);
-      this.$emit('update:modelValue', vals);
-      this.$emit('change', vals);
-    },
-    removeValue(value, e) {
-      if (e) e.stopPropagation();
-      this.toggle({ value });
-    },
-    onKeyDown(e) {
-      if (!this.isOpen) {
-        if (e.key === 'ArrowDown' || e.key === 'Enter') { e.preventDefault(); this.isOpen = true; }
-        return;
+    toggleDropdown() {
+      if (this.disabled) return;
+      this.isOpen = !this.isOpen;
+      if (this.isOpen) {
+        this.searchQuery = '';
+        this.highlightedIndex = 0;
+        this.$nextTick(() => {
+          if (this.searchable && this.$refs.searchInput) {
+            this.$refs.searchInput.focus();
+          }
+        });
       }
-      const total = this.filteredOptions.length;
-      if (!total) return;
-      if (e.key === 'ArrowDown') { e.preventDefault(); this.highlightedIndex = (this.highlightedIndex + 1) % total; }
-      else if (e.key === 'ArrowUp') { e.preventDefault(); this.highlightedIndex = (this.highlightedIndex - 1 + total) % total; }
-      else if (e.key === 'Enter') { e.preventDefault(); this.toggle(this.filteredOptions[this.highlightedIndex]); }
-      else if (e.key === 'Escape') { this.isOpen = false; e.stopPropagation(); }
+    },
+    closeDropdown() {
+      this.isOpen = false;
+      this.searchQuery = '';
+    },
+    handleClickOutside(e) {
+      if (!this.$el.contains(e.target)) {
+        this.closeDropdown();
+      }
+    },
+    isSelected(val) {
+      return (this.modelValue || []).includes(val);
+    },
+    toggle(opt) {
+      const cur = [...(this.modelValue || [])];
+      const idx = cur.indexOf(opt.value);
+      if (idx >= 0) {
+        cur.splice(idx, 1);
+      } else {
+        cur.push(opt.value);
+      }
+      this.$emit('update:modelValue', cur);
+      this.$emit('change', cur);
+    },
+    removeValue(val, e) {
+      if (e) e.stopPropagation();
+      const cur = (this.modelValue || []).filter(v => v !== val);
+      this.$emit('update:modelValue', cur);
+      this.$emit('change', cur);
     },
     clearAll(e) {
       if (e) e.stopPropagation();
@@ -103,38 +112,39 @@ const MultiselectComponent = {
     }
   },
   template: `
-    <div class="relative w-full" @keydown="onKeyDown">
-      <!-- Trigger / Chip Summary -->
+    <div class="relative inline-block text-left w-full">
+      <!-- Trigger -->
       <button
         type="button"
+        @click="toggleDropdown"
         :disabled="disabled"
-        @click="toggle"
         :class="[
-          'w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-all select-none focus:outline-none focus:ring-1 focus:ring-indigo-500',
-          disabled ? 'opacity-50 cursor-not-allowed bg-gray-900/40 border-gray-800 text-gray-500' : 'bg-gray-950/80 hover:bg-gray-900 border border-gray-800 hover:border-gray-700 text-gray-200 cursor-pointer shadow-sm',
+          'w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors select-none focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600',
+          disabled ? 'opacity-50 cursor-not-allowed bg-zinc-100 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400' : 'bg-zinc-50 dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 cursor-pointer shadow-2xs',
           buttonClass
         ]"
       >
-        <div class="flex items-center gap-1 flex-wrap min-w-0">
+        <div class="flex items-center flex-wrap gap-1 min-w-0 flex-1">
           <template v-if="selectedObjects.length">
             <span
-              v-for="sel in selectedObjects.slice(0, maxDisplay)"
+              v-for="sel in displayedSelections"
               :key="sel.value"
-              class="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded bg-indigo-950/60 border border-indigo-800/40 text-indigo-300 text-[10px] font-medium"
+              class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 text-[10px] font-medium"
             >
+              <span v-if="sel.color" class="w-1.5 h-1.5 rounded-full" :style="{ backgroundColor: sel.color }"></span>
               <span v-if="sel.icon">{{ sel.icon }}</span>
               <span class="truncate max-w-[90px]">{{ sel.label }}</span>
-              <span v-if="!disabled" @click="removeValue(sel.value, $event)" class="hover:text-white pl-1 cursor-pointer">×</span>
+              <span v-if="!disabled" @click="removeValue(sel.value, $event)" class="hover:text-zinc-900 dark:hover:text-white pl-0.5 cursor-pointer">×</span>
             </span>
-            <span v-if="hiddenCount > 0" class="text-[10px] text-gray-400">+{{ hiddenCount }}</span>
-            <span v-if="!selectedObjects.length" class="text-gray-500">{{ placeholder }}</span>
+            <span v-if="hiddenCount > 0" class="text-[10px] text-zinc-400">+{{ hiddenCount }}</span>
+            <span v-if="!selectedObjects.length" class="text-zinc-400">{{ placeholder }}</span>
           </template>
           <template v-else>
-            <span class="text-gray-500">{{ placeholder }}</span>
+            <span class="text-zinc-400">{{ placeholder }}</span>
           </template>
         </div>
-        <div class="flex items-center space-x-1 shrink-0 ml-1.5 text-gray-400">
-          <button v-if="selectedObjects.length && !disabled" type="button" @click="clearAll" class="hover:text-white p-0.5 rounded">×</button>
+        <div class="flex items-center space-x-1 shrink-0 ml-1.5 text-zinc-400">
+          <button v-if="selectedObjects.length && !disabled" type="button" @click="clearAll" class="hover:text-zinc-700 dark:hover:text-zinc-200 p-0.5 rounded">×</button>
           <span class="text-[9px] transition-transform duration-150" :class="{ 'rotate-180': isOpen }">▼</span>
         </div>
       </button>
@@ -142,18 +152,18 @@ const MultiselectComponent = {
       <!-- Dropdown -->
       <div
         v-show="isOpen"
-        class="absolute left-0 right-0 z-50 mt-1 rounded-xl bg-gray-900/95 border border-gray-800 shadow-2xl backdrop-blur-md overflow-hidden text-xs"
+        class="absolute left-0 right-0 z-50 mt-1 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xl backdrop-blur-sm overflow-hidden text-xs"
         role="listbox"
       >
-        <div v-if="searchable" class="p-1.5 border-b border-gray-800/80 bg-gray-950/50">
+        <div v-if="searchable" class="p-1.5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
           <div class="relative flex items-center">
-            <span class="absolute left-2.5 text-gray-500">🔍</span>
+            <span class="absolute left-2.5 text-zinc-400 text-xs">🔍</span>
             <input
               ref="searchInput"
               v-model="searchQuery"
               type="text"
               :placeholder="searchPlaceholder"
-              class="w-full pl-7 pr-2.5 py-1 rounded-lg bg-gray-900 border border-gray-800 text-xs text-gray-100 placeholder-gray-500 focus:outline-none focus:border-indigo-500/80"
+              class="w-full pl-7 pr-2.5 py-1 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500"
               @click.stop
             />
           </div>
@@ -166,28 +176,26 @@ const MultiselectComponent = {
             @mouseenter="highlightedIndex = idx"
             :class="[
               'flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors text-xs select-none',
-              highlightedIndex === idx ? 'bg-indigo-600/20 text-white' : 'text-gray-300 hover:bg-gray-800/60',
-              isSelected(opt.value) ? 'bg-indigo-950/40 text-indigo-200' : ''
+              highlightedIndex === idx ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/60',
+              isSelected(opt.value) ? 'bg-zinc-100 dark:bg-zinc-800/80 font-semibold text-zinc-900 dark:text-zinc-100' : ''
             ]"
           >
             <div class="flex items-center space-x-2 truncate">
-              <span v-if="opt.icon" class="text-sm shrink-0">{{ opt.icon }}</span>
+              <span v-if="opt.icon" class="text-xs shrink-0">{{ opt.icon }}</span>
               <span v-if="opt.color" class="w-2 h-2 rounded-full shrink-0" :style="{ backgroundColor: opt.color }"></span>
               <div class="truncate">
                 <span class="truncate">{{ opt.label }}</span>
-                <p v-if="opt.description" class="text-[10px] text-gray-500 truncate">{{ opt.description }}</p>
+                <p v-if="opt.description" class="text-[10px] text-zinc-400 truncate">{{ opt.description }}</p>
               </div>
             </div>
             <div class="flex items-center space-x-1.5 shrink-0 ml-2">
-              <span v-if="opt.badge" class="px-1.5 py-0.5 rounded text-[10px] bg-gray-800 text-gray-400 font-mono">{{ opt.badge }}</span>
-              <span v-if="isSelected(opt.value)" class="text-indigo-400 font-bold">✓</span>
+              <span v-if="opt.badge" class="px-1.5 py-0.5 rounded text-[10px] bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 font-mono">{{ opt.badge }}</span>
+              <span v-if="isSelected(opt.value)" class="text-zinc-900 dark:text-zinc-100 font-bold">✓</span>
             </div>
           </div>
-          <div v-if="filteredOptions.length === 0" class="py-4 text-center text-gray-500 text-xs italic">No matching options</div>
+          <div v-if="filteredOptions.length === 0" class="py-3 text-center text-zinc-400 text-xs italic">No matching options</div>
         </div>
       </div>
     </div>
   `
 };
-
-window.MultiselectComponent = MultiselectComponent;

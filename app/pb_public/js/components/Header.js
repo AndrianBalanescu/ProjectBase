@@ -1,8 +1,9 @@
 // pb_public/js/components/Header.js
+// Minimalist, high-density header with Dark/Light theme toggle, clean tabs, and agent fleet access.
 
 const HeaderComponent = {
-  props: ['projects', 'currentProject', 'currentView', 'realtimeConnected', 'notifications', 'unreadNotifications', 'agents', 'agentSource', 'agentSyncing'],
-  emits: ['select-project', 'change-view', 'open-new-issue', 'open-omnibar', 'open-new-project', 'open-custom-fields', 'open-notification-settings', 'toggle-notifications', 'notification-click', 'mark-all-read', 'sync-agents', 'open-agents'],
+  props: ['projects', 'currentProject', 'currentView', 'realtimeConnected', 'notifications', 'unreadNotifications', 'agents', 'agentSource', 'agentSyncing', 'theme'],
+  emits: ['select-project', 'change-view', 'open-new-issue', 'open-omnibar', 'open-new-project', 'open-custom-fields', 'open-notification-settings', 'toggle-notifications', 'notification-click', 'mark-all-read', 'sync-agents', 'open-agents', 'toggle-theme'],
   data() {
     return {
       dropdownOpen: false,
@@ -42,21 +43,19 @@ const HeaderComponent = {
     },
     toggleNotif() {
       this.notifOpen = !this.notifOpen;
-      if (this.notifOpen) this.$emit('toggle-notifications');
+      if (this.notifOpen) {
+        this.$emit('toggle-notifications');
+      }
     },
-    clickNotif(n) {
-      this.notifOpen = false;
-      this.$emit('notification-click', n);
-    },
-    fmtTime(iso) {
-      if (!iso) return '';
-      const d = new Date(iso);
+    formatTime(dateStr) {
+      if (!dateStr) return '';
+      const d = new Date(dateStr);
       const now = new Date();
-      const diff = Math.floor((now - d) / 1000);
-      if (diff < 60) return 'just now';
-      if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-      return Math.floor(diff / 86400) + 'd ago';
+      const diffSec = Math.floor((now - d) / 1000);
+      if (diffSec < 60) return 'just now';
+      if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+      if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+      return `${Math.floor(diffSec / 86400)}d ago`;
     },
     notifIcon(type) {
       const map = {
@@ -71,307 +70,284 @@ const HeaderComponent = {
     }
   },
   template: `
-    <header class="h-14 border-b border-gray-800 bg-gray-900/90 backdrop-blur-md px-4 flex items-center gap-2 sticky top-0 z-30 select-none">
+    <header class="h-14 border-b border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-[#121215]/95 backdrop-blur-md px-3 flex items-center gap-2 sticky top-0 z-30 select-none">
       <!-- Left: Logo & Project Switcher -->
-      <div class="flex items-center space-x-4 flex-shrink-0">
-        <div class="flex items-center space-x-2 font-bold text-white tracking-tight cursor-pointer" @click="$emit('change-view', 'projects')">
-          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
-            <i data-lucide="layers" class="w-4 h-4"></i>
+      <div class="flex items-center space-x-3 flex-shrink-0">
+        <div class="flex items-center space-x-2 font-bold text-zinc-900 dark:text-white tracking-tight cursor-pointer" @click="$emit('change-view', 'projects')">
+          <div class="w-7 h-7 rounded-md bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 flex items-center justify-center font-bold text-sm shadow-2xs">
+            ⚡
           </div>
-          <span class="text-base font-semibold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">PBase</span>
-          <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-gray-800/80 text-gray-400 border border-gray-700/50 select-none">v1.0.0</span>
+          <span class="text-sm font-semibold tracking-tight">ProjectBase</span>
+          <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700/50 select-none">v1.0.0</span>
         </div>
 
-        <div class="h-5 w-px bg-gray-800"></div>
+        <div class="h-4 w-px bg-zinc-200 dark:bg-zinc-800"></div>
 
         <!-- Project Selector Dropdown -->
         <div class="relative" ref="dropdown">
-          <button 
+          <button
             @click="dropdownOpen = !dropdownOpen"
-            class="flex items-center space-x-2 px-2.5 py-1.5 rounded-lg hover:bg-gray-800/80 text-sm text-gray-200 transition-colors border border-transparent hover:border-gray-700/60"
+            class="flex items-center space-x-1.5 px-2 py-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium text-zinc-700 dark:text-zinc-200 transition-colors border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700"
           >
-            <span v-if="currentProject" class="flex items-center space-x-2">
-              <span class="text-base leading-none">{{ currentProject.icon || '📁' }}</span>
-              <span class="font-medium max-w-[140px] truncate">{{ currentProject.name }}</span>
-              <span class="text-xs px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 font-mono">{{ currentProject.identifier }}</span>
+            <span v-if="currentProject" class="flex items-center space-x-1.5">
+              <span>{{ currentProject.icon || '📁' }}</span>
+              <span class="font-semibold">{{ currentProject.name }}</span>
             </span>
-            <span v-else class="flex items-center space-x-2 text-gray-400">
-              <i data-lucide="layout-grid" class="w-4 h-4"></i>
-              <span class="font-medium">All Projects</span>
-            </span>
-            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-gray-500"></i>
+            <span v-else class="text-zinc-500">All Projects</span>
+            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-zinc-400"></i>
           </button>
 
           <!-- Dropdown Menu -->
-          <div 
-            v-if="dropdownOpen" 
-            class="absolute left-0 mt-2 w-64 glass-dropdown rounded-xl shadow-2xl p-1.5 z-50 border border-gray-800 animate-in fade-in slide-in-from-top-2 duration-150"
+          <div
+            v-if="dropdownOpen"
+            class="absolute left-0 mt-1.5 w-60 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xl z-50 py-1 text-xs animate-in fade-in slide-in-from-top-2 duration-150"
           >
-            <div class="px-2 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">Projects</div>
-            
-            <button 
-              @click="selectProj(null)" 
-              class="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs text-left transition-colors"
-              :class="!currentProject ? 'bg-indigo-600/20 text-indigo-300 font-medium' : 'text-gray-300 hover:bg-gray-800/60'"
-            >
-              <div class="flex items-center space-x-2">
-                <i data-lucide="layout-grid" class="w-4 h-4 text-gray-400"></i>
-                <span>All Projects</span>
-              </div>
-              <i v-if="!currentProject" data-lucide="check" class="w-3.5 h-3.5 text-indigo-400"></i>
-            </button>
+            <div class="px-3 py-1.5 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+              Switch Project
+            </div>
 
-            <div class="my-1 border-t border-gray-800/60"></div>
+            <div class="max-h-56 overflow-y-auto py-0.5 space-y-0.5">
+              <button
+                @click="selectProj(null)"
+                class="w-full text-left px-3 py-1.5 flex items-center space-x-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-700 dark:text-zinc-200"
+                :class="{ 'font-semibold text-zinc-900 dark:text-white bg-zinc-50 dark:bg-zinc-800/50': !currentProject }"
+              >
+                <span>🌐</span>
+                <span class="flex-1">All Projects</span>
+              </button>
 
-            <div class="max-h-56 overflow-y-auto space-y-0.5">
-              <button 
-                v-for="p in projects" 
+              <button
+                v-for="p in projects"
                 :key="p.id"
                 @click="selectProj(p)"
-                class="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs text-left transition-colors"
-                :class="currentProject && currentProject.id === p.id ? 'bg-indigo-600/20 text-indigo-300 font-medium' : 'text-gray-300 hover:bg-gray-800/60'"
+                class="w-full text-left px-3 py-1.5 flex items-center space-x-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-700 dark:text-zinc-200"
+                :class="{ 'font-semibold text-zinc-900 dark:text-white bg-zinc-50 dark:bg-zinc-800/50': currentProject && currentProject.id === p.id }"
               >
-                <div class="flex items-center space-x-2 min-w-0">
-                  <span class="text-sm flex-shrink-0">{{ p.icon || '📁' }}</span>
-                  <span class="truncate">{{ p.name }}</span>
-                </div>
-                <span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 font-mono flex-shrink-0 ml-2">{{ p.identifier }}</span>
+                <span>{{ p.icon || '📁' }}</span>
+                <span class="flex-1 truncate">{{ p.name }}</span>
+                <span class="text-[10px] font-mono text-zinc-400">{{ p.identifier }}</span>
               </button>
             </div>
 
-            <div class="my-1 border-t border-gray-800/60"></div>
+            <div class="border-t border-zinc-200 dark:border-zinc-800 my-1"></div>
 
-            <button 
+            <button
               @click="$emit('open-new-project'); dropdownOpen = false;"
-              class="w-full flex items-center space-x-2 px-2.5 py-2 rounded-lg text-xs text-indigo-400 hover:bg-indigo-950/40 hover:text-indigo-300 transition-colors"
+              class="w-full text-left px-3 py-1.5 flex items-center space-x-2 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
             >
-              <i data-lucide="plus-circle" class="w-4 h-4"></i>
-              <span>Create New Project</span>
+              <i data-lucide="plus" class="w-3.5 h-3.5 text-zinc-400"></i>
+              <span>New Project...</span>
             </button>
           </div>
         </div>
       </div>
 
-      <!-- Center: View Switcher Tabs (flexible, shrinks/scrolls so right actions stay visible) -->
+      <!-- Center: View Switcher Tabs (Minimalist Strip) -->
       <div class="hidden md:flex items-center flex-1 min-w-0 justify-center px-2">
-        <div class="flex items-center bg-gray-950/80 p-0.5 rounded-lg border border-gray-800/80 text-xs overflow-x-auto scrollbar-none">
-          <button 
-            @click="$emit('change-view', 'board')" 
-            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all font-medium"
-            :class="currentView === 'board' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'"
+        <div class="flex items-center bg-zinc-100 dark:bg-zinc-900/80 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-xs overflow-x-auto scrollbar-none">
+          <button
+            @click="$emit('change-view', 'board')"
+            class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all font-medium"
+            :class="currentView === 'board' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
           >
             <i data-lucide="kanban" class="w-3.5 h-3.5"></i>
             <span>Board</span>
           </button>
-          <button 
-            @click="$emit('change-view', 'list')" 
-            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all font-medium"
-            :class="currentView === 'list' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'"
+          <button
+            @click="$emit('change-view', 'list')"
+            class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all font-medium"
+            :class="currentView === 'list' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
           >
             <i data-lucide="list-todo" class="w-3.5 h-3.5"></i>
             <span>List</span>
           </button>
-          <button 
-            @click="$emit('change-view', 'cycles')" 
-            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all font-medium"
-            :class="currentView === 'cycles' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'"
+          <button
+            @click="$emit('change-view', 'cycles')"
+            class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all font-medium"
+            :class="currentView === 'cycles' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
           >
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
             <span>Cycles</span>
           </button>
           <button
             @click="$emit('change-view', 'timeline')"
-            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all font-medium"
-            :class="currentView === 'timeline' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'"
+            class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all font-medium"
+            :class="currentView === 'timeline' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
+            title="Timeline Schedule"
           >
             <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
             <span>Timeline</span>
           </button>
           <button
             @click="$emit('change-view', 'milestones')"
-            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all font-medium"
-            :class="currentView === 'milestones' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'"
+            class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all font-medium"
+            :class="currentView === 'milestones' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
           >
-            <i data-lucide="flag" class="w-3.5 h-3.5"></i>
-            <span>Milestones</span>
+            <i data-lucide="milestone" class="w-3.5 h-3.5"></i>
+            <span>Roadmap</span>
           </button>
-          <button 
-            @click="$emit('change-view', 'projects')" 
-            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all font-medium"
-            :class="currentView === 'projects' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'"
+          <button
+            @click="$emit('change-view', 'projects')"
+            class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all font-medium"
+            :class="currentView === 'projects' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
           >
-            <i data-lucide="folder-kanban" class="w-3.5 h-3.5"></i>
+            <i data-lucide="folder" class="w-3.5 h-3.5"></i>
             <span>Projects</span>
           </button>
-          <button 
-            @click="$emit('change-view', 'stats')" 
-            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all font-medium"
-            :class="currentView === 'stats' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'"
+          <button
+            @click="$emit('change-view', 'stats')"
+            class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all font-medium"
+            :class="currentView === 'stats' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
           >
-            <i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i>
-            <span>Analytics</span>
+            <i data-lucide="bar-chart-3" class="w-3.5 h-3.5"></i>
+            <span>Stats</span>
           </button>
           <button
             @click="$emit('change-view', 'agents')"
-            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all font-medium"
-            :class="currentView === 'agents' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'"
+            class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all font-medium"
+            :class="currentView === 'agents' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
+            title="AI Agents & Live Sessions"
           >
-            <i data-lucide="bot" class="w-3.5 h-3.5 text-emerald-400"></i>
+            <i data-lucide="bot" class="w-3.5 h-3.5"></i>
             <span>Agents</span>
           </button>
           <button
             @click="$emit('change-view', 'portfolio')"
-            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all font-medium"
-            :class="currentView === 'portfolio' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'"
-            title="Portfolio Dashboard (9)"
+            class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all font-medium"
+            :class="currentView === 'portfolio' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
+            title="Portfolio Dashboard"
           >
             <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i>
             <span>Portfolio</span>
           </button>
-          <button 
-            @click="$emit('change-view', 'docs')" 
-            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all font-medium"
-            :class="currentView === 'docs' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'"
+          <button
+            @click="$emit('change-view', 'docs')"
+            class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all font-medium"
+            :class="currentView === 'docs' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
           >
-            <i data-lucide="book-open" class="w-3.5 h-3.5 text-indigo-400"></i>
-            <span>Docs & API</span>
+            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+            <span>Docs</span>
           </button>
         </div>
       </div>
 
-      <!-- Right: Search, Actions, Live Status -->
-      <div class="flex items-center space-x-2 flex-shrink-0">
+      <!-- Right: Search, Theme Toggle, Actions, Live Status -->
+      <div class="flex items-center space-x-1.5 flex-shrink-0">
         <!-- Omnibar Search Trigger -->
         <button
           @click="$emit('open-omnibar')"
-          class="flex items-center space-x-2 px-2.5 py-1.5 rounded-lg bg-gray-950/80 hover:bg-gray-800 border border-gray-800 text-gray-400 hover:text-gray-200 text-xs transition-all"
+          class="flex items-center space-x-2 px-2 py-1 rounded-md bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 text-xs transition-colors"
           title="Search across all issues (⌘K)"
         >
           <i data-lucide="search" class="w-3.5 h-3.5"></i>
-          <span class="hidden md:inline">Search...</span>
-          <kbd class="hidden md:inline-block px-1.5 py-0.5 rounded bg-gray-800/80 text-[10px] text-gray-400 font-mono border border-gray-700/60">⌘K</kbd>
+          <span class="hidden md:inline">Search</span>
+          <kbd class="hidden md:inline-block px-1 py-0.5 rounded bg-white dark:bg-zinc-800 text-[10px] text-zinc-500 font-mono border border-zinc-200 dark:border-zinc-700">⌘K</kbd>
+        </button>
+
+        <!-- Theme Switcher (Dark / Light Minimalist Toggle) -->
+        <button
+          @click="$emit('toggle-theme')"
+          class="p-1.5 rounded-md text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+          :title="theme === 'dark' ? 'Switch to Light theme' : 'Switch to Dark theme'"
+        >
+          <i :data-lucide="theme === 'dark' ? 'sun' : 'moon'" class="w-4 h-4"></i>
         </button>
 
         <!-- Notifications Inbox Bell -->
         <div class="relative" ref="notifDropdown">
           <button
             @click.stop="toggleNotif"
-            class="relative p-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+            class="relative p-1.5 rounded-md text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
             title="Notifications"
           >
             <i data-lucide="bell" class="w-4 h-4"></i>
             <span
               v-if="unreadNotifications > 0"
-              class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-indigo-500 text-white text-[9px] font-bold flex items-center justify-center shadow"
+              class="absolute -top-0.5 -right-0.5 min-w-[15px] h-3.5 px-0.5 rounded-full bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[9px] font-bold flex items-center justify-center shadow-2xs"
             >{{ unreadNotifications > 99 ? '99+' : unreadNotifications }}</span>
           </button>
 
           <!-- Dropdown Inbox -->
           <div
             v-if="notifOpen"
-            class="absolute right-0 mt-2 w-80 glass-dropdown rounded-xl shadow-2xl z-50 border border-gray-800 animate-in fade-in slide-in-from-top-2 duration-150 overflow-hidden"
+            class="absolute right-0 mt-1.5 w-80 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-150 overflow-hidden"
           >
-            <div class="flex items-center justify-between px-3 py-2 border-b border-gray-800/70">
-              <div class="text-xs font-semibold text-gray-300 uppercase tracking-wider">Inbox</div>
+            <div class="flex items-center justify-between px-3 py-2 border-b border-zinc-200 dark:border-zinc-800">
+              <div class="text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">Inbox</div>
               <button
                 v-if="unreadNotifications > 0"
                 @click="$emit('mark-all-read')"
-                class="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
+                class="text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 font-medium transition-colors"
               >Mark all read</button>
             </div>
-            <div class="max-h-80 overflow-y-auto">
+
+            <!-- Notifications list -->
+            <div class="max-h-80 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800/60">
               <template v-if="notifications && notifications.length > 0">
-                <button
+                <div
                   v-for="n in notifications"
                   :key="n.id"
-                  @click="clickNotif(n)"
-                  class="w-full flex items-start space-x-2.5 px-3 py-2.5 text-left transition-colors"
-                  :class="n.read ? 'hover:bg-gray-800/40' : 'bg-indigo-950/30 hover:bg-indigo-950/50 border-l-2 border-indigo-500'"
+                  @click="$emit('notification-click', n); notifOpen = false;"
+                  class="p-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer transition-colors flex items-start space-x-2.5"
+                  :class="{ 'bg-zinc-50/50 dark:bg-zinc-800/20': !n.read }"
                 >
-                  <i :data-lucide="notifIcon(n.type)" class="w-4 h-4 mt-0.5 flex-shrink-0" :class="n.read ? 'text-gray-500' : 'text-indigo-400'"></i>
-                  <span class="min-w-0 flex-1">
-                    <span class="block text-xs text-gray-200 leading-snug break-words">{{ n.message }}</span>
-                    <span class="block mt-0.5 text-[10px] text-gray-500">{{ fmtTime(n.created) }}</span>
-                  </span>
-                </button>
+                  <div
+                    class="w-6 h-6 rounded-md flex items-center justify-center shrink-0 mt-0.5 text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800"
+                  >
+                    <i :data-lucide="notifIcon(n.type)" class="w-3.5 h-3.5"></i>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <div class="text-xs text-zinc-800 dark:text-zinc-200 line-clamp-2">
+                      <span class="font-semibold">{{ n.title }}</span>
+                      <span v-if="n.message" class="text-zinc-500 dark:text-zinc-400"> — {{ n.message }}</span>
+                    </div>
+                    <div class="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1 flex items-center justify-between">
+                      <span>{{ formatTime(n.created) }}</span>
+                      <span v-if="!n.read" class="w-1.5 h-1.5 rounded-full bg-zinc-900 dark:bg-zinc-100"></span>
+                    </div>
+                  </div>
+                </div>
               </template>
-              <div v-else class="px-4 py-8 text-center text-gray-500 text-xs">
+              <div v-else class="p-6 text-center text-xs text-zinc-400 dark:text-zinc-500">
                 <i data-lucide="bell-off" class="w-5 h-5 mx-auto mb-2 opacity-40"></i>
-                <p>No notifications yet.</p>
+                No notifications
               </div>
+            </div>
+
+            <!-- Footer: notification channel config link -->
+            <div class="px-3 py-2 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-between text-[11px]">
+              <span class="text-zinc-400 dark:text-zinc-500">Discord / Telegram / Webhook</span>
+              <a
+                href="javascript:void(0)"
+                @click.prevent="$emit('open-notification-settings'); notifOpen = false;"
+                class="text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white font-medium flex items-center space-x-1"
+              >
+                <i data-lucide="settings" class="w-3 h-3"></i>
+                <span>Configure</span>
+              </a>
             </div>
           </div>
         </div>
-
-        <!-- More Actions Overflow Menu -->
-        <div class="relative" ref="moreDropdown">
-          <button
-            @click="moreOpen = !moreOpen"
-            class="p-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
-            title="More actions (export, fields, admin)"
-          >
-            <i data-lucide="ellipsis-vertical" class="w-4 h-4"></i>
-          </button>
-          <div
-            v-if="moreOpen"
-            class="absolute right-0 mt-2 w-56 glass-dropdown rounded-xl shadow-2xl p-1.5 z-50 border border-gray-800 animate-in fade-in slide-in-from-top-2 duration-150"
-          >
-            <button
-              v-if="currentProject"
-              @click="$emit('open-custom-fields'); moreOpen = false;"
-              class="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-xs text-gray-300 hover:bg-gray-800/60 text-left transition-colors"
-            >
-              <i data-lucide="settings-2" class="w-4 h-4 text-gray-400"></i>
-              <span>Custom Fields</span>
-            </button>
-            <button
-              @click="$emit('open-export'); moreOpen = false;"
-              class="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-xs text-gray-300 hover:bg-gray-800/60 text-left transition-colors"
-            >
-              <i data-lucide="download" class="w-4 h-4 text-gray-400"></i>
-              <span>Export Issues</span>
-            </button>
-            <button
-              @click="$emit('open-notification-settings'); moreOpen = false;"
-              class="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-xs text-gray-300 hover:bg-gray-800/60 text-left transition-colors"
-            >
-              <i data-lucide="bell" class="w-4 h-4 text-gray-400"></i>
-              <span>Notification Settings</span>
-            </button>
-            <div class="my-1 border-t border-gray-800/60"></div>
-            <a
-              href="/_/"
-              target="_blank"
-              rel="noopener"
-              class="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-xs text-gray-400 hover:bg-gray-800/60 transition-colors"
-            >
-              <i data-lucide="database" class="w-4 h-4"></i>
-              <span>PocketBase Admin</span>
-            </a>
-          </div>
-        </div>
-
 
         <!-- Agentic-native: live agent stack + team dropdown -->
         <div class="relative" ref="teamDropdown">
           <button
             @click.stop="teamOpen = !teamOpen"
-            class="flex items-center -space-x-1.5 rounded-full px-1 py-0.5 hover:bg-gray-800/70 transition-colors"
-            :title="(agents && agents.length) ? (agents.length + ' agents online — click for team') : 'No agents detected'"
+            class="flex items-center -space-x-1.5 rounded-full px-1 py-0.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            :title="(agents && agents.length) ? (agents.length + ' agents detected') : 'No agents detected'"
           >
             <template v-if="agents && agents.length > 0">
               <span
-                v-for="a in agents.slice(0, 4)"
+                v-for="a in agents.slice(0, 3)"
                 :key="a.name"
-                class="w-6 h-6 rounded-full border-2 border-gray-950 flex items-center justify-center text-[10px] font-bold shadow-sm select-none"
-                :class="a.found ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white' : 'bg-gray-800 text-gray-500'"
-              >{{ agentInitial(a) }}</span>
+                class="w-5 h-5 rounded-full border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-[10px] select-none"
+              >{{ a.avatar }}</span>
               <span
-                v-if="agents.length > 4"
-                class="w-6 h-6 rounded-full border-2 border-gray-950 bg-gray-800 text-gray-300 text-[9px] flex items-center justify-center font-semibold"
-              >+{{ agents.length - 4 }}</span>
+                v-if="agents.length > 3"
+                class="w-5 h-5 rounded-full border border-zinc-200 dark:border-zinc-800 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-[8px] flex items-center justify-center font-semibold"
+              >+{{ agents.length - 3 }}</span>
             </template>
-            <span v-else class="text-gray-600 flex items-center space-x-1 px-1.5 text-xs">
+            <span v-else class="text-zinc-400 flex items-center space-x-1 px-1 text-xs">
               <i data-lucide="bot" class="w-3.5 h-3.5"></i>
             </span>
           </button>
@@ -379,71 +355,112 @@ const HeaderComponent = {
           <!-- Team dropdown -->
           <div
             v-if="teamOpen"
-            class="absolute right-0 mt-2 w-64 glass-dropdown rounded-xl shadow-2xl z-50 border border-gray-800 animate-in fade-in slide-in-from-top-2 duration-150 overflow-hidden"
+            class="absolute right-0 mt-1.5 w-64 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-150 overflow-hidden"
           >
-            <div class="flex items-center justify-between px-3 py-2 border-b border-gray-800/70">
-              <div class="text-xs font-semibold text-gray-300 uppercase tracking-wider">Agent Team</div>
+            <div class="p-2.5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+              <div class="text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider flex items-center space-x-1.5">
+                <i data-lucide="bot" class="w-3.5 h-3.5"></i>
+                <span>Agent Fleet</span>
+              </div>
               <button
                 @click="$emit('sync-agents')"
-                class="flex items-center space-x-1 text-[11px] text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
                 :disabled="agentSyncing"
+                class="text-[11px] text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors flex items-center space-x-1"
+                title="Rescan agent runtimes"
               >
                 <i data-lucide="refresh-cw" class="w-3 h-3" :class="{ 'animate-spin': agentSyncing }"></i>
-                <span>{{ agentSyncing ? 'Syncing' : 'Rescan' }}</span>
+                <span>{{ agentSyncing ? 'Scanning...' : 'Rescan' }}</span>
               </button>
             </div>
-            <div class="py-1 max-h-72 overflow-y-auto">
+
+            <!-- Agent List -->
+            <div class="py-1 divide-y divide-zinc-100 dark:divide-zinc-800/40">
               <template v-if="agents && agents.length > 0">
                 <button
                   v-for="a in agents"
                   :key="a.name"
                   @click="$emit('open-agents', a.name); teamOpen = false;"
-                  class="w-full flex items-center space-x-2.5 px-3 py-2 hover:bg-gray-800/50 transition-colors text-left"
+                  class="w-full flex items-center space-x-2 px-3 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors text-left"
                 >
-                  <span
-                    class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                    :class="a.found ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white' : 'bg-gray-800 text-gray-500'"
-                  >{{ a.avatar || agentInitial(a) }}</span>
+                  <span class="text-sm shrink-0">{{ a.avatar }}</span>
                   <div class="min-w-0 flex-1">
                     <div class="flex items-center space-x-1.5">
-                      <span class="text-xs font-medium text-gray-200 truncate">{{ a.name }}</span>
-                      <span class="w-1.5 h-1.5 rounded-full" :class="a.status === 'online' ? 'bg-emerald-400' : 'bg-gray-600'" :title="a.status === 'online' ? 'online' : 'offline'"></span>
-                      <span v-if="a.session_count" class="text-[9px] px-1 py-0.5 rounded bg-indigo-600/20 text-indigo-300 font-semibold">{{ a.session_count }} live</span>
+                      <span class="text-xs font-medium text-zinc-800 dark:text-zinc-200 truncate capitalize">{{ a.name }}</span>
+                      <span class="w-1.5 h-1.5 rounded-full" :class="a.status === 'online' ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-zinc-400 dark:bg-zinc-600'" :title="a.status === 'online' ? 'online' : 'offline'"></span>
+                      <span v-if="a.session_count" class="text-[9px] px-1 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-semibold">{{ a.session_count }} live</span>
                     </div>
-                    <div class="text-[10px] text-gray-500 truncate">{{ a.provider }} · {{ a.runtime }}</div>
+                    <div class="text-[10px] text-zinc-400 dark:text-zinc-500 truncate">{{ a.provider }} · {{ a.runtime }}</div>
                   </div>
-                  <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-gray-600 shrink-0"></i>
+                  <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-zinc-400 shrink-0"></i>
                 </button>
               </template>
               <div v-else class="px-3 py-4 text-center">
-                <i data-lucide="bot" class="w-6 h-6 text-gray-600 mx-auto mb-1.5"></i>
-                <div class="text-xs text-gray-500">No agents detected.</div>
-                <div class="text-[10px] text-gray-600 mt-0.5">Run the agent-bridge on this host.</div>
+                <i data-lucide="bot" class="w-5 h-5 text-zinc-400 mx-auto mb-1.5"></i>
+                <div class="text-xs text-zinc-500">No agents detected.</div>
               </div>
             </div>
-            <div class="flex items-center justify-between px-3 py-1.5 border-t border-gray-800/70 bg-gray-950/40">
+
+            <!-- Footer: open agents page link -->
+            <div class="px-3 py-2 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-between text-[11px]">
+              <span class="text-[10px] font-mono text-zinc-400">source: {{ agentSource || 'bridge' }}</span>
               <button
                 @click="$emit('open-agents', null); teamOpen = false;"
-                class="flex items-center space-x-1 text-[11px] text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
+                class="text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white font-medium flex items-center space-x-1"
               >
-                <i data-lucide="bot" class="w-3 h-3"></i>
-                <span>View all agents &amp; sessions</span>
+                <span>Cockpit</span>
+                <i data-lucide="arrow-right" class="w-3 h-3"></i>
               </button>
-              <span class="text-[10px] text-gray-600">{{ agents && agents.length }} agents</span>
             </div>
           </div>
         </div>
 
-        <!-- New Issue Button -->
-        <button 
+        <!-- Create Task CTA Button (Minimalist) -->
+        <button
           @click="$emit('open-new-issue')"
-          class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
+          class="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 text-xs font-semibold shadow-2xs transition-colors"
+          title="Create New Issue (C)"
         >
           <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-          <span>New Issue</span>
-          <kbd class="hidden sm:inline-block px-1 py-0.5 rounded bg-indigo-700 text-[10px] font-mono ml-1">C</kbd>
+          <span class="hidden sm:inline">New Task</span>
         </button>
 
+        <!-- More Settings Menu -->
+        <div class="relative" ref="moreDropdown">
+          <button
+            @click.stop="moreOpen = !moreOpen"
+            class="p-1 rounded-md text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            title="More actions (Export, Fields, Admin)"
+          >
+            <i data-lucide="more-vertical" class="w-4 h-4"></i>
+          </button>
+
+          <div
+            v-if="moreOpen"
+            class="glass-dropdown absolute right-0 mt-1.5 w-48 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xl z-50 py-1 text-xs animate-in fade-in slide-in-from-top-2 duration-150"
+          >
+            <button
+              @click="$emit('open-custom-fields'); moreOpen = false;"
+              class="w-full text-left px-3 py-1.5 flex items-center space-x-2 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            >
+              <i data-lucide="sliders" class="w-3.5 h-3.5 text-zinc-400"></i>
+              <span>Custom Fields</span>
+            </button>
+            <button
+              @click="$emit('open-export'); moreOpen = false;"
+              class="w-full text-left px-3 py-1.5 flex items-center space-x-2 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            >
+              <i data-lucide="download" class="w-3.5 h-3.5 text-zinc-400"></i>
+              <span>Export Issues</span>
+            </button>
+            <button
+              @click="$emit('open-notification-settings'); moreOpen = false;"
+              class="w-full text-left px-3 py-1.5 flex items-center space-x-2 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            >
+              <i data-lucide="bell-ring" class="w-3.5 h-3.5 text-zinc-400"></i>
+              <span>Notification Settings</span>
+            </button>
+          </div>
+        </div>
       </div>
     </header>
   `

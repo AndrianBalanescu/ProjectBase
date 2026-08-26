@@ -1,9 +1,23 @@
 <!DOCTYPE html>
-<html lang="en" class="dark h-full bg-[#0b0f19]">
+<html lang="en" class="dark h-full">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ProjectBase — Ultra-lightweight Project & Kanban Management</title>
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem('projectbase_theme') || 'dark';
+        if (saved === 'light') {
+          document.documentElement.classList.remove('dark');
+          document.documentElement.classList.add('light');
+        } else {
+          document.documentElement.classList.add('dark');
+          document.documentElement.classList.remove('light');
+        }
+      } catch(e) {}
+    })();
+  </script>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22 width=%2232%22 height=%2232%22><text y=%2226%22 font-size=%2226%22>⚡</text></svg>" />
   <link rel="manifest" href="/manifest.webmanifest" />
   
@@ -22,9 +36,11 @@
   <script src="/vendor/purify.min.js"></script>
   <script src="/vendor/confetti.min.js"></script>
 </head>
-<body class="h-full bg-[#0b0f19] text-gray-100 antialiased selection:bg-indigo-500 selection:text-white overflow-hidden">
+<body class="h-full bg-slate-50 dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 antialiased selection:bg-zinc-800 selection:text-zinc-100 overflow-hidden">
   
   <div id="app" class="h-full flex flex-col">
+    <!-- QA Tailwind Probe (ensures verified utilities remain in static CSS) -->
+    <div class="hidden pl-7 ml-1.5 mt-1.5 max-h-52 text-sky-300" aria-hidden="true"></div>
     <!-- Auth Gate -->
     <div v-if="!authReady" class="h-full flex items-center justify-center bg-[#0b0f19] text-gray-400 text-sm">Loading session...</div>
     <div v-else-if="!isAuthenticated" class="h-full flex items-center justify-center bg-[#0b0f19] p-6">
@@ -72,6 +88,7 @@
       :agents="agents"
       :agent-source="agentSource"
       :agent-syncing="agentSyncing"
+      :theme="theme"
       @select-project="selectProject"
       @change-view="changeView"
       @open-new-issue="isNewIssueOpen = true"
@@ -85,6 +102,7 @@
       @mark-all-read="handleMarkAllNotificationsRead"
       @sync-agents="handleSyncAgents"
       @open-agents="openAgents"
+      @toggle-theme="toggleTheme"
     ></header-bar>
 
     <!-- Offline indicator (Service Worker app shell stays usable offline) -->

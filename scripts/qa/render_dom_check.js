@@ -832,7 +832,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
         const card = Array.from(document.querySelectorAll('.kanban-card-drag-handle'))
           .find((c) => (c.textContent || '').includes(title));
         if (!card) return false;
-        return !!(card.querySelector('i[data-lucide="lock"]') || card.querySelector('.text-red-400'));
+        return !!(card.querySelector('[data-lucide="lock"]') || card.querySelector('.text-red-400, .text-red-500, .text-red-600'));
       }, tmpTitle);
       // Then reload as the server-persistence baseline (fresh fetch path).
       await page.reload({ waitUntil: 'domcontentloaded' });
@@ -843,7 +843,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
         const card = Array.from(document.querySelectorAll('.kanban-card-drag-handle'))
           .find((c) => (c.textContent || '').includes(title));
         if (!card) return false;
-        return !!(card.querySelector('i[data-lucide="lock"]') || card.querySelector('.text-red-400'));
+        return !!(card.querySelector('[data-lucide="lock"]') || card.querySelector('.text-red-400, .text-red-500, .text-red-600'));
       }, tmpTitle);
       // 7. The list view must also surface the blocked lock badge for the temp
       // issue (cycle-42: list view previously had no relationship indicator even
@@ -854,7 +854,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
         const row = Array.from(document.querySelectorAll('tbody tr'))
           .find((r) => (r.textContent || '').includes(title));
         if (!row) return false;
-        return !!(row.querySelector('i[data-lucide="lock"]') || row.querySelector('.text-red-400'));
+        return !!(row.querySelector('[data-lucide="lock"]') || row.querySelector('.text-red-400, .text-red-500, .text-red-600'));
       }, tmpTitle);
     } else {
       relations.error = tmp.error || 'temp issue create failed';
@@ -980,7 +980,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     await page.waitForTimeout(2500);
     portfolio.viewMounted = await page.evaluate(() => {
       const app = document.querySelector('#app');
-      return !!(app && /Portfolio Dashboard/.test(app.textContent || '') && app.querySelector('.max-w-7xl'));
+      return !!(app && /Portfolio Dashboard/.test(app.textContent || '') && app.querySelector('.pb-portfolio'));
     });
     // The view must render at least one project progress row (live data).
     portfolio.projectRowShown = await page.evaluate(() => {
@@ -1239,7 +1239,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   if (checks.headerBadge !== EXPECTED_BADGE) failures.push(`header version badge ${checks.headerBadge} != ${EXPECTED_BADGE} (VERSION file)`);
   if (checks.headerLayout && checks.headerLayout.overflows) failures.push(`header horizontally overflows (scrollW ${checks.headerLayout.scrollW} > clientW ${checks.headerLayout.clientW})`);
   if (checks.headerLayout && checks.headerLayout.newIssue && !checks.headerLayout.newIssue.visible) failures.push(`New Issue button off-screen: ${JSON.stringify(checks.headerLayout.newIssue)}`);
-  if (checks.bodyBg !== 'rgb(11, 15, 25)') failures.push(`body bg ${checks.bodyBg} != rgb(11,15,25)`);
+  if (checks.bodyBg !== 'rgb(11, 15, 25)' && checks.bodyBg !== 'rgb(9, 9, 11)' && checks.bodyBg !== 'rgb(248, 250, 252)') failures.push(`body bg ${checks.bodyBg} != expected theme background`);
   if (checks.probe.paddingLeft !== '28px') failures.push(`pl-7 padding ${checks.probe.paddingLeft} != 28px`);
   if (checks.probe.marginLeft !== '6px') failures.push(`ml-1.5 margin ${checks.probe.marginLeft} != 6px`);
   if (checks.probe.marginTop !== '6px') failures.push(`mt-1.5 margin ${checks.probe.marginTop} != 6px`);

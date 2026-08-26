@@ -1,4 +1,5 @@
 // pb_public/js/components/KanbanBoard.js
+// Minimalist, high-density Kanban Board supporting Dark and Light themes with subtle, low-contrast accents.
 
 const KanbanBoardComponent = {
   props: ['issues', 'projects', 'currentProject', 'cycles', 'labels', 'filterQuery', 'filterPriority', 'filterCycle', 'selectedIssueIds', 'agents'],
@@ -7,10 +8,10 @@ const KanbanBoardComponent = {
     return {
       agentFilter: '',
       columns: [
-        { key: 'backlog', name: 'Backlog', color: '#6b7280', icon: 'circle-dot' },
-        { key: 'todo', name: 'Todo', color: '#8b5cf6', icon: 'circle' },
+        { key: 'backlog', name: 'Backlog', color: '#71717a', icon: 'circle-dot' },
+        { key: 'todo', name: 'Todo', color: '#a1a1aa', icon: 'circle' },
         { key: 'in_progress', name: 'In Progress', color: '#3b82f6', icon: 'clock' },
-        { key: 'in_review', name: 'In Review', color: '#eab308', icon: 'eye' },
+        { key: 'in_review', name: 'In Review', color: '#f59e0b', icon: 'eye' },
         { key: 'done', name: 'Done', color: '#10b981', icon: 'check-circle-2' },
         { key: 'cancelled', name: 'Cancelled', color: '#ef4444', icon: 'x-circle' }
       ],
@@ -39,11 +40,11 @@ const KanbanBoardComponent = {
       if (this.filterQuery) count++;
       if (this.filterPriority) count++;
       if (this.filterCycle) count++;
+      if (this.agentFilter) count++;
       return count;
     },
     filteredIssues() {
       return this.issues.filter(issue => {
-        // Text filter
         if (this.filterQuery) {
           const q = this.filterQuery.toLowerCase();
           const matchTitle = (issue.title || '').toLowerCase().includes(q);
@@ -51,38 +52,21 @@ const KanbanBoardComponent = {
           const matchDesc = (issue.description || '').toLowerCase().includes(q);
           if (!matchTitle && !matchId && !matchDesc) return false;
         }
-
-        // Priority filter
-        if (this.filterPriority && issue.priority !== this.filterPriority) {
-          return false;
-        }
-
-        // Cycle filter
-        if (this.filterCycle && issue.cycle !== this.filterCycle) {
-          return false;
-        }
-
-        // Agent filter (assignee matches a known agent)
-        if (this.agentFilter && !(issue.assignee || '').toLowerCase().includes(this.agentFilter.toLowerCase())) {
-          return false;
-        }
-
+        if (this.filterPriority && issue.priority !== this.filterPriority) return false;
+        if (this.filterCycle && issue.cycle !== this.filterCycle) return false;
+        if (this.agentFilter && !(issue.assignee || '').toLowerCase().includes(this.agentFilter.toLowerCase())) return false;
         return true;
       });
-    },
-    totalStoryPoints() {
-      return this.filteredIssues.reduce((sum, i) => sum + (Number(i.estimate) || 0), 0);
     }
   },
   mounted() {
     this.$nextTick(() => {
       this.initSortable();
-      if (window.lucide) window.lucide.createIcons();
     });
   },
   updated() {
     this.$nextTick(() => {
-      if (window.lucide) window.lucide.createIcons();
+      this.initSortable();
     });
   },
   beforeUnmount() {
@@ -90,13 +74,18 @@ const KanbanBoardComponent = {
   },
   methods: {
     clearFilters() {
-      this.$emit('update:filterQuery', '');
-      this.$emit('update:filterPriority', '');
-      this.$emit('update:filterCycle', '');
+      this.searchModel = '';
+      this.priorityModel = '';
+      this.cycleModel = '';
+      this.agentFilter = '';
     },
-
-    agentAvatar(agent) {
-      const a = (this.agents || []).find(x => x.name === agent);
+    findAgent(name) {
+      if (!name || !this.agents) return null;
+      const clean = name.toLowerCase().trim();
+      return this.agents.find(a => a.name.toLowerCase() === clean);
+    },
+    agentAvatar(name) {
+      const a = this.findAgent(name);
       return a ? a.avatar : null;
     },
 
@@ -154,49 +143,50 @@ const KanbanBoardComponent = {
 
         const sortable = new Sortable(el, {
           group: 'kanban-board',
-          animation: 180,
+          animation: 150,
           ghostClass: 'sortable-ghost',
           chosenClass: 'sortable-chosen',
           dragClass: 'sortable-drag',
           handle: '.kanban-card-drag-handle',
           onEnd: (evt) => {
-            const issueId = evt.item.getAttribute('data-issue-id');
+            const itemEl = evt.item;
+            const issueId = itemEl.getAttribute('data-issue-id');
             const toColKey = evt.to.getAttribute('data-col-key');
+            const newIndex = evt.newIndex;
+
             if (!issueId || !toColKey) return;
 
-            const cardElements = Array.from(evt.to.querySelectorAll('[data-issue-id]'));
-            const newIndex = cardElements.indexOf(evt.item);
+            const targetIssues = this.getIssuesForColumn(toColKey)
+              .filter(i => i.id !== issueId);
 
-            let newOrder = Date.now();
-            if (cardElements.length > 1) {
-              const prevCard = cardElements[newIndex - 1];
-              const nextCard = cardElements[newIndex + 1];
-
-              const prevOrder = prevCard ? Number(prevCard.getAttribute('data-order') || 0) : null;
-              const nextOrder = nextCard ? Number(nextCard.getAttribute('data-order') || 0) : null;
-
-              if (prevOrder !== null && nextOrder !== null) {
-                newOrder = (prevOrder + nextOrder) / 2;
-              } else if (prevOrder !== null) {
-                newOrder = prevOrder + 1000;
-              } else if (nextOrder !== null) {
-                newOrder = nextOrder - 1000;
-              }
+            let newOrder = 0;
+            if (targetIssues.length === 0) {
+              newOrder = 0;
+            } else if (newIndex === 0) {
+              newOrder = (targetIssues[0].order || 0) - 1000;
+            } else if (newIndex >= targetIssues.length) {
+              newOrder = (targetIssues[targetIssues.length - 1].order || 0) + 1000;
+            } else {
+              const prevOrder = targetIssues[newIndex - 1].order || 0;
+              const nextOrder = targetIssues[newIndex].order || 0;
+              newOrder = Math.round((prevOrder + nextOrder) / 2);
             }
 
-            evt.item.setAttribute('data-order', newOrder);
+            const currentIssue = this.issues.find(i => i.id === issueId);
+            if (currentIssue) {
+              const statusChanged = currentIssue.status !== toColKey;
+              if (statusChanged && toColKey === 'done' && window.confetti) {
+                window.confetti({
+                  particleCount: 40,
+                  spread: 60,
+                  origin: { y: 0.8 }
+                });
+              }
 
-            this.$emit('update-issue', {
-              id: issueId,
-              status: toColKey,
-              order: newOrder
-            });
-
-            if (toColKey === 'done' && window.confetti) {
-              window.confetti({
-                particleCount: 40,
-                spread: 60,
-                origin: { y: 0.85 }
+              this.$emit('update-issue', {
+                id: issueId,
+                status: toColKey,
+                order: newOrder
               });
             }
           }
@@ -245,11 +235,11 @@ const KanbanBoardComponent = {
     },
     getPriorityIcon(priority) {
       switch (priority) {
-        case 'urgent': return { icon: 'alert-octagon', color: 'text-red-500 bg-red-950/40 border-red-800/40' };
-        case 'high': return { icon: 'arrow-up', color: 'text-orange-500 bg-orange-950/40 border-orange-800/40' };
-        case 'medium': return { icon: 'equal', color: 'text-amber-400 bg-amber-950/40 border-amber-800/40' };
-        case 'low': return { icon: 'arrow-down', color: 'text-blue-400 bg-blue-950/40 border-blue-800/40' };
-        default: return { icon: 'minus', color: 'text-gray-500 bg-gray-900 border-gray-800' };
+        case 'urgent': return { icon: 'alert-octagon', color: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800/40' };
+        case 'high': return { icon: 'arrow-up', color: 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 border-orange-200 dark:border-orange-800/40' };
+        case 'medium': return { icon: 'equal', color: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/40' };
+        case 'low': return { icon: 'arrow-down', color: 'text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700' };
+        default: return { icon: 'minus', color: 'text-zinc-400 dark:text-zinc-500 bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800' };
       }
     },
     formatDueDate(dateStr) {
@@ -257,14 +247,11 @@ const KanbanBoardComponent = {
       const d = new Date(dateStr);
       const now = new Date();
       const diffDays = Math.ceil((d - now) / (1000 * 60 * 60 * 24));
-      const formatted = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-      if (diffDays < 0) {
-        return { text: formatted, status: 'overdue' };
-      } else if (diffDays === 0) {
-        return { text: 'Today', status: 'today' };
-      }
-      return { text: formatted, status: 'upcoming' };
+      if (diffDays < 0) return { text: `${Math.abs(diffDays)}d overdue`, status: 'overdue' };
+      if (diffDays === 0) return { text: 'Today', status: 'today' };
+      if (diffDays === 1) return { text: 'Tomorrow', status: 'upcoming' };
+      return { text: `${diffDays}d left`, status: 'upcoming' };
     },
     isBlocked(issue) {
       if (!issue || !Array.isArray(issue.relations)) return false;
@@ -278,25 +265,25 @@ const KanbanBoardComponent = {
     }
   },
   template: `
-    <div class="h-[calc(100vh-3.5rem)] flex flex-col bg-[#0b0f19] overflow-hidden">
-      
-      <!-- Top Filter & Search Toolbar -->
-      <div class="px-4 py-2.5 border-b border-gray-800/80 bg-gray-950/40 flex items-center justify-between flex-shrink-0 select-none">
-        <div class="flex items-center space-x-3">
+    <div class="h-[calc(100vh-3.5rem)] flex flex-col bg-slate-50 dark:bg-[#09090b] overflow-hidden select-none">
+
+      <!-- Top Filter & Search Toolbar (Minimalist Strip) -->
+      <div class="px-3 py-2 border-b border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-[#121215]/95 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center space-x-2">
           <!-- Search input -->
           <div class="relative">
-            <i data-lucide="search" class="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-2.5"></i>
-            <input 
-              v-model="searchModel" 
+            <i data-lucide="search" class="w-3.5 h-3.5 text-zinc-400 absolute left-2 top-2"></i>
+            <input
+              v-model="searchModel"
               placeholder="Filter tasks..."
-              class="pl-8 pr-3 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-48 sm:w-60"
+              class="pl-7 pr-2.5 py-1 rounded-md bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 w-44 sm:w-56"
             />
           </div>
 
           <!-- Priority Filter -->
-          <select 
+          <select
             v-model="priorityModel"
-            class="px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-xs text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            class="px-2 py-1 rounded-md bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600"
           >
             <option value="">All Priorities</option>
             <option value="urgent">🔥 Urgent</option>
@@ -307,10 +294,10 @@ const KanbanBoardComponent = {
           </select>
 
           <!-- Cycle Filter -->
-          <select 
+          <select
             v-if="cycles && cycles.length > 0"
             v-model="cycleModel"
-            class="px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-xs text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[160px] truncate"
+            class="px-2 py-1 rounded-md bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 max-w-[150px] truncate"
           >
             <option value="">All Cycles</option>
             <option v-for="c in cycles" :key="c.id" :value="c.id">{{ c.name }}</option>
@@ -320,34 +307,32 @@ const KanbanBoardComponent = {
           <select
             v-if="agents && agents.length > 0"
             v-model="agentFilter"
-            class="px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-xs text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[150px]"
+            class="px-2 py-1 rounded-md bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 max-w-[140px]"
           >
             <option value="">All Agents</option>
             <option v-for="a in agents" :key="a.name" :value="a.name">{{ a.avatar }} {{ a.name }}</option>
           </select>
 
           <!-- Clear Filters -->
-          <button 
+          <button
             v-if="activeFilterCount > 0"
             @click="clearFilters"
-            class="px-2 py-1 rounded text-[11px] text-gray-400 hover:text-white bg-gray-800/60 hover:bg-gray-800 flex items-center space-x-1 transition-colors"
+            class="px-2 py-1 rounded text-[11px] text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 flex items-center space-x-1 transition-colors"
           >
             <i data-lucide="x" class="w-3 h-3"></i>
             <span>Clear ({{ activeFilterCount }})</span>
           </button>
         </div>
 
-        <div class="flex items-center space-x-3 text-xs text-gray-400 font-mono">
+        <!-- Right Quick Stats & Keyboard Hint -->
+        <div class="hidden sm:flex items-center space-x-3 text-xs text-zinc-500 font-mono">
           <span>{{ filteredIssues.length }} items</span>
-          <span v-if="totalStoryPoints > 0" class="text-indigo-400 font-semibold">• {{ totalStoryPoints }} pts</span>
-          
-          <!-- Shortcuts modal trigger -->
-          <button 
+          <button
             @click="$emit('open-shortcuts-modal')"
-            class="p-1 rounded text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors"
-            title="Keyboard Shortcuts (?)"
+            class="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
+            title="Keyboard shortcuts (?)"
           >
-            <kbd class="px-1.5 py-0.5 rounded bg-gray-800 border border-gray-700 text-[10px] text-gray-400 font-mono">?</kbd>
+            <kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[10px] text-zinc-600 dark:text-zinc-400 font-mono">?</kbd>
           </button>
         </div>
       </div>
@@ -355,58 +340,58 @@ const KanbanBoardComponent = {
       <!-- Kanban Columns Horizontal Scroll Area -->
       <div class="flex-1 overflow-x-auto overflow-y-hidden p-2">
         <div class="flex items-start space-x-2 h-full min-w-max pb-2">
-          
+
           <!-- Column Loop -->
-          <div 
-            v-for="col in columns" 
+          <div
+            v-for="col in columns"
             :key="col.key"
-            class="w-80 flex-shrink-0 flex flex-col max-h-full rounded-xl bg-gray-900/60 border border-gray-800/80 shadow-lg"
+            class="w-80 flex-shrink-0 flex flex-col max-h-full rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800/80 shadow-2xs overflow-hidden"
           >
             <!-- Column Header -->
-            <div class="p-3 border-b border-gray-800/60 flex items-center justify-between select-none">
+            <div class="p-2.5 border-b border-zinc-200 dark:border-zinc-800/70 flex items-center justify-between select-none bg-zinc-50/50 dark:bg-zinc-900/40">
               <div class="flex items-center space-x-2">
-                <span class="w-2.5 h-2.5 rounded-full" :style="{ backgroundColor: col.color }"></span>
-                <h3 class="text-xs font-semibold text-gray-200 tracking-wide">{{ col.name }}</h3>
-                <span class="px-1.5 py-0.5 rounded-md bg-gray-800 text-[11px] font-mono text-gray-400 font-medium">
+                <span class="w-2 h-2 rounded-full" :style="{ backgroundColor: col.color }"></span>
+                <h3 class="text-xs font-semibold text-zinc-800 dark:text-zinc-200 tracking-tight">{{ col.name }}</h3>
+                <span class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[10px] font-mono text-zinc-600 dark:text-zinc-400 font-medium">
                   {{ getIssuesForColumn(col.key).length }}
                 </span>
               </div>
 
-              <div class="flex items-center space-x-1.5">
-                <span v-if="getColumnEstimateSum(col.key) > 0" class="text-[10px] text-gray-500 font-mono" title="Total Story Points">
+              <div class="flex items-center space-x-1">
+                <span v-if="getColumnEstimateSum(col.key) > 0" class="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono mr-1" title="Total Story Points">
                   {{ getColumnEstimateSum(col.key) }} pts
                 </span>
 
-                <button 
+                <button
                   @click="startQuickAdd(col.key)"
-                  class="p-1 rounded-md text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
-                  title="Add task to column"
+                  class="p-1 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title="Quick add task"
                 >
                   <i data-lucide="plus" class="w-3.5 h-3.5"></i>
                 </button>
               </div>
             </div>
 
-            <!-- Quick Add Inline Box -->
-            <div v-if="quickAddColumn === col.key" class="p-2 border-b border-gray-800/80 bg-gray-950/60">
-              <input 
+            <!-- Inline Quick Add Input -->
+            <div v-if="quickAddColumn === col.key" class="p-2 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
+              <input
                 :id="'quick-add-input-' + col.key"
                 v-model="quickAddTitle"
                 @keydown.enter="submitQuickAdd(col.key)"
                 @keydown.esc="cancelQuickAdd"
-                placeholder="What needs to be done? Press Enter..."
-                class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-indigo-500/50 text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                placeholder="What needs to be done?"
+                class="w-full px-2.5 py-1.5 text-xs rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600"
               />
-              <div class="flex items-center justify-end space-x-1.5 mt-2">
-                <button 
-                  @click="cancelQuickAdd" 
-                  class="px-2 py-1 text-[11px] text-gray-400 hover:text-gray-200 rounded hover:bg-gray-800"
+              <div class="flex items-center justify-end space-x-1.5 mt-1.5">
+                <button
+                  @click="cancelQuickAdd"
+                  class="px-2 py-0.5 text-[11px] text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 rounded"
                 >
                   Cancel
                 </button>
-                <button 
-                  @click="submitQuickAdd(col.key)" 
-                  class="px-2.5 py-1 text-[11px] font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded shadow-sm"
+                <button
+                  @click="submitQuickAdd(col.key)"
+                  class="px-2.5 py-0.5 text-[11px] font-semibold bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 rounded shadow-2xs"
                 >
                   Add
                 </button>
@@ -414,118 +399,128 @@ const KanbanBoardComponent = {
             </div>
 
             <!-- Draggable Cards Container -->
-            <div 
+            <div
               :id="'kanban-col-' + col.key"
               :data-col-key="col.key"
-              class="flex-1 overflow-y-auto p-2 space-y-2 min-h-[120px]"
+              class="flex-1 overflow-y-auto p-1.5 space-y-1.5 min-h-[100px]"
             >
               <!-- Card Item -->
-              <div 
-                v-for="issue in getIssuesForColumn(col.key)" 
+              <div
+                v-for="issue in getIssuesForColumn(col.key)"
                 :key="issue.id"
                 :data-issue-id="issue.id"
                 :data-order="issue.order || 0"
-                class="kanban-card-drag-handle group relative bg-gray-950/90 hover:bg-gray-800/70 border border-gray-800/90 hover:border-gray-700/80 rounded-xl p-3 shadow-md hover:shadow-xl transition-all cursor-pointer select-none"
-                :class="{ 'border-red-900/70': isBlocked(issue), 'ring-2 ring-indigo-500/70 border-indigo-500/80 bg-indigo-950/30': isSelected(issue) }"
+                class="kanban-card-drag-handle group relative bg-white hover:bg-zinc-50/90 dark:bg-[#18181b] dark:hover:bg-zinc-800/90 border border-zinc-200 dark:border-zinc-700/60 rounded-lg p-2.5 shadow-2xs transition-all cursor-pointer select-none"
+                :class="{ 'border-red-400 dark:border-red-800/70': isBlocked(issue), 'ring-2 ring-zinc-500/80 border-zinc-500 bg-zinc-100/90 dark:bg-zinc-800': isSelected(issue) }"
                 @click="handleCardClick($event, issue)"
               >
                 <!-- Card Header -->
-                <div class="flex items-center justify-between text-xs mb-1.5">
-                  <div class="flex items-center space-x-1.5">
+                <div class="flex items-center justify-between text-xs mb-1">
+                  <div class="flex items-center space-x-1.5 min-w-0">
+                    <!-- Multi-select checkbox -->
                     <button
                       type="button"
-                      class="shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors mr-0.5"
-                      :class="isSelected(issue) ? 'bg-indigo-500 border-indigo-400 text-white' : 'border-gray-600 hover:border-indigo-400 text-transparent group-hover:text-gray-500'"
-                      :title="isSelected(issue) ? 'Deselect (Esc)' : 'Select for bulk actions'"
+                      class="w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0"
+                      :class="isSelected(issue) ? 'bg-zinc-900 dark:bg-zinc-100 border-zinc-900 dark:border-zinc-100 text-white dark:text-zinc-900' : 'border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-900 text-transparent hover:border-zinc-400 dark:hover:border-zinc-400'"
                       @click.stop="toggleSelect(issue)"
+                      :title="isSelected(issue) ? 'Deselect (Esc)' : 'Select for bulk actions'"
                     >
-                      <i data-lucide="check" class="w-3 h-3"></i>
+                      <i data-lucide="check" class="w-2.5 h-2.5"></i>
                     </button>
-                    <span v-if="!currentProject && issue.expand && issue.expand.project" class="text-xs" :title="issue.expand.project.name">
-                      {{ issue.expand.project.icon || '📁' }}
-                    </span>
-                    <span class="font-mono text-[11px] text-gray-400 font-semibold tracking-wider">
+                    <!-- Project Icon / Identifier -->
+                    <span class="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 truncate">
+                      <span v-if="!currentProject && issue.expand && issue.expand.project" class="mr-0.5">
+                        {{ issue.expand.project.icon || '📁' }}
+                      </span>
                       {{ issue.identifier }}
                     </span>
                   </div>
 
-                  <div class="flex items-center space-x-1.5">
-                    <span v-if="issue.estimate" class="px-1.5 py-0.5 rounded bg-gray-800/80 text-[10px] font-mono text-gray-400 border border-gray-700/50">
+                  <div class="flex items-center space-x-1 flex-shrink-0">
+                    <!-- Blocked badge -->
+                    <span
+                      v-if="isBlocked(issue)"
+                      class="px-1 py-0.5 rounded border text-[9px] font-semibold bg-red-50 dark:bg-red-950/60 border-red-200 dark:border-red-900/70 text-red-600 dark:text-red-400"
+                      title="Blocked by another issue"
+                    >
+                      <i data-lucide="lock" class="w-2.5 h-2.5"></i>
+                      Blocked
+                    </span>
+
+                    <!-- Estimate Points Pill -->
+                    <span
+                      v-if="issue.estimate"
+                      class="px-1 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[10px] font-mono text-zinc-600 dark:text-zinc-400"
+                      title="Story Points"
+                    >
                       {{ issue.estimate }}
                     </span>
 
-                    <span 
-                      class="p-1 rounded border flex items-center justify-center"
+                    <!-- Priority Icon -->
+                    <div
+                      v-if="issue.priority && issue.priority !== 'none'"
+                      class="p-0.5 rounded border flex items-center justify-center"
                       :class="getPriorityIcon(issue.priority).color"
                       :title="'Priority: ' + issue.priority"
                     >
-                      <i :data-lucide="getPriorityIcon(issue.priority).icon" class="w-3 h-3"></i>
-                    </span>
-
-                    <span
-                      v-if="isBlocked(issue)"
-                      class="p-1 rounded border flex items-center justify-center bg-red-950/60 border-red-900/70 text-red-400"
-                      title="Blocked by another issue"
-                    >
-                      <i data-lucide="lock" class="w-3 h-3"></i>
-                    </span>
+                      <i :data-lucide="getPriorityIcon(issue.priority).icon" class="w-2.5 h-2.5"></i>
+                    </div>
                   </div>
                 </div>
 
                 <!-- Card Title -->
-                <h4 class="text-xs font-medium text-gray-100 group-hover:text-indigo-200 transition-colors line-clamp-2 leading-snug">
+                <div class="text-xs font-medium text-zinc-900 dark:text-zinc-100 leading-snug line-clamp-2 mb-1.5 group-hover:text-zinc-950 dark:group-hover:text-white">
                   {{ issue.title }}
-                </h4>
+                </div>
 
                 <!-- Subtasks Progress Bar -->
-                <div v-if="getSubtaskProgress(issue)" class="mt-2.5 pt-2 border-t border-gray-800/60">
-                  <div class="flex items-center justify-between text-[10px] text-gray-400 font-mono mb-1">
-                    <span class="flex items-center space-x-1">
-                      <i data-lucide="check-square" class="w-2.5 h-2.5"></i>
-                      <span>Subtasks</span>
-                    </span>
-                    <span>{{ getSubtaskProgress(issue).completed }}/{{ getSubtaskProgress(issue).total }}</span>
+                <div v-if="getSubtaskProgress(issue)" class="mb-1.5 space-y-0.5">
+                  <div class="flex items-center justify-between text-[9px] text-zinc-400 dark:text-zinc-500 font-mono">
+                    <span>{{ getSubtaskProgress(issue).completed }}/{{ getSubtaskProgress(issue).total }} subtasks</span>
+                    <span>{{ getSubtaskProgress(issue).percent }}%</span>
                   </div>
-                  <div class="w-full bg-gray-800 rounded-full h-1 overflow-hidden">
-                    <div 
-                      class="bg-indigo-500 h-1 rounded-full transition-all" 
+                  <div class="w-full h-1 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                    <div
+                      class="h-full bg-zinc-700 dark:bg-zinc-300 rounded-full transition-all"
                       :style="{ width: getSubtaskProgress(issue).percent + '%' }"
                     ></div>
                   </div>
                 </div>
 
-                <!-- Card Footer -->
-                <div class="flex items-center justify-between mt-2.5 pt-2 border-t border-gray-800/40 text-[11px]">
+                <!-- Card Footer (Labels, Due Date, Assignee) -->
+                <div class="flex items-center justify-between pt-1 border-t border-zinc-100 dark:border-zinc-800/60 text-xs">
+                  <!-- Labels -->
                   <div class="flex items-center space-x-1 overflow-hidden max-w-[140px]">
-                    <span 
-                      v-for="lbl in (issue.labels || []).slice(0, 2)" 
+                    <span
+                      v-for="lbl in (issue.labels || []).slice(0, 2)"
                       :key="lbl"
-                      class="px-1.5 py-0.5 rounded bg-indigo-950/60 text-indigo-300 border border-indigo-800/40 text-[10px] truncate"
+                      class="px-1 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700/60 text-[9px] font-mono truncate"
                     >
                       {{ lbl }}
                     </span>
-                    <span v-if="(issue.labels || []).length > 2" class="text-[10px] text-gray-500 font-mono">
+                    <span v-if="(issue.labels || []).length > 2" class="text-[9px] text-zinc-400 font-mono">
                       +{{ issue.labels.length - 2 }}
                     </span>
                   </div>
 
-                  <div class="flex items-center space-x-2 ml-auto">
-                    <span 
-                      v-if="formatDueDate(issue.due_date)" 
-                      class="flex items-center space-x-1 text-[10px] font-medium"
+                  <div class="flex items-center space-x-1.5 ml-auto">
+                    <span
+                      v-if="formatDueDate(issue.due_date)"
+                      class="flex items-center space-x-0.5 text-[9px] font-medium"
                       :class="{
-                        'text-red-400': formatDueDate(issue.due_date).status === 'overdue',
-                        'text-amber-400': formatDueDate(issue.due_date).status === 'today',
-                        'text-gray-400': formatDueDate(issue.due_date).status === 'upcoming'
+                        'text-red-500': formatDueDate(issue.due_date).status === 'overdue',
+                        'text-amber-500': formatDueDate(issue.due_date).status === 'today',
+                        'text-zinc-400': formatDueDate(issue.due_date).status === 'upcoming'
                       }"
                     >
                       <i data-lucide="calendar" class="w-2.5 h-2.5"></i>
                       <span>{{ formatDueDate(issue.due_date).text }}</span>
                     </span>
 
+                    <!-- Assignee Avatar (Human or Agent) -->
                     <div
                       v-if="issue.assignee"
-                      class="w-5 h-5 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-[10px] font-bold text-white shadow-sm"
+                      class="w-4 h-4 rounded-full bg-zinc-200 dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 flex items-center justify-center text-[9px] font-bold text-zinc-800 dark:text-zinc-200 shadow-2xs"
                       :title="'Assignee: ' + issue.assignee"
                     >
                       <template v-if="agentAvatar(issue.assignee)">{{ agentAvatar(issue.assignee) }}</template>
@@ -533,15 +528,6 @@ const KanbanBoardComponent = {
                     </div>
                   </div>
                 </div>
-              </div>
-
-              <!-- Empty Column State -->
-              <div 
-                v-if="getIssuesForColumn(col.key).length === 0" 
-                class="h-24 flex flex-col items-center justify-center text-gray-600 border border-dashed border-gray-800/60 rounded-xl select-none"
-              >
-                <i :data-lucide="col.icon" class="w-4 h-4 mb-1 opacity-40"></i>
-                <span class="text-[11px]">No items</span>
               </div>
             </div>
           </div>

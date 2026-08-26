@@ -1,5 +1,5 @@
 // pb_public/js/components/MilestonesView.js
-// Milestones & North Star Strategic Roadmap Component
+// Minimalist Milestones & North Star Strategic Roadmap Component supporting Dark and Light themes.
 
 const MilestonesViewComponent = {
   props: ['milestones', 'issues', 'projects', 'currentProject'],
@@ -43,7 +43,7 @@ const MilestonesViewComponent = {
       return this.milestones.filter(m => m.project === this.activeProject.id || !m.project);
     },
     milestonesWithProgress() {
-      return this.filteredMilestones.map(m => {
+      return (this.filteredMilestones || []).map(m => {
         const linkedIssues = this.issues.filter(i => i.milestone === m.id);
         const total = linkedIssues.length;
         const done = linkedIssues.filter(i => i.status === 'done').length;
@@ -93,61 +93,49 @@ const MilestonesViewComponent = {
         try { settings = JSON.parse(settings); } catch (e) { settings = {}; }
       }
       settings.north_star = { ...this.northStarForm };
-      this.$emit('update-project', this.activeProject.id, { settings });
+      this.$emit('update-project', {
+        id: this.activeProject.id,
+        settings: settings
+      });
       this.isEditNorthStarOpen = false;
     },
     handleCreateMilestone() {
-      if (!this.newMilestone.name || !this.activeProject) return;
+      if (!this.newMilestone.name) return;
       this.$emit('create-milestone', {
-        name: this.newMilestone.name,
-        description: this.newMilestone.description,
-        target_date: this.newMilestone.target_date,
-        status: this.newMilestone.status,
-        project: this.activeProject.id
+        ...this.newMilestone,
+        project: this.activeProject ? this.activeProject.id : null
       });
       this.newMilestone = { name: '', description: '', target_date: '', status: 'planned' };
       this.isNewMilestoneOpen = false;
-    },
-    updateStatus(m, newStatus) {
-      this.$emit('update-milestone', m.id, { status: newStatus });
     }
   },
   template: `
-    <div class="h-full overflow-y-auto bg-gray-950 p-2.5 space-y-3">
+    <div class="h-[calc(100vh-3.5rem)] overflow-y-auto p-4 bg-zinc-50 dark:bg-[#09090b] space-y-4 select-none">
       <!-- 1. North Star Banner -->
-      <div class="relative overflow-hidden rounded-xl bg-gradient-to-r from-indigo-950/60 via-purple-950/40 to-gray-900 border border-indigo-500/20 p-3 shadow-xl">
-        <div class="absolute top-0 right-0 p-6 pointer-events-none opacity-10">
-          <i data-lucide="compass" class="w-48 h-48 text-indigo-300"></i>
-        </div>
-
-        <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div class="space-y-2 max-w-3xl">
+      <div class="p-4 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+          <div class="space-y-1 max-w-3xl">
             <div class="flex items-center space-x-2">
-              <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 flex items-center space-x-1">
-                <i data-lucide="sparkles" class="w-3 h-3 text-indigo-400"></i>
-                <span>North Star Objective</span>
+              <span class="text-base">🧭</span>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 font-mono">North Star Roadmap</span>
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700/60">
+                {{ northStar.target_quarter }}
               </span>
-              <span v-if="activeProject" class="text-xs text-gray-400 font-medium">[{{ activeProject.identifier }}] {{ activeProject.name }}</span>
             </div>
-            <h2 class="text-xl md:text-2xl font-bold text-white tracking-tight">
-              {{ northStar ? northStar.vision : 'Define your project vision & strategic trajectory.' }}
-            </h2>
-            <p class="text-sm text-gray-300">
-              {{ northStar ? northStar.objective : 'Add target milestones, architecture goals, and success criteria.' }}
-            </p>
+            <h2 class="text-sm sm:text-base font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{{ northStar.vision }}</h2>
+            <p class="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">{{ northStar.objective }}</p>
           </div>
 
-          <div class="flex items-center space-x-3 flex-shrink-0">
+          <div class="flex items-center space-x-2 shrink-0">
             <button
               @click="openEditNorthStar"
-              class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-gray-900/80 hover:bg-gray-800 border border-gray-700 text-gray-200 transition-all flex items-center space-x-1.5 shadow-sm"
+              class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700/60 transition-colors"
             >
-              <i data-lucide="edit-3" class="w-3.5 h-3.5 text-gray-400"></i>
-              <span>Edit North Star</span>
+              Edit Vision
             </button>
             <button
               @click="isNewMilestoneOpen = true"
-              class="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition-all flex items-center space-x-1.5"
+              class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 shadow-2xs transition-colors flex items-center space-x-1.5"
             >
               <i data-lucide="plus" class="w-3.5 h-3.5"></i>
               <span>Add Milestone</span>
@@ -157,241 +145,197 @@ const MilestonesViewComponent = {
       </div>
 
       <!-- 2. Roadmap Grid by Status -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
         <!-- In Progress Milestones -->
-        <div class="space-y-4">
-          <div class="flex items-center justify-between pb-2 border-b border-gray-800/80">
+        <div class="space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800">
             <div class="flex items-center space-x-2">
-              <span class="w-2.5 h-2.5 rounded-full bg-amber-400 ring-4 ring-amber-400/10"></span>
-              <h3 class="text-sm font-semibold text-white">In Progress</h3>
+              <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+              <h3 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">In Progress</h3>
             </div>
-            <span class="text-xs font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20">
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700/60">
               {{ groupedMilestones.in_progress.length }}
             </span>
           </div>
 
-          <div v-if="groupedMilestones.in_progress.length === 0" class="p-6 rounded-xl border border-dashed border-gray-800 text-center text-xs text-gray-500">
+          <div v-if="groupedMilestones.in_progress.length === 0" class="p-5 rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 text-center text-xs text-zinc-400">
             No active milestones in progress.
           </div>
 
           <div
             v-for="m in groupedMilestones.in_progress"
             :key="m.id"
-            class="p-5 rounded-xl bg-gray-900/70 border border-amber-500/30 shadow-lg space-y-4 transition-all hover:border-amber-500/50"
+            class="p-4 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800/80 shadow-2xs space-y-3"
           >
             <div class="flex items-start justify-between gap-2">
-              <div class="space-y-1">
-                <h4 class="text-sm font-bold text-white tracking-tight">{{ m.name }}</h4>
-                <p class="text-xs text-gray-400 line-clamp-2">{{ m.description }}</p>
+              <div class="space-y-0.5">
+                <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{{ m.name }}</h4>
+                <p class="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2">{{ m.description }}</p>
               </div>
-              <div class="flex items-center space-x-1">
-                <button
-                  @click="updateStatus(m, 'achieved')"
-                  title="Mark as achieved"
-                  class="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-all"
-                >
-                  <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
-                </button>
-              </div>
-            </div>
-
-            <!-- Progress Bar -->
-            <div class="space-y-1.5">
-              <div class="flex justify-between text-xs font-medium">
-                <span class="text-gray-400">Progress</span>
-                <span class="text-amber-300 font-mono">{{ m.progressPercent }}% ({{ m.doneCount }}/{{ m.totalCount }} tasks)</span>
-              </div>
-              <div class="w-full h-2 rounded-full bg-gray-800 overflow-hidden">
-                <div class="h-full bg-gradient-to-r from-amber-500 to-emerald-500 transition-all duration-300" :style="{ width: m.progressPercent + '%' }"></div>
-              </div>
-            </div>
-
-            <div class="flex items-center justify-between text-xs text-gray-400 pt-2 border-t border-gray-800/60">
-              <span class="flex items-center space-x-1">
-                <i data-lucide="calendar" class="w-3.5 h-3.5 text-gray-500"></i>
-                <span>{{ formatDate(m.target_date) }}</span>
-              </span>
-              <button
-                @click="$emit('delete-milestone', m.id)"
-                class="text-gray-500 hover:text-red-400 transition-colors"
-                title="Delete milestone"
-              >
+              <button @click="$emit('delete-milestone', m.id)" class="text-zinc-400 hover:text-red-500 p-0.5">
                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
               </button>
             </div>
 
-            <!-- Linked Tasks Preview -->
-            <div v-if="m.linkedIssues.length > 0" class="space-y-1.5 pt-2">
-              <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Linked Tasks</div>
-              <div class="space-y-1 max-h-40 overflow-y-auto">
-                <div
-                  v-for="iss in m.linkedIssues"
-                  :key="iss.id"
-                  @click="$emit('open-issue', iss)"
-                  class="p-2 rounded-lg bg-gray-950/60 border border-gray-800/60 hover:border-gray-700 cursor-pointer flex items-center justify-between text-xs transition-all"
-                >
-                  <div class="flex items-center space-x-2 truncate">
-                    <span class="font-mono text-gray-400 font-medium">{{ iss.identifier }}</span>
-                    <span class="text-gray-200 truncate">{{ iss.title }}</span>
-                  </div>
-                  <span
-                    class="px-1.5 py-0.5 rounded text-[10px] uppercase font-mono font-bold flex-shrink-0"
-                    :class="{
-                      'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20': iss.status === 'done',
-                      'bg-amber-500/10 text-amber-300 border border-amber-500/20': iss.status === 'in_progress',
-                      'bg-gray-800 text-gray-400': iss.status === 'todo' || iss.status === 'backlog'
-                    }"
-                  >
-                    {{ iss.status }}
-                  </span>
+            <!-- Progress Bar -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+                <span>Progress</span>
+                <span class="text-zinc-900 dark:text-zinc-100 font-semibold">{{ m.progressPercent }}%</span>
+              </div>
+              <div class="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                <div class="bg-zinc-800 dark:bg-zinc-200 h-full rounded-full transition-all" :style="{ width: m.progressPercent + '%' }"></div>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between text-[10px] text-zinc-400 pt-2 border-t border-zinc-100 dark:border-zinc-800/60 font-mono">
+              <span>{{ formatDate(m.target_date) }}</span>
+              <span>{{ m.doneCount }}/{{ m.totalCount }} issues</span>
+            </div>
+
+            <!-- Linked issues mini list -->
+            <div v-if="m.linkedIssues && m.linkedIssues.length" class="space-y-1 pt-1">
+              <div
+                v-for="iss in m.linkedIssues"
+                :key="iss.id"
+                @click="$emit('open-issue', iss)"
+                class="px-2 py-1 rounded bg-zinc-50 dark:bg-zinc-900/60 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-between text-xs cursor-pointer border border-zinc-200 dark:border-zinc-800"
+              >
+                <div class="flex items-center space-x-1.5 truncate">
+                  <span class="font-mono text-[11px] text-zinc-500">{{ iss.identifier }}</span>
+                  <span class="text-zinc-800 dark:text-zinc-200 truncate font-medium">{{ iss.title }}</span>
                 </div>
+                <span
+                  class="text-[9px] px-1 py-0.5 rounded font-mono shrink-0"
+                  :class="iss.status === 'done' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'"
+                >
+                  {{ iss.status }}
+                </span>
               </div>
             </div>
           </div>
         </div>
 
         <!-- Planned Milestones -->
-        <div class="space-y-4">
-          <div class="flex items-center justify-between pb-2 border-b border-gray-800/80">
+        <div class="space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800">
             <div class="flex items-center space-x-2">
-              <span class="w-2.5 h-2.5 rounded-full bg-indigo-400 ring-4 ring-indigo-400/10"></span>
-              <h3 class="text-sm font-semibold text-white">Planned</h3>
+              <span class="w-2 h-2 rounded-full bg-zinc-400"></span>
+              <h3 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">Planned</h3>
             </div>
-            <span class="text-xs font-mono px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700/60">
               {{ groupedMilestones.planned.length }}
             </span>
           </div>
 
-          <div v-if="groupedMilestones.planned.length === 0" class="p-6 rounded-xl border border-dashed border-gray-800 text-center text-xs text-gray-500">
+          <div v-if="groupedMilestones.planned.length === 0" class="p-5 rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 text-center text-xs text-zinc-400">
             No planned milestones.
           </div>
 
           <div
             v-for="m in groupedMilestones.planned"
             :key="m.id"
-            class="p-5 rounded-xl bg-gray-900/50 border border-gray-800 shadow-md space-y-4 transition-all hover:border-gray-700"
+            class="p-4 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800/80 shadow-2xs space-y-3"
           >
             <div class="flex items-start justify-between gap-2">
-              <div class="space-y-1">
-                <h4 class="text-sm font-bold text-white tracking-tight">{{ m.name }}</h4>
-                <p class="text-xs text-gray-400 line-clamp-2">{{ m.description }}</p>
+              <div class="space-y-0.5">
+                <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{{ m.name }}</h4>
+                <p class="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2">{{ m.description }}</p>
               </div>
-              <div class="flex items-center space-x-1">
-                <button
-                  @click="updateStatus(m, 'in_progress')"
-                  title="Start milestone"
-                  class="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 transition-all"
-                >
-                  <i data-lucide="play" class="w-3.5 h-3.5"></i>
-                </button>
-              </div>
-            </div>
-
-            <!-- Progress Bar -->
-            <div class="space-y-1.5">
-              <div class="flex justify-between text-xs font-medium">
-                <span class="text-gray-400">Progress</span>
-                <span class="text-gray-400 font-mono">{{ m.progressPercent }}% ({{ m.doneCount }}/{{ m.totalCount }} tasks)</span>
-              </div>
-              <div class="w-full h-2 rounded-full bg-gray-800 overflow-hidden">
-                <div class="h-full bg-indigo-500 transition-all duration-300" :style="{ width: m.progressPercent + '%' }"></div>
-              </div>
-            </div>
-
-            <div class="flex items-center justify-between text-xs text-gray-400 pt-2 border-t border-gray-800/60">
-              <span class="flex items-center space-x-1">
-                <i data-lucide="calendar" class="w-3.5 h-3.5 text-gray-500"></i>
-                <span>{{ formatDate(m.target_date) }}</span>
-              </span>
-              <button
-                @click="$emit('delete-milestone', m.id)"
-                class="text-gray-500 hover:text-red-400 transition-colors"
-                title="Delete milestone"
-              >
+              <button @click="$emit('delete-milestone', m.id)" class="text-zinc-400 hover:text-red-500 p-0.5">
                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
               </button>
+            </div>
+
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+                <span>Progress</span>
+                <span class="text-zinc-900 dark:text-zinc-100 font-semibold">{{ m.progressPercent }}%</span>
+              </div>
+              <div class="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                <div class="bg-zinc-800 dark:bg-zinc-200 h-full rounded-full transition-all" :style="{ width: m.progressPercent + '%' }"></div>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between text-[10px] text-zinc-400 pt-2 border-t border-zinc-100 dark:border-zinc-800/60 font-mono">
+              <span>{{ formatDate(m.target_date) }}</span>
+              <span>{{ m.doneCount }}/{{ m.totalCount }} issues</span>
             </div>
           </div>
         </div>
 
         <!-- Achieved Milestones -->
-        <div class="space-y-4">
-          <div class="flex items-center justify-between pb-2 border-b border-gray-800/80">
+        <div class="space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800">
             <div class="flex items-center space-x-2">
-              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 ring-4 ring-emerald-400/10"></span>
-              <h3 class="text-sm font-semibold text-white">Achieved</h3>
+              <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <h3 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">Achieved</h3>
             </div>
-            <span class="text-xs font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700/60">
               {{ groupedMilestones.achieved.length }}
             </span>
           </div>
 
-          <div v-if="groupedMilestones.achieved.length === 0" class="p-6 rounded-xl border border-dashed border-gray-800 text-center text-xs text-gray-500">
+          <div v-if="groupedMilestones.achieved.length === 0" class="p-5 rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 text-center text-xs text-zinc-400">
             No achieved milestones yet.
           </div>
 
           <div
             v-for="m in groupedMilestones.achieved"
             :key="m.id"
-            class="p-5 rounded-xl bg-gray-900/30 border border-emerald-500/20 opacity-90 shadow-md space-y-4 transition-all hover:opacity-100"
+            class="p-4 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800/80 shadow-2xs space-y-3"
           >
             <div class="flex items-start justify-between gap-2">
-              <div class="space-y-1">
+              <div class="space-y-0.5">
                 <div class="flex items-center space-x-1.5">
-                  <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
-                  <h4 class="text-sm font-bold text-white tracking-tight">{{ m.name }}</h4>
+                  <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-500"></i>
+                  <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{{ m.name }}</h4>
                 </div>
-                <p class="text-xs text-gray-400 line-clamp-2">{{ m.description }}</p>
+                <p class="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2">{{ m.description }}</p>
               </div>
             </div>
 
-            <div class="w-full h-2 rounded-full bg-gray-800 overflow-hidden">
+            <div class="w-full h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
               <div class="h-full bg-emerald-500 w-full"></div>
             </div>
 
-            <div class="flex items-center justify-between text-xs text-gray-400 pt-2 border-t border-gray-800/60">
-              <span class="text-emerald-400 font-medium">Completed</span>
-              <button
-                @click="$emit('delete-milestone', m.id)"
-                class="text-gray-500 hover:text-red-400 transition-colors"
-                title="Delete milestone"
-              >
-                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-              </button>
+            <div class="flex items-center justify-between text-[10px] text-zinc-400 pt-2 border-t border-zinc-100 dark:border-zinc-800/60 font-mono">
+              <span>{{ formatDate(m.target_date) }}</span>
+              <span class="text-emerald-600 dark:text-emerald-400 font-semibold">100% complete</span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Add Milestone Modal -->
-      <div v-if="isNewMilestoneOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-5">
-          <div class="flex items-center justify-between">
-            <h3 class="text-base font-bold text-white">Create New Milestone</h3>
-            <button @click="isNewMilestoneOpen = false" class="text-gray-400 hover:text-white">
+      <!-- Create Milestone Modal -->
+      <div v-if="isNewMilestoneOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
+        <div class="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 w-full max-w-md shadow-2xl space-y-4">
+          <div class="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2.5">
+            <h3 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">Create New Milestone</h3>
+            <button @click="isNewMilestoneOpen = false" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
               <i data-lucide="x" class="w-4 h-4"></i>
             </button>
           </div>
 
-          <div class="space-y-4">
+          <div class="space-y-3 text-xs select-text">
             <div>
-              <label class="block text-xs font-semibold text-gray-300 mb-1.5">Milestone Name</label>
-              <input v-model="newMilestone.name" type="text" placeholder="e.g. M2: Zero-Build Fast View Parity" class="w-full px-3.5 py-2.5 rounded-xl bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+              <label class="block text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">Milestone Name</label>
+              <input v-model="newMilestone.name" type="text" placeholder="e.g. M2: Zero-Build Fast View Parity" class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-400" />
             </div>
 
             <div>
-              <label class="block text-xs font-semibold text-gray-300 mb-1.5">Description & Scope</label>
-              <textarea v-model="newMilestone.description" rows="3" placeholder="Target features, architecture gates, and deliverables..." class="w-full px-3.5 py-2.5 rounded-xl bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"></textarea>
+              <label class="block text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">Description & Scope</label>
+              <textarea v-model="newMilestone.description" rows="2" placeholder="Target features and deliverables..." class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-400"></textarea>
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-2 gap-2.5">
               <div>
-                <label class="block text-xs font-semibold text-gray-300 mb-1.5">Target Date</label>
-                <input v-model="newMilestone.target_date" type="date" class="w-full px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                <label class="block text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">Target Date</label>
+                <input v-model="newMilestone.target_date" type="date" class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:border-zinc-400" />
               </div>
               <div>
-                <label class="block text-xs font-semibold text-gray-300 mb-1.5">Status</label>
-                <select v-model="newMilestone.status" class="w-full px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                <label class="block text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">Status</label>
+                <select v-model="newMilestone.status" class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-400">
                   <option value="planned">Planned</option>
                   <option value="in_progress">In Progress</option>
                   <option value="achieved">Achieved</option>
@@ -400,43 +344,43 @@ const MilestonesViewComponent = {
             </div>
           </div>
 
-          <div class="flex justify-end space-x-3 pt-2">
-            <button @click="isNewMilestoneOpen = false" class="px-4 py-2 rounded-xl text-xs font-semibold text-gray-400 hover:text-white bg-gray-800">Cancel</button>
-            <button @click="handleCreateMilestone" class="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500">Create Milestone</button>
+          <div class="flex justify-end space-x-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+            <button @click="isNewMilestoneOpen = false" class="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800">Cancel</button>
+            <button @click="handleCreateMilestone" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 shadow-2xs">Create Milestone</button>
           </div>
         </div>
       </div>
 
       <!-- Edit North Star Modal -->
-      <div v-if="isEditNorthStarOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-5">
-          <div class="flex items-center justify-between">
-            <h3 class="text-base font-bold text-white">Edit North Star Objective</h3>
-            <button @click="isEditNorthStarOpen = false" class="text-gray-400 hover:text-white">
+      <div v-if="isEditNorthStarOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
+        <div class="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 w-full max-w-md shadow-2xl space-y-4">
+          <div class="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2.5">
+            <h3 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">Edit North Star Objective</h3>
+            <button @click="isEditNorthStarOpen = false" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
               <i data-lucide="x" class="w-4 h-4"></i>
             </button>
           </div>
 
-          <div class="space-y-4">
+          <div class="space-y-3 text-xs select-text">
             <div>
-              <label class="block text-xs font-semibold text-gray-300 mb-1.5">North Star Vision</label>
-              <textarea v-model="northStarForm.vision" rows="2" placeholder="High level strategic purpose..." class="w-full px-3.5 py-2.5 rounded-xl bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"></textarea>
+              <label class="block text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">North Star Vision</label>
+              <textarea v-model="northStarForm.vision" rows="2" placeholder="High level strategic purpose..." class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-400"></textarea>
             </div>
 
             <div>
-              <label class="block text-xs font-semibold text-gray-300 mb-1.5">Concrete Objective & Metrics</label>
-              <textarea v-model="northStarForm.objective" rows="3" placeholder="Measurable targets..." class="w-full px-3.5 py-2.5 rounded-xl bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"></textarea>
+              <label class="block text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">Concrete Objective</label>
+              <textarea v-model="northStarForm.objective" rows="2" placeholder="Measurable targets..." class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-400"></textarea>
             </div>
 
             <div>
-              <label class="block text-xs font-semibold text-gray-300 mb-1.5">Target Horizon</label>
-              <input v-model="northStarForm.target_quarter" type="text" placeholder="e.g. Q4 2026" class="w-full px-3.5 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+              <label class="block text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1">Target Horizon</label>
+              <input v-model="northStarForm.target_quarter" type="text" placeholder="e.g. Q4 2026" class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:border-zinc-400" />
             </div>
           </div>
 
-          <div class="flex justify-end space-x-3 pt-2">
-            <button @click="isEditNorthStarOpen = false" class="px-4 py-2 rounded-xl text-xs font-semibold text-gray-400 hover:text-white bg-gray-800">Cancel</button>
-            <button @click="saveNorthStar" class="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500">Save North Star</button>
+          <div class="flex justify-end space-x-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+            <button @click="isEditNorthStarOpen = false" class="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800">Cancel</button>
+            <button @click="saveNorthStar" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 shadow-2xs">Save North Star</button>
           </div>
         </div>
       </div>

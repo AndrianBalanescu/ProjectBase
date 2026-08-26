@@ -45,6 +45,9 @@ BOUND_CLASS_LITERAL_RE = re.compile(r"""(["'])([a-z0-9\-\s]+)\1""")
 MARKER_CLASSES = {
     # SortableJS drag handle selector (KanbanBoard.js), styled via utilities.
     "kanban-card-drag-handle",
+    # Semantic root marker for the Portfolio view (PortfolioView.js), styled
+    # via utilities; used as a stable QA/selector hook, not a styled utility.
+    "pb-portfolio",
     # `<html class="dark ...">` ancestor hook for Tailwind dark-mode variant.
     # It is a state toggle on the root element, not a styled utility class.
     "dark",

@@ -1,4 +1,5 @@
 // pb_public/js/components/CommandPalette.js
+// Minimalist, high-density Command Palette supporting Dark and Light themes.
 
 const CommandPaletteComponent = {
   props: ['isOpen', 'issues', 'projects'],
@@ -26,67 +27,66 @@ const CommandPaletteComponent = {
         { type: 'action', id: 'act_board', title: 'Switch to Board View', subtitle: 'View Kanban Board', action: () => this.$emit('change-view', 'board'), icon: 'kanban' },
         { type: 'action', id: 'act_list', title: 'Switch to List View', subtitle: 'View tabular task list', action: () => this.$emit('change-view', 'list'), icon: 'list-todo' },
         { type: 'action', id: 'act_cycles', title: 'Switch to Cycles View', subtitle: 'View Sprints & Velocity', action: () => this.$emit('change-view', 'cycles'), icon: 'refresh-cw' },
-        { type: 'action', id: 'act_timeline', title: 'Switch to Timeline View', subtitle: 'View Gantt schedule of cycles, milestones & issues', action: () => this.$emit('change-view', 'timeline'), icon: 'calendar' },
-        { type: 'action', id: 'act_stats', title: 'View Analytics & Activity', subtitle: 'System statistics', action: () => this.$emit('change-view', 'stats'), icon: 'bar-chart-2' },
-        { type: 'action', id: 'act_portfolio', title: 'View Portfolio Dashboard', subtitle: 'Cross-project progress & roadmap health', action: () => this.$emit('change-view', 'portfolio'), icon: 'layout-dashboard' },
-        { type: 'action', id: 'act_welcome', title: 'Show Welcome Guide', subtitle: 'Re-open the first-run onboarding checklist', action: () => this.$emit('open-welcome'), icon: 'sparkles' }
+        { type: 'action', id: 'act_milestones', title: 'Switch to Milestones View', subtitle: 'View North Star Roadmap', action: () => this.$emit('change-view', 'milestones'), icon: 'milestone' },
+        { type: 'action', id: 'act_stats', title: 'Switch to Stats / Analytics', subtitle: 'View Workspace Insights', action: () => this.$emit('change-view', 'stats'), icon: 'bar-chart-3' },
+        { type: 'action', id: 'act_agents', title: 'Switch to Agents Cockpit', subtitle: 'Autonomous Task Orchestration', action: () => this.$emit('change-view', 'agents'), icon: 'bot' },
+        { type: 'action', id: 'act_portfolio', title: 'Switch to Portfolio View', subtitle: 'Multi-Project Health & Rollups', action: () => this.$emit('change-view', 'portfolio'), icon: 'layers' },
+        { type: 'action', id: 'act_timeline', title: 'Switch to Timeline View', subtitle: 'Gantt Roadmap & Schedules', action: () => this.$emit('change-view', 'timeline'), icon: 'calendar' },
+        { type: 'action', id: 'act_welcome', title: 'Open Welcome & Shortcuts', subtitle: 'Keyboard shortcuts guide', action: () => this.$emit('open-welcome'), icon: 'help-circle' }
       ];
 
-      for (const act of actions) {
-        if (!q || act.title.toLowerCase().includes(q) || act.subtitle.toLowerCase().includes(q)) {
-          items.push(act);
+      actions.forEach(a => {
+        if (!q || a.title.toLowerCase().includes(q) || a.subtitle.toLowerCase().includes(q)) {
+          items.push(a);
         }
-      }
+      });
 
       // Projects
-      for (const p of this.projects) {
+      (this.projects || []).forEach(p => {
         if (!q || p.name.toLowerCase().includes(q) || p.identifier.toLowerCase().includes(q)) {
           items.push({
             type: 'project',
-            id: p.id,
+            id: 'proj_' + p.id,
             title: p.name,
             subtitle: `Project [${p.identifier}]`,
             icon: 'folder',
-            data: p,
             action: () => this.$emit('select-project', p)
           });
         }
-      }
+      });
 
-      // Issues: current-project matches first, then global cross-project
-      // matches (deduped by id) so a search surfaces items from every project.
-      const seen = new Set();
-      for (const issue of this.issues) {
-        seen.add(issue.id);
-        if (!q || issue.title.toLowerCase().includes(q) || (issue.identifier || '').toLowerCase().includes(q)) {
+      // Issues (scoped to current view)
+      (this.issues || []).forEach(i => {
+        if (!q || (i.title && i.title.toLowerCase().includes(q)) || (i.identifier && i.identifier.toLowerCase().includes(q))) {
           items.push({
             type: 'issue',
-            id: issue.id,
-            title: issue.title,
-            subtitle: `${issue.identifier} • ${issue.status} • ${issue.priority}`,
+            id: 'iss_' + i.id,
+            title: i.title,
+            subtitle: `${i.identifier || 'Issue'} · ${i.status} · ${i.priority}`,
             icon: 'check-square',
-            data: issue,
-            action: () => this.$emit('select-issue', issue)
+            action: () => this.$emit('select-issue', i)
           });
         }
-      }
-      for (const g of this.globalResults) {
-        if (seen.has(g.id)) continue;
-        seen.add(g.id);
-        if (!q || g.title.toLowerCase().includes(q) || (g.identifier || '').toLowerCase().includes(q)) {
+      });
+
+      // Cross-project Global Search Results
+      if (q && Array.isArray(this.globalResults) && this.globalResults.length > 0) {
+        const localIssueIds = new Set((this.issues || []).map(x => x.id));
+        this.globalResults.forEach(r => {
+          if (localIssueIds.has(r.id)) return;
+          const projTag = r.project_identifier ? `[${r.project_identifier}] ` : '';
           items.push({
-            type: 'issue',
-            id: g.id,
-            title: g.title,
-            subtitle: `${g.identifier} • ${g.status} • ${g.priority} • ${g.project_identifier || g.project_name}`,
-            icon: 'check-square',
-            data: g,
-            action: () => this.$emit('select-global-issue', g)
+            type: 'global-issue',
+            id: 'global_' + r.id,
+            title: `${r.identifier || 'PB'}: ${r.title}`,
+            subtitle: `${projTag}${r.project_name || 'Other project'} · ${r.status || 'todo'} · ${r.priority || 'medium'}`,
+            icon: 'search',
+            action: () => this.$emit('select-global-issue', r)
           });
-        }
+        });
       }
 
-      return items.slice(0, 30);
+      return items;
     }
   },
   watch: {
@@ -119,7 +119,6 @@ const CommandPaletteComponent = {
     scheduleGlobalSearch(raw) {
       const q = (raw || '').trim();
       if (this._searchTimer) { clearTimeout(this._searchTimer); this._searchTimer = null; }
-      // De-bounce so the fetch only fires after the user stops typing.
       this._searchTimer = setTimeout(() => this.runGlobalSearch(q), 250);
     },
     async runGlobalSearch(q) {
@@ -144,82 +143,80 @@ const CommandPaletteComponent = {
     handleKey(e) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        this.selectedIndex = (this.selectedIndex + 1) % this.results.length;
+        this.selectedIndex = (this.selectedIndex + 1) % (this.results.length || 1);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        this.selectedIndex = (this.selectedIndex - 1 + this.results.length) % this.results.length;
+        this.selectedIndex = (this.selectedIndex - 1 + this.results.length) % (this.results.length || 1);
       } else if (e.key === 'Enter') {
         e.preventDefault();
         if (this.results[this.selectedIndex]) {
           this.results[this.selectedIndex].action();
           this.$emit('close');
         }
-      } else if (e.key === 'Escape') {
-        this.$emit('close');
       }
     }
   },
   template: `
-    <div v-if="isOpen" class="fixed inset-0 z-50 overflow-y-auto p-4 sm:p-6 md:p-20 flex justify-center items-start">
+    <div v-if="isOpen" class="fixed inset-0 z-50 overflow-y-auto p-4 sm:p-6 md:p-20 flex justify-center items-start select-none">
       <!-- Backdrop -->
-      <div class="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity" @click="$emit('close')"></div>
+      <div class="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-sm transition-opacity" @click="$emit('close')"></div>
 
-      <!-- Omnibar Box -->
-      <div class="relative w-full max-w-2xl bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150">
-        
+      <!-- Modal Card -->
+      <div class="relative w-full max-w-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150">
+
         <!-- Search Input Header -->
-        <div class="flex items-center px-4 border-b border-gray-800 bg-gray-950/60">
-          <i data-lucide="search" class="w-5 h-5 text-gray-400 mr-3"></i>
-          <input 
+        <div class="flex items-center px-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/60">
+          <i data-lucide="search" class="w-4 h-4 text-zinc-400 mr-3 shrink-0"></i>
+          <input
             ref="searchInput"
             v-model="query"
             @keydown="handleKey"
             placeholder="Type a command, project, or issue name..."
-            class="w-full py-3.5 bg-transparent text-sm text-white placeholder-gray-500 focus:outline-none"
+            class="w-full py-3 bg-transparent text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none"
           />
-          <kbd class="px-1.5 py-0.5 rounded bg-gray-800 text-[10px] text-gray-400 font-mono border border-gray-700">ESC</kbd>
+          <kbd class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[10px] text-zinc-500 font-mono border border-zinc-200 dark:border-zinc-700 shrink-0">ESC</kbd>
         </div>
 
         <!-- Results List -->
-        <div class="max-h-96 overflow-y-auto p-2 space-y-1">
-          <div 
-            v-for="(item, idx) in results" 
+        <div class="max-h-96 overflow-y-auto p-1.5 space-y-0.5">
+          <div
+            v-for="(item, idx) in results"
             :key="item.id"
             @click="item.action(); $emit('close');"
             @mouseenter="selectedIndex = idx"
-            class="flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors"
-            :class="selectedIndex === idx ? 'bg-indigo-600/20 border border-indigo-500/40 text-white' : 'text-gray-300 hover:bg-gray-800/60 border border-transparent'"
+            class="flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors"
+            :class="selectedIndex === idx ? 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-900 dark:text-white' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900'"
           >
-            <div class="flex items-center space-x-3 min-w-0">
-              <div 
-                class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                :class="selectedIndex === idx ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400'"
+            <div class="flex items-center space-x-2.5 min-w-0">
+              <div
+                class="w-6 h-6 rounded-md flex items-center justify-center shrink-0 border"
+                :class="selectedIndex === idx ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white border-zinc-300 dark:border-zinc-600' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border-zinc-200 dark:border-zinc-700/60'"
               >
-                <i :data-lucide="item.icon" class="w-4 h-4"></i>
+                <i :data-lucide="item.icon" class="w-3.5 h-3.5"></i>
               </div>
               <div class="min-w-0">
-                <div class="text-xs font-semibold truncate">{{ item.title }}</div>
-                <div class="text-[10px] text-gray-400 truncate">{{ item.subtitle }}</div>
+                <div class="text-xs font-medium truncate">{{ item.title }}</div>
+                <div class="text-[10px] text-zinc-400 truncate">{{ item.subtitle }}</div>
               </div>
             </div>
 
-            <div class="flex items-center space-x-1.5 text-xs text-gray-500 flex-shrink-0">
-              <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-gray-800/80">{{ item.type }}</span>
+            <div class="flex items-center space-x-1.5 text-xs text-zinc-400 shrink-0 ml-2">
+              <span class="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/60">{{ item.type }}</span>
             </div>
           </div>
 
-          <div v-if="results.length === 0" class="py-10 text-center text-gray-500 text-xs">
+          <div v-if="results.length === 0" class="py-8 text-center text-zinc-400 text-xs">
             No matching actions, projects, or issues found.
           </div>
         </div>
 
         <!-- Footer Help -->
-        <div class="px-4 py-2 border-t border-gray-800/80 bg-gray-950/60 flex items-center justify-between text-[11px] text-gray-500 select-none">
+        <div class="px-4 py-2 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/60 flex items-center justify-between text-[10px] text-zinc-400 select-none">
           <div class="flex items-center space-x-3">
-            <span><kbd class="text-[10px] font-mono bg-gray-800 px-1 rounded">↑↓</kbd> to navigate</span>
-            <span><kbd class="text-[10px] font-mono bg-gray-800 px-1 rounded">↵</kbd> to select</span>
+            <span><kbd class="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 rounded border border-zinc-200 dark:border-zinc-700">↑↓</kbd> navigate</span>
+            <span><kbd class="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 rounded border border-zinc-200 dark:border-zinc-700">↵</kbd> select</span>
           </div>
-          <span>ProjectBase Fast Command</span>
+          <span>ProjectBase Command</span>
         </div>
 
       </div>

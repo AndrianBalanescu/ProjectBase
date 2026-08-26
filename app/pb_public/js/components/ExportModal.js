@@ -1,9 +1,5 @@
 // pb_public/js/components/ExportModal.js
-// Flat-file exporter UI for ProjectBase (cycle 29).
-// The importer (ImportModal) only brings data in; this modal lets a user take
-// their issues back out as a portable CSV or JSON file so they can back up,
-// migrate to Linear/Plane/Trello, or re-import into another ProjectBase.
-// Backed by GET /api/projectbase/export/csv and /api/projectbase/export/json.
+// Minimalist Flat-file exporter modal supporting Dark and Light themes.
 
 const ExportModalComponent = {
   props: ['isOpen', 'projects', 'currentProject'],
@@ -31,6 +27,9 @@ const ExportModalComponent = {
         this.error = '';
         this.result = null;
         this.projectId = this.currentProject ? this.currentProject.id : (this.projects[0] ? this.projects[0].id : '');
+        this.$nextTick(() => {
+          if (window.lucide) window.lucide.createIcons();
+        });
       }
     }
   },
@@ -38,8 +37,6 @@ const ExportModalComponent = {
     close() {
       this.$emit('close');
     },
-    // Trigger a browser download by navigating the auth'd fetch to a blob URL.
-    // CSV is a text blob; JSON is served as a blob too so we can pretty-print.
     async doExport() {
       this.error = '';
       this.result = null;
@@ -83,53 +80,73 @@ const ExportModalComponent = {
     }
   },
   template: `
-    <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" @click.self="close">
-      <div class="w-full max-w-lg rounded-2xl bg-gray-900 border border-gray-800 shadow-2xl overflow-hidden">
-        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-800">
+    <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 select-none" @click.self="close">
+      <div class="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-sm transition-opacity" @click="close"></div>
+
+      <div class="relative w-full max-w-lg rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-5 py-3.5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
           <div class="flex items-center space-x-2">
-            <i data-lucide="download" class="w-4 h-4 text-indigo-400"></i>
-            <h2 class="text-sm font-semibold text-white">Export Issues</h2>
+            <div class="w-6 h-6 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center border border-zinc-200 dark:border-zinc-700/60">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            </div>
+            <h2 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">Export Issues</h2>
           </div>
-          <button @click="close" class="text-gray-400 hover:text-white transition-colors"><i data-lucide="x" class="w-4 h-4"></i></button>
+          <button @click="close" class="p-1 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
         </div>
 
+        <!-- Body -->
         <div class="p-5 space-y-4">
           <!-- Format Tabs -->
-          <div class="flex items-center space-x-2 text-xs">
-            <button @click="format='csv'" class="px-3 py-1.5 rounded-lg font-medium" :class="format==='csv' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'">CSV</button>
-            <button @click="format='json'" class="px-3 py-1.5 rounded-lg font-medium" :class="format==='json' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'">JSON</button>
+          <div class="flex items-center space-x-1 p-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-fit">
+            <button
+              @click="format='csv'"
+              class="px-3 py-1 rounded-md text-xs font-medium transition-colors"
+              :class="format==='csv' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+            >CSV</button>
+            <button
+              @click="format='json'"
+              class="px-3 py-1 rounded-md text-xs font-medium transition-colors"
+              :class="format==='json' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+            >JSON</button>
           </div>
 
           <!-- Source Project -->
-          <div>
-            <label class="text-xs font-medium text-gray-400 mb-1 block">Source Project</label>
-            <select v-model="projectId" class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500">
+          <div class="space-y-1">
+            <label class="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block">Source Project</label>
+            <select
+              v-model="projectId"
+              class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 cursor-pointer"
+            >
               <option v-for="p in validProjects" :key="p.id" :value="p.id">{{ p.name }} ({{ p.identifier }})</option>
             </select>
           </div>
 
           <!-- Info / Result -->
-          <div v-if="error" class="px-3 py-2 rounded-lg bg-red-950/40 border border-red-800/40 text-red-300 text-xs">
+          <div v-if="error" class="px-3 py-2 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/40 text-rose-600 dark:text-rose-300 text-xs">
             {{ error }}
           </div>
-          <div v-if="result" class="px-3 py-2 rounded-lg bg-emerald-950/40 border border-emerald-800/40 text-emerald-300 text-xs">
+          <div v-if="result" class="px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-300 text-xs">
             Exported {{ result.format.toUpperCase() }} for <strong>{{ result.project }}</strong>.
             <template v-if="result.count !== null">{{ result.count }} row(s) included.</template>
           </div>
 
-          <p class="text-[11px] leading-relaxed text-gray-500">
+          <p class="text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
             Exports mirror the importer columns (title, description, status, priority,
             assignee, dates, estimate, labels, source_key) plus custom fields, so a
             downloaded file can be re-imported into ProjectBase or another tool.
           </p>
         </div>
 
-        <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-800 bg-gray-950/50">
-          <button @click="close" class="px-3 py-2 rounded-lg text-xs text-gray-300 hover:bg-gray-800">Cancel</button>
+        <!-- Footer -->
+        <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
+          <button @click="close" class="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">Cancel</button>
           <button
             @click="doExport"
             :disabled="exporting || !projectId"
-            class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 text-xs font-medium shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >{{ exporting ? 'Exporting...' : 'Export' }}</button>
         </div>
       </div>

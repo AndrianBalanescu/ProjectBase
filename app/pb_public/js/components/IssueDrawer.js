@@ -1,4 +1,5 @@
 // pb_public/js/components/IssueDrawer.js
+// Minimalist, high-density Issue Drawer supporting Dark and Light themes with subtle, low-contrast accents.
 
 const IssueDrawerComponent = {
   components: {
@@ -42,44 +43,59 @@ const IssueDrawerComponent = {
       relationPickerOpen: false,
       relationLoading: false,
       relationError: '',
-      drawerWidth: null, // persisted user-resized width (px); null = default max-w-3xl
-      isResizing: false
+      drawerWidth: null, // persisted user-resized width (px); null = default
+      isResizing: false,
+      resizeStartX: 0,
+      resizeStartWidth: 0
     };
   },
   computed: {
     drawerStyle() {
-      if (this.isFullscreen || !this.drawerWidth) return null;
-      const maxW = Math.max(360, Math.min(1280, window.innerWidth - 64));
-      const w = Math.min(this.drawerWidth, maxW);
-      return { width: w + 'px', maxWidth: '95vw' };
+      if (this.isFullscreen) return {};
+      const width = this.drawerWidth || (this.widthOverride ? Number(this.widthOverride) : null);
+      if (!width) return {};
+      return {
+        width: `${width}px`,
+        maxWidth: '95vw',
+        minWidth: '380px'
+      };
     },
-    renderedDescription() {
-      if (!this.editDesc) return '<p class="text-gray-500 italic">No description provided. Click write to add details.</p>';
+    subtaskStats() {
+      if (!this.subtasks || this.subtasks.length === 0) return { total: 0, completed: 0, percent: 0 };
+      const completed = this.subtasks.filter(s => s.done).length;
+      const total = this.subtasks.length;
+      return { total, completed, percent: Math.round((completed / total) * 100) };
+    },
+    cycleOptions() {
+      const opts = [{ value: '', label: 'None' }];
+      (this.cycles || []).forEach(c => {
+        opts.push({ value: c.id, label: c.name + (c.status === 'active' ? ' (Active)' : '') });
+      });
+      return opts;
+    },
+    milestoneOptions() {
+      const opts = [{ value: '', label: 'None' }];
+      (this.milestones || []).forEach(m => {
+        opts.push({ value: m.id, label: (m.icon || '🚩') + ' ' + m.title });
+      });
+      return opts;
+    },
+    renderedDesc() {
+      if (!this.editDesc) return '<p class="text-zinc-400 italic">No description provided.</p>';
       if (window.marked && window.DOMPurify) {
         return window.DOMPurify.sanitize(window.marked.parse(this.editDesc));
       }
       return this.editDesc;
     },
-    subtaskStats() {
-      const total = this.subtasks.length;
-      const completed = this.subtasks.filter(s => s.done).length;
-      const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
-      return { total, completed, percent };
-    },
-    fieldDefsNormalized() {
-      let defs = this.fieldDefs;
-      if (typeof defs === 'string') { try { defs = JSON.parse(defs); } catch (e) { defs = []; } }
-      return Array.isArray(defs) ? defs : [];
-    },
     blockedByCount() {
-      const blocked = this.relationIncoming.filter(r => r.type === 'blocks').length;
-      const out = this.relationOutgoing.filter(r => r.type === 'blocked_by').length;
+      const blocked = (this.relationIncoming || []).filter(r => r.type === 'blocks').length;
+      const out = (this.relationOutgoing || []).filter(r => r.type === 'blocked_by').length;
       return blocked + out;
     },
     relationCandidates() {
       const list = Array.isArray(this.issues) ? this.issues : [];
-      const q = this.relationQuery.trim().toLowerCase();
-      const linked = new Set(this.relationOutgoing.map(r => r.issue));
+      const q = (this.relationQuery || '').trim().toLowerCase();
+      const linked = new Set((this.relationOutgoing || []).map(r => r.issue));
       return list.filter(i => {
         if (!i || i.id === this.issue?.id) return false;
         if (linked.has(i.id)) return false;
@@ -90,59 +106,10 @@ const IssueDrawerComponent = {
     },
     relationsByType() {
       const by = { blocks: [], blocked_by: [], related: [] };
-      for (const r of this.relationOutgoing) {
+      for (const r of (this.relationOutgoing || [])) {
         if (by[r.type]) by[r.type].push(r);
       }
       return by;
-    },
-    projectMilestones() {
-      const list = Array.isArray(this.milestones) ? this.milestones : [];
-      const proj = this.issue && this.issue.project ? this.issue.project : null;
-      if (!proj) return list;
-      return list.filter(m => !m.project || m.project === proj);
-    },
-    statusOptions() {
-      return [
-        { value: 'backlog', label: 'Backlog', icon: '📥' },
-        { value: 'todo', label: 'Todo', icon: '📋' },
-        { value: 'in_progress', label: 'In Progress', icon: '⚡' },
-        { value: 'in_review', label: 'In Review', icon: '👀' },
-        { value: 'done', label: 'Done', icon: '✅' },
-        { value: 'cancelled', label: 'Cancelled', icon: '🚫' }
-      ];
-    },
-    priorityOptions() {
-      return [
-        { value: 'urgent', label: 'Urgent', icon: '🔴', color: '#ef4444' },
-        { value: 'high', label: 'High', icon: '🟠', color: '#f97316' },
-        { value: 'medium', label: 'Medium', icon: '🟡', color: '#eab308' },
-        { value: 'low', label: 'Low', icon: '🔵', color: '#3b82f6' },
-        { value: 'none', label: 'None', icon: '⚪', color: '#6b7280' }
-      ];
-    },
-    cycleOptions() {
-      const opts = [{ value: '', label: 'No Cycle', icon: '⭕' }];
-      (this.cycles || []).forEach(c => {
-        opts.push({
-          value: c.id,
-          label: c.name || `Cycle ${c.number}`,
-          icon: '🔄',
-          badge: c.status ? c.status.toUpperCase() : null
-        });
-      });
-      return opts;
-    },
-    milestoneOptions() {
-      const opts = [{ value: '', label: 'No Milestone', icon: '⚬' }];
-      (this.projectMilestones || []).forEach(m => {
-        opts.push({
-          value: m.id,
-          label: m.name || 'Milestone',
-          icon: '🎯',
-          badge: m.status ? m.status.toUpperCase() : null
-        });
-      });
-      return opts;
     }
   },
   watch: {
@@ -155,107 +122,97 @@ const IssueDrawerComponent = {
           this.editStatus = newVal.status || 'backlog';
           this.editPriority = newVal.priority || 'none';
           this.editEstimate = newVal.estimate || 0;
-          this.editStartDate = newVal.start_date ? newVal.start_date.substring(0, 10) : '';
-          this.editDueDate = newVal.due_date ? newVal.due_date.substring(0, 10) : '';
+          this.editStartDate = newVal.start_date ? newVal.start_date.split('T')[0] : '';
+          this.editDueDate = newVal.due_date ? newVal.due_date.split('T')[0] : '';
           this.editCycle = newVal.cycle || '';
           this.editMilestone = newVal.milestone || '';
           this.editAssignee = newVal.assignee || '';
           this.editLabels = Array.isArray(newVal.labels) ? [...newVal.labels] : [];
           this.subtasks = Array.isArray(newVal.subtasks) ? JSON.parse(JSON.stringify(newVal.subtasks)) : [];
-          let cf = newVal.custom_fields;
-          if (typeof cf === 'string') { try { cf = JSON.parse(cf); } catch (e) { cf = {}; } }
-          this.editCustomFields = (cf && typeof cf === 'object' && !Array.isArray(cf)) ? { ...cf } : {};
+          this.editCustomFields = (newVal.custom_fields && typeof newVal.custom_fields === 'object')
+            ? JSON.parse(JSON.stringify(newVal.custom_fields))
+            : {};
           this.loadComments();
           this.loadRelations();
         }
       }
     },
-    // Live ?w= URL param: clamped 360-1280 like the drag handle. While an
-    // override is active the URL wins; any manual resize clears it so the
-    // user's localStorage preference takes back over.
-    widthOverride: {
-      immediate: true,
-      handler(v) {
-        const w = parseInt(v, 10);
-        if (!isNaN(w) && w >= 360 && w <= 1280) this.drawerWidth = w;
-      }
-    },
-    // Live realtime comment events (from any user) bump this key; reload the
-    // thread so new/updated comments appear without a manual refresh.
-    commentRefreshKey: {
-      handler() {
-        if (this.issue) this.loadComments();
-      }
+    commentRefreshKey() {
+      if (this.issue) this.loadComments();
     }
   },
   mounted() {
-    const saved = parseInt((typeof localStorage !== 'undefined' && localStorage.getItem('pb.drawer.width')) || '', 10);
-    if (!isNaN(saved) && saved >= 360 && saved <= 1280) this.drawerWidth = saved;
-    // URL ?w= overrides the saved width for this deep link (not persisted).
-    if (this.widthOverride) {
-      const w = parseInt(this.widthOverride, 10);
-      if (!isNaN(w) && w >= 360 && w <= 1280) this.drawerWidth = w;
-    }
-    this.$nextTick(() => {
-      if (window.lucide) window.lucide.createIcons();
-    });
+    try {
+      const saved = localStorage.getItem('pb.drawer.width') || localStorage.getItem('projectbase_drawer_width');
+      if (saved) {
+        const num = parseInt(saved, 10);
+        if (!isNaN(num) && num >= 380 && num <= 1600) {
+          this.drawerWidth = num;
+        }
+      }
+    } catch (e) {}
+
+    window.addEventListener('mousemove', this.onResizeMove);
+    window.addEventListener('mouseup', this.onResizeEnd);
   },
   beforeUnmount() {
-    this.stopResize();
-  },
-  updated() {
-    this.$nextTick(() => {
-      if (window.lucide) window.lucide.createIcons();
-    });
+    window.removeEventListener('mousemove', this.onResizeMove);
+    window.removeEventListener('mouseup', this.onResizeEnd);
   },
   methods: {
     startResize(e) {
       if (this.isFullscreen) return;
-      e.preventDefault();
       this.isResizing = true;
+      this.resizeStartX = e.clientX;
+      const el = this.$el.querySelector('.max-w-3xl, [style*="width"]');
+      this.resizeStartWidth = el ? el.getBoundingClientRect().width : (this.drawerWidth || 768);
       document.body.classList.add('select-none');
-      this._resizeMove = (ev) => this.onResizeMove(ev);
-      this._resizeUp = () => this.stopResize();
-      window.addEventListener('mousemove', this._resizeMove);
-      window.addEventListener('mouseup', this._resizeUp);
     },
     onResizeMove(e) {
       if (!this.isResizing) return;
-      const maxW = Math.max(360, Math.min(1280, window.innerWidth - 64));
-      const w = window.innerWidth - e.clientX;
-      this.drawerWidth = Math.round(Math.min(Math.max(w, 360), maxW));
+      const delta = this.resizeStartX - e.clientX;
+      const newWidth = Math.min(Math.max(this.resizeStartWidth + delta, 380), window.innerWidth * 0.95);
+      this.drawerWidth = Math.round(newWidth);
     },
-    stopResize() {
+    onResizeEnd() {
       if (!this.isResizing) return;
       this.isResizing = false;
       document.body.classList.remove('select-none');
-      window.removeEventListener('mousemove', this._resizeMove);
-      window.removeEventListener('mouseup', this._resizeUp);
-      try {
-        if (this.drawerWidth) localStorage.setItem('pb.drawer.width', String(this.drawerWidth));
-      } catch (err) { /* private mode: ignore */ }
-      // Manual resize ends any ?w= URL override; localStorage is the source of truth again.
-      this.$emit('update:widthOverride', null);
+      if (this.drawerWidth) {
+        try {
+          localStorage.setItem('pb.drawer.width', String(this.drawerWidth));
+          localStorage.setItem('projectbase_drawer_width', String(this.drawerWidth));
+        } catch (e) {}
+        this.$emit('update:widthOverride', this.drawerWidth);
+      }
     },
     resetWidth() {
-      this.stopResize();
       this.drawerWidth = null;
       try {
         localStorage.removeItem('pb.drawer.width');
-      } catch (err) { /* private mode: ignore */ }
+        localStorage.removeItem('projectbase_drawer_width');
+      } catch (e) {}
       this.$emit('update:widthOverride', null);
+    },
+    toggleFullscreen() {
+      this.isFullscreen = !this.isFullscreen;
+      if (this.isFullscreen) {
+        this.descFocus = false;
+      }
     },
     enterDescFocus() {
       this.descFocus = true;
-      this.descTab = 'rich';
       this.$nextTick(() => {
-        if (window.lucide) window.lucide.createIcons();
-        // Focus the Milkdown editor root so typing starts immediately. The
-        // editor mounts asynchronously (crepe.create()), so retry briefly.
         const tryFocus = (attempt) => {
-          const root = document.querySelector('.fixed.inset-0.z-\\[60\\] [contenteditable="true"]');
-          if (root && root.focus) { root.focus(); return; }
-          if (attempt < 30) setTimeout(() => tryFocus(attempt + 1), 100);
+          if (!this.descFocus) return;
+          const ed = this.$refs.focusMilkdown;
+          const el = ed && (ed.$el || ed);
+          const pm = el && el.querySelector && el.querySelector('.ProseMirror');
+          if (pm) {
+            pm.focus();
+          } else if (attempt < 10) {
+            setTimeout(() => tryFocus(attempt + 1), 50);
+          }
         };
         tryFocus(0);
       });
@@ -337,7 +294,15 @@ const IssueDrawerComponent = {
       if (type === 'blocked_by') return 'blocks';
       return 'related';
     },
-    saveChanges() {
+    relationLabel(type) {
+      switch (type) {
+        case 'blocks': return 'Blocks';
+        case 'blocked_by': return 'Blocked by';
+        case 'related': return 'Related to';
+        default: return type;
+      }
+    },
+    async saveChanges() {
       if (!this.issue) return;
       this.$emit('update-issue', {
         id: this.issue.id,
@@ -364,8 +329,6 @@ const IssueDrawerComponent = {
       if (!this.issue) return;
       try {
         const body = { issue_id: this.issue.id, agent_target: target };
-        // Send custom instructions (trimmed) when provided. Mirrors the
-        // backend's 8000-char cap so a huge paste cannot 400 on the wire.
         if (prompt && String(prompt).trim()) body.prompt = String(prompt).trim().slice(0, 8000);
         const res = await fetch('/api/projectbase/dispatch-agent', {
           method: 'POST',
@@ -390,24 +353,23 @@ const IssueDrawerComponent = {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            action: 'generate_subtasks',
+            action: 'subtasks',
             title: this.editTitle,
             description: this.editDesc
           })
         });
         const data = await res.json();
-        if (data.subtasks && Array.isArray(data.subtasks)) {
-          for (const s of data.subtasks) {
-            this.subtasks.push({
-              id: 'st_' + Date.now() + Math.random().toString(36).substring(2, 5),
-              title: s,
-              done: false
-            });
-          }
+        if (Array.isArray(data.subtasks)) {
+          const newItems = data.subtasks.map(t => ({
+            id: 'st_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+            title: t,
+            done: false
+          }));
+          this.subtasks = [...this.subtasks, ...newItems];
           this.saveChanges();
         }
       } catch (err) {
-        console.error('AI subtask error:', err);
+        console.error('AI subtasks error:', err);
       } finally {
         this.aiLoadingSubtasks = false;
       }
@@ -416,17 +378,11 @@ const IssueDrawerComponent = {
       if (!this.editTitle) return;
       this.aiLoadingDesc = true;
       try {
-        const headers = { 'Content-Type': 'application/json' };
-        // The ai-assist route requires auth; send the PocketBase token.
-        // `pb` is a top-level const in api.js (global lexical scope, not window).
-        if (typeof pb !== 'undefined' && pb.authStore && pb.authStore.token) {
-          headers['Authorization'] = pb.authStore.token;
-        }
         const res = await fetch('/api/projectbase/ai-assist', {
           method: 'POST',
-          headers,
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            action: 'polish_description',
+            action: 'description',
             title: this.editTitle,
             description: this.editDesc
           })
@@ -434,18 +390,35 @@ const IssueDrawerComponent = {
         const data = await res.json();
         if (data.description) {
           this.editDesc = data.description;
-          this.descTab = 'preview';
+          this.descTab = 'rich';
           this.saveChanges();
         }
       } catch (err) {
-        console.error('AI polish error:', err);
+        console.error('AI description polish error:', err);
       } finally {
         this.aiLoadingDesc = false;
       }
     },
-    toggleSubtask(sub) {
-      sub.done = !sub.done;
-      this.saveChanges();
+    copyIdentifier() {
+      if (!this.issue) return;
+      navigator.clipboard.writeText(this.issue.identifier || this.issue.id);
+      this.copiedBadge = true;
+      setTimeout(() => { this.copiedBadge = false; }, 2000);
+    },
+    copyAgentCurl() {
+      if (!this.issue) return;
+      const origin = window.location.origin;
+      const cmd = `curl -X POST "${origin}/api/projectbase/dispatch-agent" -H "Content-Type: application/json" -d '{"issue_id":"${this.issue.id}","agent_target":"flomaster"}'`;
+      navigator.clipboard.writeText(cmd);
+      this.copiedBadge = true;
+      setTimeout(() => { this.copiedBadge = false; }, 2000);
+    },
+    copyIssueLink() {
+      if (!this.issue) return;
+      const url = `${window.location.origin}/#/pb/projects/${this.issue.project}/issue/${this.issue.id}`;
+      navigator.clipboard.writeText(url);
+      this.copiedLinkBadge = true;
+      setTimeout(() => { this.copiedLinkBadge = false; }, 2000);
     },
     addSubtask() {
       if (!this.newSubtaskTitle.trim()) return;
@@ -495,306 +468,250 @@ const IssueDrawerComponent = {
     formatTime(dateStr) {
       if (!dateStr) return '';
       const d = new Date(dateStr);
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' on ' + d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    },
-    copyIdentifier() {
-      if (!this.issue) return;
-      navigator.clipboard.writeText(this.issue.identifier);
-      this.copiedBadge = true;
-      setTimeout(() => { this.copiedBadge = false; }, 2000);
-    },
-    copyAgentCurl() {
-      if (!this.issue) return;
-      const cmd = `curl -X PATCH ${window.location.origin}/api/collections/issues/records/${this.issue.id} \\
-  -H "Content-Type: application/json" \\
-  -d '{"status":"done"}'`;
-      navigator.clipboard.writeText(cmd);
-      alert('Copied Agent cURL command to clipboard!');
-    },
-    copyIssueLink() {
-      if (!this.issue) return;
-      // Deep link straight to this card: hash route opens the drawer on reload.
-      const url = `${window.location.origin}${window.location.pathname}#/pb/board/issue/${this.issue.id}`;
-      navigator.clipboard.writeText(url);
-      this.copiedLinkBadge = true;
-      setTimeout(() => { this.copiedLinkBadge = false; }, 2000);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' on ' +
+        d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     }
   },
   template: `
-    <div v-if="issue" class="fixed inset-0 z-50 overflow-hidden flex justify-end">
+    <div v-if="issue" class="fixed inset-0 z-50 overflow-hidden flex justify-end select-none">
       <!-- Backdrop -->
-      <div 
-        class="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
+      <div
+        class="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-sm transition-opacity"
         @click="$emit('close')"
       ></div>
 
       <!-- Slide-Over Drawer Container -->
-      <div :class="isFullscreen ? 'fixed inset-0 z-50 bg-gray-900 flex flex-col h-full w-full' : 'relative w-full max-w-3xl bg-gray-900 border-l border-gray-800 shadow-2xl flex flex-col h-full z-10 animate-in slide-in-from-right duration-200'" :style="drawerStyle">
-
+      <div
+        :class="isFullscreen ? 'fixed inset-0 z-50 bg-white dark:bg-[#121215] flex flex-col h-full w-full' : 'relative w-full max-w-3xl bg-white dark:bg-[#121215] border-l border-zinc-200 dark:border-zinc-800 shadow-2xl flex flex-col h-full z-10 animate-in slide-in-from-right duration-200'"
+        :style="drawerStyle"
+      >
         <!-- Drag-to-resize handle (hidden in fullscreen; double-click resets) -->
         <div
           v-if="!isFullscreen"
           @mousedown="startResize"
           @dblclick="resetWidth"
-          class="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20 bg-transparent hover:bg-indigo-500/50 active:bg-indigo-500/70 transition-colors"
+          class="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20 bg-transparent hover:bg-zinc-400/50 dark:hover:bg-zinc-600/50 transition-colors"
           title="Drag to resize drawer · double-click to reset"
         ></div>
-        
+
         <!-- Header -->
-        <div class="px-6 py-4 border-b border-gray-800 flex items-center justify-between bg-gray-950/60 select-none">
-          <div class="flex items-center space-x-3">
-            <button 
+        <div class="px-5 py-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/60 select-none">
+          <div class="flex items-center space-x-2.5">
+            <button
               @click="copyIdentifier"
-              class="px-2.5 py-1 rounded-md bg-indigo-950/60 hover:bg-indigo-900/60 border border-indigo-800/40 text-indigo-400 font-mono text-xs font-semibold flex items-center space-x-1.5 transition-colors"
+              class="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700/60 text-zinc-800 dark:text-zinc-200 font-mono text-xs font-semibold flex items-center space-x-1.5 transition-colors shadow-2xs"
               title="Click to copy ID"
             >
               <span>{{ issue.identifier }}</span>
-              <i data-lucide="copy" class="w-3 h-3 text-indigo-400"></i>
+              <i data-lucide="copy" class="w-3 h-3 text-zinc-400"></i>
             </button>
+            <span v-if="copiedBadge" class="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono">Copied!</span>
 
-            <span v-if="copiedBadge" class="text-[10px] text-emerald-400 font-medium animate-pulse">Copied!</span>
-
-            <span
-              v-if="blockedByCount > 0"
-              class="px-2 py-0.5 rounded-md bg-red-950/70 border border-red-800/60 text-red-300 text-[10px] font-semibold flex items-center space-x-1"
-              title="This issue is blocked by another issue"
-            >
-              <i data-lucide="lock" class="w-3 h-3"></i>
-              <span>Blocked{{ blockedByCount > 1 ? ' x' + blockedByCount : '' }}</span>
-            </span>
-
-            <span v-if="issue.expand && issue.expand.project" class="text-xs text-gray-400 font-medium">
-              {{ issue.expand.project.name }}
-            </span>
-          </div>
-
-          <div class="flex items-center space-x-2">
-            <!-- Share / Copy deep link -->
+            <!-- Copy permalink button -->
             <button
               @click="copyIssueLink"
-              class="px-2.5 py-1 rounded-md text-[11px] font-mono text-sky-300 hover:text-white bg-sky-950/60 hover:bg-sky-900/70 border border-sky-800/40 transition-colors flex items-center space-x-1.5 shadow-sm select-none"
-              title="Copy direct link to this card"
+              class="p-1 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Copy permalink to this issue"
             >
-              <i data-lucide="link" class="w-3 h-3"></i>
-              <span>Copy Link</span>
-              <span v-if="copiedLinkBadge" class="text-[10px] text-emerald-400 font-semibold animate-pulse">✓</span>
+              <i data-lucide="link" class="w-3.5 h-3.5"></i>
             </button>
-            <!-- Agent Dispatch Controls -->
+            <span v-if="copiedLinkBadge" class="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono">Link copied!</span>
+          </div>
+
+          <!-- Top Drawer Controls -->
+          <div class="flex items-center space-x-1">
+            <!-- Fullscreen Toggle -->
+            <button
+              @click="toggleFullscreen"
+              class="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              :title="isFullscreen ? 'Exit Fullscreen' : 'Fullscreen (Expand)'"
+            >
+              <i :data-lucide="isFullscreen ? 'minimize-2' : 'maximize-2'" class="w-4 h-4"></i>
+            </button>
+
+            <!-- Agent Dispatch Dropdown -->
             <div class="relative">
               <button
                 type="button"
                 @click="isAgentDropdownOpen = !isAgentDropdownOpen"
-                class="px-2.5 py-1 rounded-md text-[11px] font-mono text-purple-300 hover:text-white bg-purple-950/60 hover:bg-purple-900/70 border border-purple-800/40 transition-colors flex items-center space-x-1.5 shadow-sm select-none"
+                class="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 text-xs font-semibold shadow-2xs transition-colors"
                 title="Dispatch this issue to an autonomous agent"
               >
-                <i data-lucide="bot" class="w-3 h-3"></i>
                 <span>Trigger Agent</span>
-                <span class="text-[9px] transition-transform duration-150" :class="{ 'rotate-180': isAgentDropdownOpen }">▼</span>
+                <i data-lucide="chevron-down" class="w-3 h-3"></i>
               </button>
+
               <div
-                v-show="isAgentDropdownOpen"
-                class="absolute right-0 top-full mt-1.5 w-56 p-1.5 rounded-xl bg-gray-900/95 border border-gray-700 shadow-2xl backdrop-blur-md z-30 space-y-0.5"
-                @click.stop
+                v-if="isAgentDropdownOpen"
+                class="absolute right-0 mt-1.5 w-64 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xl z-50 p-2 text-xs animate-in fade-in duration-150 space-y-1.5"
               >
-                <div class="px-2 py-1 text-[10px] text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-800/80 mb-1 flex items-center justify-between">
-                  <span>Dispatch Agent</span>
-                  <span class="text-[9px] text-purple-400 font-mono">Multica 2.0</span>
+                <div class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider px-1">
+                  Autonomous Agent Dispatch
                 </div>
-                <!-- Dynamic Detected Agents -->
-                <div v-if="agents && agents.length > 0">
+
+                <div class="space-y-0.5">
                   <button
-                    v-for="a in agents"
+                    v-for="a in (agents && agents.length ? agents : [{ name: 'flomaster', avatar: '🧠', provider: 'local' }])"
                     :key="a.name"
                     @click="dispatchAgent(a.name, agentPrompt); isAgentDropdownOpen = false;"
-                    class="w-full flex items-center space-x-2 text-left px-2 py-1.5 text-xs text-gray-200 hover:bg-purple-950/60 hover:text-purple-300 rounded-lg transition-colors"
+                    class="w-full flex items-center space-x-2 px-2 py-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-left text-zinc-800 dark:text-zinc-200 transition-colors"
                   >
-                    <span class="text-sm">{{ a.avatar }}</span>
+                    <span>{{ a.avatar || '🤖' }}</span>
                     <div class="min-w-0 flex-1">
-                      <div class="font-medium capitalize truncate flex items-center justify-between">
-                        <span>{{ a.name }}</span>
-                        <span v-if="a.session_count > 0" class="text-[9px] px-1 rounded bg-purple-900/50 text-purple-300 font-mono">{{ a.session_count }} live</span>
-                      </div>
-                      <div class="text-[10px] text-gray-500 truncate">{{ a.runtime || a.provider }}</div>
+                      <div class="font-semibold capitalize truncate">{{ a.name }}</div>
+                      <div class="text-[10px] text-zinc-400 truncate">{{ a.provider }}</div>
                     </div>
                   </button>
-                </div>
-                <!-- Fallback defaults if no dynamic agents loaded -->
-                <div v-else>
                   <button
-                    @click="dispatchAgent('flomaster'); isAgentDropdownOpen = false;"
-                    class="w-full flex items-center space-x-2 text-left px-2 py-1.5 text-xs text-gray-200 hover:bg-purple-950/60 hover:text-purple-300 rounded-lg transition-colors"
+                    @click="dispatchAgent('custom', agentPrompt); isAgentDropdownOpen = false;"
+                    class="w-full flex items-center space-x-2 px-2 py-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-left text-zinc-800 dark:text-zinc-200 transition-colors"
                   >
-                    <span class="text-sm">🧠</span>
-                    <div>
-                      <div class="font-medium">Flomaster</div>
-                      <div class="text-[10px] text-gray-500">Autonomous loop</div>
+                    <span>✨</span>
+                    <div class="min-w-0 flex-1">
+                      <div class="font-semibold truncate">Custom Agent</div>
+                      <div class="text-[10px] text-zinc-400 truncate">Dispatch with custom prompt</div>
                     </div>
                   </button>
                 </div>
-                <div class="border-t border-gray-800/80 my-1"></div>
-                <button
-                  @click="dispatchAgent('custom', agentPrompt); isAgentDropdownOpen = false;"
-                  class="w-full flex items-center space-x-2 text-left px-2 py-1.5 text-xs text-gray-200 hover:bg-purple-950/60 hover:text-purple-300 rounded-lg transition-colors"
-                  :class="{ 'bg-purple-950/30': agentPrompt && agentPrompt.trim() }"
-                >
-                  <span class="text-sm">✨</span>
-                  <div>
-                    <div class="font-medium">Custom Prompt</div>
-                    <div class="text-[10px] text-gray-500">With instructions below</div>
-                  </div>
-                </button>
-                    <div class="text-[10px] text-gray-500">Custom instructions</div>
-                  </div>
-                </button>
-                <!-- Custom instruction prompt editor (cycle 39) -->
-                <div v-if="isAgentDropdownOpen" class="mt-1.5 pt-1.5 border-t border-gray-800/80 space-y-1.5">
+
+                <!-- Custom instruction prompt editor -->
+                <div class="pt-1.5 border-t border-zinc-200 dark:border-zinc-800 space-y-1">
                   <textarea
                     v-model="agentPrompt"
-                    rows="3"
+                    rows="2"
                     maxlength="8000"
-                    placeholder="Optional custom instructions for the dispatched agent..."
-                    class="w-full px-2.5 py-1.5 rounded-lg bg-gray-950 border border-gray-800 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-y"
+                    placeholder="Optional custom instructions for agent..."
+                    class="w-full px-2 py-1 text-xs rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 resize-y"
                   ></textarea>
                   <div class="flex items-center justify-between px-0.5">
-                    <span class="text-[9px] text-gray-500 font-mono">{{ agentPrompt.length }}/8000</span>
+                    <span class="text-[9px] text-zinc-400 font-mono">{{ agentPrompt.length }}/8000</span>
                     <button
                       type="button"
                       @click="agentPrompt = ''"
-                      class="text-[10px] text-gray-400 hover:text-white transition-colors"
+                      class="text-[10px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
                     >Clear</button>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- Agent cURL Helper -->
-            <button 
-              @click="copyAgentCurl"
-              class="px-2 py-1 rounded-md text-[11px] font-mono text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 transition-colors flex items-center space-x-1"
-              title="Copy Agent REST cURL snippet"
-            >
-              <i data-lucide="terminal" class="w-3 h-3"></i>
-              <span>Agent API</span>
-            </button>
-
-            <!-- Delete Button -->
-            <button 
-              @click="$emit('delete-issue', issue.id); $emit('close');"
-              class="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-gray-800 transition-colors"
+            <!-- Delete Issue -->
+            <button
+              @click="$emit('delete-issue', issue.id)"
+              class="p-1.5 rounded-md text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
               title="Delete Issue"
             >
               <i data-lucide="trash-2" class="w-4 h-4"></i>
             </button>
 
-            <!-- Fullscreen Toggle -->
-            <button
-              @click="isFullscreen = !isFullscreen"
-              class="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
-              :title="isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'"
-            >
-              <i :data-lucide="isFullscreen ? 'minimize-2' : 'maximize-2'" class="w-4 h-4"></i>
-            </button>
-
             <!-- Close Button -->
-            <button 
+            <button
               @click="$emit('close')"
-              class="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+              class="p-1.5 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Close Drawer (Esc)"
             >
-              <i data-lucide="x" class="w-5 h-5"></i>
+              <i data-lucide="x" class="w-4 h-4"></i>
             </button>
           </div>
         </div>
 
-        <!-- Body: Scrollable Content & Sidebar Grid -->
-        <div class="flex-1 overflow-y-auto p-6 space-y-6">
-          
+        <!-- Drawer Body (Scrollable) -->
+        <div class="flex-1 overflow-y-auto p-5 space-y-5 text-zinc-800 dark:text-zinc-200 select-text">
+
           <!-- Title Input -->
-          <div>
-            <input 
+          <div class="space-y-1">
+            <input
               v-model="editTitle"
               @blur="saveChanges"
-              @keydown.enter="$event.target.blur()"
               placeholder="Issue title..."
-              class="w-full text-xl font-bold bg-transparent text-white border-b border-transparent hover:border-gray-800 focus:border-indigo-500 focus:outline-none transition-colors py-1"
+              class="w-full text-lg font-bold bg-transparent text-zinc-900 dark:text-zinc-100 border-b border-transparent hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-zinc-500 focus:outline-none transition-colors py-1"
             />
           </div>
 
-          <!-- Properties Grid -->
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-xl bg-gray-950/60 border border-gray-800 text-xs">
+          <!-- Metadata Properties Grid (2 columns on desktop) -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-zinc-50/70 dark:bg-zinc-900/40 p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 select-none">
             <!-- Status -->
             <div class="space-y-1">
-              <label class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Status</label>
-              <searchable-select
+              <label class="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">Status</label>
+              <select
                 v-model="editStatus"
-                :options="statusOptions"
-                placeholder="Select Status"
-                :searchable="false"
                 @change="saveChanges"
-              ></searchable-select>
+                class="w-full px-2 py-1 rounded-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600"
+              >
+                <option value="backlog">Backlog</option>
+                <option value="todo">Todo</option>
+                <option value="in_progress">In Progress</option>
+                <option value="in_review">In Review</option>
+                <option value="done">Done</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
             </div>
 
             <!-- Priority -->
             <div class="space-y-1">
-              <label class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Priority</label>
-              <searchable-select
+              <label class="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">Priority</label>
+              <select
                 v-model="editPriority"
-                :options="priorityOptions"
-                placeholder="Select Priority"
-                :searchable="false"
                 @change="saveChanges"
-              ></searchable-select>
+                class="w-full px-2 py-1 rounded-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600"
+              >
+                <option value="none">None</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
             </div>
 
-            <!-- Estimate -->
+            <!-- Estimate Points -->
             <div class="space-y-1">
-              <label class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Estimate (Pts)</label>
+              <label class="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">Estimate Points</label>
               <input
+                v-model="editEstimate"
                 type="number"
-                v-model.number="editEstimate"
-                @blur="saveChanges"
                 min="0"
-                max="100"
-                class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                @blur="saveChanges"
+                class="w-full px-2 py-1 rounded-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 font-mono focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600"
               />
             </div>
 
             <!-- Start Date -->
             <div class="space-y-1">
-              <label class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Start Date</label>
+              <label class="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">Start Date</label>
               <input
-                type="date"
                 v-model="editStartDate"
+                type="date"
                 @change="saveChanges"
-                class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                class="w-full px-2 py-1 rounded-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 font-mono focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600"
               />
             </div>
 
             <!-- Due Date -->
             <div class="space-y-1">
-              <label class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Due Date</label>
+              <label class="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">Due Date</label>
               <input
-                type="date"
                 v-model="editDueDate"
+                type="date"
                 @change="saveChanges"
-                class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                class="w-full px-2 py-1 rounded-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 font-mono focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600"
               />
             </div>
 
             <!-- Cycle / Sprint -->
-            <div class="space-y-1 sm:col-span-2">
-              <label class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Sprint Cycle</label>
+            <div class="space-y-1">
+              <label class="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">Cycle</label>
               <searchable-select
                 v-model="editCycle"
                 :options="cycleOptions"
-                placeholder="Select Sprint Cycle"
+                placeholder="Select Cycle"
                 search-placeholder="Filter cycles..."
                 @change="saveChanges"
               ></searchable-select>
             </div>
 
             <!-- Milestone -->
-            <div class="space-y-1 sm:col-span-2">
-              <label class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Milestone</label>
+            <div class="space-y-1">
+              <label class="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">Milestone</label>
               <searchable-select
                 v-model="editMilestone"
                 :options="milestoneOptions"
@@ -806,246 +723,168 @@ const IssueDrawerComponent = {
 
             <!-- Assignee -->
             <div class="space-y-1 sm:col-span-2">
-              <label class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Assignee</label>
+              <label class="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider">Assignee</label>
               <input
                 v-model="editAssignee"
                 @blur="saveChanges"
                 placeholder="Assign to agent or user..."
-                class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                class="w-full px-2 py-1 rounded-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600"
               />
-              <div v-if="agents && agents.length > 0" class="flex flex-wrap items-center gap-1.5 pt-1">
-                <span class="text-[9px] text-gray-500 uppercase tracking-wider font-semibold">Agents:</span>
+              <div v-if="agents && agents.length > 0" class="flex flex-wrap items-center gap-1 pt-1">
+                <span class="text-[9px] text-zinc-400 uppercase tracking-wider font-semibold">Agents:</span>
                 <button
                   v-for="a in agents"
                   :key="a.name"
                   @click="editAssignee = a.name; saveChanges()"
-                  class="flex items-center space-x-1 px-1.5 py-0.5 rounded-md border text-[10px] font-medium transition-colors"
-                  :class="editAssignee === a.name ? 'bg-purple-950/50 border-purple-700 text-purple-300' : 'bg-gray-900 border-gray-800 text-gray-400 hover:border-purple-700/60 hover:text-gray-200'"
+                  class="flex items-center space-x-1 px-1.5 py-0.5 rounded border text-[10px] font-medium transition-colors"
+                  :class="editAssignee === a.name ? 'bg-zinc-200 dark:bg-zinc-700 border-zinc-400 dark:border-zinc-500 text-zinc-900 dark:text-white font-semibold' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
                   :title="'Assign to ' + a.name"
                 >
                   <span>{{ a.avatar }}</span>
-                  <span>{{ a.name }}</span>
+                  <span class="capitalize">{{ a.name }}</span>
                 </button>
               </div>
             </div>
           </div>
 
-          <!-- Labels Manager -->
-          <div class="space-y-2">
-            <div class="flex items-center justify-between">
-              <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Labels & Tags</label>
-            </div>
-            
+          <!-- Labels Editor -->
+          <div class="space-y-1.5">
+            <label class="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider select-none">Labels</label>
             <div class="flex flex-wrap items-center gap-1.5">
-              <span 
-                v-for="lbl in editLabels" 
+              <span
+                v-for="lbl in editLabels"
                 :key="lbl"
-                class="px-2 py-1 rounded-md bg-indigo-950/70 text-indigo-300 border border-indigo-800/40 text-xs font-medium flex items-center space-x-1.5"
+                class="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700/60 text-xs font-medium flex items-center space-x-1"
               >
                 <span>{{ lbl }}</span>
-                <button @click="removeLabel(lbl)" class="hover:text-red-400 transition-colors">
-                  <i data-lucide="x" class="w-3 h-3"></i>
-                </button>
+                <button @click="removeLabel(lbl)" class="hover:text-red-500 ml-1">×</button>
               </span>
 
-              <!-- Quick add label dropdown / preset buttons -->
-              <button 
-                v-for="preset in ['feature', 'bug', 'core', 'frontend', 'api', 'infra', 'agent']"
-                :key="preset"
-                v-show="!editLabels.includes(preset)"
-                @click="addLabel(preset)"
-                class="px-2 py-0.5 rounded text-[11px] bg-gray-800/80 hover:bg-gray-700 text-gray-400 hover:text-gray-200 transition-colors"
-              >
-                +{{ preset }}
-              </button>
+              <input
+                @keydown.enter.prevent="addLabel($event.target.value); $event.target.value = '';"
+                placeholder="+ Add label (press Enter)"
+                class="px-2 py-0.5 text-xs rounded-md bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 focus:outline-none focus:border-zinc-400"
+              />
             </div>
           </div>
 
-          <!-- Custom Fields -->
-          <div v-if="fieldDefsNormalized.length" class="space-y-2">
-            <div class="flex items-center justify-between">
-              <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Custom Fields</label>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-              <div v-for="f in fieldDefsNormalized" :key="f.key" class="space-y-1">
-                <label class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">
-                  {{ f.label }} <span v-if="f.required" class="text-red-400">*</span>
-                </label>
-
-                <input
-                  v-if="f.type === 'text'"
-                  v-model="editCustomFields[f.key]"
-                  @blur="saveChanges"
-                  placeholder="—"
-                  class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                />
-
-                <input
-                  v-else-if="f.type === 'number'"
-                  v-model.number="editCustomFields[f.key]"
-                  @blur="saveChanges"
-                  type="number"
-                  placeholder="—"
-                  class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                />
-
-                <select
-                  v-else-if="f.type === 'select'"
-                  v-model="editCustomFields[f.key]"
-                  @change="saveChanges"
-                  class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                >
-                  <option value="">—</option>
-                  <option v-for="opt in f.options" :key="opt" :value="opt">{{ opt }}</option>
-                </select>
-
-                <label v-else-if="f.type === 'checkbox'" class="flex items-center gap-2 text-xs text-gray-300">
-                  <input type="checkbox" v-model="editCustomFields[f.key]" @change="saveChanges" class="accent-indigo-500" />
-                  {{ editCustomFields[f.key] ? 'Yes' : 'No' }}
-                </label>
-
-                <input
-                  v-else-if="f.type === 'date'"
-                  v-model="editCustomFields[f.key]"
-                  @change="saveChanges"
-                  type="date"
-                  class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-gray-200 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- Description Section (Write & Preview Tabs & AI Polish) -->
+          <!-- Description Section (Milkdown WYSIWYG Editor) -->
           <div class="space-y-2">
-            <div class="flex items-center justify-between border-b border-gray-800 pb-1.5">
+            <div class="flex items-center justify-between select-none">
               <div class="flex items-center space-x-2">
-                <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Description</label>
-                <button 
-                  @click="polishAiDescription"
-                  :disabled="aiLoadingDesc"
-                  class="px-2 py-0.5 rounded-md bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 text-purple-300 text-[11px] font-medium flex items-center space-x-1 transition-all"
-                  title="Enhance description into structured PRD with Acceptance Criteria"
-                >
-                  <span v-if="aiLoadingDesc" class="animate-spin text-xs">🌀</span>
-                  <span v-else>✨</span>
-                  <span>{{ aiLoadingDesc ? 'Generating...' : 'AI Enhance PRD' }}</span>
-                </button>
+                <label class="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Description</label>
+                <div class="flex items-center bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-md border border-zinc-200 dark:border-zinc-800 text-[11px]">
+                  <button
+                    @click="descTab = 'rich'"
+                    class="px-2 py-0.5 rounded transition-colors"
+                    :class="descTab === 'rich' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                  >WYSIWYG</button>
+                  <button
+                    @click="descTab = 'raw'"
+                    class="px-2 py-0.5 rounded transition-colors"
+                    :class="descTab === 'raw' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                  >Markdown</button>
+                  <button
+                    @click="descTab = 'preview'"
+                    class="px-2 py-0.5 rounded transition-colors"
+                    :class="descTab === 'preview' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                  >Preview</button>
+                </div>
+              </div>
+
+              <div class="flex items-center space-x-1.5">
                 <button
                   @click="toggleDescFocus"
-                  class="px-2 py-0.5 rounded-md bg-gray-900/80 hover:bg-gray-800 border border-gray-700 text-gray-300 text-[11px] font-medium flex items-center space-x-1 transition-all"
-                  :title="descFocus ? 'Exit focus mode (Esc)' : 'Open distraction-free focus mode'"
+                  class="px-2 py-1 rounded text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center space-x-1 transition-colors"
+                  title="Focus mode (distraction-free)"
                 >
-                  <i :data-lucide="descFocus ? 'minimize-2' : 'maximize-2'" class="w-3 h-3"></i>
-                  <span>{{ descFocus ? 'Exit Focus' : 'Focus' }}</span>
-                </button>
-              </div>
-              
-              <div class="flex items-center bg-gray-950 p-0.5 rounded-lg border border-gray-800 text-xs">
-                <button
-                  @click="descTab = 'rich'"
-                  class="px-2.5 py-1 rounded-md font-medium transition-all"
-                  :class="descTab === 'rich' || descTab === 'write' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-gray-200'"
-                >
-                  Rich
+                  <i data-lucide="expand" class="w-3 h-3"></i>
+                  <span>Focus</span>
                 </button>
                 <button
-                  @click="descTab = 'raw'"
-                  class="px-2.5 py-1 rounded-md font-medium transition-all"
-                  :class="descTab === 'raw' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-gray-200'"
+                  @click="polishAiDescription"
+                  :disabled="aiLoadingDesc"
+                  class="px-2 py-1 rounded text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700/60 flex items-center space-x-1 transition-colors"
                 >
-                  Raw
-                </button>
-                <button
-                  @click="descTab = 'preview'"
-                  class="px-2.5 py-1 rounded-md font-medium transition-all"
-                  :class="descTab === 'preview' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-gray-200'"
-                >
-                  Preview
+                  <span>{{ aiLoadingDesc ? 'Polishing...' : '✨ Polish AI' }}</span>
                 </button>
               </div>
             </div>
 
-            <!-- Rich Mode (Milkdown WYSIWYG) -->
-            <div v-show="descTab === 'rich' || descTab === 'write'">
+            <!-- WYSIWYG Editor Tab -->
+            <div v-if="descTab === 'rich'" class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-2 min-h-[140px]">
               <milkdown-editor
                 v-model="editDesc"
                 @blur="saveChanges"
-                placeholder="Detailed markdown description, requirements, architecture notes..."
-                class="w-full min-h-[140px] px-3 py-2 rounded-xl bg-gray-950/80 border border-gray-800 text-gray-100 text-xs focus-within:ring-1 focus-within:ring-indigo-500 leading-relaxed"
               ></milkdown-editor>
             </div>
 
-            <!-- Raw Mode (Monospace Textarea) -->
-            <div v-show="descTab === 'raw'">
-              <textarea
-                v-model="editDesc"
-                @blur="saveChanges"
-                rows="6"
-                placeholder="Detailed markdown description, requirements, architecture notes..."
-                class="w-full px-3 py-2 rounded-xl bg-gray-950/80 border border-gray-800 text-gray-100 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 leading-relaxed"
-              ></textarea>
-            </div>
-            <!-- Preview Mode -->
-            <div 
-              v-show="descTab === 'preview'"
-              class="p-4 rounded-xl bg-gray-950/80 border border-gray-800 min-h-[140px] markdown-body"
-              v-html="renderedDescription"
+            <!-- Raw Markdown Tab -->
+            <textarea
+              v-else-if="descTab === 'raw'"
+              v-model="editDesc"
+              @blur="saveChanges"
+              rows="6"
+              placeholder="Write Markdown description..."
+              class="w-full p-3 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 font-mono placeholder-zinc-400 focus:outline-none focus:border-zinc-400"
+            ></textarea>
+
+            <!-- Preview Tab -->
+            <div
+              v-else-if="descTab === 'preview'"
+              class="p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 text-xs markdown-body min-h-[120px]"
+              v-html="renderedDesc"
             ></div>
           </div>
 
-          <!-- Subtasks / Checklist -->
-          <div class="space-y-3 pt-2">
-            <div class="flex items-center justify-between">
+          <!-- Subtasks / Checklist Section -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between select-none">
               <div class="flex items-center space-x-2">
-                <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Checklist & Subtasks</label>
-                <button 
-                  @click="generateAiSubtasks"
-                  :disabled="aiLoadingSubtasks"
-                  class="px-2 py-0.5 rounded-md bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 text-purple-300 text-[11px] font-medium flex items-center space-x-1 transition-all"
-                  title="Automatically generate sequential checklist steps with AI"
-                >
-                  <span v-if="aiLoadingSubtasks" class="animate-spin text-xs">🌀</span>
-                  <span v-else>✨</span>
-                  <span>{{ aiLoadingSubtasks ? 'Generating...' : 'AI Auto-Breakdown' }}</span>
-                </button>
-                <span v-if="subtaskStats.total > 0" class="text-xs font-mono text-indigo-400">
+                <label class="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Checklist Steps</label>
+                <span class="text-xs font-mono text-zinc-400">
                   ({{ subtaskStats.completed }}/{{ subtaskStats.total }})
                 </span>
               </div>
-
-              <span v-if="subtaskStats.total > 0" class="text-xs font-mono text-gray-400">
-                {{ subtaskStats.percent }}% complete
-              </span>
-            </div>
-
-            <!-- Progress bar -->
-            <div v-if="subtaskStats.total > 0" class="w-full bg-gray-950 rounded-full h-1.5 overflow-hidden">
-              <div class="bg-indigo-500 h-full rounded-full transition-all" :style="{ width: subtaskStats.percent + '%' }"></div>
-            </div>
-
-            <!-- Subtask items list -->
-            <div class="space-y-1.5">
-              <div 
-                v-for="(sub, idx) in subtasks" 
-                :key="sub.id"
-                class="group flex items-center justify-between p-2 rounded-lg bg-gray-950/60 border border-gray-800/80 hover:border-gray-700 text-xs transition-colors"
+              <button
+                @click="generateAiSubtasks"
+                :disabled="aiLoadingSubtasks"
+                class="px-2 py-0.5 text-xs text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded border border-zinc-200 dark:border-zinc-700/60 flex items-center space-x-1 transition-colors"
               >
-                <div class="flex items-center space-x-2.5 min-w-0">
-                  <input 
-                    type="checkbox" 
-                    :checked="sub.done" 
-                    @change="toggleSubtask(sub)"
-                    class="w-4 h-4 rounded bg-gray-900 border-gray-700 text-indigo-600 focus:ring-0 cursor-pointer"
-                  />
-                  <span class="truncate" :class="{ 'line-through text-gray-500': sub.done, 'text-gray-200': !sub.done }">
-                    {{ sub.title }}
-                  </span>
-                </div>
+                <span>{{ aiLoadingSubtasks ? 'Generating...' : '⚡ AI Steps' }}</span>
+              </button>
+            </div>
 
-                <button 
+            <!-- Progress Bar -->
+            <div v-if="subtaskStats.total > 0" class="w-full h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+              <div
+                class="h-full bg-zinc-800 dark:bg-zinc-200 rounded-full transition-all"
+                :style="{ width: subtaskStats.percent + '%' }"
+              ></div>
+            </div>
+
+            <!-- Subtasks List -->
+            <div class="space-y-1">
+              <div
+                v-for="(st, idx) in subtasks"
+                :key="st.id || idx"
+                class="flex items-center space-x-2 p-2 rounded-lg bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 group"
+              >
+                <input
+                  type="checkbox"
+                  v-model="st.done"
+                  @change="saveChanges"
+                  class="rounded border-zinc-300 dark:border-zinc-600 text-zinc-900 dark:text-zinc-100 focus:ring-0 cursor-pointer"
+                />
+                <input
+                  v-model="st.title"
+                  @blur="saveChanges"
+                  class="flex-1 bg-transparent text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none"
+                  :class="{ 'line-through text-zinc-400 dark:text-zinc-500': st.done }"
+                />
+                <button
                   @click="removeSubtask(idx)"
-                  class="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                  class="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-red-500 transition-opacity"
                 >
                   <i data-lucide="x" class="w-3.5 h-3.5"></i>
                 </button>
@@ -1053,15 +892,15 @@ const IssueDrawerComponent = {
 
               <!-- Add subtask input -->
               <div class="flex items-center space-x-2 pt-1">
-                <input 
+                <input
                   v-model="newSubtaskTitle"
                   @keydown.enter="addSubtask"
                   placeholder="Add a checklist step... Press Enter"
-                  class="flex-1 px-3 py-1.5 rounded-lg bg-gray-950/60 border border-gray-800 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  class="flex-1 px-3 py-1.5 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-zinc-400"
                 />
-                <button 
+                <button
                   @click="addSubtask"
-                  class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-white text-xs font-medium transition-colors"
+                  class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 text-xs font-medium transition-colors shadow-2xs"
                 >
                   Add
                 </button>
@@ -1071,32 +910,33 @@ const IssueDrawerComponent = {
 
           <!-- Issue Relationships (blocks / blocked_by / related) -->
           <div class="space-y-3 pt-2">
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between select-none">
               <div class="flex items-center space-x-2">
-                <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Relationships</label>
+                <label class="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Relationships</label>
                 <span v-if="relationLoading" class="animate-spin text-[10px]">⏳</span>
-                <span v-if="relationOutgoing.length > 0" class="text-xs font-mono text-indigo-400">
+                <span v-if="relationOutgoing.length > 0" class="text-xs font-mono text-zinc-500">
                   ({{ relationOutgoing.length }})
                 </span>
               </div>
-              <span v-if="relationError" class="text-[10px] text-red-400">{{ relationError }}</span>
+              <span v-if="relationError" class="text-[10px] text-red-500">{{ relationError }}</span>
             </div>
 
             <!-- Blocks -->
             <div v-if="relationsByType.blocks.length > 0" class="space-y-1.5">
-              <div class="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Blocks</div>
+              <div class="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Blocks</div>
               <div
                 v-for="r in relationsByType.blocks"
-                :key="'blk' + r.issue"
-                class="group flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-950/60 border border-gray-800"
+                :key="'rel' + (r.issue || r.target_issue)"
+                class="group flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs"
               >
-                <a :href="'#/pb/board/issue/' + r.issue" class="flex items-center space-x-2 min-w-0">
-                  <span class="font-mono text-[10px] text-amber-400 shrink-0">{{ r.target.identifier }}</span>
-                  <span class="truncate text-xs text-gray-200">{{ r.target.title }}</span>
+                <a :href="'#/pb/board/issue/' + (r.issue || r.target_issue)" class="flex items-center space-x-2 min-w-0">
+                  <span class="font-mono text-[10px] text-zinc-500 shrink-0">{{ r.target ? r.target.identifier : (r.target_identifier || '') }}</span>
+                  <span class="truncate text-xs text-zinc-800 dark:text-zinc-200">{{ r.target ? r.target.title : (r.target_title || '') }}</span>
                 </a>
                 <button
-                  @click="removeRelation(r.issue, 'blocks')"
-                  class="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                  @click="removeRelation(r.issue || r.target_issue, 'blocks')"
+                  class="text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                  title="Remove relation"
                 >
                   <i data-lucide="x" class="w-3.5 h-3.5"></i>
                 </button>
@@ -1105,19 +945,20 @@ const IssueDrawerComponent = {
 
             <!-- Blocked by -->
             <div v-if="relationsByType.blocked_by.length > 0" class="space-y-1.5">
-              <div class="text-[10px] text-red-400/80 font-medium uppercase tracking-wider">Blocked by</div>
+              <div class="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Blocked by</div>
               <div
                 v-for="r in relationsByType.blocked_by"
-                :key="'blb' + r.issue"
-                class="group flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-red-950/30 border border-red-900/40"
+                :key="'rel' + (r.issue || r.target_issue)"
+                class="group flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs"
               >
-                <a :href="'#/pb/board/issue/' + r.issue" class="flex items-center space-x-2 min-w-0">
-                  <span class="font-mono text-[10px] text-red-400 shrink-0">{{ r.target.identifier }}</span>
-                  <span class="truncate text-xs text-gray-200">{{ r.target.title }}</span>
+                <a :href="'#/pb/board/issue/' + (r.issue || r.target_issue)" class="flex items-center space-x-2 min-w-0">
+                  <span class="font-mono text-[10px] text-zinc-500 shrink-0">{{ r.target ? r.target.identifier : (r.target_identifier || '') }}</span>
+                  <span class="truncate text-xs text-zinc-800 dark:text-zinc-200">{{ r.target ? r.target.title : (r.target_title || '') }}</span>
                 </a>
                 <button
-                  @click="removeRelation(r.issue, 'blocked_by')"
-                  class="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                  @click="removeRelation(r.issue || r.target_issue, 'blocked_by')"
+                  class="text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                  title="Remove relation"
                 >
                   <i data-lucide="x" class="w-3.5 h-3.5"></i>
                 </button>
@@ -1126,19 +967,20 @@ const IssueDrawerComponent = {
 
             <!-- Related -->
             <div v-if="relationsByType.related.length > 0" class="space-y-1.5">
-              <div class="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Related</div>
+              <div class="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Related</div>
               <div
                 v-for="r in relationsByType.related"
-                :key="'rel' + r.issue"
-                class="group flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-950/60 border border-gray-800"
+                :key="'rel' + (r.issue || r.target_issue)"
+                class="group flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs"
               >
-                <a :href="'#/pb/board/issue/' + r.issue" class="flex items-center space-x-2 min-w-0">
-                  <span class="font-mono text-[10px] text-indigo-400 shrink-0">{{ r.target.identifier }}</span>
-                  <span class="truncate text-xs text-gray-200">{{ r.target.title }}</span>
+                <a :href="'#/pb/board/issue/' + (r.issue || r.target_issue)" class="flex items-center space-x-2 min-w-0">
+                  <span class="font-mono text-[10px] text-zinc-500 shrink-0">{{ r.target ? r.target.identifier : (r.target_identifier || '') }}</span>
+                  <span class="truncate text-xs text-zinc-800 dark:text-zinc-200">{{ r.target ? r.target.title : (r.target_title || '') }}</span>
                 </a>
                 <button
-                  @click="removeRelation(r.issue, 'related')"
-                  class="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                  @click="removeRelation(r.issue || r.target_issue, 'related')"
+                  class="text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                  title="Remove relation"
                 >
                   <i data-lucide="x" class="w-3.5 h-3.5"></i>
                 </button>
@@ -1149,7 +991,7 @@ const IssueDrawerComponent = {
             <div class="flex items-center space-x-2 pt-1">
               <select
                 v-model="relationType"
-                class="px-2 py-1.5 rounded-lg bg-gray-950/60 border border-gray-800 text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                class="px-2 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none"
                 title="Relation type"
               >
                 <option value="blocks">Blocks</option>
@@ -1162,102 +1004,96 @@ const IssueDrawerComponent = {
                   @focus="relationPickerOpen = true"
                   @keydown.enter="relationCandidates[0] && addRelation(relationCandidates[0].id)"
                   placeholder="Search issues to link..."
-                  class="w-full px-3 py-1.5 rounded-lg bg-gray-950/60 border border-gray-800 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none"
                 />
                 <div
                   v-if="relationPickerOpen && relationCandidates.length > 0"
-                  class="absolute z-30 mt-1 w-full max-h-44 overflow-y-auto rounded-lg bg-gray-900 border border-gray-700 shadow-xl"
+                  class="absolute z-30 mt-1 w-full max-h-44 overflow-y-auto rounded-lg bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-700 shadow-xl"
                 >
                   <button
                     v-for="c in relationCandidates"
                     :key="c.id"
                     @click="addRelation(c.id)"
-                    class="w-full text-left px-3 py-2 hover:bg-gray-800 flex items-center space-x-2 text-xs"
+                    class="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 flex items-center space-x-2 text-xs transition-colors"
                   >
-                    <span class="font-mono text-[10px] text-indigo-400 shrink-0">{{ c.identifier }}</span>
-                    <span class="truncate text-gray-200">{{ c.title }}</span>
+                    <span class="font-mono text-[10px] text-zinc-500 shrink-0">{{ c.identifier }}</span>
+                    <span class="truncate text-zinc-800 dark:text-zinc-200">{{ c.title }}</span>
                   </button>
                 </div>
                 <div
-                  v-else-if="relationPickerOpen && relationQuery && relationCandidates.length === 0"
-                  class="absolute z-30 mt-1 w-full rounded-lg bg-gray-900 border border-gray-700 shadow-xl px-3 py-2 text-[11px] text-gray-500"
+                  v-if="relationPickerOpen && relationQuery && relationCandidates.length === 0"
+                  class="absolute z-30 mt-1 w-full p-2 text-center text-xs text-zinc-400 bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xl"
                 >
-                  No matching issues
+                  No matching issues found
                 </div>
               </div>
-              <button
-                @click="relationCandidates[0] && addRelation(relationCandidates[0].id)"
-                :disabled="relationLoading || relationCandidates.length === 0"
-                class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-40 text-white text-xs font-medium transition-colors"
-              >
-                Link
-              </button>
             </div>
           </div>
 
-          <!-- Comments & Activity Timeline -->
-          <div class="space-y-4 pt-4 border-t border-gray-800">
-            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Comments & Agent Audit Stream</h4>
-            
+          <!-- Comments & Activity Stream -->
+          <div class="space-y-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
+            <h4 class="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider select-none">Comments & Agent Audit Stream</h4>
+
             <!-- Comment Form -->
-            <div class="p-3 rounded-xl bg-gray-950/80 border border-gray-800 space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-xs text-gray-400 font-medium">Post as:</span>
+            <div class="p-3 rounded-xl bg-zinc-50/70 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-2">
+              <div class="flex items-center justify-between select-none">
+                <span class="text-xs text-zinc-500 font-medium">Post as:</span>
                 <div class="flex items-center space-x-2 text-xs">
                   <label class="flex items-center space-x-1 cursor-pointer">
-                    <input type="radio" v-model="newCommentAuthorType" value="user" class="text-indigo-600 focus:ring-0" />
-                    <span class="text-gray-300">User</span>
+                    <input type="radio" v-model="newCommentAuthorType" value="user" class="text-zinc-900 dark:text-zinc-100 focus:ring-0" />
+                    <span class="text-zinc-700 dark:text-zinc-300">User</span>
                   </label>
                   <label class="flex items-center space-x-1 cursor-pointer">
-                    <input type="radio" v-model="newCommentAuthorType" value="agent" class="text-indigo-600 focus:ring-0" />
-                    <span class="text-purple-400 font-medium">AI Agent</span>
+                    <input type="radio" v-model="newCommentAuthorType" value="agent" class="text-zinc-900 dark:text-zinc-100 focus:ring-0" />
+                    <span class="text-zinc-900 dark:text-zinc-200 font-semibold">AI Agent</span>
                   </label>
                 </div>
               </div>
 
-              <textarea 
+              <textarea
                 v-model="newCommentContent"
                 @keydown.ctrl.enter="submitComment"
                 @keydown.meta.enter="submitComment"
                 rows="2"
                 placeholder="Add execution note or update... (Cmd+Enter to send)"
-                class="w-full px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                class="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-zinc-400"
               ></textarea>
 
               <div class="flex items-center justify-end">
-                <button 
+                <button
                   @click="submitComment"
-                  class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium shadow-sm transition-all"
+                  :disabled="!newCommentContent.trim()"
+                  class="px-3 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 disabled:opacity-50 text-xs font-semibold shadow-2xs transition-colors"
                 >
-                  Send
+                  Post Comment
                 </button>
               </div>
             </div>
 
-            <!-- Comments Timeline List -->
-            <div class="space-y-3">
-              <div 
-                v-for="c in comments" 
+            <!-- Comment List -->
+            <div class="space-y-2">
+              <div
+                v-for="c in comments"
                 :key="c.id"
-                class="p-3.5 rounded-xl border bg-gray-950/60 border-gray-800/80 space-y-2"
+                class="p-3 rounded-xl bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 space-y-1.5"
               >
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center space-x-2">
-                    <span 
-                      class="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold uppercase"
-                      :class="c.author_type === 'agent' ? 'bg-purple-950 text-purple-300 border border-purple-800/40' : 'bg-blue-950 text-blue-300 border border-blue-800/40'"
+                <div class="flex items-center justify-between text-xs select-none">
+                  <div class="flex items-center space-x-1.5">
+                    <span
+                      class="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase font-mono"
+                      :class="c.author_type === 'agent' ? 'bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'"
                     >
                       {{ c.author_type }}
                     </span>
-                    <span class="text-xs font-semibold text-gray-200">{{ c.author }}</span>
+                    <span class="text-xs font-semibold text-zinc-900 dark:text-zinc-100">{{ c.author }}</span>
                   </div>
-                  <span class="text-[11px] font-mono text-gray-500">{{ formatTime(c.created) }}</span>
+                  <span class="text-[11px] font-mono text-zinc-400">{{ formatTime(c.created) }}</span>
                 </div>
 
-                <div class="text-xs text-gray-300 markdown-body" v-html="renderCommentBody(c.content)"></div>
+                <div class="text-xs text-zinc-800 dark:text-zinc-200 markdown-body" v-html="renderCommentBody(c.content)"></div>
               </div>
 
-              <div v-if="comments.length === 0" class="py-4 text-center text-gray-500 text-xs">
+              <div v-if="comments.length === 0" class="py-4 text-center text-zinc-400 text-xs">
                 No comments or agent logs on this issue yet.
               </div>
             </div>
@@ -1269,96 +1105,41 @@ const IssueDrawerComponent = {
       <!-- Distraction-free Description Focus Mode -->
       <div
         v-if="descFocus"
-        class="fixed inset-0 z-[60] bg-gray-950 flex flex-col"
+        class="fixed inset-0 z-[60] bg-white dark:bg-[#09090b] flex flex-col"
         @keydown.esc.stop="exitDescFocus"
       >
         <!-- Focus header -->
-        <div class="px-6 py-3 border-b border-gray-800 flex items-center justify-between bg-gray-900/80 select-none">
-          <div class="flex items-center space-x-3 min-w-0">
-            <span class="px-2 py-0.5 rounded-md bg-indigo-950/60 border border-indigo-800/40 text-indigo-400 font-mono text-xs font-semibold shrink-0">
+        <div class="px-5 py-2.5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/80 dark:bg-zinc-900/80 select-none">
+          <div class="flex items-center space-x-2.5 min-w-0">
+            <span class="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-mono text-xs font-semibold shrink-0">
               {{ issue.identifier }}
             </span>
-            <span class="text-sm font-semibold text-gray-200 truncate">{{ editTitle || 'Untitled issue' }}</span>
+            <span class="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">{{ editTitle || 'Untitled issue' }}</span>
           </div>
           <div class="flex items-center space-x-2 shrink-0">
             <button
               @click="polishAiDescription"
               :disabled="aiLoadingDesc"
-              class="px-2.5 py-1 rounded-md bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800/40 text-purple-300 text-xs font-medium flex items-center space-x-1 transition-all"
-              title="Enhance description into structured PRD with Acceptance Criteria"
+              class="px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-medium flex items-center space-x-1 transition-colors"
             >
-              <span v-if="aiLoadingDesc" class="animate-spin text-xs">🌀</span>
-              <span v-else>✨</span>
-              <span>{{ aiLoadingDesc ? 'Generating...' : 'AI Enhance PRD' }}</span>
+              <span>{{ aiLoadingDesc ? 'Polishing...' : '✨ Polish AI' }}</span>
             </button>
             <button
               @click="exitDescFocus"
-              class="px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition-colors"
-              title="Save and exit focus mode (Esc)"
+              class="px-3 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 text-xs font-semibold transition-colors shadow-2xs"
             >
-              Done
+              Done (Esc)
             </button>
           </div>
         </div>
 
-        <!-- Focus body: centered, max-width editor -->
-        <div class="flex-1 overflow-y-auto">
-          <div class="max-w-3xl mx-auto px-6 py-8 space-y-4">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center bg-gray-900 p-0.5 rounded-lg border border-gray-800 text-xs">
-                <button
-                  @click="descTab = 'rich'"
-                  class="px-2.5 py-1 rounded-md font-medium transition-all"
-                  :class="descTab === 'rich' || descTab === 'write' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-gray-200'"
-                >
-                  Rich
-                </button>
-                <button
-                  @click="descTab = 'raw'"
-                  class="px-2.5 py-1 rounded-md font-medium transition-all"
-                  :class="descTab === 'raw' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-gray-200'"
-                >
-                  Raw
-                </button>
-                <button
-                  @click="descTab = 'preview'"
-                  class="px-2.5 py-1 rounded-md font-medium transition-all"
-                  :class="descTab === 'preview' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-gray-200'"
-                >
-                  Preview
-                </button>
-              </div>
-              <span class="text-[11px] text-gray-500">Press Esc to save &amp; exit</span>
-            </div>
-
-            <!-- Rich Mode -->
-            <div v-show="descTab === 'rich' || descTab === 'write'">
-              <milkdown-editor
-                v-model="editDesc"
-                @blur="saveChanges"
-                placeholder="Detailed markdown description, requirements, architecture notes..."
-                class="w-full min-h-[60vh] px-4 py-3 rounded-xl bg-gray-900/80 border border-gray-800 text-gray-100 text-sm focus-within:ring-1 focus-within:ring-indigo-500 leading-relaxed"
-              ></milkdown-editor>
-            </div>
-
-            <!-- Raw Mode -->
-            <div v-show="descTab === 'raw'">
-              <textarea
-                v-model="editDesc"
-                @blur="saveChanges"
-                rows="24"
-                placeholder="Detailed markdown description, requirements, architecture notes..."
-                class="w-full px-4 py-3 rounded-xl bg-gray-900/80 border border-gray-800 text-gray-100 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 leading-relaxed"
-              ></textarea>
-            </div>
-
-            <!-- Preview Mode -->
-            <div
-              v-show="descTab === 'preview'"
-              class="p-4 rounded-xl bg-gray-900/80 border border-gray-800 min-h-[60vh] markdown-body"
-              v-html="renderedDescription"
-            ></div>
-          </div>
+        <!-- Focus editor body -->
+        <div class="flex-1 overflow-y-auto p-8 max-w-4xl mx-auto w-full">
+          <milkdown-editor
+            ref="focusMilkdown"
+            v-model="editDesc"
+            @blur="saveChanges"
+          ></milkdown-editor>
         </div>
       </div>
     </div>
