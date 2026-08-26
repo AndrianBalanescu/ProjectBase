@@ -11,3 +11,4 @@ prism-out/
 **/research/jobs/
 backups/
 pocketbase-types.ts
+/bin/

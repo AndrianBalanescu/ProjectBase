@@ -1,0 +1,14 @@
+# ProjectBase agent-bridge (sidecar) — publishes sanitized agent metadata.
+# Runs AS the machine user (default: ubuntu) so it can read their agent dirs.
+# The PB server (its own locked-down user) then reads the world-readable JSON.
+[Unit]
+Description=ProjectBase agent-bridge (sanitized agent scan)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+ExecStart=/data/projects/projectbase/bin/agent_bridge --out /run/projectbase/agents.json
+# StandardOutput=journal

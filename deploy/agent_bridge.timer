@@ -1,0 +1,12 @@
+# Runs the ProjectBase agent-bridge every 2 minutes so board agent statuses
+# stay reasonably fresh. One-shot service + timer instead of a long-running daemon.
+[Unit]
+Description=ProjectBase agent-bridge refresh timer
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+Unit=agent_bridge.service
+
+[Install]
+WantedBy=timers.target

@@ -1929,6 +1929,57 @@
           }
         }
       }
+    },
+    "/projectbase/agents": {
+      "get": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "List Detected Local Agents",
+        "description": "Returns the sanitized team of AI agents detected on the host (read from the agent-bridge output). Includes name, provider, runtime, avatar and found flag.",
+        "responses": {
+          "200": {
+            "description": "Agent list"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        }
+      }
+    },
+    "/projectbase/agents/flomaster": {
+      "get": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Flomaster Agent Summary",
+        "description": "Returns a summary of the local flomaster agent (config presence, provider/model, last session).",
+        "responses": {
+          "200": {
+            "description": "Flomaster summary"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        }
+      }
+    },
+    "/projectbase/agents/sync": {
+      "post": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Persist Detected Agents",
+        "description": "Upserts the detected agents from the bridge into the agents collection (keyed by name).",
+        "responses": {
+          "200": {
+            "description": "Sync summary"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        }
+      }
     }
   }
 }
