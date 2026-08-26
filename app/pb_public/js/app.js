@@ -7,15 +7,39 @@ const { createApp, ref, reactive, computed, onMounted, nextTick } = Vue;
 // Data cache: persist the last-known-good workspace snapshot to localStorage so
 // a page refresh keeps content on screen while the fresh fetch resolves (no
 // blank flash). The cache is a best-effort mirror, never the source of truth.
+// Snapshots are isolated per authenticated identity and expire after 24 hours,
+// preventing stale/cross-account workspace content from being rendered.
 // ---------------------------------------------------------------------------
-const DATA_CACHE_KEY = 'projectbase_data_cache_v1';
+const DATA_CACHE_PREFIX = 'projectbase_data_cache_v2:';
+const DATA_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+function currentCacheKey() {
+  try {
+    const model = API && API.client && API.client.authStore && API.client.authStore.model;
+    const id = model && model.id;
+    return id ? DATA_CACHE_PREFIX + id : null;
+  } catch (e) {
+    return null;
+  }
+}
 
 function readDataCache() {
   try {
-    const raw = localStorage.getItem(DATA_CACHE_KEY);
+    const key = currentCacheKey();
+    if (!key) return {};
+    const raw = localStorage.getItem(key);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return {};
+    if (!parsed || typeof parsed !== 'object' || parsed.version !== 2) return {};
+    if (!parsed.cachedAt || Date.now() - parsed.cachedAt > DATA_CACHE_MAX_AGE_MS) {
+      localStorage.removeItem(key);
+      return {};
+    }
+    // Validate the fields we consume before handing them to Vue templates.
+    if (!Array.isArray(parsed.projects) || !Array.isArray(parsed.issues) ||
+        !Array.isArray(parsed.cycles) || !Array.isArray(parsed.milestones) ||
+        !Array.isArray(parsed.labels) || !Array.isArray(parsed.agents) ||
+        !Array.isArray(parsed.agentSessions)) return {};
     return parsed;
   } catch (e) {
     return {};
@@ -24,8 +48,12 @@ function readDataCache() {
 
 function writeDataCache(snapshot) {
   try {
+    const key = currentCacheKey();
+    if (!key) return;
     // Only persist the workspace snapshot fields (never auth/session state).
     const slim = {
+      version: 2,
+      cachedAt: Date.now(),
       currentProject: snapshot.currentProject || null,
       projects: snapshot.projects || [],
       issues: snapshot.issues || [],
@@ -36,7 +64,7 @@ function writeDataCache(snapshot) {
       agentSessions: snapshot.agentSessions || [],
       agentSource: snapshot.agentSource || 'bridge'
     };
-    localStorage.setItem(DATA_CACHE_KEY, JSON.stringify(slim));
+    localStorage.setItem(key, JSON.stringify(slim));
   } catch (e) {
     // Quota / private-mode: cache is best-effort, ignore failures.
   }
