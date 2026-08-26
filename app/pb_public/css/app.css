@@ -65,26 +65,26 @@
 }
 
 html.light {
-  /* Surfaces & Canvas: Softer, rich grayish neutral slate (eliminates blinding white) */
-  --bg-app: #eceef2;
-  --bg-surface: #f4f5f8;
-  --bg-surface-elevated: #ffffff;
-  --bg-card: #ffffff;
-  --bg-card-hover: #f3f4f7;
-  --bg-subtle: #e2e5eb;
-  --bg-overlay: rgba(236, 238, 242, 0.9);
+  /* Surfaces & Canvas: Calm, eye-friendly muted slate-gray (zero stark white) */
+  --bg-app: #dfe3e8;
+  --bg-surface: #e8ecf1;
+  --bg-surface-elevated: #f0f3f7;
+  --bg-card: #f0f3f7;
+  --bg-card-hover: #e4e8ee;
+  --bg-subtle: #dbe0e7;
+  --bg-overlay: rgba(223, 227, 232, 0.92);
 
-  /* Borders & Dividers: Crisp, structured grayish borders */
-  --border-app: #d1d5db;
-  --border-subtle: #e2e8f0;
-  --border-hover: #9ca3af;
-  --border-focus: #4b5563;
+  /* Borders & Dividers */
+  --border-app: #cbd3dc;
+  --border-subtle: #d5dce5;
+  --border-hover: #94a3b8;
+  --border-focus: #475569;
 
   /* Typography: Deep crisp black and dark-zinc text for maximum legibility */
   --text-primary: #09090b;
   --text-secondary: #27272a;
-  --text-muted: #52525b;
-  --text-dim: #71717a;
+  --text-muted: #4b5563;
+  --text-dim: #64748b;
 
   /* Minimalist Accents */
   --accent-btn-bg: #18181b;
@@ -93,32 +93,74 @@ html.light {
   --accent-btn-border: #18181b;
 
   /* Soft Status Tints */
-  --status-todo-bg: #e2e8f0;
-  --status-todo-text: #1e293b;
-  --status-todo-border: #cbd5e1;
+  --status-todo-bg: #dbe0e7;
+  --status-todo-text: #0f172a;
+  --status-todo-border: #cbd3dc;
 
-  --status-progress-bg: #eff6ff;
+  --status-progress-bg: #dbeafe;
   --status-progress-text: #1d4ed8;
-  --status-progress-border: #bfdbfe;
+  --status-progress-border: #93c5fd;
 
-  --status-review-bg: #fffbeb;
+  --status-review-bg: #fef3c7;
   --status-review-text: #b45309;
-  --status-review-border: #fde68a;
+  --status-review-border: #fcd34d;
 
-  --status-done-bg: #ecfdf5;
+  --status-done-bg: #d1fae5;
   --status-done-text: #047857;
-  --status-done-border: #a7f3d0;
+  --status-done-border: #6ee7b7;
 
-  --status-cancel-bg: #e2e8f0;
+  --status-cancel-bg: #dbe0e7;
   --status-cancel-text: #64748b;
-  --status-cancel-border: #cbd5e1;
+  --status-cancel-border: #cbd3dc;
 
   /* Scrollbars */
   --scrollbar-track: transparent;
-  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb: #cbd3dc;
   --scrollbar-thumb-hover: #94a3b8;
 
   color-scheme: light;
+}
+
+/* Light mode utility overrides to eliminate blinding pure white across all components */
+html.light .bg-white {
+  background-color: #f0f3f7 !important;
+}
+html.light .bg-zinc-50,
+html.light .bg-slate-50,
+html.light .bg-gray-50 {
+  background-color: #dfe3e8 !important;
+}
+html.light .bg-zinc-100,
+html.light .bg-slate-100,
+html.light .bg-gray-100 {
+  background-color: #d5dce5 !important;
+}
+html.light .border-zinc-200,
+html.light .border-slate-200,
+html.light .border-gray-200 {
+  border-color: #cbd3dc !important;
+}
+html.light .border-zinc-100,
+html.light .border-slate-100,
+html.light .border-gray-100 {
+  border-color: #d5dce5 !important;
+}
+html.light input:not([type="checkbox"]):not([type="radio"]),
+html.light textarea,
+html.light select {
+  background-color: #e8ecf1 !important;
+  color: #09090b !important;
+  border-color: #cbd3dc !important;
+}
+html.light input:not([type="checkbox"]):not([type="radio"]):focus,
+html.light textarea:focus,
+html.light select:focus {
+  background-color: #f0f3f7 !important;
+  border-color: #64748b !important;
+}
+html.light .glass-dropdown {
+  background: #f0f3f7 !important;
+  border: 1px solid #cbd3dc !important;
 }
 
 /* ---------------------------------------------------------------------------
