@@ -64,9 +64,37 @@ type Session struct {
 	LiveActivity    []ActivityEvent `json:"live_activity,omitempty"`
 	LastText        string          `json:"last_text,omitempty"`
 	RecentTools     []Tool          `json:"recent_tools,omitempty"`
+	Chat            []ChatMessage   `json:"chat,omitempty"`
+	TokenUsage      TokenStats      `json:"token_usage,omitempty"`
 	Todos           []TodoItem      `json:"todos,omitempty"`
 	MessageCount    int             `json:"message_count"`
 	Avatar          string          `json:"avatar"`
+}
+
+// ChatMessage is one sanitized, structured chat turn. `role` is "user" or
+// "assistant". For assistant turns, content blocks are rendered as compact,
+// type-distinct bubbles (reasoning, text, tools). Never forwards raw tool
+// outputs or secrets.
+type ChatMessage struct {
+	Role       string         `json:"role"`
+	Content    string         `json:"content,omitempty"`     // plain text (user / assistant text)
+	Reasoning  string         `json:"reasoning,omitempty"`   // cursive, low-saturation thought block
+	Tools      []ChatTool     `json:"tools,omitempty"`       // grouped tool invocations
+	Timestamp  string         `json:"timestamp,omitempty"`
+}
+
+// ChatTool is a compact, grouped tool invocation inside an assistant turn.
+type ChatTool struct {
+	Name   string `json:"name"`
+	Input  string `json:"input,omitempty"`
+	Intent string `json:"intent,omitempty"`
+}
+
+// TokenStats aggregates token usage across the scanned message window.
+type TokenStats struct {
+	Prompt     int `json:"prompt"`
+	Completion int `json:"completion"`
+	Total      int `json:"total"`
 }
 
 // ActivityEvent is an interleaved chronological item in the live session stream.
@@ -585,6 +613,45 @@ func parseSessionJSON(homeDir, jsonPath, journalPath, avatar string) Session {
 
 	reasoningSteps := extractReasoningSteps(latestReasoning)
 
+	// Build a sanitized, structured chat stream for the native chat UI.
+	// User turns become plain text bubbles (right-aligned); assistant turns
+	// carry reasoning, text, and grouped tools (left-aligned). Cap at ~30 turns.
+	chat := buildChat(scan, 30)
+
+	// Aggregate token usage across the scanned window. input_tokens/output_tokens
+	// are cumulative running totals per session, so take the latest (max) value.
+	var tokenStats TokenStats
+	for _, rawMsg := range scan {
+		msg, ok := rawMsg.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		tu, okTU := msg["token_usage"].(map[string]interface{})
+		if !okTU {
+			continue
+		}
+		// Anthropic/OpenAI-style keys: input_tokens/output_tokens.
+		if p, ok := tu["input_tokens"].(float64); ok {
+			if int(p) > tokenStats.Prompt {
+				tokenStats.Prompt = int(p)
+			}
+		} else if p, ok := tu["prompt_tokens"].(float64); ok {
+			if int(p) > tokenStats.Prompt {
+				tokenStats.Prompt = int(p)
+			}
+		}
+		if c, ok := tu["output_tokens"].(float64); ok {
+			if int(c) > tokenStats.Completion {
+				tokenStats.Completion = int(c)
+			}
+		} else if c, ok := tu["completion_tokens"].(float64); ok {
+			if int(c) > tokenStats.Completion {
+				tokenStats.Completion = int(c)
+			}
+		}
+	}
+	tokenStats.Total = tokenStats.Prompt + tokenStats.Completion
+
 	return Session{
 		Agent:           "flomaster",
 		ID:              raw.ID,
@@ -603,7 +670,118 @@ func parseSessionJSON(homeDir, jsonPath, journalPath, avatar string) Session {
 		FilesTouched:    filesTouched,
 		LiveActivity:    events,
 		RecentTools:     tools,
+		Chat:            chat,
+		TokenUsage:      tokenStats,
 	}
+}
+
+// buildChat converts a slice of raw messages into sanitized, structured chat
+// turns for the native chat UI. Only user/assistant turns are surfaced; tool
+// results are never forwarded. The output is capped to `max` most recent turns.
+func buildChat(scan []interface{}, max int) []ChatMessage {
+	var chat []ChatMessage
+	for _, rawMsg := range scan {
+		msg, ok := rawMsg.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		role, _ := msg["role"].(string)
+		if role != "user" && role != "assistant" {
+			continue
+		}
+		ts, _ := msg["timestamp"].(string)
+		content := msg["content"]
+
+		turn := ChatMessage{Role: role, Timestamp: ts}
+
+		// Plain string content: a user prompt or a plain assistant reply.
+		if textStr, isStr := content.(string); isStr {
+			t := strings.TrimSpace(textStr)
+			if t != "" {
+				if role == "user" {
+					turn.Content = truncateString(t, 600)
+				} else {
+					turn.Content = truncateString(t, 800)
+				}
+			}
+		} else if blocks, isBlocks := content.([]interface{}); isBlocks {
+			for _, rawBlk := range blocks {
+				blk, okB := rawBlk.(map[string]interface{})
+				if !okB {
+					continue
+				}
+				bType, _ := blk["type"].(string)
+				switch bType {
+				case "text":
+					t, _ := blk["text"].(string)
+					if strings.TrimSpace(t) != "" {
+						turn.Content = truncateString(strings.TrimSpace(t), 800)
+					}
+				case "reasoning":
+					r, _ := blk["text"].(string)
+					if strings.TrimSpace(r) != "" {
+						turn.Reasoning = truncateString(strings.TrimSpace(r), 700)
+					}
+				case "tool_use":
+					tName, _ := blk["name"].(string)
+					if tName != "" {
+						inputMap, _ := blk["input"].(map[string]interface{})
+						intent := ""
+						inputSum := ""
+						if inputMap != nil {
+							if it, okI := inputMap["intent"].(string); okI {
+								intent = it
+							}
+							inputSum = toolInputSummary(inputMap)
+						}
+						turn.Tools = append(turn.Tools, ChatTool{
+							Name:   tName,
+							Input:  inputSum,
+							Intent: intent,
+						})
+					}
+				}
+			}
+		}
+
+		// OpenAI-style tool_calls on assistant messages.
+		if tcs, okTC := msg["tool_calls"].([]interface{}); okTC {
+			for _, tc := range tcs {
+				if tcObj, okT := tc.(map[string]interface{}); okT {
+					fn, _ := tcObj["function"].(map[string]interface{})
+					name, _ := fn["name"].(string)
+					argsStr, _ := fn["arguments"].(string)
+					intent := ""
+					inputSum := ""
+					if argsStr != "" {
+						var argsMap map[string]interface{}
+						if json.Unmarshal([]byte(argsStr), &argsMap) == nil {
+							if it, okA := argsMap["intent"].(string); okA {
+								intent = it
+							}
+							inputSum = toolInputSummary(argsMap)
+						}
+					}
+					if name != "" {
+						turn.Tools = append(turn.Tools, ChatTool{
+							Name:   name,
+							Input:  inputSum,
+							Intent: intent,
+						})
+					}
+				}
+			}
+		}
+
+		if turn.Content != "" || turn.Reasoning != "" || len(turn.Tools) > 0 {
+			chat = append(chat, turn)
+		}
+	}
+
+	if len(chat) > max {
+		chat = chat[len(chat)-max:]
+	}
+	return chat
 }
 
 // toolInputSummary renders a short, single-line summary of a tool_use input,

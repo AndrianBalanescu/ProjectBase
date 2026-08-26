@@ -8,7 +8,7 @@ const NewIssueModalComponent = {
     'searchable-select': window.SearchableSelectComponent || SearchableSelectComponent,
     'multiselect': window.MultiselectComponent || MultiselectComponent
   },
-  props: ['isOpen', 'projects', 'currentProject', 'cycles', 'labels', 'milestones', 'agents'],
+  props: ['isOpen', 'projects', 'currentProject', 'cycles', 'labels', 'milestones', 'agents', 'pendingIssue'],
   emits: ['close', 'create-issue'],
   data() {
     return {
@@ -66,20 +66,21 @@ const NewIssueModalComponent = {
   },
   methods: {
     resetForm() {
-      this.title = '';
-      this.description = '';
+      const p = this.pendingIssue;
+      this.title = p && p.title ? p.title : '';
+      this.description = p && p.description ? p.description : '';
       this.projectId = this.currentProject ? this.currentProject.id : (this.projects[0] ? this.projects[0].id : '');
       this.status = 'todo';
-      this.priority = 'medium';
-      this.estimate = 0;
+      this.priority = p && p.priority ? p.priority : 'medium';
+      this.estimate = p && p.estimate ? Number(p.estimate) || 0 : 0;
       this.startDate = '';
       this.dueDate = '';
       this.cycleId = '';
       this.milestoneId = '';
-      this.assignee = '';
+      this.assignee = p && p.assignee ? p.assignee : '';
       this.selectedLabels = [];
       this.customFields = {};
-      this.subtasks = [];
+      this.subtasks = p && p.subtasks ? [...p.subtasks] : [];
       this.newSubtaskInput = '';
       this.chatPrompt = '';
       this.aiFeedback = '';

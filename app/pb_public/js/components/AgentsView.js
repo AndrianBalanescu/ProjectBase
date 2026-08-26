@@ -1,7 +1,8 @@
 // pb_public/js/components/AgentsView.js
-// Multica 2.0: Minimalist, ultra-dense, full-width agent cockpit dashboard.
-// Low-contrast refined palette, light & dark theme support, live streaming tools & reasoning,
-// session continuation/resume on tickets, active checklist, and 1-click dispatch.
+// Multica 2.0: Native Chat & Command Center.
+// SMS-style chat with user messages right-aligned (avatar right), assistant
+// left-aligned, low-saturation cursive reasoning blocks, compact grouped masonry
+// tool cards, session stats header widget, and 1-click session continuation.
 
 const AgentsViewComponent = {
   props: ['agents', 'sessions', 'activeAgentName', 'agentSource'],
@@ -16,7 +17,8 @@ const AgentsViewComponent = {
       dispatchSuccess: null,
       liveStreamActive: true,
       pollTimer: null,
-      activeTab: 'activity' // 'activity' | 'tools' | 'reasoning' | 'todos'
+      showTools: true, // expand grouped tool cards
+      expandedMessage: null // assistant message id whose reasoning is expanded
     };
   },
   computed: {
@@ -55,6 +57,22 @@ const AgentsViewComponent = {
         return this.visibleSessions[0] || null;
       }
       return this.visibleSessions.find(s => s.id === this.selectedSessionId) || this.visibleSessions[0] || null;
+    },
+    // The sanitized chat turns for the selected session (or a fallback).
+    chatTurns() {
+      const s = this.selectedSession;
+      if (s && s.chat && s.chat.length > 0) return s.chat;
+      // Fallback: derive from live_activity for sessions without a chat stream.
+      if (s && s.live_activity && s.live_activity.length > 0) {
+        return s.live_activity.map(ev => ({
+          role: 'assistant',
+          content: ev.intent || (ev.type === 'text' ? ev.summary : '') || '',
+          reasoning: ev.type === 'reasoning' ? ev.summary : '',
+          tools: ev.type === 'tool' ? [{ name: ev.name, input: ev.input, intent: ev.intent }] : [],
+          timestamp: ev.timestamp
+        }));
+      }
+      return [];
     }
   },
   watch: {
@@ -69,7 +87,7 @@ const AgentsViewComponent = {
   },
   mounted() {
     if (window.lucide) window.lucide.createIcons();
-    // Live streaming poll: refresh telemetry every 3.5 seconds
+    // Live streaming poll: refresh telemetry every 3.5 seconds.
     this.pollTimer = setInterval(() => {
       if (this.liveStreamActive) {
         this.$emit('sync-agents');
@@ -106,26 +124,77 @@ const AgentsViewComponent = {
       if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
       return Math.floor(diff / 86400) + 'd ago';
     },
+    fmtTokens(n) {
+      if (!n) return '0';
+      if (n < 1000) return String(n);
+      if (n < 1000000) return (n / 1000).toFixed(1) + 'k';
+      return (n / 1000000).toFixed(1) + 'M';
+    },
     workingDirLabel(dir) {
       if (!dir) return '—';
       const parts = dir.split('/');
       return parts.slice(-2).join('/');
     },
     toolColor(name) {
-      if (!name) return 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300';
+      if (!name) return 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700';
       if (name.includes('edit') || name.includes('write') || name.includes('patch')) {
         return 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/60';
       }
-      if (name.includes('read') || name.includes('grep') || name.includes('find') || name.includes('ls')) {
+      if (name.includes('read') || name.includes('grep') || name.includes('find') || name.includes('ls') || name.includes('agentgrep')) {
         return 'bg-sky-100 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border border-sky-200 dark:border-sky-900/60';
       }
       if (name.includes('bash') || name.includes('cmd') || name.includes('exec')) {
         return 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/60';
       }
+      if (name.includes('web') || name.includes('search') || name.includes('fetch')) {
+        return 'bg-cyan-100 dark:bg-cyan-950/60 text-cyan-800 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-900/60';
+      }
       if (name.includes('mcp') || name.includes('todo') || name.includes('goal')) {
         return 'bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-900/60';
       }
       return 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700';
+    },
+    toolIcon(name) {
+      if (!name) return 'terminal';
+      if (name.includes('edit') || name.includes('write') || name.includes('patch')) return 'file-edit';
+      if (name.includes('read') || name.includes('grep') || name.includes('find') || name.includes('ls') || name.includes('agentgrep')) return 'file-search';
+      if (name.includes('bash') || name.includes('cmd') || name.includes('exec')) return 'terminal';
+      if (name.includes('web') || name.includes('search') || name.includes('fetch')) return 'globe';
+      if (name.includes('mcp')) return 'plug';
+      if (name.includes('todo') || name.includes('goal')) return 'list-checks';
+      return 'wrench';
+    },
+    // Group consecutive same-tool invocations into a single compact card.
+    groupTools(tools) {
+      if (!tools || tools.length === 0) return [];
+      const groups = [];
+      for (const t of tools) {
+        const last = groups[groups.length - 1];
+        if (last && last.name === t.name) {
+          last.count++;
+          if (!last.inputs.includes(t.input)) last.inputs.push(t.input);
+        } else {
+          groups.push({
+            name: t.name,
+            count: 1,
+            intent: t.intent,
+            inputs: t.input ? [t.input] : [],
+            lastInput: t.input
+          });
+        }
+      }
+      return groups;
+    },
+    // Toggle expansion of a message's reasoning.
+    toggleReasoning(idx) {
+      this.expandedMessage = this.expandedMessage === idx ? null : idx;
+    },
+    createTicketFromSession(session) {
+      if (!session) return;
+      this.$emit('open-new-issue', {
+        title: session.intention ? session.intention.slice(0, 100) : (session.title || 'Task from session ' + session.short_name),
+        description: `### Originating Session\n- **Agent:** \`${session.agent}\`\n- **Session:** \`${session.short_name || session.id}\`\n- **Model:** \`${session.model}\`\n- **CWD:** \`${session.working_dir}\`\n\n### Intent\n${session.intention || 'No explicit intent specified.'}\n\n### Relevant Files\n${(session.files_touched || []).map(f => '- `' + f + '`').join('\n') || '- None'}`
+      });
     },
     async quickDispatch(agentName) {
       if (!this.quickPrompt.trim()) return;
@@ -138,7 +207,7 @@ const AgentsViewComponent = {
           instructions: this.quickPrompt,
           session_id: this.selectedSession ? this.selectedSession.id : null
         });
-        this.dispatchSuccess = `Dispatched to ${target}`;
+        this.dispatchSuccess = `Sent to ${target}`;
         this.quickPrompt = '';
         setTimeout(() => { this.dispatchSuccess = null; }, 3000);
         this.$emit('sync-agents');
@@ -147,23 +216,15 @@ const AgentsViewComponent = {
       } finally {
         this.isDispatching = false;
       }
-    },
-    createTicketFromSession(session) {
-      if (!session) return;
-      this.$emit('open-new-issue', {
-        title: session.intention ? session.intention.slice(0, 100) : (session.title || 'Task from session ' + session.short_name),
-        description: `### Originating Session\n- **Agent:** \`${session.agent}\`\n- **Session:** \`${session.short_name || session.id}\`\n- **Model:** \`${session.model}\`\n- **CWD:** \`${session.working_dir}\`\n\n### Intent\n${session.intention || 'No explicit intent specified.'}\n\n### Relevant Files\n${(session.files_touched || []).map(f => '- `' + f + '`').join('\n') || '- None'}`
-      });
     }
   },
   template: `
     <div class="w-full h-[calc(100vh-3.5rem)] flex flex-col md:flex-row p-2 gap-2 bg-zinc-50 dark:bg-[#09090b] text-zinc-900 dark:text-zinc-200 overflow-hidden select-none">
 
       <!-- ========================================================= -->
-      <!-- PANE 1: LEFT AGENT TABS SIDEBAR (COMPACT, MINIMALIST)     -->
+      <!-- PANE 1: LEFT AGENT TABS SIDEBAR (COMPACT)                 -->
       <!-- ========================================================= -->
-      <aside class="w-full md:w-60 shrink-0 flex flex-col bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800/80 rounded-xl overflow-hidden shadow-xs">
-        <!-- Sidebar Header -->
+      <aside class="w-full md:w-56 shrink-0 flex flex-col bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800/80 rounded-xl overflow-hidden shadow-xs">
         <div class="p-2.5 border-b border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/50">
           <div class="flex items-center space-x-2">
             <span class="text-sm">🤖</span>
@@ -171,7 +232,7 @@ const AgentsViewComponent = {
           </div>
           <div class="flex items-center gap-1.5">
             <span class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/60 text-[10px] font-mono text-zinc-700 dark:text-zinc-300 font-semibold">
-              {{ onlineAgents.length }}/{{ (agents || []).length }} ON
+              {{ onlineAgents.length }}/{{ (agents || []).length }}
             </span>
             <button
               @click="$emit('sync-agents')"
@@ -183,7 +244,6 @@ const AgentsViewComponent = {
           </div>
         </div>
 
-        <!-- Filter & Search Box -->
         <div class="p-2 border-b border-zinc-200 dark:border-zinc-800/80 space-y-1.5 bg-zinc-50/30 dark:bg-zinc-950/20">
           <div class="relative">
             <i data-lucide="search" class="w-3 h-3 absolute left-2 top-2 text-zinc-400"></i>
@@ -199,9 +259,7 @@ const AgentsViewComponent = {
               @click="filterStatus = 'all'"
               class="flex-1 py-0.5 text-[10px] font-medium rounded transition-colors text-center"
               :class="filterStatus === 'all' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-semibold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
-            >
-              All ({{ (agents || []).length }})
-            </button>
+            >All ({{ (agents || []).length }})</button>
             <button
               @click="filterStatus = 'online'"
               class="flex-1 py-0.5 text-[10px] font-medium rounded transition-colors text-center flex items-center justify-center gap-1"
@@ -213,9 +271,7 @@ const AgentsViewComponent = {
           </div>
         </div>
 
-        <!-- Agent Tabs List -->
         <div class="flex-1 overflow-y-auto p-1.5 space-y-1">
-          <!-- All Agents Overview Option -->
           <button
             @click="selectAgent(null)"
             class="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left text-xs transition-colors"
@@ -225,12 +281,9 @@ const AgentsViewComponent = {
               <span class="text-sm">🌐</span>
               <span class="truncate">Workspace Fleet</span>
             </div>
-            <span class="px-1.5 py-0.5 rounded bg-zinc-200/80 dark:bg-zinc-700/60 text-[10px] font-mono font-medium">
-              {{ totalSessions }}
-            </span>
+            <span class="px-1.5 py-0.5 rounded bg-zinc-200/80 dark:bg-zinc-700/60 text-[10px] font-mono">{{ totalSessions }}</span>
           </button>
 
-          <!-- Individual Detected Agents -->
           <button
             v-for="agent in filteredAgents"
             :key="agent.name"
@@ -245,21 +298,16 @@ const AgentsViewComponent = {
                   <span>{{ agent.name }}</span>
                   <span v-if="agent.core" class="text-[8px] uppercase tracking-wider text-zinc-400">core</span>
                 </div>
-                <div class="text-[10px] font-mono text-zinc-400 truncate">
-                  {{ agent.provider }}
-                </div>
+                <div class="text-[10px] font-mono text-zinc-400 truncate">{{ agent.provider }}</div>
               </div>
             </div>
             <div class="flex items-center space-x-1.5 shrink-0">
-              <span v-if="agent.session_count" class="px-1.5 py-0.5 rounded bg-zinc-200/80 dark:bg-zinc-700/60 text-[10px] font-mono">
-                {{ agent.session_count }}
-              </span>
+              <span v-if="agent.session_count" class="px-1.5 py-0.5 rounded bg-zinc-200/80 dark:bg-zinc-700/60 text-[10px] font-mono">{{ agent.session_count }}</span>
               <span class="w-2 h-2 rounded-full" :class="statusDot(agent.status)" :title="agent.status"></span>
             </div>
           </button>
         </div>
 
-        <!-- Telemetry Source Footer -->
         <div class="p-2 border-t border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/70 dark:bg-zinc-900/40 text-[10px] font-mono text-zinc-500 dark:text-zinc-400 flex items-center justify-between">
           <span class="flex items-center gap-1">
             <span class="w-1.5 h-1.5 rounded-full" :class="agentSource === 'bridge' ? 'bg-emerald-500' : 'bg-amber-500'"></span>
@@ -273,391 +321,178 @@ const AgentsViewComponent = {
       </aside>
 
       <!-- ========================================================= -->
-      <!-- PANE 2 & 3: MAIN STACK (SESSIONS + LIVE STREAM & TRACE)  -->
+      <!-- PANE 2: NATIVE CHAT & COMMAND CENTER                      -->
       <!-- ========================================================= -->
       <section class="flex-1 flex flex-col bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800/80 rounded-xl overflow-hidden shadow-xs min-w-0">
 
-        <!-- Top Cockpit Header -->
-        <div class="p-2.5 border-b border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/50 flex-wrap gap-2">
+        <!-- Session Chat Header with Stats Widget -->
+        <div class="p-2.5 border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/70 dark:bg-zinc-900/50 flex items-center justify-between flex-wrap gap-2">
           <div class="flex items-center space-x-2.5 min-w-0">
-            <span class="text-xl shrink-0">{{ activeAgent ? activeAgent.avatar : '🧠' }}</span>
+            <span class="text-xl shrink-0">{{ selectedSession ? (selectedSession.avatar || '🧠') : '🤖' }}</span>
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <h2 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 capitalize truncate">
-                  {{ activeAgent ? activeAgent.name : 'Flomaster & Agent Fleet Sessions' }}
+                  {{ selectedSession ? (selectedSession.short_name || 'Session') : 'Select a Session' }}
                 </h2>
-                <span v-if="activeAgent" class="px-1.5 py-0.5 rounded text-[10px] font-mono border" :class="activeAgent.status === 'online' ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-400' : 'bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500'">
-                  {{ activeAgent.status }}
-                </span>
-              </div>
-              <p class="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono truncate">
-                {{ activeAgent ? (activeAgent.runtime + ' · ' + activeAgent.provider + ' · ' + (activeAgent.source_dir || 'detected')) : 'Real-time telemetry, tool executions & reasoning from active coding agents' }}
-              </p>
-            </div>
-          </div>
-
-          <!-- Quick Actions in top bar -->
-          <div class="flex items-center gap-2">
-            <div class="flex items-center text-[11px] font-mono text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900 px-2 py-1 rounded border border-zinc-200 dark:border-zinc-800">
-              <span class="text-zinc-900 dark:text-zinc-200 font-bold mr-1.5">{{ visibleSessions.length }}</span>
-              <span>active session{{ visibleSessions.length === 1 ? '' : 's' }}</span>
-            </div>
-            <button
-              @click="$emit('open-new-issue')"
-              class="px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 text-xs font-semibold flex items-center space-x-1 transition-colors shadow-2xs"
-            >
-              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-              <span>New Task</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Main Body: 2-Column Split View (Session Feed + Inspection Cockpit) -->
-        <div class="flex-1 flex flex-col lg:flex-row overflow-hidden divide-y lg:divide-y-0 lg:divide-x divide-zinc-200 dark:divide-zinc-800/80">
-
-          <!-- Left Column: Live Sessions List -->
-          <div class="w-full lg:w-80 shrink-0 flex flex-col overflow-hidden min-w-0 bg-zinc-50/30 dark:bg-zinc-950/20">
-            <div class="p-2 border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/70 dark:bg-zinc-900/50 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-              <span>Active Agent Sessions</span>
-              <span class="font-mono text-[10px] text-zinc-400">{{ visibleSessions.length }} live</span>
-            </div>
-
-            <div class="flex-1 overflow-y-auto p-2 space-y-1.5">
-              <!-- Empty state -->
-              <div v-if="visibleSessions.length === 0" class="py-12 text-center select-none flex flex-col items-center">
-                <i data-lucide="bot" class="w-10 h-10 mb-2 opacity-30 text-zinc-400"></i>
-                <div class="text-xs font-semibold text-zinc-600 dark:text-zinc-400">No active sessions for this agent</div>
-                <div class="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1 max-w-xs">Start a session in flomaster or dispatch a task from any Kanban issue.</div>
-              </div>
-
-              <!-- Session Item Card -->
-              <div
-                v-for="s in visibleSessions"
-                :key="s.id"
-                @click="selectSession(s)"
-                class="rounded-lg border p-2.5 transition-all cursor-pointer space-y-1.5 select-text"
-                :class="selectedSession && selectedSession.id === s.id ? 'bg-zinc-100/80 dark:bg-zinc-800/80 border-zinc-400 dark:border-zinc-600 shadow-xs' : 'bg-white dark:bg-zinc-900/40 border-zinc-200 dark:border-zinc-800/70 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30'"
-              >
-                <!-- Card Header -->
-                <div class="flex items-start justify-between gap-2">
-                  <div class="flex items-center space-x-2 min-w-0">
-                    <span class="text-base shrink-0">{{ s.avatar || '🧠' }}</span>
-                    <div class="min-w-0">
-                      <div class="text-xs font-bold text-zinc-900 dark:text-zinc-200 truncate flex items-center gap-1.5">
-                        <span>{{ s.short_name || s.id }}</span>
-                        <span v-if="s.is_active" class="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse shrink-0" title="Active & Running"></span>
-                      </div>
-                      <div class="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 truncate flex items-center gap-1">
-                        <span>{{ s.model || 'model' }}</span>
-                        <span>·</span>
-                        <span>{{ workingDirLabel(s.working_dir) }}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <span class="text-[10px] font-mono text-zinc-400 shrink-0">
-                    {{ fmtTime(s.last_active_at || s.updated_at) }}
-                  </span>
-                </div>
-
-                <!-- User Intention / Goal line -->
-                <p v-if="s.intention" class="text-xs text-zinc-700 dark:text-zinc-300 line-clamp-2 leading-tight">
-                  {{ s.intention }}
-                </p>
-
-                <!-- Tool Pills Preview -->
-                <div v-if="s.recent_tools && s.recent_tools.length > 0" class="flex flex-wrap gap-1 pt-0.5">
-                  <span
-                    v-for="(t, ti) in s.recent_tools.slice(0, 4)"
-                    :key="ti"
-                    class="px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold"
-                    :class="toolColor(t.name)"
-                  >
-                    {{ t.name }}
-                  </span>
-                  <span v-if="s.recent_tools.length > 4" class="text-[9px] text-zinc-400 font-mono self-center">
-                    +{{ s.recent_tools.length - 4 }}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Right Column: Deep Inspection & Live Streaming Cockpit -->
-          <div class="flex-1 flex flex-col overflow-hidden min-w-0 bg-white dark:bg-[#121215]">
-            <!-- Inspector Header & Tab Navigation -->
-            <div class="p-2 border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/70 dark:bg-zinc-900/50 flex items-center justify-between flex-wrap gap-2">
-              <div class="flex items-center space-x-2">
-                <span class="text-sm">{{ selectedSession ? (selectedSession.avatar || '🧠') : '🤖' }}</span>
-                <span class="text-xs font-bold text-zinc-900 dark:text-zinc-200">
-                  {{ selectedSession ? (selectedSession.short_name || selectedSession.id) : 'Select a Session' }}
-                </span>
                 <span v-if="selectedSession && selectedSession.is_active" class="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-400 text-[10px] font-mono font-semibold flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                   Streaming
                 </span>
               </div>
-
-              <!-- View Sub-tabs -->
-              <div class="flex items-center gap-1 text-xs">
-                <button
-                  @click="activeTab = 'activity'"
-                  class="px-2 py-1 rounded font-medium transition-colors"
-                  :class="activeTab === 'activity' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-semibold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
-                >
-                  ⚡ Live Stream
-                </button>
-                <button
-                  @click="activeTab = 'reasoning'"
-                  class="px-2 py-1 rounded font-medium transition-colors"
-                  :class="activeTab === 'reasoning' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-semibold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
-                >
-                  💭 Reasoning
-                </button>
-                <button
-                  @click="activeTab = 'tools'"
-                  class="px-2 py-1 rounded font-medium transition-colors"
-                  :class="activeTab === 'tools' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-semibold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
-                >
-                  🔧 Tool Trace ({{ (selectedSession && selectedSession.recent_tools || []).length }})
-                </button>
-                <button
-                  v-if="selectedSession && selectedSession.todos && selectedSession.todos.length > 0"
-                  @click="activeTab = 'todos'"
-                  class="px-2 py-1 rounded font-medium transition-colors"
-                  :class="activeTab === 'todos' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-semibold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
-                >
-                  📋 Checklist ({{ selectedSession.todos.length }})
-                </button>
-              </div>
+              <p class="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono truncate">
+                {{ selectedSession ? (selectedSession.model + ' · ' + workingDirLabel(selectedSession.working_dir)) : (activeAgent ? (activeAgent.runtime + ' · ' + activeAgent.provider) : 'Flomaster & Agent Fleet Sessions') }}
+              </p>
             </div>
-
-            <!-- Content Area for Selected Session -->
-            <div v-if="selectedSession" class="flex-1 overflow-y-auto p-3 space-y-3">
-
-              <!-- Overview Meta Card -->
-              <div class="p-3 rounded-xl bg-zinc-50/70 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-2">
-                <div class="flex items-center justify-between flex-wrap gap-2">
-                  <div>
-                    <div class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">User Intention / Goal</div>
-                    <div class="text-sm font-medium text-zinc-900 dark:text-zinc-200 mt-0.5">
-                      {{ selectedSession.intention || selectedSession.title || 'Interactive agent session' }}
-                    </div>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <button
-                      @click="createTicketFromSession(selectedSession)"
-                      class="px-2 py-1 text-xs rounded-md bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 transition-colors flex items-center space-x-1"
-                      title="Create a tracked ProjectBase issue from this session"
-                    >
-                      <i data-lucide="tag" class="w-3 h-3"></i>
-                      <span>Create Ticket</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-2 pt-1 border-t border-zinc-200/60 dark:border-zinc-800/60 text-[11px] font-mono">
-                  <div>
-                    <span class="text-zinc-400">Model: </span>
-                    <span class="font-semibold text-zinc-800 dark:text-zinc-200">{{ selectedSession.model || 'prime' }}</span>
-                  </div>
-                  <div>
-                    <span class="text-zinc-400">Messages: </span>
-                    <span class="font-semibold text-zinc-800 dark:text-zinc-200">{{ selectedSession.message_count || 0 }}</span>
-                  </div>
-                  <div class="col-span-2 truncate" :title="selectedSession.working_dir">
-                    <span class="text-zinc-400">CWD: </span>
-                    <span class="text-zinc-700 dark:text-zinc-300">{{ selectedSession.working_dir || 'workspace' }}</span>
-                  </div>
-                </div>
-
-                <!-- Files touched pills -->
-                <div v-if="selectedSession.files_touched && selectedSession.files_touched.length > 0" class="pt-1">
-                  <div class="text-[10px] text-zinc-500 uppercase font-semibold">Touched Files</div>
-                  <div class="flex flex-wrap gap-1 mt-1">
-                    <span
-                      v-for="(f, fi) in selectedSession.files_touched"
-                      :key="fi"
-                      class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[10px] font-mono text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700/60 truncate max-w-xs"
-                      :title="f"
-                    >
-                      {{ f.split('/').slice(-2).join('/') }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- TAB 1: Interleaved Live Activity Stream -->
-              <div v-if="activeTab === 'activity'" class="space-y-2">
-                <div class="text-xs font-semibold text-zinc-500 uppercase tracking-wider flex items-center justify-between">
-                  <span>Chronological Stream</span>
-                  <span class="text-[10px] font-mono text-zinc-400">Recent {{ (selectedSession.live_activity || []).length }} events</span>
-                </div>
-
-                <div v-if="!selectedSession.live_activity || selectedSession.live_activity.length === 0" class="p-8 text-center text-zinc-400 text-xs italic">
-                  No activity events recorded yet.
-                </div>
-
-                <div v-else class="space-y-1.5">
-                  <div
-                    v-for="(ev, ei) in selectedSession.live_activity"
-                    :key="ei"
-                    class="p-2 rounded-lg border text-xs transition-colors flex items-start space-x-2"
-                    :class="ev.type === 'reasoning' ? 'bg-indigo-50/40 dark:bg-indigo-950/20 border-indigo-200/60 dark:border-indigo-900/40' : (ev.type === 'tool' ? 'bg-zinc-50/80 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800')"
-                  >
-                    <!-- Event Icon -->
-                    <span class="text-sm shrink-0 mt-0.5">
-                      {{ ev.type === 'reasoning' ? '💭' : (ev.type === 'tool' ? '🔧' : '💬') }}
-                    </span>
-
-                    <!-- Event Body -->
-                    <div class="min-w-0 flex-1 space-y-0.5">
-                      <div class="flex items-center justify-between gap-2">
-                        <div class="flex items-center gap-1.5 font-medium">
-                          <span v-if="ev.type === 'tool'" class="px-1 py-0.5 rounded text-[10px] font-mono font-bold" :class="toolColor(ev.name)">
-                            {{ ev.name }}
-                          </span>
-                          <span v-if="ev.intent" class="text-xs text-zinc-900 dark:text-zinc-100 font-semibold">
-                            {{ ev.intent }}
-                          </span>
-                          <span v-else-if="ev.type === 'reasoning'" class="text-[11px] font-bold text-indigo-700 dark:text-indigo-300">
-                            Reasoning Thought
-                          </span>
-                          <span v-else class="text-xs text-zinc-800 dark:text-zinc-200">
-                            Assistant message
-                          </span>
-                        </div>
-                        <span class="text-[10px] font-mono text-zinc-400 shrink-0">
-                          {{ fmtTime(ev.timestamp) }}
-                        </span>
-                      </div>
-
-                      <div v-if="ev.input" class="text-[10px] font-mono text-zinc-600 dark:text-zinc-400 break-all bg-white/60 dark:bg-zinc-950/60 p-1 rounded border border-zinc-200/40 dark:border-zinc-800/40">
-                        {{ ev.input }}
-                      </div>
-
-                      <div v-if="ev.summary && ev.type !== 'tool'" class="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap">
-                        {{ ev.summary }}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- TAB 2: Deep Reasoning Inspector -->
-              <div v-if="activeTab === 'reasoning'" class="space-y-3">
-                <div class="text-xs font-semibold text-zinc-500 uppercase tracking-wider flex items-center justify-between">
-                  <span>Model Thought Process & Steps</span>
-                  <span v-if="selectedSession.is_active" class="text-emerald-500 text-[10px] font-mono flex items-center gap-1">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Live Thought Stream
-                  </span>
-                </div>
-
-                <div v-if="selectedSession.reasoning_steps && selectedSession.reasoning_steps.length > 0" class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 space-y-2">
-                  <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Key Reasoning Steps:</div>
-                  <ul class="space-y-1 text-xs text-zinc-700 dark:text-zinc-300">
-                    <li v-for="(st, sti) in selectedSession.reasoning_steps" :key="sti" class="flex items-start space-x-2">
-                      <span class="text-emerald-500 font-bold shrink-0">✓</span>
-                      <span>{{ st }}</span>
-                    </li>
-                  </ul>
-                </div>
-
-                <div class="p-3.5 rounded-xl bg-zinc-50/90 dark:bg-zinc-950/90 border border-zinc-200 dark:border-zinc-800 space-y-2 font-mono text-xs leading-relaxed text-zinc-800 dark:text-zinc-200">
-                  <div class="text-[10px] uppercase font-bold text-zinc-400">Latest Reasoning Snapshot</div>
-                  <div class="whitespace-pre-wrap">
-                    {{ selectedSession.latest_reasoning || 'No raw reasoning block recorded in current session window.' }}
-                  </div>
-                </div>
-              </div>
-
-              <!-- TAB 3: Tool Execution Trace -->
-              <div v-if="activeTab === 'tools'" class="space-y-2">
-                <div class="text-xs font-semibold text-zinc-500 uppercase tracking-wider flex items-center justify-between">
-                  <span>Recent Tool Execution Trace</span>
-                  <span class="font-mono text-[10px] text-zinc-400">{{ (selectedSession.recent_tools || []).length }} operations</span>
-                </div>
-
-                <div v-if="!selectedSession.recent_tools || selectedSession.recent_tools.length === 0" class="p-8 text-center text-zinc-400 text-xs italic">
-                  No tools recorded in recent window.
-                </div>
-
-                <div v-else class="space-y-1.5">
-                  <div
-                    v-for="(t, ti) in selectedSession.recent_tools"
-                    :key="ti"
-                    class="p-2 rounded-lg bg-zinc-50/70 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-xs space-y-1 font-mono"
-                  >
-                    <div class="flex items-center justify-between">
-                      <div class="flex items-center space-x-1.5">
-                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold" :class="toolColor(t.name)">{{ t.name }}</span>
-                        <span v-if="t.intent" class="text-xs font-sans font-semibold text-zinc-900 dark:text-zinc-100">{{ t.intent }}</span>
-                      </div>
-                      <span class="text-[10px] text-zinc-400">{{ fmtTime(t.timestamp) }}</span>
-                    </div>
-                    <div v-if="t.input" class="text-[10px] text-zinc-600 dark:text-zinc-400 break-all bg-white dark:bg-zinc-950 p-1.5 rounded border border-zinc-200 dark:border-zinc-800/80">
-                      {{ t.input }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- TAB 4: Active Checklist / Todos -->
-              <div v-if="activeTab === 'todos'" class="space-y-2">
-                <div class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Active Checklist</div>
-                <div class="space-y-1">
-                  <div
-                    v-for="(td, tdi) in selectedSession.todos"
-                    :key="tdi"
-                    class="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs flex items-center justify-between"
-                  >
-                    <div class="flex items-center space-x-2">
-                      <span :class="td.status === 'completed' ? 'text-emerald-500' : 'text-amber-500'">●</span>
-                      <span class="text-zinc-800 dark:text-zinc-200">{{ td.content }}</span>
-                    </div>
-                    <span class="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
-                      {{ td.status }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-            <!-- Empty selection state -->
-            <div v-else class="flex-1 flex items-center justify-center p-8 text-center text-zinc-400 text-xs">
-              Select a session from the list to inspect live streaming telemetry and reasoning.
-            </div>
-
-            <!-- Bottom Interactive Prompt & Continuation Bar -->
-            <div class="p-2.5 border-t border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/70 dark:bg-zinc-900/50">
-              <div class="flex items-center space-x-2">
-                <input
-                  v-model="quickPrompt"
-                  @keydown.enter="quickDispatch(activeAgent ? activeAgent.name : 'flomaster')"
-                  type="text"
-                  :placeholder="selectedSession ? ('Send follow-up instruction to ' + (selectedSession.short_name || 'session') + '...') : 'Dispatch instruction to agent...'"
-                  class="flex-1 px-3 py-1.5 text-xs rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-zinc-400"
-                />
-                <button
-                  @click="quickDispatch(activeAgent ? activeAgent.name : 'flomaster')"
-                  :disabled="isDispatching || !quickPrompt.trim()"
-                  class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 text-xs font-semibold flex items-center space-x-1 transition-colors disabled:opacity-50 shadow-2xs shrink-0"
-                >
-                  <i data-lucide="send" class="w-3 h-3"></i>
-                  <span>{{ isDispatching ? 'Sending...' : (selectedSession ? 'Continue Session' : 'Dispatch') }}</span>
-                </button>
-              </div>
-              <div v-if="dispatchSuccess" class="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono mt-1">
-                ✓ {{ dispatchSuccess }}
-              </div>
-            </div>
-
           </div>
 
+          <!-- Compact Session Stats Widget -->
+          <div v-if="selectedSession" class="flex items-center gap-1.5 flex-wrap">
+            <div class="px-2 py-1 rounded-md bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-[10px] font-mono flex items-center gap-1" title="Model">
+              <span class="text-zinc-400">🧠</span>
+              <span class="font-bold text-zinc-800 dark:text-zinc-200">{{ selectedSession.model || 'prime' }}</span>
+            </div>
+            <div class="px-2 py-1 rounded-md bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-[10px] font-mono flex items-center gap-1" title="Messages">
+              <span class="text-zinc-400">💬</span>
+              <span class="font-bold text-zinc-800 dark:text-zinc-200">{{ selectedSession.message_count || 0 }}</span>
+            </div>
+            <div class="px-2 py-1 rounded-md bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-[10px] font-mono flex items-center gap-1" title="Tool calls">
+              <span class="text-zinc-400">🔧</span>
+              <span class="font-bold text-zinc-800 dark:text-zinc-200">{{ (selectedSession.recent_tools || []).length }}</span>
+            </div>
+            <div class="px-2 py-1 rounded-md bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-[10px] font-mono flex items-center gap-1" title="Prompt tokens">
+              <span class="text-zinc-400">⬆</span>
+              <span class="font-bold text-zinc-800 dark:text-zinc-200">{{ fmtTokens(selectedSession.token_usage && selectedSession.token_usage.prompt) }}</span>
+            </div>
+            <div class="px-2 py-1 rounded-md bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-[10px] font-mono flex items-center gap-1" title="Completion tokens">
+              <span class="text-zinc-400">⬇</span>
+              <span class="font-bold text-zinc-800 dark:text-zinc-200">{{ fmtTokens(selectedSession.token_usage && selectedSession.token_usage.completion) }}</span>
+            </div>
+            <div class="px-2 py-1 rounded-md bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-[10px] font-mono flex items-center gap-1" title="Total tokens">
+              <span class="text-zinc-400">∑</span>
+              <span class="font-bold text-zinc-800 dark:text-zinc-200">{{ fmtTokens(selectedSession.token_usage && selectedSession.token_usage.total) }}</span>
+            </div>
+            <button
+              @click="createTicketFromSession(selectedSession)"
+              class="px-2 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-[10px] font-semibold transition-colors flex items-center space-x-1"
+              title="Create a tracked ProjectBase issue from this session"
+            >
+              <i data-lucide="tag" class="w-3 h-3"></i>
+              <span>Create Ticket</span>
+            </button>
+          </div>
         </div>
-      </section>
 
+        <!-- Native Chat Message Stream -->
+        <div class="flex-1 overflow-y-auto p-3 space-y-3 bg-zinc-50/50 dark:bg-zinc-950/30">
+          <div v-if="!selectedSession" class="h-full flex flex-col items-center justify-center text-center text-zinc-400 text-xs space-y-2">
+            <i data-lucide="message-square" class="w-10 h-10 opacity-30"></i>
+            <p class="font-semibold text-zinc-600 dark:text-zinc-400">Select a session to view its live chat</p>
+            <p class="max-w-xs text-zinc-400">Start a session in flomaster or dispatch a task from any Kanban issue.</p>
+          </div>
+
+          <div v-else-if="chatTurns.length === 0" class="py-16 text-center text-zinc-400 text-xs italic">
+            No chat messages recorded yet. Live reasoning and tools will stream here as the agent works.
+          </div>
+
+          <!-- Message Bubbles -->
+          <div v-else class="space-y-3">
+            <div
+              v-for="(turn, idx) in chatTurns"
+              :key="idx"
+              class="flex items-end gap-2"
+              :class="turn.role === 'user' ? 'justify-end flex-row-reverse' : 'justify-start'"
+            >
+              <!-- Avatar (right for user, left for assistant) -->
+              <span class="w-6 h-6 rounded-full flex items-center justify-center text-sm shrink-0"
+                :class="turn.role === 'user' ? 'bg-indigo-100 dark:bg-indigo-950/60 order-2' : 'bg-zinc-200 dark:bg-zinc-800 order-1'">
+                {{ turn.role === 'user' ? '🧑' : (selectedSession.avatar || '🧠') }}
+              </span>
+
+              <!-- Bubble Body -->
+              <div
+                class="max-w-[80%] rounded-2xl px-3 py-2 shadow-2xs text-xs leading-relaxed space-y-2 min-w-0"
+                :class="turn.role === 'user'
+                  ? 'bg-indigo-500/90 text-white dark:bg-indigo-600/90 rounded-br-sm'
+                  : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-bl-sm'"
+              >
+                <!-- User message content -->
+                <div v-if="turn.role === 'user' && turn.content" class="whitespace-pre-wrap break-words">
+                  {{ turn.content }}
+                </div>
+
+                <!-- Assistant content blocks -->
+                <template v-if="turn.role === 'assistant'">
+                  <!-- Reasoning: low-saturation, cursive, collapsible -->
+                  <div v-if="turn.reasoning" class="space-y-1">
+                    <button
+                      @click="toggleReasoning(idx)"
+                      class="text-[10px] uppercase tracking-wider font-semibold text-zinc-400 dark:text-zinc-500 flex items-center gap-1 hover:underline"
+                    >
+                      <span class="italic font-serif text-zinc-400">💭 thought</span>
+                      <span class="text-zinc-300 dark:text-zinc-600">{{ expandedMessage === idx ? '▾' : '▸' }}</span>
+                    </button>
+                    <p
+                      v-if="expandedMessage === idx"
+                      class="text-[11px] italic font-serif text-zinc-500 dark:text-zinc-400 leading-relaxed whitespace-pre-wrap select-text"
+                    >
+                      {{ turn.reasoning }}
+                    </p>
+                    <p v-else class="text-[11px] italic font-serif text-zinc-400 dark:text-zinc-500 leading-relaxed truncate select-text">
+                      {{ turn.reasoning }}
+                    </p>
+                  </div>
+
+                  <!-- Assistant text -->
+                  <div v-if="turn.content" class="text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap break-words select-text">
+                    {{ turn.content }}
+                  </div>
+
+                  <!-- Grouped masonry tool cards -->
+                  <div v-if="turn.tools && turn.tools.length > 0" class="pt-1">
+                    <div class="flex flex-wrap gap-1.5">
+                      <div
+                        v-for="(g, gi) in groupTools(turn.tools)"
+                        :key="gi"
+                        class="px-2 py-1 rounded-lg border text-[10px] font-mono flex items-center gap-1.5"
+                        :class="toolColor(g.name)"
+                        :title="g.inputs.join(' · ')"
+                      >
+                        <i :data-lucide="toolIcon(g.name)" class="w-3 h-3 shrink-0"></i>
+                        <span class="font-bold">{{ g.name }}</span>
+                        <span v-if="g.count > 1" class="px-1 rounded bg-white/40 dark:bg-black/20 font-bold">×{{ g.count }}</span>
+                        <span v-if="g.intent" class="truncate max-w-[120px] text-[9px] opacity-80">{{ g.intent }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interactive Chat Prompt / Continuation Bar -->
+        <div class="p-2.5 border-t border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/70 dark:bg-zinc-900/50">
+          <div class="flex items-end space-x-2">
+            <textarea
+              v-model="quickPrompt"
+              @keydown.enter.exact.prevent="quickDispatch(activeAgent ? activeAgent.name : 'flomaster')"
+              rows="1"
+              :placeholder="selectedSession ? ('Send a follow-up to ' + (selectedSession.short_name || 'session') + '…') : 'Dispatch instruction to agent…'"
+              class="flex-1 px-3 py-2 text-xs rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-zinc-400 resize-none"
+            ></textarea>
+            <button
+              @click="quickDispatch(activeAgent ? activeAgent.name : 'flomaster')"
+              :disabled="isDispatching || !quickPrompt.trim()"
+              class="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 text-xs font-semibold flex items-center space-x-1.5 transition-colors disabled:opacity-50 shadow-2xs shrink-0"
+            >
+              <i data-lucide="send" class="w-3.5 h-3.5"></i>
+              <span>{{ isDispatching ? 'Sending…' : (selectedSession ? 'Continue Session' : 'Dispatch') }}</span>
+            </button>
+          </div>
+          <div v-if="dispatchSuccess" class="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono mt-1">✓ {{ dispatchSuccess }}</div>
+        </div>
+
+      </section>
     </div>
   `
 };

@@ -69,6 +69,7 @@ const App = {
       // Modals
       isOmnibarOpen: false,
       isNewIssueOpen: false,
+      pendingNewIssue: null, // pre-filled payload when opening New Issue from a session
       isImportOpen: false,
       isExportOpen: false,
       isNotificationSettingsOpen: false,
@@ -524,6 +525,13 @@ const App = {
       this.isWelcomeOpen = false;
       this.isNewIssueOpen = true;
     },
+    openNewIssue(payload) {
+      this.isNewIssueOpen = true;
+      // Support pre-filled payload from a session's "Create Ticket" action.
+      if (payload && payload.title) {
+        this.pendingNewIssue = payload;
+      }
+    },
     openWelcomeBoard() {
       this.isWelcomeOpen = false;
       if (this.projects.length) {
@@ -704,6 +712,7 @@ const App = {
         // Optimistic (non-SSE) update path: bump the tick so snapshot views
         // (PortfolioView) refetch even when the SSE event is missed (PB-56).
         this.realtimeTick++;
+        this.pendingNewIssue = null;
         this.showToast(`Created issue ${created.identifier}`, 'success');
       } catch (err) {
         console.error('Issue create failed:', err);

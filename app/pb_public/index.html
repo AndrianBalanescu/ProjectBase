@@ -206,6 +206,8 @@
         :active-agent-name="activeAgentName"
         :agent-source="agentSource"
         @navigate="navigateAgent"
+        @sync-agents="handleSyncAgents"
+        @open-new-issue="openNewIssue"
       ></agents-view>
 
       <!-- 6. Docs & API View -->
@@ -409,6 +411,7 @@
       :labels="labels"
       :milestones="milestones"
       :agents="agents"
+      :pending-issue="pendingNewIssue"
       @close="isNewIssueOpen = false"
       @create-issue="handleCreateIssue"
     ></new-issue-modal>
