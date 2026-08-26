@@ -16,21 +16,10 @@
 //
 //	bin/agent_bridge --out /run/projectbase/agents.json
 //
-// Output schema (sanitized, never secrets):
-//
-//	{
-//	  "host": "<hostname>",
-//	  "scanned_at": "<iso8601>",
-//	  "agents": [
-//	    {"name":"flomaster","provider":"openai-api","runtime":"flomaster","avatar":"\U0001f9e0","source_dir":"~/.flomaster","found":true,"core":true,"status":"online","session_count":2}
-//	  ],
-//	  "sessions": [
-//	    {"agent":"flomaster","id":"...","short_name":"panda","title":"...","status":"Active","model":"...","working_dir":"...","last_active_at":"...","updated_at":"...","intention":"...","message_count":768,"avatar":"\U0001f9e0"}
-//	  ]
-//	}
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -55,49 +44,56 @@ type Agent struct {
 }
 
 // Session is a lightweight, sanitized view of one flomaster session. It carries
-// only public metadata + a short intent/plan line + recent tool-call names,
-// never message bodies, tool outputs, or secrets.
+// only public metadata + a short intent/plan line + recent tool-call names + live reasoning streams,
+// never full message bodies, tool outputs, or secrets.
 type Session struct {
-	Agent        string `json:"agent"`
-	ID           string `json:"id"`
-	ShortName    string `json:"short_name"`
-	Title        string `json:"title"`
-	Status       string `json:"status"`
-	Model        string `json:"model"`
-	WorkingDir   string `json:"working_dir"`
-	LastActiveAt string `json:"last_active_at"`
-	UpdatedAt    string `json:"updated_at"`
-	Intention    string     `json:"intention"`
-	LastText     string     `json:"last_text,omitempty"`
-	RecentTools  []Tool     `json:"recent_tools,omitempty"`
-	Todos        []TodoItem `json:"todos,omitempty"`
-	MessageCount int        `json:"message_count"`
-	Avatar       string     `json:"avatar"`
+	Agent           string          `json:"agent"`
+	ID              string          `json:"id"`
+	ShortName       string          `json:"short_name"`
+	Title           string          `json:"title"`
+	Status          string          `json:"status"`
+	IsActive        bool            `json:"is_active"`
+	Model           string          `json:"model"`
+	WorkingDir      string          `json:"working_dir"`
+	LastActiveAt    string          `json:"last_active_at"`
+	UpdatedAt       string          `json:"updated_at"`
+	Intention       string          `json:"intention"`
+	LatestReasoning string          `json:"latest_reasoning,omitempty"`
+	ReasoningSteps  []string        `json:"reasoning_steps,omitempty"`
+	FilesTouched    []string        `json:"files_touched,omitempty"`
+	LiveActivity    []ActivityEvent `json:"live_activity,omitempty"`
+	LastText        string          `json:"last_text,omitempty"`
+	RecentTools     []Tool          `json:"recent_tools,omitempty"`
+	Todos           []TodoItem      `json:"todos,omitempty"`
+	MessageCount    int             `json:"message_count"`
+	Avatar          string          `json:"avatar"`
 }
 
-// Tool is one sanitized tool invocation: name + a short input summary (never
-// output, never file contents).
-type Tool struct {
-	Name      string `json:"name"`
-	Input     string `json:"input,omitempty"`
+// ActivityEvent is an interleaved chronological item in the live session stream.
+type ActivityEvent struct {
+	Type      string `json:"type"`                // "reasoning" | "tool" | "text"
+	Name      string `json:"name,omitempty"`      // tool name (for tool events)
+	Intent    string `json:"intent,omitempty"`    // tool intent label
+	Input     string `json:"input,omitempty"`     // input summary (file path, query, command)
+	Summary   string `json:"summary,omitempty"`   // reasoning or text snippet
 	Timestamp string `json:"timestamp,omitempty"`
 }
 
-// TodoItem is one entry in a session's active checklist (the -goals.json
-// snapshot). Only content + status are published; confidence history is not.
+// Tool is one sanitized tool invocation: name + a short input summary (never
+// raw output, never secret values).
+type Tool struct {
+	Name      string `json:"name"`
+	Input     string `json:"input,omitempty"`
+	Intent    string `json:"intent,omitempty"`
+	Timestamp string `json:"timestamp,omitempty"`
+}
+
+// TodoItem is one entry in a session's active checklist (the -goals.json snapshot).
 type TodoItem struct {
+	ID       string `json:"id,omitempty"`
 	Content  string `json:"content"`
 	Status   string `json:"status"`
 	Priority string `json:"priority,omitempty"`
-	ID       string `json:"id,omitempty"`
-}
-
-var agentDefs = []Agent{
-	{Name: "flomaster", Provider: "openai-api", Runtime: "flomaster", Avatar: "\U0001f9e0", SourceDir: "~/.flomaster", Core: true},
-	{Name: "hermes", Provider: "openrouter", Runtime: "hermes", Avatar: "\U0001f426", SourceDir: "~/.hermes", Core: true},
-	{Name: "agents-hub", Provider: "mixed", Runtime: "hub", Avatar: "\U0001f9f0", SourceDir: "~/.agents", Core: true},
-	{Name: "cursor", Provider: "openai", Runtime: "cursor", Avatar: "\U0001f5b1", SourceDir: "~/.cursor", Core: false},
-	{Name: "pi", Provider: "inflection", Runtime: "pi", Avatar: "\U0001f967", SourceDir: "~/.pi", Core: false},
 }
 
 type payload struct {
@@ -107,13 +103,21 @@ type payload struct {
 	Sessions  []Session `json:"sessions"`
 }
 
-// home resolves the real home dir of the running user, regardless of the
-// (possibly locked-down) HOME env set by the calling environment.
+// agentDefs lists well-known agents to scan on the host.
+var agentDefs = []Agent{
+	{Name: "flomaster", Provider: "openai-api", Runtime: "flomaster", Avatar: "🧠", SourceDir: "~/.flomaster", Core: true},
+	{Name: "hermes", Provider: "openrouter", Runtime: "hermes", Avatar: "🐦", SourceDir: "~/.hermes", Core: true},
+	{Name: "agents-hub", Provider: "mixed", Runtime: "hub", Avatar: "🧰", SourceDir: "~/.agents", Core: true},
+	{Name: "cursor", Provider: "openai", Runtime: "cursor", Avatar: "🖱", SourceDir: "~/.cursor", Core: false},
+	{Name: "claude", Provider: "anthropic", Runtime: "claude-code", Avatar: "🤖", SourceDir: "~/.claude", Core: false},
+}
+
 func home() string {
+	if h := os.Getenv("HOME"); h != "" {
+		return h
+	}
 	if u, err := user.Current(); err == nil && u.HomeDir != "" {
-		if fi, err := os.Stat(u.HomeDir); err == nil && fi.IsDir() {
-			return u.HomeDir
-		}
+		return u.HomeDir
 	}
 	for _, cand := range []string{"/home/ubuntu", "/home/admin", "/root"} {
 		if fi, err := os.Stat(cand); err == nil && fi.IsDir() {
@@ -142,7 +146,7 @@ func main() {
 		// flomaster sessions are the live, human-readable proof of "what the
 		// agent is working on right now".
 		if a.Name == "flomaster" && a.Found {
-			s := collectSessions(filepath.Join(homeDir, base, "sessions"), a.Avatar)
+			s := collectSessions(homeDir, filepath.Join(homeDir, base, "sessions"), a.Avatar)
 			a.SessionCount = len(s)
 			if a.SessionCount > 0 {
 				a.Status = "online"
@@ -182,11 +186,62 @@ func dirExists(p string) bool {
 	return err == nil && fi.IsDir()
 }
 
+func isSessionProcessAlive(homeDir, sessionID string) bool {
+	if sessionID == "" {
+		return false
+	}
+	// Try both full session ID and base name
+	candidates := []string{
+		filepath.Join(homeDir, ".flomaster", "active_pids", sessionID),
+	}
+	for _, pidFile := range candidates {
+		data, err := os.ReadFile(pidFile)
+		if err != nil {
+			continue
+		}
+		pidStr := strings.TrimSpace(string(data))
+		if pidStr == "" {
+			continue
+		}
+		var pid int
+		if _, err := fmt.Sscanf(pidStr, "%d", &pid); err == nil && pid > 0 {
+			if _, err := os.Stat(fmt.Sprintf("/proc/%d", pid)); err == nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func extractReasoningSteps(r string) []string {
+	if r == "" {
+		return nil
+	}
+	var steps []string
+	lines := strings.Split(r, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "**") && strings.HasSuffix(line, "**") {
+			heading := strings.Trim(line, "* ")
+			if heading != "" {
+				steps = append(steps, heading)
+			}
+		} else if strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "* ") {
+			bullet := strings.TrimPrefix(strings.TrimPrefix(line, "- "), "* ")
+			if bullet != "" {
+				steps = append(steps, truncateString(bullet, 120))
+			}
+		}
+		if len(steps) >= 6 {
+			break
+		}
+	}
+	return steps
+}
+
 // collectSessions scans a flomaster sessions dir and returns the most recent,
-// sanitized sessions (public metadata only). It reads the .json snapshots and,
-// for each, a tiny -plan.json sibling that carries the user's current intent
-// line. Message bodies are never read into the output.
-func collectSessions(dir, avatar string) []Session {
+// sanitized sessions (public metadata only).
+func collectSessions(homeDir, dir, avatar string) []Session {
 	ents, err := os.ReadDir(dir)
 	if err != nil {
 		return nil
@@ -196,44 +251,84 @@ func collectSessions(dir, avatar string) []Session {
 		m    int64
 	}
 	var cands []cand
+	seenBases := make(map[string]bool)
+
 	for _, e := range ents {
 		if e.IsDir() {
 			continue
 		}
 		name := e.Name()
-		if !strings.HasPrefix(name, "session_") || !strings.HasSuffix(name, ".json") {
+		if !strings.HasPrefix(name, "session_") {
 			continue
 		}
-		// skip journals + backups; only the primary .json snapshot
-		if strings.Contains(name, ".journal.jsonl") || strings.HasSuffix(name, ".bak") {
+		var base string
+		if strings.HasSuffix(name, ".json") {
+			base = strings.TrimSuffix(name, ".json")
+		} else if strings.HasSuffix(name, ".journal.jsonl") {
+			base = strings.TrimSuffix(name, ".journal.jsonl")
+		} else {
 			continue
 		}
-		// accept only the canonical session_<name>_<ts>_<id>.json (no suffix like -plan/-goals)
-		base := strings.TrimSuffix(name, ".json")
+
 		if strings.Contains(base, "-plan") || strings.Contains(base, "-goals") ||
 			strings.Contains(base, "-review-state") || strings.Contains(base, "-gate-observations") {
 			continue
 		}
-		if fi, err := e.Info(); err == nil {
-			cands = append(cands, cand{base: name, m: fi.ModTime().Unix()})
+		if seenBases[base] {
+			continue
+		}
+		seenBases[base] = true
+
+		// Check max modtime between .json and .journal.jsonl
+		var maxM int64
+		jsonPath := filepath.Join(dir, base+".json")
+		if fi, err := os.Stat(jsonPath); err == nil {
+			maxM = fi.ModTime().Unix()
+		}
+		journalPath := filepath.Join(dir, base+".journal.jsonl")
+		if fi, err := os.Stat(journalPath); err == nil {
+			if fi.ModTime().Unix() > maxM {
+				maxM = fi.ModTime().Unix()
+			}
+		}
+
+		// Check if active PID exists: prioritize active sessions while preserving relative recency
+		if isSessionProcessAlive(homeDir, base) {
+			maxM += 1000000000
+		}
+
+		if maxM > 0 {
+			cands = append(cands, cand{base: base, m: maxM})
 		}
 	}
-	// newest first, cap at 8 sessions
+
+	// newest first, cap at 12 sessions
 	sort.Slice(cands, func(i, j int) bool { return cands[i].m > cands[j].m })
-	if len(cands) > 8 {
-		cands = cands[:8]
+	if len(cands) > 12 {
+		cands = cands[:12]
 	}
 	sessionsDir := dir
 	todosDir := filepath.Join(filepath.Dir(dir), "todos")
 
 	out := make([]Session, 0, len(cands))
 	for _, c := range cands {
-		s := parseSessionJSON(filepath.Join(sessionsDir, c.base), avatar)
+		s := parseSessionJSON(homeDir, filepath.Join(sessionsDir, c.base+".json"), filepath.Join(sessionsDir, c.base+".journal.jsonl"), avatar)
+		if s.ID == "" && s.ShortName == "" {
+			s.ID = c.base
+			s.ShortName = strings.Split(c.base, "_")[1]
+		}
 		if s.ID == "" {
 			continue
 		}
-		// pull the intent line from the matching -plan.json sibling (tiny file)
-		base := strings.TrimSuffix(c.base, ".json")
+		base := c.base
+
+		// Check if active
+		if isSessionProcessAlive(homeDir, s.ID) || isSessionProcessAlive(homeDir, base) {
+			s.IsActive = true
+			s.Status = "Running"
+		}
+
+		// Pull user intent line from the matching -plan.json sibling
 		planPath := filepath.Join(todosDir, base+"-plan.json")
 		if b, err := os.ReadFile(planPath); err == nil {
 			var pl struct {
@@ -243,9 +338,8 @@ func collectSessions(dir, avatar string) []Session {
 				s.Intention = pl.UserIntention
 			}
 		}
-		// Active checklist from the todos/<base>.json snapshot: publish only
-		// content + status so the Agents cockpit can render a live "working on"
-		// list. Falls back to -goals.json if the primary file is absent.
+
+		// Active checklist from todos/<base>.json or -goals.json
 		goalsPaths := []string{
 			filepath.Join(todosDir, base+".json"),
 			filepath.Join(todosDir, base+"-goals.json"),
@@ -259,7 +353,6 @@ func collectSessions(dir, avatar string) []Session {
 			if json.Unmarshal(b, &todos) != nil || len(todos) == 0 {
 				continue
 			}
-			// Keep it small: only items that are still actionable/in progress.
 			var active []TodoItem
 			for _, t := range todos {
 				st := strings.ToLower(strings.TrimSpace(t.Status))
@@ -268,7 +361,7 @@ func collectSessions(dir, avatar string) []Session {
 						active = append(active, t)
 					}
 				}
-				if len(active) >= 6 {
+				if len(active) >= 8 {
 					break
 				}
 			}
@@ -282,13 +375,8 @@ func collectSessions(dir, avatar string) []Session {
 	return out
 }
 
-// parseSessionJSON reads one session snapshot. It is intentionally tolerant:
-// malformed/missing fields fall back to empty strings.
-func parseSessionJSON(path, avatar string) Session {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return Session{}
-	}
+// parseSessionJSON reads session snapshot and appends any fresh journal lines.
+func parseSessionJSON(homeDir, jsonPath, journalPath, avatar string) Session {
 	var raw struct {
 		ID           string        `json:"id"`
 		Title        string        `json:"title"`
@@ -300,93 +388,226 @@ func parseSessionJSON(path, avatar string) Session {
 		UpdatedAt    string        `json:"updated_at"`
 		Messages     []interface{} `json:"messages"`
 	}
-	if json.Unmarshal(b, &raw) != nil {
-		return Session{}
+
+	if b, err := os.ReadFile(jsonPath); err == nil {
+		json.Unmarshal(b, &raw)
 	}
-	if raw.ID == "" && raw.ShortName == "" {
-		return Session{}
-	}
-	// Walk messages from the tail (most recent first) to collect sanitized
-	// tool calls + last assistant text. Cap at ~40 recent tools per session.
-	var tools []Tool
-	lastText := ""
-	scan := raw.Messages
-	if len(scan) > 120 {
-		scan = scan[len(scan)-120:]
-	}
-	for i := len(scan) - 1; i >= 0; i-- {
-		if len(tools) >= 40 {
-			break
+
+	// Read journal.jsonl for appended messages that haven't flushed to .json
+	if jf, err := os.Open(journalPath); err == nil {
+		defer jf.Close()
+		scanner := bufio.NewScanner(jf)
+		// Max buffer size for big journal lines
+		buf := make([]byte, 1024*1024)
+		scanner.Buffer(buf, 10*1024*1024)
+		for scanner.Scan() {
+			line := scanner.Bytes()
+			if len(line) == 0 {
+				continue
+			}
+			var jEntry struct {
+				AppendMessages []interface{} `json:"append_messages"`
+				Append         *struct {
+					Message interface{} `json:"message"`
+				} `json:"append"`
+			}
+			if json.Unmarshal(line, &jEntry) == nil {
+				if len(jEntry.AppendMessages) > 0 {
+					raw.Messages = append(raw.Messages, jEntry.AppendMessages...)
+				}
+				if jEntry.Append != nil && jEntry.Append.Message != nil {
+					raw.Messages = append(raw.Messages, jEntry.Append.Message)
+				}
+			}
 		}
-		msg, ok := scan[i].(map[string]interface{})
+	}
+
+	if raw.ID == "" && raw.ShortName == "" && len(raw.Messages) == 0 {
+		return Session{}
+	}
+
+	var events []ActivityEvent
+	var tools []Tool
+	filesTouchedMap := make(map[string]bool)
+	latestReasoning := ""
+	lastText := ""
+
+	scan := raw.Messages
+	if len(scan) > 100 {
+		scan = scan[len(scan)-100:]
+	}
+
+	for _, rawMsg := range scan {
+		msg, ok := rawMsg.(map[string]interface{})
 		if !ok {
 			continue
 		}
 		role, _ := msg["role"].(string)
-		if lastText == "" && role == "assistant" {
-			if t, ok2 := msg["content"].(string); ok2 && strings.TrimSpace(t) != "" {
-				lastText = strings.TrimSpace(t)
-				if len(lastText) > 220 {
-					lastText = lastText[:220]
-				}
+		ts, _ := msg["timestamp"].(string)
+		content := msg["content"]
+
+		if textStr, isStr := content.(string); isStr && strings.TrimSpace(textStr) != "" {
+			if role == "assistant" {
+				lastText = truncateString(strings.TrimSpace(textStr), 240)
+				events = append(events, ActivityEvent{
+					Type:      "text",
+					Summary:   lastText,
+					Timestamp: ts,
+				})
 			}
-		}
-		if role != "assistant" {
-			continue
-		}
-		// tool_calls is used by OpenAI-style schemas.
-		if tcs, ok2 := msg["tool_calls"].([]interface{}); ok2 {
-			for _, tc := range tcs {
-				if tcObj, ok3 := tc.(map[string]interface{}); ok3 {
-					fn, _ := tcObj["function"].(map[string]interface{})
-					name, _ := fn["name"].(string)
-					if name != "" {
-						tools = append(tools, Tool{Name: name})
+		} else if blocks, isBlocks := content.([]interface{}); isBlocks {
+			for _, rawBlk := range blocks {
+				blk, okB := rawBlk.(map[string]interface{})
+				if !okB {
+					continue
+				}
+				bType, _ := blk["type"].(string)
+				if bType == "reasoning" {
+					rText, _ := blk["text"].(string)
+					rText = strings.TrimSpace(rText)
+					if rText != "" {
+						latestReasoning = truncateString(rText, 1400)
+						events = append(events, ActivityEvent{
+							Type:      "reasoning",
+							Summary:   truncateString(rText, 320),
+							Timestamp: ts,
+						})
+					}
+				} else if bType == "tool_use" {
+					tName, _ := blk["name"].(string)
+					if tName != "" {
+						inputMap, _ := blk["input"].(map[string]interface{})
+						intent := ""
+						inputSum := ""
+						if inputMap != nil {
+							if it, ok := inputMap["intent"].(string); ok {
+								intent = it
+							}
+							if fp, ok := inputMap["file_path"].(string); ok && fp != "" {
+								filesTouchedMap[fp] = true
+							}
+							if p, ok := inputMap["path"].(string); ok && p != "" {
+								filesTouchedMap[p] = true
+							}
+							inputSum = toolInputSummary(inputMap)
+						}
+						t := Tool{
+							Name:      tName,
+							Input:     inputSum,
+							Intent:    intent,
+							Timestamp: ts,
+						}
+						tools = append(tools, t)
+						events = append(events, ActivityEvent{
+							Type:      "tool",
+							Name:      tName,
+							Intent:    intent,
+							Input:     inputSum,
+							Timestamp: ts,
+						})
+					}
+				} else if bType == "text" {
+					tText, _ := blk["text"].(string)
+					if strings.TrimSpace(tText) != "" && role == "assistant" {
+						lastText = truncateString(strings.TrimSpace(tText), 240)
+						events = append(events, ActivityEvent{
+							Type:      "text",
+							Summary:   lastText,
+							Timestamp: ts,
+						})
 					}
 				}
 			}
-			continue
 		}
-		// Anthropic-style content blocks with tool_use.
-		if blocks, ok2 := msg["content"].([]interface{}); ok2 {
-			for _, blk := range blocks {
-				b, ok3 := blk.(map[string]interface{})
-				if !ok3 {
-					continue
+
+		// Handle OpenAI style tool_calls
+		if tcs, okTC := msg["tool_calls"].([]interface{}); okTC {
+			for _, tc := range tcs {
+				if tcObj, okT := tc.(map[string]interface{}); okT {
+					fn, _ := tcObj["function"].(map[string]interface{})
+					name, _ := fn["name"].(string)
+					argsStr, _ := fn["arguments"].(string)
+					intent := ""
+					inputSum := ""
+					if argsStr != "" {
+						var argsMap map[string]interface{}
+						if json.Unmarshal([]byte(argsStr), &argsMap) == nil {
+							if it, ok := argsMap["intent"].(string); ok {
+								intent = it
+							}
+							if fp, ok := argsMap["file_path"].(string); ok && fp != "" {
+								filesTouchedMap[fp] = true
+							}
+							inputSum = toolInputSummary(argsMap)
+						}
+					}
+					if name != "" {
+						t := Tool{
+							Name:      name,
+							Input:     inputSum,
+							Intent:    intent,
+							Timestamp: ts,
+						}
+						tools = append(tools, t)
+						events = append(events, ActivityEvent{
+							Type:      "tool",
+							Name:      name,
+							Intent:    intent,
+							Input:     inputSum,
+							Timestamp: ts,
+						})
+					}
 				}
-				btype, _ := b["type"].(string)
-				if btype != "tool_use" {
-					continue
-				}
-				name, _ := b["name"].(string)
-				if name == "" {
-					continue
-				}
-				inp := toolInputSummary(b["input"])
-				tools = append(tools, Tool{Name: name, Input: inp})
 			}
 		}
 	}
+
+	// Reverse tools so newest is first
+	sort.SliceStable(tools, func(i, j int) bool { return i > j })
+	if len(tools) > 30 {
+		tools = tools[:30]
+	}
+
+	// Files touched list
+	var filesTouched []string
+	for f := range filesTouchedMap {
+		filesTouched = append(filesTouched, f)
+	}
+	sort.Strings(filesTouched)
+	if len(filesTouched) > 12 {
+		filesTouched = filesTouched[:12]
+	}
+
+	// Cap live activity at last 25 events
+	if len(events) > 25 {
+		events = events[len(events)-25:]
+	}
+
+	reasoningSteps := extractReasoningSteps(latestReasoning)
+
 	return Session{
-		Agent:        "flomaster",
-		ID:           raw.ID,
-		ShortName:    raw.ShortName,
-		Title:        raw.Title,
-		Status:       raw.Status,
-		Model:        raw.Model,
-		WorkingDir:   raw.WorkingDir,
-		LastActiveAt: raw.LastActiveAt,
-		UpdatedAt:    raw.UpdatedAt,
-		MessageCount: len(raw.Messages),
-		Avatar:       avatar,
-		LastText:     lastText,
-		RecentTools:  tools,
+		Agent:           "flomaster",
+		ID:              raw.ID,
+		ShortName:       raw.ShortName,
+		Title:           raw.Title,
+		Status:          raw.Status,
+		Model:           raw.Model,
+		WorkingDir:      raw.WorkingDir,
+		LastActiveAt:    raw.LastActiveAt,
+		UpdatedAt:       raw.UpdatedAt,
+		MessageCount:    len(raw.Messages),
+		Avatar:          avatar,
+		LastText:        lastText,
+		LatestReasoning: latestReasoning,
+		ReasoningSteps:  reasoningSteps,
+		FilesTouched:    filesTouched,
+		LiveActivity:    events,
+		RecentTools:     tools,
 	}
 }
 
 // toolInputSummary renders a short, single-line summary of a tool_use input,
 // prioritizing common keys (file_path, command, query, title, selector, url).
-// It strips anything that looks like a secret value. Output is truncated.
 func toolInputSummary(v interface{}) string {
 	if v == nil {
 		return ""
@@ -395,7 +616,7 @@ func toolInputSummary(v interface{}) string {
 	if !ok {
 		return ""
 	}
-	prefer := []string{"file_path", "command", "query", "title", "selector", "url", "target", "intent", "path"}
+	prefer := []string{"intent", "file_path", "command", "query", "title", "selector", "url", "target", "path"}
 	for _, k := range prefer {
 		val, exists := obj[k]
 		if !exists {
@@ -405,9 +626,17 @@ func toolInputSummary(v interface{}) string {
 		if !ok2 || s == "" {
 			continue
 		}
-		return truncateString(s, 60)
+		if k == "intent" && len(obj) > 1 {
+			// Also include secondary key
+			for _, sec := range []string{"file_path", "command", "query", "title", "path"} {
+				if secVal, ok3 := obj[sec].(string); ok3 && secVal != "" {
+					return truncateString(s+" · "+secVal, 80)
+				}
+			}
+		}
+		return truncateString(s, 70)
 	}
-	// fallback: join all scalar values
+	// fallback: join scalar values
 	var parts []string
 	for k, val := range obj {
 		if strings.EqualFold(k, "password") || strings.EqualFold(k, "token") || strings.EqualFold(k, "api_key") || strings.EqualFold(k, "secret") {

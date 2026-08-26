@@ -6,7 +6,7 @@ const IssueDrawerComponent = {
     'milkdown-editor': window.MilkdownEditorComponent || MilkdownEditorComponent,
     'searchable-select': window.SearchableSelectComponent || SearchableSelectComponent
   },
-  props: ['issue', 'projects', 'cycles', 'labels', 'fieldDefs', 'milestones', 'issues', 'widthOverride', 'commentRefreshKey', 'agents'],
+  props: ['issue', 'projects', 'cycles', 'labels', 'fieldDefs', 'milestones', 'issues', 'widthOverride', 'commentRefreshKey', 'agents', 'sessions'],
   emits: ['close', 'update-issue', 'delete-issue', 'relations-changed', 'update:widthOverride'],
   data() {
     return {
@@ -28,6 +28,8 @@ const IssueDrawerComponent = {
       comments: [],
       newCommentContent: '',
       newCommentAuthorType: 'user', // 'user' or 'agent'
+      dispatchToSession: true,
+      showFullReasoning: false,
       copiedBadge: false,
       copiedLinkBadge: false,
       isAgentDropdownOpen: false,
@@ -110,6 +112,19 @@ const IssueDrawerComponent = {
         if (by[r.type]) by[r.type].push(r);
       }
       return by;
+    },
+    activeSession() {
+      if (!this.issue || !this.sessions || this.sessions.length === 0) return null;
+      const directMatch = this.sessions.find(s =>
+        (s.id && s.id.includes(this.issue.id)) ||
+        (s.intention && (s.intention.includes(this.issue.identifier) || s.intention.includes(this.issue.title))) ||
+        (s.title && s.title.includes(this.issue.identifier))
+      );
+      if (directMatch) return directMatch;
+      if (this.issue.status === 'in_progress' && (this.issue.assignee === 'flomaster' || !this.issue.assignee)) {
+        return this.sessions.find(s => s.is_active) || this.sessions[0] || null;
+      }
+      return null;
     }
   },
   watch: {
@@ -443,16 +458,33 @@ const IssueDrawerComponent = {
       this.editLabels = this.editLabels.filter(l => l !== lbl);
       this.saveChanges();
     },
+    toolColor(name) {
+      if (!name) return 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300';
+      if (name.includes('edit') || name.includes('write') || name.includes('patch')) {
+        return 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/60';
+      }
+      if (name.includes('read') || name.includes('grep') || name.includes('find') || name.includes('ls')) {
+        return 'bg-sky-100 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border border-sky-200 dark:border-sky-900/60';
+      }
+      if (name.includes('bash') || name.includes('cmd') || name.includes('exec')) {
+        return 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/60';
+      }
+      return 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700';
+    },
     async submitComment() {
       if (!this.newCommentContent.trim() || !this.issue) return;
+      const content = this.newCommentContent.trim();
       try {
         const author = this.newCommentAuthorType === 'agent' ? 'Flomaster Agent' : 'User';
         await API.createComment({
           issue: this.issue.id,
           author: author,
           author_type: this.newCommentAuthorType,
-          content: this.newCommentContent.trim()
+          content: content
         });
+        if (this.dispatchToSession && this.activeSession) {
+          await this.dispatchAgent(this.issue.assignee || 'flomaster', content);
+        }
         this.newCommentContent = '';
         await this.loadComments();
       } catch (err) {
@@ -1030,6 +1062,62 @@ const IssueDrawerComponent = {
             </div>
           </div>
 
+          <!-- ========================================================= -->
+          <!-- Active Agent Session & Live Reasoning Stream (Multica 2.0) -->
+          <!-- ========================================================= -->
+          <div v-if="activeSession" class="space-y-2 pt-3 border-t border-zinc-200 dark:border-zinc-800">
+            <div class="flex items-center justify-between select-none">
+              <div class="flex items-center space-x-2">
+                <span class="text-sm">{{ activeSession.avatar || '🧠' }}</span>
+                <span class="text-xs font-bold text-zinc-900 dark:text-zinc-200">
+                  Active Session: {{ activeSession.short_name || activeSession.id }}
+                </span>
+                <span v-if="activeSession.is_active" class="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-400 text-[10px] font-mono font-semibold flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Streaming
+                </span>
+              </div>
+              <span class="text-[10px] font-mono text-zinc-400">{{ activeSession.model }}</span>
+            </div>
+
+            <!-- Live Reasoning / Thought Process Box -->
+            <div v-if="activeSession.latest_reasoning" class="p-3 rounded-xl bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-200/60 dark:border-indigo-900/40 space-y-1.5">
+              <div class="flex items-center justify-between text-[10px] font-semibold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">
+                <span class="flex items-center gap-1">
+                  <span>💭</span>
+                  <span>Latest Reasoning & Thought</span>
+                </span>
+                <button
+                  type="button"
+                  @click="showFullReasoning = !showFullReasoning"
+                  class="text-[10px] hover:underline"
+                >
+                  {{ showFullReasoning ? 'Collapse' : 'Expand' }}
+                </button>
+              </div>
+              <p
+                class="text-xs text-zinc-800 dark:text-zinc-200 leading-relaxed font-sans"
+                :class="showFullReasoning ? 'whitespace-pre-wrap' : 'line-clamp-3'"
+              >
+                {{ activeSession.latest_reasoning }}
+              </p>
+            </div>
+
+            <!-- Recent Tool Executions Pill List -->
+            <div v-if="activeSession.recent_tools && activeSession.recent_tools.length > 0" class="flex flex-wrap gap-1">
+              <span class="text-[10px] text-zinc-400 self-center uppercase font-semibold mr-1">Tools:</span>
+              <span
+                v-for="(t, ti) in activeSession.recent_tools.slice(0, 5)"
+                :key="ti"
+                class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold"
+                :class="toolColor(t.name)"
+                :title="t.input"
+              >
+                {{ t.name }}
+              </span>
+            </div>
+          </div>
+
           <!-- Comments & Activity Stream -->
           <div class="space-y-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
             <h4 class="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider select-none">Comments & Agent Audit Stream</h4>
@@ -1059,7 +1147,13 @@ const IssueDrawerComponent = {
                 class="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-zinc-400"
               ></textarea>
 
-              <div class="flex items-center justify-end">
+              <div class="flex items-center justify-between pt-1">
+                <label v-if="activeSession" class="flex items-center space-x-1.5 text-xs text-zinc-600 dark:text-zinc-400 cursor-pointer select-none">
+                  <input type="checkbox" v-model="dispatchToSession" class="rounded border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100" />
+                  <span>⚡ Continue discussion in active session</span>
+                </label>
+                <div v-else></div>
+
                 <button
                   @click="submitComment"
                   :disabled="!newCommentContent.trim()"

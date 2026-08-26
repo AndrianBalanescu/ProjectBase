@@ -23,15 +23,15 @@
   --border-hover: #3f3f46;
   --border-focus: #52525b;
 
-  /* Typography */
-  --text-primary: #f4f4f5;
+  /* Typography: Calm, dimmer light-grayish on black (zero stark glare) */
+  --text-primary: #d4d4d8;
   --text-secondary: #a1a1aa;
   --text-muted: #71717a;
   --text-dim: #52525b;
 
   /* Minimalist Accents */
   --accent-btn-bg: #27272a;
-  --accent-btn-text: #f4f4f5;
+  --accent-btn-text: #e4e4e7;
   --accent-btn-hover: #3f3f46;
   --accent-btn-border: #3f3f46;
 
@@ -65,37 +65,37 @@
 }
 
 html.light {
-  /* Surfaces & Canvas */
-  --bg-app: #f8fafc;
-  --bg-surface: #ffffff;
+  /* Surfaces & Canvas: Softer, rich grayish neutral slate (eliminates blinding white) */
+  --bg-app: #eceef2;
+  --bg-surface: #f4f5f8;
   --bg-surface-elevated: #ffffff;
   --bg-card: #ffffff;
-  --bg-card-hover: #f1f5f9;
-  --bg-subtle: #f4f4f5;
-  --bg-overlay: rgba(255, 255, 255, 0.9);
+  --bg-card-hover: #f3f4f7;
+  --bg-subtle: #e2e5eb;
+  --bg-overlay: rgba(236, 238, 242, 0.9);
 
-  /* Borders & Dividers */
-  --border-app: #e2e8f0;
-  --border-subtle: #f1f5f9;
-  --border-hover: #cbd5e1;
-  --border-focus: #94a3b8;
+  /* Borders & Dividers: Crisp, structured grayish borders */
+  --border-app: #d1d5db;
+  --border-subtle: #e2e8f0;
+  --border-hover: #9ca3af;
+  --border-focus: #4b5563;
 
-  /* Typography */
+  /* Typography: Deep crisp black and dark-zinc text for maximum legibility */
   --text-primary: #09090b;
-  --text-secondary: #52525b;
-  --text-muted: #71717a;
-  --text-dim: #94a3b8;
+  --text-secondary: #27272a;
+  --text-muted: #52525b;
+  --text-dim: #71717a;
 
   /* Minimalist Accents */
-  --accent-btn-bg: #09090b;
+  --accent-btn-bg: #18181b;
   --accent-btn-text: #ffffff;
   --accent-btn-hover: #27272a;
-  --accent-btn-border: #09090b;
+  --accent-btn-border: #18181b;
 
   /* Soft Status Tints */
-  --status-todo-bg: #f1f5f9;
-  --status-todo-text: #334155;
-  --status-todo-border: #e2e8f0;
+  --status-todo-bg: #e2e8f0;
+  --status-todo-text: #1e293b;
+  --status-todo-border: #cbd5e1;
 
   --status-progress-bg: #eff6ff;
   --status-progress-text: #1d4ed8;
@@ -109,9 +109,9 @@ html.light {
   --status-done-text: #047857;
   --status-done-border: #a7f3d0;
 
-  --status-cancel-bg: #f1f5f9;
-  --status-cancel-text: #94a3b8;
-  --status-cancel-border: #e2e8f0;
+  --status-cancel-bg: #e2e8f0;
+  --status-cancel-text: #64748b;
+  --status-cancel-border: #cbd5e1;
 
   /* Scrollbars */
   --scrollbar-track: transparent;

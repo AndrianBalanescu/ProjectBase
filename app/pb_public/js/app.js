@@ -323,6 +323,20 @@ const App = {
       }
     },
 
+    async loadLiveAgents() {
+      if (!this.isAuthenticated) return;
+      try {
+        const live = await API.getAgents().catch(() => null);
+        if (live && Array.isArray(live.agents)) {
+          this.agents = live.agents;
+          this.agentSessions = live.sessions || [];
+          this.agentSource = live.source || 'bridge';
+        }
+      } catch (e) {
+        // silent background poll
+      }
+    },
+
     setupRealtime() {
       API.initRealtime((collection, event) => {
         const { action, record } = event;

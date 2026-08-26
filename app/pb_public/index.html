@@ -374,6 +374,7 @@
       :milestones="milestones"
       :issues="issues"
       :agents="agents"
+      :sessions="agentSessions"
       :field-defs="currentProject ? currentProject.custom_field_defs : []"
       :comment-refresh-key="commentRefreshKey"
       v-model:width-override="drawerWidthOverride"
@@ -400,13 +401,14 @@
     ></command-palette>
 
     <!-- New Issue Modal -->
-    <new-issue-modal 
+    <new-issue-modal
       :is-open="isNewIssueOpen"
       :projects="projects"
       :current-project="currentProject"
       :cycles="cycles"
       :labels="labels"
       :milestones="milestones"
+      :agents="agents"
       @close="isNewIssueOpen = false"
       @create-issue="handleCreateIssue"
     ></new-issue-modal>

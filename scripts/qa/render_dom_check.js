@@ -1239,7 +1239,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   if (checks.headerBadge !== EXPECTED_BADGE) failures.push(`header version badge ${checks.headerBadge} != ${EXPECTED_BADGE} (VERSION file)`);
   if (checks.headerLayout && checks.headerLayout.overflows) failures.push(`header horizontally overflows (scrollW ${checks.headerLayout.scrollW} > clientW ${checks.headerLayout.clientW})`);
   if (checks.headerLayout && checks.headerLayout.newIssue && !checks.headerLayout.newIssue.visible) failures.push(`New Issue button off-screen: ${JSON.stringify(checks.headerLayout.newIssue)}`);
-  if (checks.bodyBg !== 'rgb(11, 15, 25)' && checks.bodyBg !== 'rgb(9, 9, 11)' && checks.bodyBg !== 'rgb(248, 250, 252)') failures.push(`body bg ${checks.bodyBg} != expected theme background`);
+  if (!['rgb(11, 15, 25)', 'rgb(9, 9, 11)', 'rgb(248, 250, 252)', 'rgb(236, 238, 242)'].includes(checks.bodyBg)) failures.push(`body bg ${checks.bodyBg} != expected theme background`);
   if (checks.probe.paddingLeft !== '28px') failures.push(`pl-7 padding ${checks.probe.paddingLeft} != 28px`);
   if (checks.probe.marginLeft !== '6px') failures.push(`ml-1.5 margin ${checks.probe.marginLeft} != 6px`);
   if (checks.probe.marginTop !== '6px') failures.push(`mt-1.5 margin ${checks.probe.marginTop} != 6px`);

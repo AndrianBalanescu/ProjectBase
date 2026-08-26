@@ -38,7 +38,7 @@ routerAdd("GET", "/api/projectbase/agents", (e) => {
         return cands[0] || "/home/ubuntu"
     }
     try {
-        if (!e.auth || !e.auth.id) return e.unauthorizedError("Authentication required")
+        if (!e.auth || !e.auth.id) return e.json(200, { home: "", source: "unauthed", agents: [], sessions: [] })
         const home = homeOf()
         // Prefer the bridge JSON (sanitized, machine-user scanned).
         for (const bp of BRIDGE_PATHS) {

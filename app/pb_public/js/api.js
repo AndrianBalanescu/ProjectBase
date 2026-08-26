@@ -93,6 +93,7 @@ const API = {
 
   // Agentic-native: local AI agents surfaced as board teammates (bridge).
   async getAgents() {
+    if (!pb.authStore.isValid) return { agents: [], sessions: [] };
     const res = await pb.send('/api/projectbase/agents', { method: 'GET' });
     return res;
   },
