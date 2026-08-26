@@ -18,16 +18,20 @@ routerAdd("GET", "/api/projectbase/agents", (e) => {
     const BRIDGE_PATHS = ["/run/projectbase/agents.json", "/tmp/projectbase/agents.json"]
     const exists = (p) => { try { $os.stat(p); return true } catch (x) { return false } }
     // Decode a UTF-8 byte Array into a JS string (goja lacks TextDecoder).
+    // IMPORTANT: build the result with an array + single join(), NOT `out +=`
+    // string concatenation. In the Goja JSVM, `+=` on a growing string is O(n^2)
+    // and a 140KB file saturates the CPU (this was the runaway root cause).
     const decodeUtf8 = (bytes) => {
-        let out = "", i = 0
+        const out = []
+        let i = 0
         while (i < bytes.length) {
             let c = bytes[i]
-            if (c < 0x80) { out += String.fromCharCode(c); i++ }
-            else if (c < 0xE0) { out += String.fromCharCode(((c & 0x1F) << 6) | (bytes[i+1] & 0x3F)); i += 2 }
-            else if (c < 0xF0) { out += String.fromCharCode(((c & 0x0F) << 12) | ((bytes[i+1] & 0x3F) << 6) | (bytes[i+2] & 0x3F)); i += 3 }
-            else { const cp = ((c & 0x07) << 18) | ((bytes[i+1] & 0x3F) << 12) | ((bytes[i+2] & 0x3F) << 6) | (bytes[i+3] & 0x3F); out += String.fromCodePoint(cp); i += 4 }
+            if (c < 0x80) { out.push(String.fromCharCode(c)); i++ }
+            else if (c < 0xE0) { out.push(String.fromCharCode(((c & 0x1F) << 6) | (bytes[i+1] & 0x3F))); i += 2 }
+            else if (c < 0xF0) { out.push(String.fromCharCode(((c & 0x0F) << 12) | ((bytes[i+1] & 0x3F) << 6) | (bytes[i+2] & 0x3F))); i += 3 }
+            else { const cp = ((c & 0x07) << 18) | ((bytes[i+1] & 0x3F) << 12) | ((bytes[i+2] & 0x3F) << 6) | (bytes[i+3] & 0x3F); out.push(String.fromCodePoint(cp)); i += 4 }
         }
-        return out
+        return out.join('')
     }
     const homeOf = () => {
         const cands = []
@@ -41,6 +45,16 @@ routerAdd("GET", "/api/projectbase/agents", (e) => {
         if (!e.auth || !e.auth.id) return e.json(200, { home: "", source: "unauthed", agents: [], sessions: [] })
         const home = homeOf()
         // Prefer the bridge JSON (sanitized, machine-user scanned).
+        // TTL cache: the byte-by-byte UTF-8 decode below is O(n^2) in the JSVM
+        // and saturates the CPU on a 300KB file when polled every few seconds.
+        // Cache the parsed result for 3s so the decode runs at most ~20x/min.
+        const CACHE_KEY = "pbAgentsBridgeCache"
+        const CACHE_TTL_MS = 3000
+        let cached = null
+        try { cached = $app.store().get(CACHE_KEY) } catch (x) {}
+        if (cached && cached.at && (Date.now() - cached.at) < CACHE_TTL_MS) {
+            return e.json(200, cached.payload)
+        }
         for (const bp of BRIDGE_PATHS) {
             if (!exists(bp)) continue
             try {
@@ -53,7 +67,9 @@ routerAdd("GET", "/api/projectbase/agents", (e) => {
                     source_dir: a.source_dir || "~/" + a.dir, found: !!a.found, core: !!a.core,
                     status: a.status || "offline", session_count: a.session_count || 0,
                 }))
-                return e.json(200, { home, source: "bridge", host: parsed.host || null, scanned_at: parsed.scanned_at || null, agents, sessions: parsed.sessions || [] })
+                const payload = { home, source: "bridge", host: parsed.host || null, scanned_at: parsed.scanned_at || null, agents, sessions: parsed.sessions || [] }
+                try { $app.store().set(CACHE_KEY, { at: Date.now(), payload }) } catch (x) {}
+                return e.json(200, payload)
             } catch (err) {
                 const msg = err && err.message ? err.message : JSON.stringify(err)
                 console.log(">>> [Agents] bridge parse error:", msg)
@@ -141,15 +157,17 @@ routerAdd("POST", "/api/projectbase/agents/sync", (e) => {
     }
     const BRIDGE_PATHS = ["/run/projectbase/agents.json", "/tmp/projectbase/agents.json"]
     const decodeUtf8 = (bytes) => {
-        let out = "", i = 0
+        // Array + single join() — `out +=` is O(n^2) in Goja (CPU runaway bug).
+        const out = []
+        let i = 0
         while (i < bytes.length) {
             let c = bytes[i]
-            if (c < 0x80) { out += String.fromCharCode(c); i++ }
-            else if (c < 0xE0) { out += String.fromCharCode(((c & 0x1F) << 6) | (bytes[i+1] & 0x3F)); i += 2 }
-            else if (c < 0xF0) { out += String.fromCharCode(((c & 0x0F) << 12) | ((bytes[i+1] & 0x3F) << 6) | (bytes[i+2] & 0x3F)); i += 3 }
-            else { const cp = ((c & 0x07) << 18) | ((bytes[i+1] & 0x3F) << 12) | ((bytes[i+2] & 0x3F) << 6) | (bytes[i+3] & 0x3F); out += String.fromCodePoint(cp); i += 4 }
+            if (c < 0x80) { out.push(String.fromCharCode(c)); i++ }
+            else if (c < 0xE0) { out.push(String.fromCharCode(((c & 0x1F) << 6) | (bytes[i+1] & 0x3F))); i += 2 }
+            else if (c < 0xF0) { out.push(String.fromCharCode(((c & 0x0F) << 12) | ((bytes[i+1] & 0x3F) << 6) | (bytes[i+2] & 0x3F))); i += 3 }
+            else { const cp = ((c & 0x07) << 18) | ((bytes[i+1] & 0x3F) << 12) | ((bytes[i+2] & 0x3F) << 6) | (bytes[i+3] & 0x3F); out.push(String.fromCodePoint(cp)); i += 4 }
         }
-        return out
+        return out.join('')
     }
     const exists = (base, rel) => { try { $os.stat(base + "/" + rel); return true } catch (x) { return false } }
     try {

@@ -330,10 +330,11 @@ func collectSessions(homeDir, dir, avatar string) []Session {
 		}
 	}
 
-	// newest first, cap at 12 sessions
+	// newest first, cap at 8 sessions (payload budget: the PB hook decodes this
+	// file byte-by-byte in the JSVM, so the total size must stay small)
 	sort.Slice(cands, func(i, j int) bool { return cands[i].m > cands[j].m })
-	if len(cands) > 12 {
-		cands = cands[:12]
+	if len(cands) > 8 {
+		cands = cands[:8]
 	}
 	sessionsDir := dir
 	todosDir := filepath.Join(filepath.Dir(dir), "todos")
@@ -399,6 +400,22 @@ func collectSessions(homeDir, dir, avatar string) []Session {
 			}
 		}
 		out = append(out, s)
+	}
+	// Payload budget: keep the heavy streams (chat, live activity, raw
+	// reasoning) ONLY on the 3 most recent/active sessions; the rest ship as
+	// lightweight cards (metadata + capped tool list + checklist). The file is
+	// read + UTF-8-decoded in JS on every /api/projectbase/agents poll, so a
+	// 300KB payload saturates the CPU (12 sessions x full streams was ~330KB).
+	for i := range out {
+		if i >= 3 {
+			out[i].Chat = nil
+			out[i].LiveActivity = nil
+			out[i].LatestReasoning = ""
+			out[i].ReasoningSteps = nil
+			if len(out[i].RecentTools) > 8 {
+				out[i].RecentTools = out[i].RecentTools[:8]
+			}
+		}
 	}
 	return out
 }
