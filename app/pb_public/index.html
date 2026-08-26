@@ -69,6 +69,9 @@
       :realtime-connected="realtimeConnected"
       :notifications="notifications"
       :unread-notifications="unreadNotifications"
+      :agents="agents"
+      :agent-source="agentSource"
+      :agent-syncing="agentSyncing"
       @select-project="selectProject"
       @change-view="changeView"
       @open-new-issue="isNewIssueOpen = true"
@@ -80,6 +83,7 @@
       @toggle-notifications="loadNotifications"
       @notification-click="handleNotificationClick"
       @mark-all-read="handleMarkAllNotificationsRead"
+      @sync-agents="handleSyncAgents"
     ></header-bar>
 
     <!-- Offline indicator (Service Worker app shell stays usable offline) -->

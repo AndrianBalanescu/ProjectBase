@@ -654,6 +654,7 @@ const IssueDrawerComponent = {
                     >Clear</button>
                   </div>
                 </div>
+              </div>
             </div>
 
             <!-- Agent cURL Helper -->

@@ -1,13 +1,14 @@
 // pb_public/js/components/Header.js
 
 const HeaderComponent = {
-  props: ['projects', 'currentProject', 'currentView', 'realtimeConnected', 'notifications', 'unreadNotifications'],
-  emits: ['select-project', 'change-view', 'open-new-issue', 'open-omnibar', 'open-new-project', 'open-custom-fields', 'open-notification-settings', 'toggle-notifications', 'notification-click', 'mark-all-read'],
+  props: ['projects', 'currentProject', 'currentView', 'realtimeConnected', 'notifications', 'unreadNotifications', 'agents', 'agentSource', 'agentSyncing'],
+  emits: ['select-project', 'change-view', 'open-new-issue', 'open-omnibar', 'open-new-project', 'open-custom-fields', 'open-notification-settings', 'toggle-notifications', 'notification-click', 'mark-all-read', 'sync-agents'],
   data() {
     return {
       dropdownOpen: false,
       notifOpen: false,
-      moreOpen: false
+      moreOpen: false,
+      teamOpen: false
     };
   },
   mounted() {
@@ -27,10 +28,17 @@ const HeaderComponent = {
       if (this.$refs.moreDropdown && !this.$refs.moreDropdown.contains(e.target)) {
         this.moreOpen = false;
       }
+      if (this.$refs.teamDropdown && !this.$refs.teamDropdown.contains(e.target)) {
+        this.teamOpen = false;
+      }
     },
     selectProj(proj) {
       this.dropdownOpen = false;
       this.$emit('select-project', proj);
+    },
+    agentInitial(agent) {
+      const name = (agent && agent.name) || '?';
+      return name.charAt(0).toUpperCase();
     },
     toggleNotif() {
       this.notifOpen = !this.notifOpen;
@@ -335,6 +343,79 @@ const HeaderComponent = {
           </div>
         </div>
 
+
+        <!-- Agentic-native: live agent stack + team dropdown -->
+        <div class="relative" ref="teamDropdown">
+          <button
+            @click.stop="teamOpen = !teamOpen"
+            class="flex items-center -space-x-1.5 rounded-full px-1 py-0.5 hover:bg-gray-800/70 transition-colors"
+            :title="(agents && agents.length) ? (agents.length + ' agents online — click for team') : 'No agents detected'"
+          >
+            <template v-if="agents && agents.length > 0">
+              <span
+                v-for="a in agents.slice(0, 4)"
+                :key="a.name"
+                class="w-6 h-6 rounded-full border-2 border-gray-950 flex items-center justify-center text-[10px] font-bold shadow-sm select-none"
+                :class="a.found ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white' : 'bg-gray-800 text-gray-500'"
+              >{{ agentInitial(a) }}</span>
+              <span
+                v-if="agents.length > 4"
+                class="w-6 h-6 rounded-full border-2 border-gray-950 bg-gray-800 text-gray-300 text-[9px] flex items-center justify-center font-semibold"
+              >+{{ agents.length - 4 }}</span>
+            </template>
+            <span v-else class="text-gray-600 flex items-center space-x-1 px-1.5 text-xs">
+              <i data-lucide="bot" class="w-3.5 h-3.5"></i>
+            </span>
+          </button>
+
+          <!-- Team dropdown -->
+          <div
+            v-if="teamOpen"
+            class="absolute right-0 mt-2 w-64 glass-dropdown rounded-xl shadow-2xl z-50 border border-gray-800 animate-in fade-in slide-in-from-top-2 duration-150 overflow-hidden"
+          >
+            <div class="flex items-center justify-between px-3 py-2 border-b border-gray-800/70">
+              <div class="text-xs font-semibold text-gray-300 uppercase tracking-wider">Agent Team</div>
+              <button
+                @click="$emit('sync-agents')"
+                class="flex items-center space-x-1 text-[11px] text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
+                :disabled="agentSyncing"
+              >
+                <i data-lucide="refresh-cw" class="w-3 h-3" :class="{ 'animate-spin': agentSyncing }"></i>
+                <span>{{ agentSyncing ? 'Syncing' : 'Rescan' }}</span>
+              </button>
+            </div>
+            <div class="py-1 max-h-72 overflow-y-auto">
+              <template v-if="agents && agents.length > 0">
+                <div
+                  v-for="a in agents"
+                  :key="a.name"
+                  class="flex items-center space-x-2.5 px-3 py-2 hover:bg-gray-800/50 transition-colors"
+                >
+                  <span
+                    class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                    :class="a.found ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white' : 'bg-gray-800 text-gray-500'"
+                  >{{ a.avatar || agentInitial(a) }}</span>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center space-x-1.5">
+                      <span class="text-xs font-medium text-gray-200 truncate">{{ a.name }}</span>
+                      <span class="w-1.5 h-1.5 rounded-full" :class="a.found ? 'bg-emerald-400' : 'bg-gray-600'" :title="a.found ? 'online' : 'offline'"></span>
+                    </div>
+                    <div class="text-[10px] text-gray-500 truncate">{{ a.provider }} · {{ a.runtime }}</div>
+                  </div>
+                </div>
+              </template>
+              <div v-else class="px-3 py-4 text-center">
+                <i data-lucide="bot" class="w-6 h-6 text-gray-600 mx-auto mb-1.5"></i>
+                <div class="text-xs text-gray-500">No agents detected.</div>
+                <div class="text-[10px] text-gray-600 mt-0.5">Run the agent-bridge on this host.</div>
+              </div>
+            </div>
+            <div class="flex items-center justify-between px-3 py-1.5 border-t border-gray-800/70 bg-gray-950/40">
+              <span class="text-[10px] text-gray-600">source: {{ agentSource || 'bridge' }}</span>
+              <span class="text-[10px] text-gray-600">{{ agents && agents.length }} agents</span>
+            </div>
+          </div>
+        </div>
 
         <!-- New Issue Button -->
         <button 

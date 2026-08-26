@@ -44,6 +44,9 @@ const App = {
       cycles: [],
       milestones: [],
       labels: [],
+      agents: [], // Agentic-native: detected local AI agents (board teammates)
+      agentSource: 'bridge',
+      agentSyncing: false,
       selectedIssue: null,
       selectedIssueIds: new Set(),
       lastSelectedIssueId: null, // shift+click range anchor
@@ -240,13 +243,14 @@ const App = {
     },
     async loadAllData() {
       try {
-        const [projs, iss, cycs, mls, lbls, notifs] = await Promise.all([
+        const [projs, iss, cycs, mls, lbls, notifs, agents] = await Promise.all([
           API.getProjects(),
           API.getIssues(this.currentProject ? this.currentProject.id : null),
           API.getCycles(this.currentProject ? this.currentProject.id : null),
           API.getMilestones(this.currentProject ? this.currentProject.id : null),
           API.getLabels(this.currentProject ? this.currentProject.id : null),
-          API.getNotifications()
+          API.getNotifications(),
+          API.getAgents().catch(() => ({ agents: [] }))
         ]);
 
         this.projects = projs;
@@ -255,6 +259,8 @@ const App = {
         this.milestones = mls;
         this.labels = lbls;
         this.notifications = (notifs && notifs.items) || [];
+        this.agents = (agents && agents.agents) || [];
+        this.agentSource = (agents && agents.source) || 'bridge';
 
         // Auto-select first favorite project if none selected
         if (!this.currentProject && this.projects.length > 0) {
@@ -958,6 +964,24 @@ const App = {
       } catch (err) {
         // Non-fatal: the inbox just stays stale on a transient failure.
         console.warn('Notification load failed:', err);
+      }
+    },
+
+    async handleSyncAgents() {
+      this.agentSyncing = true;
+      try {
+        const res = await API.syncAgents();
+        // Refetch the live view so the stack + statuses reflect persisted records.
+        const live = await API.getAgents().catch(() => ({ agents: [] }));
+        this.agents = (live && live.agents) || [];
+        this.agentSource = (live && live.source) || 'bridge';
+        const n = (res && res.synced) || 0;
+        this.showToast(`${n} agent${n === 1 ? '' : 's'} synced to the board`, 'success');
+      } catch (err) {
+        console.warn('Agent sync failed:', err);
+        this.showToast('Agent sync failed', 'error');
+      } finally {
+        this.agentSyncing = false;
       }
     },
 

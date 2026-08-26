@@ -91,6 +91,16 @@ const API = {
     });
   },
 
+  // Agentic-native: local AI agents surfaced as board teammates (bridge).
+  async getAgents() {
+    const res = await pb.send('/api/projectbase/agents', { method: 'GET' });
+    return res;
+  },
+  async syncAgents() {
+    const res = await pb.send('/api/projectbase/agents/sync', { method: 'POST' });
+    return res;
+  },
+
   // Issues
   async getIssues(projectId = null) {
     const filter = projectId ? `project = "${projectId}"` : '1=1';
