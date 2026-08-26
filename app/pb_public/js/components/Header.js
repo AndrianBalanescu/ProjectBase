@@ -2,7 +2,7 @@
 
 const HeaderComponent = {
   props: ['projects', 'currentProject', 'currentView', 'realtimeConnected', 'notifications', 'unreadNotifications', 'agents', 'agentSource', 'agentSyncing'],
-  emits: ['select-project', 'change-view', 'open-new-issue', 'open-omnibar', 'open-new-project', 'open-custom-fields', 'open-notification-settings', 'toggle-notifications', 'notification-click', 'mark-all-read', 'sync-agents'],
+  emits: ['select-project', 'change-view', 'open-new-issue', 'open-omnibar', 'open-new-project', 'open-custom-fields', 'open-notification-settings', 'toggle-notifications', 'notification-click', 'mark-all-read', 'sync-agents', 'open-agents'],
   data() {
     return {
       dropdownOpen: false,
@@ -212,6 +212,14 @@ const HeaderComponent = {
             <span>Analytics</span>
           </button>
           <button
+            @click="$emit('change-view', 'agents')"
+            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all font-medium"
+            :class="currentView === 'agents' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'"
+          >
+            <i data-lucide="bot" class="w-3.5 h-3.5 text-emerald-400"></i>
+            <span>Agents</span>
+          </button>
+          <button
             @click="$emit('change-view', 'portfolio')"
             class="flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all font-medium"
             :class="currentView === 'portfolio' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'"
@@ -386,10 +394,11 @@ const HeaderComponent = {
             </div>
             <div class="py-1 max-h-72 overflow-y-auto">
               <template v-if="agents && agents.length > 0">
-                <div
+                <button
                   v-for="a in agents"
                   :key="a.name"
-                  class="flex items-center space-x-2.5 px-3 py-2 hover:bg-gray-800/50 transition-colors"
+                  @click="$emit('open-agents', a.name); teamOpen = false;"
+                  class="w-full flex items-center space-x-2.5 px-3 py-2 hover:bg-gray-800/50 transition-colors text-left"
                 >
                   <span
                     class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
@@ -398,11 +407,13 @@ const HeaderComponent = {
                   <div class="min-w-0 flex-1">
                     <div class="flex items-center space-x-1.5">
                       <span class="text-xs font-medium text-gray-200 truncate">{{ a.name }}</span>
-                      <span class="w-1.5 h-1.5 rounded-full" :class="a.found ? 'bg-emerald-400' : 'bg-gray-600'" :title="a.found ? 'online' : 'offline'"></span>
+                      <span class="w-1.5 h-1.5 rounded-full" :class="a.status === 'online' ? 'bg-emerald-400' : 'bg-gray-600'" :title="a.status === 'online' ? 'online' : 'offline'"></span>
+                      <span v-if="a.session_count" class="text-[9px] px-1 py-0.5 rounded bg-indigo-600/20 text-indigo-300 font-semibold">{{ a.session_count }} live</span>
                     </div>
                     <div class="text-[10px] text-gray-500 truncate">{{ a.provider }} · {{ a.runtime }}</div>
                   </div>
-                </div>
+                  <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-gray-600 shrink-0"></i>
+                </button>
               </template>
               <div v-else class="px-3 py-4 text-center">
                 <i data-lucide="bot" class="w-6 h-6 text-gray-600 mx-auto mb-1.5"></i>
@@ -411,7 +422,13 @@ const HeaderComponent = {
               </div>
             </div>
             <div class="flex items-center justify-between px-3 py-1.5 border-t border-gray-800/70 bg-gray-950/40">
-              <span class="text-[10px] text-gray-600">source: {{ agentSource || 'bridge' }}</span>
+              <button
+                @click="$emit('open-agents', null); teamOpen = false;"
+                class="flex items-center space-x-1 text-[11px] text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
+              >
+                <i data-lucide="bot" class="w-3 h-3"></i>
+                <span>View all agents &amp; sessions</span>
+              </button>
               <span class="text-[10px] text-gray-600">{{ agents && agents.length }} agents</span>
             </div>
           </div>

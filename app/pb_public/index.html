@@ -84,6 +84,7 @@
       @notification-click="handleNotificationClick"
       @mark-all-read="handleMarkAllNotificationsRead"
       @sync-agents="handleSyncAgents"
+      @open-agents="openAgents"
     ></header-bar>
 
     <!-- Offline indicator (Service Worker app shell stays usable offline) -->
@@ -176,6 +177,16 @@
         :projects="projects"
         :cycles="cycles"
       ></stats-view>
+
+      <!-- 5b. Agent Team View -->
+      <agents-view
+        v-else-if="currentView === 'agents'"
+        :agents="agents"
+        :sessions="agentSessions"
+        :active-agent-name="activeAgentName"
+        :agent-source="agentSource"
+        @navigate="navigateAgent"
+      ></agents-view>
 
       <!-- 6. Docs & API View -->
       <docs-view 
@@ -475,6 +486,7 @@
   <script src="/js/components/TimelineView.js"></script>
   <script src="/js/components/ProjectsView.js"></script>
   <script src="/js/components/StatsView.js"></script>
+  <script src="/js/components/AgentsView.js"></script>
   <script src="/js/components/PortfolioView.js"></script>
   <script src="/js/components/DocsView.js"></script>
   <script src="/js/components/IssueDrawer.js"></script>

@@ -13,6 +13,7 @@ const App = {
     'timeline-view': TimelineViewComponent,
     'projects-view': ProjectsViewComponent,
     'stats-view': StatsViewComponent,
+    'agents-view': AgentsViewComponent,
     'docs-view': DocsViewComponent,
     'portfolio-view': PortfolioViewComponent,
     'issue-drawer': IssueDrawerComponent,
@@ -45,6 +46,8 @@ const App = {
       milestones: [],
       labels: [],
       agents: [], // Agentic-native: detected local AI agents (board teammates)
+      agentSessions: [], // Sanitized live flomaster/agent sessions
+      activeAgentName: null, // Selected agent name on the Agents view (or null -> team list)
       agentSource: 'bridge',
       agentSyncing: false,
       selectedIssue: null,
@@ -260,6 +263,7 @@ const App = {
         this.labels = lbls;
         this.notifications = (notifs && notifs.items) || [];
         this.agents = (agents && agents.agents) || [];
+        this.agentSessions = (agents && agents.sessions) || [];
         this.agentSource = (agents && agents.source) || 'bridge';
 
         // Auto-select first favorite project if none selected
@@ -513,7 +517,7 @@ const App = {
       this.applyHashQueryState(params);
       if (!hash) return;
       const parts = hash.split('/').filter(Boolean);
-      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', timeline: 'timeline', projects: 'projects', stats: 'stats', docs: 'docs', milestones: 'milestones', portfolio: 'portfolio' };
+      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', timeline: 'timeline', projects: 'projects', stats: 'stats', docs: 'docs', milestones: 'milestones', portfolio: 'portfolio', agents: 'agents' };
 
       // parts[0] may be a project identifier or a view name (if no project prefix)
       if (parts.length >= 2 && viewMap[parts[1]]) {
@@ -529,6 +533,12 @@ const App = {
           await this.loadIssues();
         }
         this.currentView = viewMap[parts[1]] || 'board';
+        // Agent detail route: #/<proj-or-@>/agents/<name>
+        if (this.currentView === 'agents' && parts[2]) {
+          this.activeAgentName = parts[2];
+        } else if (this.currentView === 'agents') {
+          this.activeAgentName = null;
+        }
         if (parts[2] === 'issue' && parts[3]) {
           const issue = this.issues.find(i => i.id === parts[3]);
           // Never show a stale drawer: close it when the route's issue
@@ -541,16 +551,41 @@ const App = {
         }
       } else if (viewMap[parts[0]]) {
         this.currentView = viewMap[parts[0]] || 'board';
+        // Agent detail route: #/agents/<name>
+        if (this.currentView === 'agents') {
+          this.activeAgentName = parts[1] || null;
+        }
         // Plain view route (no project prefix): never a stale drawer.
         this.selectedIssue = null;
       }
     },
 
+    // Navigate the Agents view to a specific agent's detail page.
+    navigateAgent(name) {
+      this.activeAgentName = name || null;
+      const proj = this.currentProject ? this.currentProject.identifier.toLowerCase() : '';
+      const base = proj ? `#/${proj}/agents` : `#/agents`;
+      const hash = name ? `${base}/${name}` : base;
+      if (window.location.hash !== hash) {
+        try { window.history.replaceState(null, '', hash); } catch (e) { /* ignore */ }
+      }
+    },
+
+    // Header "Agent Team" dropdown entry point: switch to the Agents view.
+    openAgents(name) {
+      this.changeView('agents');
+      this.activeAgentName = name || null;
+      this.syncRoute();
+    },
+
     syncRoute() {
       const proj = this.currentProject ? this.currentProject.identifier.toLowerCase() : '';
-      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', timeline: 'timeline', projects: 'projects', stats: 'stats', docs: 'docs', milestones: 'milestones', portfolio: 'portfolio' };
+      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', timeline: 'timeline', projects: 'projects', stats: 'stats', docs: 'docs', milestones: 'milestones', portfolio: 'portfolio', agents: 'agents' };
       const v = viewMap[this.currentView] || 'board';
       let hash = proj ? `#/${proj}/${v}` : `#/${v}`;
+      if (this.currentView === 'agents' && this.activeAgentName) {
+        hash += `/${this.activeAgentName}`;
+      }
       if (this.selectedIssue) {
         hash += `/issue/${this.selectedIssue.id}`;
       }
@@ -974,6 +1009,7 @@ const App = {
         // Refetch the live view so the stack + statuses reflect persisted records.
         const live = await API.getAgents().catch(() => ({ agents: [] }));
         this.agents = (live && live.agents) || [];
+        this.agentSessions = (live && live.sessions) || [];
         this.agentSource = (live && live.source) || 'bridge';
         const n = (res && res.synced) || 0;
         this.showToast(`${n} agent${n === 1 ? '' : 's'} synced to the board`, 'success');

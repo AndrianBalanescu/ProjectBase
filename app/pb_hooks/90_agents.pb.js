@@ -51,8 +51,9 @@ routerAdd("GET", "/api/projectbase/agents", (e) => {
                 const agents = (parsed.agents || []).map((a) => ({
                     name: a.name, provider: a.provider, runtime: a.runtime, avatar: a.avatar,
                     source_dir: a.source_dir || "~/" + a.dir, found: !!a.found, core: !!a.core,
+                    status: a.status || "offline", session_count: a.session_count || 0,
                 }))
-                return e.json(200, { home, source: "bridge", host: parsed.host || null, scanned_at: parsed.scanned_at || null, agents })
+                return e.json(200, { home, source: "bridge", host: parsed.host || null, scanned_at: parsed.scanned_at || null, agents, sessions: parsed.sessions || [] })
             } catch (err) {
                 const msg = err && err.message ? err.message : JSON.stringify(err)
                 console.log(">>> [Agents] bridge parse error:", msg)
