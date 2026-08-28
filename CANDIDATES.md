@@ -91,13 +91,24 @@
 - [x] Universal Git Webhook Receiver (`POST /api/projectbase/webhooks/git`) with case-insensitive GitHub/GitLab headers and regex-free issue token triage
 - [x] FastMCP JSON-RPC 2.0 tools (`link_git_commit`, `link_git_pr`, `get_issue_git_artifacts`, `stage_code_patch`, `process_git_webhook`, `get_project_git_status`)
 - [x] Frontend IssueDrawer **🌿 Git & Code** panel with 1-click copy `git checkout`, PR status chips, commit diff stats, and visual branch/PR indicators in Kanban/List
-- [x] 283/283 automated tests passing across 17 test suites with 100% headless DOM QA and frontend guard pass
- verification
+- [x] 283/283 automated tests passing across 17 test suites with 100% headless DOM QA and frontend guard pass verification
 
 ---
 
-## Next Milestone (Cycle 14)
-**Epic 13 – Autonomous Continuous Benchmarking & High-Concurrency Multi-Tenant Federation**
-- High-concurrency load testing & SQLite WAL contention mitigation under multi-agent pressure
-- Dynamic agent autoscaling triggers based on real-time backlog depth and throughput velocity
-- Automated schema migration verification across federated peer nodes
+## Epic 14 – Autonomous Agent Autoscaling, Dynamic Workload Orchestration & Self-Healing Engine (✅ Done)
+- [x] Real-time workload analytics and queue saturation engine (`/api/projectbase/agents/workload`) calculating persona queue depths, active leases, capacity, and estimated backlog clearance time
+- [x] Dynamic persona autoscaler (`/api/projectbase/agents/autoscale`) generating horizontal worker allocation plans and concurrency scaling strategies
+- [x] Worker slot capacity reservation engine (`/api/projectbase/agents/capacity/reserve`, `/api/projectbase/agents/capacity/release`) with TTL auto-expiration
+- [x] Autonomous workflow self-healing engine (`/api/projectbase/workflow/self-heal`) detecting and auto-reconciling expired leases, orphaned DAG subtasks, and stalled statuses
+- [x] Continuous live database latency benchmarking and WAL contention telemetry (`/api/projectbase/benchmarks/live`, `/api/projectbase/benchmarks/run`)
+- [x] FastMCP JSON-RPC 2.0 tools (`get_agent_workload_status`, `calculate_autoscale_recommendations`, `reserve_agent_capacity`, `release_agent_capacity`, `run_workflow_self_heal`, `get_live_benchmarks`)
+- [x] Frontend AgentsView **⚡ Workload & Autoscaler** dashboard with live saturation meters, persona breakdown, 1-click Auto-Heal, dynamic autoscaler optimizer, and live latency metrics
+- [x] 299/299 automated tests passing across 18 test suites with 100% frontend guard verification
+
+---
+
+## Next Milestone (Cycle 16)
+**Epic 15 – Distributed Cross-Cluster Replication, High-Availability Failover & Edge SQLite Sync**
+- Distributed peer replication across geographic homelab/VPS nodes
+- Automated split-brain prevention and vector clock conflict resolution
+- Real-time zero-copy offline-first SQLite synchronization for mobile and edge nodes

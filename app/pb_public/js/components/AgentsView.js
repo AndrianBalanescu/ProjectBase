@@ -12,7 +12,7 @@ const AgentsViewComponent = {
       selectedSessionId: null,
       search: '',
       filterStatus: 'all', // 'all' | 'online'
-      activeTab: 'chat', // 'chat' | 'anomalies' | 'throughput' | 'federation'
+      activeTab: 'chat', // 'chat' | 'workload' | 'anomalies' | 'throughput' | 'federation'
       quickPrompt: '',
       isDispatching: false,
       dispatchSuccess: null,
@@ -27,7 +27,14 @@ const AgentsViewComponent = {
       federationExportJson: '',
       federationImportJson: '',
       federationConflictStrategy: 'merge',
-      federationStatus: null
+      federationStatus: null,
+      workloadData: null,
+      autoscalePlan: null,
+      isAutoscaling: false,
+      autoscaleSuccess: null,
+      benchmarksData: null,
+      isLoadingBenchmarks: false,
+      selfHealReport: null
     };
   },
   computed: {
@@ -282,6 +289,55 @@ const AgentsViewComponent = {
         this.federationStatus = 'Import failed: ' + (e.message || String(e));
       }
     },
+    async loadWorkload() {
+      try {
+        const res = await API.getAgentWorkload();
+        this.workloadData = res;
+      } catch (e) {
+        console.warn('Failed to load workload', e);
+      }
+    },
+    async runAutoscale(apply = false) {
+      try {
+        this.isAutoscaling = true;
+        this.autoscaleSuccess = null;
+        const res = await API.calculateAutoscale({ apply });
+        this.autoscalePlan = res;
+        if (apply) {
+          this.autoscaleSuccess = `Applied autoscaling plan: target ${res.total_recommended_workers} worker(s)`;
+          await this.loadWorkload();
+        }
+      } catch (e) {
+        this.autoscaleSuccess = 'Autoscale error: ' + (e.message || String(e));
+      } finally {
+        this.isAutoscaling = false;
+      }
+    },
+    async runSelfHeal(autoFix = true) {
+      try {
+        this.isHealing = true;
+        this.healSuccess = null;
+        const res = await API.runWorkflowSelfHeal({ auto_fix: autoFix });
+        this.selfHealReport = res;
+        this.healSuccess = `Resolved ${res.repairs_applied || 0} / ${res.anomalies_detected || 0} issue(s)`;
+        await this.loadWorkload();
+      } catch (e) {
+        this.healSuccess = 'Self-heal failed: ' + (e.message || String(e));
+      } finally {
+        this.isHealing = false;
+      }
+    },
+    async loadLiveBenchmarks() {
+      try {
+        this.isLoadingBenchmarks = true;
+        const res = await API.getLiveBenchmarks();
+        this.benchmarksData = res;
+      } catch (e) {
+        console.warn('Failed to load benchmarks', e);
+      } finally {
+        this.isLoadingBenchmarks = false;
+      }
+    },
     toggleReasoning(idx) {
       this.expandedMessage = (this.expandedMessage === idx ? null : idx);
     }
@@ -400,7 +456,7 @@ const AgentsViewComponent = {
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <h2 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 capitalize truncate">
-                  {{ activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center'))) }}
+                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center')))) }}
                 </h2>
                 <span v-if="selectedSession && selectedSession.is_active && activeTab === 'chat'" class="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-400 text-[10px] font-mono font-semibold flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -414,6 +470,11 @@ const AgentsViewComponent = {
                   class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors"
                   :class="activeTab === 'chat' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
                 >💬 Chat Stream</button>
+                <button
+                  @click="activeTab = 'workload'; loadWorkload(); loadLiveBenchmarks();"
+                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
+                  :class="activeTab === 'workload' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                >⚡ Workload & Autoscaler</button>
                 <button
                   @click="activeTab = 'anomalies'; loadAnomalies();"
                   class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
@@ -761,6 +822,125 @@ const AgentsViewComponent = {
                 :disabled="!federationImportJson.trim()"
                 class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-50"
               >Import Bundle</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab View 5: Workload, Autoscaler & Self-Healing -->
+        <div v-else-if="activeTab === 'workload'" class="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/30">
+          <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">⚡ Workload, Dynamic Autoscaler & Workflow Self-Healing</h3>
+              <p class="text-[11px] text-zinc-500">Autonomous concurrency optimization, queue saturation balancing, and zero-downtime auto-remediation</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                @click="loadWorkload(); loadLiveBenchmarks();"
+                class="px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold"
+              >🔄 Refresh</button>
+              <button
+                @click="runSelfHeal(true)"
+                :disabled="isHealing"
+                class="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold disabled:opacity-50 flex items-center gap-1"
+              >
+                <span>🛠️ Auto-Heal</span>
+              </button>
+            </div>
+          </div>
+
+          <div v-if="healSuccess" class="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-mono">
+            {{ healSuccess }}
+          </div>
+
+          <div v-if="autoscaleSuccess" class="p-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-800 dark:text-indigo-300 text-xs font-mono">
+            {{ autoscaleSuccess }}
+          </div>
+
+          <!-- Top Metric Cards -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] uppercase font-bold text-zinc-400">Queue Saturation</div>
+              <div class="text-xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
+                {{ workloadData ? (workloadData.workload_metrics?.saturation_percent || 0) : 0 }}%
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">
+                Risk: <span class="font-bold uppercase" :class="(workloadData && workloadData.workload_metrics?.sla_risk === 'high') ? 'text-rose-500' : 'text-emerald-500'">{{ workloadData ? (workloadData.workload_metrics?.sla_risk || 'low') : 'low' }}</span>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] uppercase font-bold text-zinc-400">Pending Backlog</div>
+              <div class="text-xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
+                {{ workloadData ? (workloadData.workload_metrics?.pending_backlog_count || 0) : 0 }}
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">Est. ~{{ workloadData ? (workloadData.workload_metrics?.estimated_clearance_minutes || 0) : 0 }}m clearance</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] uppercase font-bold text-zinc-400">Active Leases & Slots</div>
+              <div class="text-xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">
+                {{ workloadData ? (workloadData.active_leases_count || 0) : 0 }} / {{ workloadData ? (workloadData.capacity?.total_reserved_slots || 0) : 0 }}
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">Reserved worker slots</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] uppercase font-bold text-zinc-400">Live Latency p50</div>
+              <div class="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                {{ benchmarksData ? (benchmarksData.benchmark_metrics?.latency_ms?.p50 || 0) : 0 }} ms
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">{{ benchmarksData ? (benchmarksData.benchmark_metrics?.concurrency_status || 'optimal') : 'optimal' }}</div>
+            </div>
+          </div>
+
+          <!-- Persona Queues & Autoscaler Recommendation -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Persona Queues Breakdown -->
+            <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Persona Queue Saturation</h4>
+              <div v-if="workloadData && workloadData.persona_queue_depth" class="space-y-2">
+                <div v-for="(cnt, pName) in workloadData.persona_queue_depth" :key="pName" class="flex items-center justify-between p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/60 text-xs">
+                  <span class="font-medium text-zinc-800 dark:text-zinc-200 capitalize font-mono">{{ pName }}</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-zinc-500 text-[11px]">{{ cnt }} pending</span>
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                      :class="cnt > 3 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300'">
+                      {{ cnt > 3 ? 'High Load' : 'Normal' }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Autoscaler Scaling Plan Card -->
+            <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+              <div class="flex items-center justify-between">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Dynamic Scaling Optimizer</h4>
+                <span v-if="autoscalePlan" class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                  :class="autoscalePlan.autoscale_decision === 'scale_up' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'">
+                  {{ autoscalePlan.autoscale_decision }}
+                </span>
+              </div>
+              <p class="text-[11px] text-zinc-500">Autonomous evaluation of worker concurrency targets based on backlog pressure.</p>
+
+              <div class="flex items-center gap-2 pt-1">
+                <button
+                  @click="runAutoscale(false)"
+                  :disabled="isAutoscaling"
+                  class="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold disabled:opacity-50"
+                >Calculate Plan</button>
+                <button
+                  @click="runAutoscale(true)"
+                  :disabled="isAutoscaling"
+                  class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-50"
+                >🚀 Apply Scaling</button>
+              </div>
+
+              <div v-if="autoscalePlan" class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono space-y-1">
+                <div class="text-zinc-700 dark:text-zinc-300 font-bold">Target Workers: {{ autoscalePlan.total_recommended_workers }}</div>
+                <div class="text-[11px] text-zinc-500">Strategy: {{ autoscalePlan.scaling_plan?.strategy }}</div>
+                <div class="text-[10px] text-zinc-400 mt-1">Allocations: {{ JSON.stringify(autoscalePlan.persona_allocations) }}</div>
+              </div>
             </div>
           </div>
         </div>

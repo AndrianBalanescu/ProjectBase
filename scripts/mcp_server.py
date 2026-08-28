@@ -738,5 +738,126 @@ def get_validation_checkpoints(issue: str) -> Dict[str, Any]:
     iss = _find_issue(issue)
     return _request(f"/api/projectbase/checkpoints?issue_id={iss['id']}")
 
+@mcp.tool()
+def link_git_commit(
+    issue: str,
+    commit_sha: str,
+    message: str = "",
+    branch: str = "",
+    author: str = "Agent"
+) -> Dict[str, Any]:
+    """Link a git commit SHA to an issue with optional commit message and branch."""
+    iss = _find_issue(issue)
+    return _request("/api/projectbase/git/artifacts", method="POST", data={
+        "issue_id": iss["id"],
+        "artifact_type": "commit",
+        "identifier": commit_sha,
+        "title": message,
+        "branch": branch,
+        "author": author
+    })
+
+@mcp.tool()
+def link_git_pr(
+    issue: str,
+    pr_url: str,
+    pr_number: str = "",
+    title: str = "",
+    status: str = "open"
+) -> Dict[str, Any]:
+    """Link a pull request URL to an issue and synchronize issue review status."""
+    iss = _find_issue(issue)
+    return _request("/api/projectbase/git/artifacts", method="POST", data={
+        "issue_id": iss["id"],
+        "artifact_type": "pull_request",
+        "identifier": pr_number or pr_url,
+        "url": pr_url,
+        "title": title,
+        "status": status
+    })
+
+@mcp.tool()
+def get_project_git_status(project: Optional[str] = None) -> Dict[str, Any]:
+    """Get aggregated git workspace metrics: active branches, open/merged PRs, staged patches, CI pass rate."""
+    proj_id = _find_project_id(project) if project else None
+    params = f"?project_id={proj_id}" if proj_id else ""
+    return _request(f"/api/projectbase/git/status{params}")
+
+@mcp.tool()
+def get_agent_workload_status(project: Optional[str] = None) -> Dict[str, Any]:
+    """Get real-time agent queue saturation, persona backlogs, active leases, and capacity metrics."""
+    proj_id = _find_project_id(project) if project else None
+    params = f"?project_id={proj_id}" if proj_id else ""
+    return _request(f"/api/projectbase/agents/workload{params}")
+
+@mcp.tool()
+def calculate_autoscale_recommendations(
+    project: Optional[str] = None,
+    min_workers: int = 1,
+    max_workers: int = 10,
+    target_saturation_pct: int = 70,
+    apply: bool = False
+) -> Dict[str, Any]:
+    """Calculate optimal autonomous agent worker pool allocations per persona based on backlog pressure."""
+    proj_id = _find_project_id(project) if project else None
+    return _request("/api/projectbase/agents/autoscale", method="POST", data={
+        "project_id": proj_id,
+        "min_workers": min_workers,
+        "max_workers": max_workers,
+        "target_saturation_pct": target_saturation_pct,
+        "apply": apply
+    })
+
+@mcp.tool()
+def reserve_agent_capacity(
+    persona: str,
+    worker_id: str,
+    slots: int = 1,
+    ttl_seconds: int = 1800,
+    project: Optional[str] = None
+) -> Dict[str, Any]:
+    """Reserve worker slot concurrency capacity with TTL expiration."""
+    proj_id = _find_project_id(project) if project else None
+    return _request("/api/projectbase/agents/capacity/reserve", method="POST", data={
+        "persona": persona,
+        "worker_id": worker_id,
+        "slots": slots,
+        "ttl_seconds": ttl_seconds,
+        "project_id": proj_id
+    })
+
+@mcp.tool()
+def release_agent_capacity(
+    reservation_id: str = "",
+    worker_id: str = "",
+    persona: str = ""
+) -> Dict[str, Any]:
+    """Release an active agent worker capacity reservation."""
+    return _request("/api/projectbase/agents/capacity/release", method="POST", data={
+        "reservation_id": reservation_id,
+        "worker_id": worker_id,
+        "persona": persona
+    })
+
+@mcp.tool()
+def run_workflow_self_heal(
+    project: Optional[str] = None,
+    auto_fix: bool = True
+) -> Dict[str, Any]:
+    """Autonomous self-healing scan to detect and auto-repair expired leases and stalled DAG subtasks."""
+    proj_id = _find_project_id(project) if project else None
+    return _request("/api/projectbase/workflow/self-heal", method="POST", data={
+        "project_id": proj_id,
+        "auto_fix": auto_fix,
+        "trigger": "fastmcp"
+    })
+
+@mcp.tool()
+def get_live_benchmarks(iterations: int = 10) -> Dict[str, Any]:
+    """Execute live database query latency probes and concurrency health metrics."""
+    return _request("/api/projectbase/benchmarks/run", method="POST", data={
+        "iterations": iterations
+    })
+
 if __name__ == "__main__":
     mcp.run()

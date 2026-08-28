@@ -11,6 +11,16 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **Autonomous Agent Autoscaling, Dynamic Workload Orchestration & Self-Healing Engine (Epic 14)**:
+  - Real-Time Workload Analytics (`GET /api/projectbase/agents/workload`): Evaluates queue saturation %, per-persona queue depth (backend, frontend, qa, review, architect, docs, general), active task leases, reserved worker slots, and SLA clearance forecasts.
+  - Dynamic Persona Autoscaler (`POST /api/projectbase/agents/autoscale`): Calculates optimal worker allocations across persona pools and recommends horizontal scaling strategies (`scale_up`, `scale_down`, `maintain`) based on real-time backlog pressure.
+  - Worker Slot Capacity Reservation Engine (`POST /api/projectbase/agents/capacity/reserve`, `POST /api/projectbase/agents/capacity/release`): Reserves concurrency capacity slots for autonomous agent workers with configurable TTL auto-expiration.
+  - Autonomous Workflow Self-Healing Engine (`POST /api/projectbase/workflow/self-heal`): Detects and automatically reconciles expired task locks, stalled DAG parent/child issues, inconsistent statuses, and expired reservations with structured repair audits in `workflow_heals`.
+  - Continuous Live Database Benchmarking (`GET /api/projectbase/benchmarks/live`, `POST /api/projectbase/benchmarks/run`): Sub-millisecond latency probes, p50/p95 distributions, SQLite WAL status, and throughput rating.
+  - FastMCP JSON-RPC 2.0 & Python Client Expansion: Added `get_agent_workload_status`, `calculate_autoscale_recommendations`, `reserve_agent_capacity`, `release_agent_capacity`, `run_workflow_self_heal`, and `get_live_benchmarks`.
+  - Frontend AgentsView **⚡ Workload & Autoscaler** Dashboard: Interactive capacity meters, persona queue breakdowns, dynamic autoscaler optimizer, one-click Auto-Heal execution, and live database latency graphs.
+  - Comprehensive Test Suite: 16 new automated tests in `tests/test_autoscale_orchestration.py`, bringing the total test suite to 299 tests across 18 files.
+
 - **Autonomous Agent Code Sandbox, Git Artifact Workspace Engine & Webhook Auto-Triage (Epic 13)**:
   - Git Artifacts Engine (`/api/projectbase/git/artifacts`, `/api/projectbase/git/status`): Track linked code branches, commit SHAs, pull request states, CI workflow runs, and unified diff patches associated with issues.
   - Autonomous Kanban Stage Transitions: Linking an active branch moves issues to `in_progress`; opening a PR shifts status to `in_review`; merging a PR automatically advances status to `done` and synchronizes metadata.

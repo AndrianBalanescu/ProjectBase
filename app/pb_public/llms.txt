@@ -76,4 +76,11 @@ Add to ~/.cursor/mcp.json or ~/.flomaster/config.json:
    - Get patch:      GET  /api/projectbase/git/patch/<ID>
    - Git Webhook:    POST /api/projectbase/webhooks/git (GitHub/GitLab push, PR, workflow_run)
    - Git Status:     GET  /api/projectbase/git/status?project_id=<ID>
-13. Full Agent Guide: GET /llms-full.txt
+13. Workload Orchestration, Autoscaling & Workflow Self-Healing (Epic 14):
+   - Workload Metrics: GET  /api/projectbase/agents/workload?project_id=<ID> (queue saturation, persona queues, active leases)
+   - Dynamic Autoscale: POST /api/projectbase/agents/autoscale {"project_id":"<ID>","min_workers":1,"max_workers":10,"apply":true}
+   - Reserve Capacity: POST /api/projectbase/agents/capacity/reserve {"persona":"backend","worker_id":"w-1","slots":2,"ttl_seconds":1800}
+   - Release Capacity: POST /api/projectbase/agents/capacity/release {"reservation_id":"RES-ABC"}
+   - Self-Heal Scan:   POST /api/projectbase/workflow/self-heal {"project_id":"<ID>","auto_fix":true}
+   - Live Benchmarks:  GET  /api/projectbase/benchmarks/live (p50/p95 latency probe, QPS rating)
+14. Full Agent Guide: GET /llms-full.txt

@@ -492,5 +492,69 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to fetch git status');
     return data;
+  },
+
+  async getAgentWorkload(projectId = '') {
+    const params = new URLSearchParams();
+    if (projectId) params.set('project_id', projectId);
+    const res = await fetch(`/api/projectbase/agents/workload?${params.toString()}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch agent workload');
+    return data;
+  },
+
+  async calculateAutoscale(payload = {}) {
+    const res = await fetch('/api/projectbase/agents/autoscale', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to calculate autoscale');
+    return data;
+  },
+
+  async reserveAgentCapacity(payload) {
+    const res = await fetch('/api/projectbase/agents/capacity/reserve', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to reserve agent capacity');
+    return data;
+  },
+
+  async releaseAgentCapacity(payload) {
+    const res = await fetch('/api/projectbase/agents/capacity/release', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to release agent capacity');
+    return data;
+  },
+
+  async runWorkflowSelfHeal(payload = {}) {
+    const res = await fetch('/api/projectbase/workflow/self-heal', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to execute self heal');
+    return data;
+  },
+
+  async getLiveBenchmarks(iterations = 10) {
+    const res = await fetch('/api/projectbase/benchmarks/live', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch benchmarks');
+    return data;
   }
 };

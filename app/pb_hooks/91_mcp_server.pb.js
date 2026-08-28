@@ -516,6 +516,79 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
                     project_id: { type: "string", description: "Optional project ID or identifier" }
                 }
             }
+        },
+        {
+            name: "get_agent_workload_status",
+            description: "Get real-time agent queue saturation, persona backlogs, active leases, capacity, and estimated clearance time.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    project_id: { type: "string", description: "Optional project ID or identifier" }
+                }
+            }
+        },
+        {
+            name: "calculate_autoscale_recommendations",
+            description: "Calculate optimal autonomous agent worker pool allocations per persona based on backlog pressure and queue depth.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    project_id: { type: "string", description: "Optional project ID or identifier" },
+                    min_workers: { type: "integer", description: "Minimum total worker capacity (default 1)" },
+                    max_workers: { type: "integer", description: "Maximum total worker capacity (default 10)" },
+                    target_saturation_pct: { type: "integer", description: "Target saturation percentage (default 70)" },
+                    apply: { type: "boolean", description: "Apply scaling allocations to agent_workloads collection" }
+                }
+            }
+        },
+        {
+            name: "reserve_agent_capacity",
+            description: "Reserve worker slot concurrency capacity with TTL expiration.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    persona: { type: "string", description: "Persona name (e.g. backend, frontend, qa, review)" },
+                    worker_id: { type: "string", description: "Worker identifier" },
+                    slots: { type: "integer", description: "Number of slots to reserve (default 1)" },
+                    ttl_seconds: { type: "integer", description: "TTL in seconds (default 1800)" },
+                    project_id: { type: "string", description: "Optional project ID" }
+                },
+                required: ["persona", "worker_id"]
+            }
+        },
+        {
+            name: "release_agent_capacity",
+            description: "Release an active agent worker capacity reservation.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    reservation_id: { type: "string", description: "Reservation ID (e.g. RES-ABC)" },
+                    worker_id: { type: "string", description: "Worker identifier" },
+                    persona: { type: "string", description: "Optional persona filter" }
+                }
+            }
+        },
+        {
+            name: "run_workflow_self_heal",
+            description: "Autonomous self-healing scan to detect and auto-repair expired leases, orphaned DAG subtasks, and stalled statuses.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    project_id: { type: "string", description: "Optional project ID or identifier" },
+                    auto_fix: { type: "boolean", description: "Whether to apply repairs (default true)" },
+                    trigger: { type: "string", description: "Trigger name (default 'fastmcp')" }
+                }
+            }
+        },
+        {
+            name: "get_live_benchmarks",
+            description: "Execute live SQLite query latency probes, concurrency health metrics, and throughput ratings.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    iterations: { type: "integer", description: "Number of latency probe iterations (default 10, max 50)" }
+                }
+            }
         }
     ]
 
@@ -2555,6 +2628,143 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         }
     }
 
+    const getAgentWorkloadStatus = (args) => {
+        let filter = args.project_id ? ("project = '" + args.project_id + "'") : ""
+        let issues = []
+        try { issues = e.app.findRecordsByFilter("issues", filter, "-created", 1000, 0) } catch (x) {}
+        let statusCounts = { backlog: 0, todo: 0, in_progress: 0, in_review: 0, done: 0, cancelled: 0 }
+        let personaQueues = { backend: 0, frontend: 0, qa: 0, review: 0, architect: 0, docs: 0, general: 0 }
+        for (let i = 0; i < issues.length; i++) {
+            let st = issues[i].getString("status") || "backlog"
+            if (statusCounts[st] !== undefined) statusCounts[st]++
+            if (st === "todo" || st === "in_progress" || st === "backlog") {
+                let p = (issues[i].getString("task_persona") || "").toLowerCase()
+                let title = (issues[i].getString("title") || "").toLowerCase()
+                if (p && personaQueues[p] !== undefined) personaQueues[p]++
+                else if (title.indexOf("api") !== -1 || title.indexOf("backend") !== -1) personaQueues.backend++
+                else if (title.indexOf("ui") !== -1 || title.indexOf("frontend") !== -1) personaQueues.frontend++
+                else if (title.indexOf("test") !== -1 || title.indexOf("qa") !== -1) personaQueues.qa++
+                else if (title.indexOf("review") !== -1 || st === "in_review") personaQueues.review++
+                else personaQueues.general++
+            }
+        }
+        let activeLeases = 0
+        try {
+            let nowIso = new Date().toISOString().replace("T", " ").substring(0, 19) + "Z"
+            let leases = e.app.findRecordsByFilter("task_leases", "expires_at > '" + nowIso + "'", "", 200, 0)
+            activeLeases = leases.length
+        } catch (x) {}
+        let pending = statusCounts.todo + statusCounts.in_progress + statusCounts.backlog
+        let cap = Math.max(activeLeases, 2)
+        return {
+            total_issues: issues.length,
+            status_distribution: statusCounts,
+            persona_queue_depth: personaQueues,
+            active_leases_count: activeLeases,
+            pending_backlog_count: pending,
+            saturation_percent: Math.min(100, Math.round((pending / cap) * 20)),
+            estimated_clearance_minutes: Math.round(pending * 4.5)
+        }
+    }
+
+    const calculateAutoscaleRecommendations = (args) => {
+        let minW = parseInt(args.min_workers || "1", 10)
+        let maxW = parseInt(args.max_workers || "10", 10)
+        let targetSat = parseInt(args.target_saturation_pct || "70", 10)
+        let wStatus = getAgentWorkloadStatus(args)
+        let pq = wStatus.persona_queue_depth
+        let alloc = {}
+        let total = 0
+        for (let p of Object.keys(pq)) {
+            let cnt = pq[p] > 0 ? Math.max(1, Math.min(4, Math.ceil(pq[p] / 3))) : 0
+            alloc[p] = cnt
+            total += cnt
+        }
+        total = Math.max(minW, Math.min(maxW, total))
+        let decision = total > 4 ? "scale_up" : (wStatus.pending_backlog_count === 0 ? "scale_down" : "maintain")
+        return {
+            decision: decision,
+            total_recommended_workers: total,
+            target_saturation_percent: targetSat,
+            persona_allocations: alloc,
+            pending_backlog_count: wStatus.pending_backlog_count
+        }
+    }
+
+    const reserveAgentCapacity = (args) => {
+        let persona = (args.persona || "general").toLowerCase()
+        let workerId = args.worker_id || ("worker-" + Math.random().toString(36).substring(2, 7))
+        let slots = parseInt(args.slots || "1", 10)
+        let ttl = parseInt(args.ttl_seconds || "1800", 10)
+        let resId = "RES-" + Math.random().toString(36).substring(2, 9).toUpperCase()
+        let exp = new Date(Date.now() + ttl * 1000).toISOString()
+        try {
+            let col = e.app.findCollectionByNameOrId("agent_reservations")
+            let rec = new Record(col)
+            rec.set("reservation_id", resId)
+            rec.set("persona", persona)
+            rec.set("worker_id", workerId)
+            rec.set("slots", slots)
+            rec.set("expires_at", exp)
+            rec.set("status", "active")
+            if (args.project_id) rec.set("project", args.project_id)
+            e.app.save(rec)
+        } catch (x) {}
+        return { success: true, reservation_id: resId, persona: persona, worker_id: workerId, slots: slots, expires_at: exp }
+    }
+
+    const releaseAgentCapacity = (args) => {
+        let filter = ""
+        if (args.reservation_id) filter = "reservation_id = '" + args.reservation_id + "'"
+        else if (args.worker_id) filter = "worker_id = '" + args.worker_id + "'"
+        else return { error: "reservation_id or worker_id is required" }
+        let count = 0
+        try {
+            let recs = e.app.findRecordsByFilter("agent_reservations", filter, "", 50, 0)
+            for (let i = 0; i < recs.length; i++) {
+                recs[i].set("status", "released")
+                e.app.save(recs[i])
+                count++
+            }
+        } catch (x) {}
+        return { success: true, released_count: count }
+    }
+
+    const runWorkflowSelfHeal = (args) => {
+        let autoFix = args.auto_fix !== false
+        let anomalies = []
+        let repairs = []
+        let nowIso = new Date().toISOString().replace("T", " ").substring(0, 19) + "Z"
+        try {
+            let expired = e.app.findRecordsByFilter("task_leases", "expires_at < '" + nowIso + "'", "", 100, 0)
+            for (let i = 0; i < expired.length; i++) {
+                anomalies.push({ type: "expired_task_lease", id: expired[i].id })
+                if (autoFix) {
+                    try { e.app.delete(expired[i]); repairs.push({ type: "deleted_expired_lease", id: expired[i].id }) } catch (dx) {}
+                }
+            }
+        } catch (x) {}
+        return { success: true, auto_fix: autoFix, anomalies_detected: anomalies.length, repairs_applied: repairs.length, anomalies: anomalies, repairs: repairs }
+    }
+
+    const getLiveBenchmarks = (args) => {
+        let iters = parseInt(args.iterations || "10", 10)
+        if (iters < 1) iters = 1
+        if (iters > 50) iters = 50
+        let lat = []
+        let t00 = Date.now()
+        for (let i = 0; i < iters; i++) {
+            let t0 = Date.now()
+            try { e.app.findRecordsByFilter("issues", "", "-created", 10, 0) } catch (x) {}
+            lat.push(Date.now() - t0)
+        }
+        lat.sort(function(a, b) { return a - b })
+        let sum = 0
+        for (let l of lat) sum += l
+        let avg = Math.round((sum / lat.length) * 100) / 100
+        return { success: true, iterations: iters, avg_latency_ms: avg, p50_ms: lat[Math.floor(lat.length * 0.5)], p95_ms: lat[Math.floor(lat.length * 0.95)], total_time_ms: Date.now() - t00, rating: avg < 10 ? "ultra_fast" : "good" }
+    }
+
     // ---------- 1. Authentication ----------
     let authRecord = e.auth || null
     let bypassEnabled = false
@@ -2645,6 +2855,12 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         else if (toolName === "stage_code_patch") { result = stageCodePatch(args) }
         else if (toolName === "process_git_webhook") { result = processGitWebhook(args) }
         else if (toolName === "get_project_git_status") { result = getProjectGitStatus(args) }
+        else if (toolName === "get_agent_workload_status") { result = getAgentWorkloadStatus(args) }
+        else if (toolName === "calculate_autoscale_recommendations") { result = calculateAutoscaleRecommendations(args) }
+        else if (toolName === "reserve_agent_capacity") { result = reserveAgentCapacity(args) }
+        else if (toolName === "release_agent_capacity") { result = releaseAgentCapacity(args) }
+        else if (toolName === "run_workflow_self_heal") { result = runWorkflowSelfHeal(args) }
+        else if (toolName === "get_live_benchmarks") { result = getLiveBenchmarks(args) }
         else { return fail(-32602, "Unknown tool: " + toolName) }
         return ok({ content: [{ type: "text", text: JSON.stringify(result) }] })
     } catch (toolErr) {

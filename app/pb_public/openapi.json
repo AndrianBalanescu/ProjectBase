@@ -2689,6 +2689,162 @@
           "401": { "description": "Authentication required" }
         }
       }
+    },
+    "/projectbase/agents/workload": {
+      "get": {
+        "tags": ["Agent Orchestration"],
+        "summary": "Agent Workload & Queue Saturation",
+        "description": "Get real-time agent queue saturation, persona queue depth, active task leases, capacity, and estimated clearance time.",
+        "parameters": [
+          { "name": "project_id", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Optional project filter" }
+        ],
+        "responses": {
+          "200": { "description": "Workload saturation metrics and persona queue depths" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/agents/autoscale": {
+      "post": {
+        "tags": ["Agent Orchestration"],
+        "summary": "Dynamic Agent Autoscaler Plan",
+        "description": "Calculate optimal autonomous agent worker pool allocations per persona based on backlog pressure and queue depth.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "project_id": { "type": "string" },
+                  "min_workers": { "type": "integer" },
+                  "max_workers": { "type": "integer" },
+                  "target_saturation_pct": { "type": "integer" },
+                  "apply": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Autoscaling plan and persona allocations" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/agents/capacity/reserve": {
+      "post": {
+        "tags": ["Agent Orchestration"],
+        "summary": "Reserve Agent Concurrency Capacity",
+        "description": "Reserve worker slot concurrency capacity with TTL expiration.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["persona", "worker_id"],
+                "properties": {
+                  "persona": { "type": "string" },
+                  "worker_id": { "type": "string" },
+                  "slots": { "type": "integer" },
+                  "ttl_seconds": { "type": "integer" },
+                  "project_id": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Capacity reservation created" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/agents/capacity/release": {
+      "post": {
+        "tags": ["Agent Orchestration"],
+        "summary": "Release Agent Concurrency Capacity",
+        "description": "Release an active agent worker capacity reservation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reservation_id": { "type": "string" },
+                  "worker_id": { "type": "string" },
+                  "persona": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Capacity reservation released" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/workflow/self-heal": {
+      "post": {
+        "tags": ["Agent Orchestration"],
+        "summary": "Autonomous Workflow Self-Healing",
+        "description": "Autonomous self-healing scan to detect and auto-repair expired leases, orphaned DAG subtasks, and stalled statuses.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "project_id": { "type": "string" },
+                  "auto_fix": { "type": "boolean" },
+                  "trigger": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Self-healing scan results and applied repairs" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/benchmarks/live": {
+      "get": {
+        "tags": ["Telemetry & Diagnostics"],
+        "summary": "Live Database Benchmarks Telemetry",
+        "description": "Real-time query latency distribution (p50/p95), SQLite WAL status, and QPS estimation.",
+        "responses": {
+          "200": { "description": "Live benchmark telemetry report" }
+        }
+      }
+    },
+    "/projectbase/benchmarks/run": {
+      "post": {
+        "tags": ["Telemetry & Diagnostics"],
+        "summary": "Execute Latency Benchmark Probes",
+        "description": "Executes consecutive query latency probes and computes statistical distribution.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "iterations": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Benchmark execution results" }
+        }
+      }
     }
   }
 }
