@@ -123,7 +123,17 @@
 ---
 
 ## Next Milestone (Cycle 17)
-**Epic 16 – Webhook Automation Engine & Outbound Webhook Security Gateway**
-- Cryptographic HMAC-SHA256 signature verification and replay prevention for external agent webhooks
-- Declarative event filtering rules and dynamic payload transforms for Slack, Discord, and Telegram integrations
-- Real-time dead-letter queue (DLQ) retry backoff with exponential jitter and failure alert dispatch
+**Epic 16 – Webhook Automation Engine & Outbound Webhook Security Gateway (✅ Done)**
+- [x] Cryptographic HMAC-SHA256 signature verification and replay prevention for external agent webhooks (`POST /api/projectbase/webhooks/verify`)
+- [x] Declarative event filtering rules and dynamic payload transforms for Slack, Discord, Telegram, Agent, and custom integrations (`POST /api/projectbase/webhooks/dispatch`, `GET /api/projectbase/webhooks/transforms/preview`)
+- [x] Real-time dead-letter queue (DLQ) retry backoff with exponential jitter and failure diagnostics (`GET /api/projectbase/webhooks/dlq`, `POST /api/projectbase/webhooks/dlq/retry`)
+- [x] Endpoint fleet management, delivery audit history, 7 FastMCP tools, AgentsView Webhook Gateway & DLQ dashboard
+- [x] 321/321 automated tests passing across 20 test suites with 100% frontend guard verification
+
+---
+
+## Next Milestone (Cycle 18)
+**Epic 17 – OpenAPI Agent SDK Generation, Interactive Documentation & Webhook Observability**
+- Generate typed SDK examples from the OpenAPI source for Python, JavaScript, and curl
+- Add webhook delivery health analytics, p95 latency charts, and failure-rate alert thresholds
+- Publish interactive agent-facing API documentation and end-to-end integration recipes
