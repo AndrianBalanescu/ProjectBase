@@ -26,7 +26,8 @@ from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 
 PROJECTBASE_URL = os.environ.get("PROJECTBASE_URL", "http://127.0.0.1:8120")
-AI_BASE_URL = os.environ.get("AI_API_BASE", "http://127.0.0.1:20128/v1/chat/completions")
+_base = os.environ.get("AI_API_BASE") or os.environ.get("OMNIROUTE_URL", "http://127.0.0.1:20128")
+AI_BASE_URL = _base if _base.endswith("/v1/chat/completions") else f"{_base.rstrip('/')}/v1/chat/completions"
 # Protocol bootstrap credentials (same as the API test suite + MCP server). The
 # daemon authenticates as the superuser so it can write status/audit back to the
 # Kanban bidirectionally. Override in the service unit or env for deployments
@@ -57,7 +58,7 @@ def _resolve_ai_key() -> str:
 
 
 AI_API_KEY = _resolve_ai_key()
-AI_MODEL = os.environ.get("AI_MODEL", "rc/claude-sonnet-4-5")
+AI_MODEL = os.environ.get("AI_MODEL") or os.environ.get("AGENT_MODEL") or "premium"
 REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(REPO_DIR, "app", "pb_data", "data.db")
 if not os.path.exists(DB_PATH):

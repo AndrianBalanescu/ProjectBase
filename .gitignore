@@ -8,6 +8,7 @@ __pycache__/
 .flow/
 prism-out/
 .pytest_cache/
+.memrize/
 **/research/jobs/
 backups/
 pocketbase-types.ts
