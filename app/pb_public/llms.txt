@@ -69,4 +69,11 @@ Add to ~/.cursor/mcp.json or ~/.flomaster/config.json:
    - List:   GET  /api/collections/notifications/records?sort=-created
    - Read:   PATCH /api/collections/notifications/records/<ID> {"read":true}
    - Read all: POST /api/projectbase/notifications/read-all
-12. Full Agent Guide: GET /llms-full.txt
+12. Git Workspace, Code Patches & Webhook Auto-Triage (Epic 13):
+   - List artifacts: GET  /api/projectbase/git/artifacts?issue_id=<ID>&type=branch|commit|pull_request|patch|ci_run
+   - Link artifact:  POST /api/projectbase/git/artifacts {"issue_id":"<ID>","artifact_type":"branch"|"pull_request"|"commit","identifier":"...","url":"...","status":"open"|"merged"}
+   - Stage patch:    POST /api/projectbase/git/patch {"issue_id":"<ID>","patch_content":"diff --git...","title":"..."}
+   - Get patch:      GET  /api/projectbase/git/patch/<ID>
+   - Git Webhook:    POST /api/projectbase/webhooks/git (GitHub/GitLab push, PR, workflow_run)
+   - Git Status:     GET  /api/projectbase/git/status?project_id=<ID>
+13. Full Agent Guide: GET /llms-full.txt

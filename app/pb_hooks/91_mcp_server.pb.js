@@ -434,6 +434,88 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
                     auto_heal: { type: "boolean", description: "Automatically revoke dead leases and repair starved issues (default: false)" }
                 }
             }
+        },
+        {
+            name: "link_git_commit",
+            description: "Link a git commit SHA, message, author, and diff stats to an issue.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    issue_id: { type: "string", description: "Issue ID or identifier (e.g. PB-12)" },
+                    commit_sha: { type: "string", description: "Commit SHA" },
+                    message: { type: "string", description: "Commit message" },
+                    author: { type: "string", description: "Author name or email" },
+                    url: { type: "string", description: "Optional web URL to commit" },
+                    files_changed: { type: "integer", description: "Number of files changed" },
+                    additions: { type: "integer", description: "Lines added" },
+                    deletions: { type: "integer", description: "Lines deleted" }
+                },
+                required: ["issue_id", "commit_sha"]
+            }
+        },
+        {
+            name: "link_git_pr",
+            description: "Link a Pull Request to an issue and update issue PR status and stage.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    issue_id: { type: "string", description: "Issue ID or identifier (e.g. PB-12)" },
+                    pr_number: { type: "string", description: "PR number e.g. #42 or 42" },
+                    pr_url: { type: "string", description: "Pull request URL" },
+                    title: { type: "string", description: "PR title" },
+                    status: { type: "string", description: "open|merged|closed (default: open)" },
+                    branch: { type: "string", description: "PR source branch" },
+                    author: { type: "string", description: "PR author" }
+                },
+                required: ["issue_id", "pr_url"]
+            }
+        },
+        {
+            name: "get_issue_git_artifacts",
+            description: "Get all linked branches, commits, pull requests, CI runs, and staged patches for an issue.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    issue_id: { type: "string", description: "Issue ID or identifier (e.g. PB-12)" }
+                },
+                required: ["issue_id"]
+            }
+        },
+        {
+            name: "stage_code_patch",
+            description: "Stage a unified diff or patch directly on an issue for review and autonomous verification.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    issue_id: { type: "string", description: "Issue ID or identifier (e.g. PB-12)" },
+                    patch_content: { type: "string", description: "Raw unified diff / patch string" },
+                    title: { type: "string", description: "Patch summary or title" },
+                    author: { type: "string", description: "Author / agent persona name" }
+                },
+                required: ["issue_id", "patch_content"]
+            }
+        },
+        {
+            name: "process_git_webhook",
+            description: "Process a GitHub/GitLab webhook payload for automated issue triage, status advance, and commit linking.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    event_type: { type: "string", description: "push|pull_request|workflow_run" },
+                    payload: { type: "object", description: "Webhook event payload JSON" }
+                },
+                required: ["event_type", "payload"]
+            }
+        },
+        {
+            name: "get_project_git_status",
+            description: "Get aggregated git workspace metrics: active branches, open/merged PRs, staged patches, and CI pass rate.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    project_id: { type: "string", description: "Optional project ID or identifier" }
+                }
+            }
         }
     ]
 
@@ -2199,6 +2281,280 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         }
     }
 
+    const linkGitCommit = (args) => {
+        let issue = resolveIssueRecord(args.issue_id)
+        let commitSha = (args.commit_sha || "").trim()
+        if (!commitSha) throw new Error("commit_sha is required")
+        let col = e.app.findCollectionByNameOrId("git_artifacts")
+        let rec = new Record(col)
+        rec.set("project", issue.getString("project"))
+        rec.set("issue", issue.id)
+        rec.set("artifact_type", "commit")
+        rec.set("identifier", commitSha.length > 8 ? commitSha.substring(0, 8) : commitSha)
+        rec.set("title", (args.message || "").trim())
+        rec.set("author", (args.author || "agent").trim())
+        rec.set("url", (args.url || "").trim())
+        rec.set("status", "committed")
+        rec.set("diff_stats", {
+            files_changed: Number(args.files_changed) || 1,
+            additions: Number(args.additions) || 0,
+            deletions: Number(args.deletions) || 0
+        })
+        e.app.save(rec)
+        return {
+            success: true,
+            artifact_id: rec.id,
+            issue_id: issue.id,
+            commit_sha: commitSha
+        }
+    }
+
+    const linkGitPr = (args) => {
+        let issue = resolveIssueRecord(args.issue_id)
+        let prUrl = (args.pr_url || "").trim()
+        if (!prUrl) throw new Error("pr_url is required")
+        let status = (args.status || "open").toLowerCase().trim()
+        let prNum = (args.pr_number || "").trim()
+        if (!prNum && prUrl) {
+            let segs = prUrl.split("/")
+            prNum = "#" + segs[segs.length - 1]
+        }
+        let col = e.app.findCollectionByNameOrId("git_artifacts")
+        let rec = new Record(col)
+        rec.set("project", issue.getString("project"))
+        rec.set("issue", issue.id)
+        rec.set("artifact_type", "pull_request")
+        rec.set("identifier", prNum || "#PR")
+        rec.set("title", (args.title || "").trim())
+        rec.set("url", prUrl)
+        rec.set("status", status)
+        rec.set("author", (args.author || "agent").trim())
+        e.app.save(rec)
+
+        issue.set("pr_url", prUrl)
+        issue.set("pr_status", status)
+        if (args.branch) issue.set("git_branch", (args.branch || "").trim())
+        if (status === "merged") {
+            issue.set("status", "done")
+        } else if (status === "open" && issue.getString("status") !== "done") {
+            issue.set("status", "in_review")
+        }
+        e.app.save(issue)
+
+        return {
+            success: true,
+            artifact_id: rec.id,
+            issue_id: issue.id,
+            pr_status: status,
+            issue_status: issue.getString("status")
+        }
+    }
+
+    const getIssueGitArtifacts = (args) => {
+        let issue = resolveIssueRecord(args.issue_id)
+        let records = []
+        try {
+            records = e.app.findRecordsByFilter("git_artifacts", "issue = '" + issue.id + "'", "-created", 100, 0)
+        } catch (x) {}
+        let out = []
+        for (let i = 0; i < records.length; i++) {
+            let r = records[i]
+            out.push({
+                id: r.id,
+                artifact_type: r.getString("artifact_type"),
+                identifier: r.getString("identifier"),
+                title: r.getString("title"),
+                url: r.getString("url"),
+                status: r.getString("status"),
+                author: r.getString("author"),
+                diff_stats: r.get("diff_stats") || {},
+                created: r.getString("created")
+            })
+        }
+        return {
+            issue_id: issue.id,
+            git_branch: issue.getString("git_branch"),
+            pr_url: issue.getString("pr_url"),
+            pr_status: issue.getString("pr_status"),
+            artifacts: out,
+            total: out.length
+        }
+    }
+
+    const stageCodePatch = (args) => {
+        let issue = resolveIssueRecord(args.issue_id)
+        let patchContent = (args.patch_content || "").trim()
+        if (!patchContent) throw new Error("patch_content is required")
+        let col = e.app.findCollectionByNameOrId("git_artifacts")
+        let rec = new Record(col)
+        let patchId = "patch-" + String(Date.now()).slice(-8)
+        rec.set("project", issue.getString("project"))
+        rec.set("issue", issue.id)
+        rec.set("artifact_type", "patch")
+        rec.set("identifier", patchId)
+        rec.set("title", (args.title || "Autonomous agent staged patch").trim())
+        rec.set("author", (args.author || "agent").trim())
+        rec.set("status", "staged")
+        rec.set("patch_content", patchContent)
+        
+        let lines = patchContent.split("\n")
+        let adds = 0, dels = 0, files = 0
+        for (let l = 0; l < lines.length; l++) {
+            let line = lines[l]
+            if (line.indexOf("+++ b/") === 0) files++
+            else if (line.indexOf("+") === 0 && line.indexOf("+++") !== 0) adds++
+            else if (line.indexOf("-") === 0 && line.indexOf("---") !== 0) dels++
+        }
+        if (files === 0) files = 1
+        rec.set("diff_stats", { files_changed: files, additions: adds, deletions: dels })
+        e.app.save(rec)
+
+        return {
+            success: true,
+            patch_id: rec.id,
+            identifier: patchId,
+            diff_stats: { files_changed: files, additions: adds, deletions: dels },
+            issue_id: issue.id
+        }
+    }
+
+    const processGitWebhook = (args) => {
+        let eventType = (args.event_type || "push").toLowerCase().trim()
+        let payload = args.payload || {}
+        let triaged = []
+
+        const extractKeys = (txt) => {
+            if (!txt || typeof txt !== "string") return []
+            let tokens = []
+            let curr = ""
+            for (let i = 0; i < txt.length; i++) {
+                let ch = txt[i]
+                let isA = (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')
+                let isD = ch >= '0' && ch <= '9'
+                if (isA || isD || ch === '-') curr += ch
+                else { if (curr.length > 0) { tokens.push(curr); curr = "" } }
+            }
+            if (curr.length > 0) tokens.push(curr)
+            let out = []
+            for (let t of tokens) {
+                let parts = t.split('-')
+                for (let p = 0; p < parts.length - 1; p++) {
+                    let prefix = parts[p].toUpperCase()
+                    let suffix = parts[p + 1]
+                    let validPrefix = prefix.length >= 1 && prefix.length <= 10
+                    for (let c = 0; c < prefix.length; c++) {
+                        let code = prefix.charCodeAt(c)
+                        let isAlnum = (code >= 65 && code <= 90) || (code >= 48 && code <= 57) || code === 95
+                        if (!isAlnum) { validPrefix = false; break }
+                    }
+                    let validSuffix = suffix.length >= 1 && suffix.length <= 8
+                    for (let c = 0; c < suffix.length; c++) {
+                        let code = suffix.charCodeAt(c)
+                        if (code < 48 || code > 57) { validSuffix = false; break }
+                    }
+                    if (validPrefix && validSuffix) {
+                        let id = prefix + "-" + suffix
+                        if (out.indexOf(id) === -1) out.push(id)
+                    }
+                }
+            }
+            return out
+        }
+
+        if (eventType === "push") {
+            let commits = payload.commits || []
+            for (let c of commits) {
+                let keys = extractKeys(c.message || "")
+                for (let k of keys) {
+                    try {
+                        let isRec = resolveIssueRecord(k)
+                        let col = e.app.findCollectionByNameOrId("git_artifacts")
+                        let rec = new Record(col)
+                        rec.set("project", isRec.getString("project"))
+                        rec.set("issue", isRec.id)
+                        rec.set("artifact_type", "commit")
+                        rec.set("identifier", (c.id || c.sha || "sha").substring(0, 8))
+                        rec.set("title", c.message || "")
+                        rec.set("author", (c.author ? (c.author.name || c.author.username) : "git"))
+                        rec.set("status", "committed")
+                        e.app.save(rec)
+
+                        if (isRec.getString("status") === "backlog" || isRec.getString("status") === "todo") {
+                            isRec.set("status", "in_progress")
+                            e.app.save(isRec)
+                        }
+                        triaged.push({ key: k, type: "commit", status: isRec.getString("status") })
+                    } catch (x) {}
+                }
+            }
+        } else if (eventType === "pull_request") {
+            let pr = payload.pull_request || payload
+            let keys = extractKeys((pr.title || "") + " " + (pr.body || ""))
+            let merged = pr.merged === true || payload.action === "closed" && pr.merged
+            let state = merged ? "merged" : (pr.state || "open")
+            for (let k of keys) {
+                try {
+                    let isRec = resolveIssueRecord(k)
+                    let col = e.app.findCollectionByNameOrId("git_artifacts")
+                    let rec = new Record(col)
+                    rec.set("project", isRec.getString("project"))
+                    rec.set("issue", isRec.id)
+                    rec.set("artifact_type", "pull_request")
+                    rec.set("identifier", "#" + String(pr.number || "PR"))
+                    rec.set("title", pr.title || "")
+                    rec.set("url", pr.html_url || pr.url || "")
+                    rec.set("status", state)
+                    e.app.save(rec)
+
+                    isRec.set("pr_url", pr.html_url || pr.url || "")
+                    isRec.set("pr_status", state)
+                    if (state === "merged") isRec.set("status", "done")
+                    else if (state === "open" && isRec.getString("status") !== "done") isRec.set("status", "in_review")
+                    e.app.save(isRec)
+
+                    triaged.push({ key: k, type: "pull_request", state: state, status: isRec.getString("status") })
+                } catch (x) {}
+            }
+        }
+
+        return {
+            success: true,
+            event_type: eventType,
+            triaged_count: triaged.length,
+            triaged: triaged
+        }
+    }
+
+    const getProjectGitStatus = (args) => {
+        let filter = args.project_id ? ("project = '" + args.project_id + "'") : "1=1"
+        let recs = []
+        try { recs = e.app.findRecordsByFilter("git_artifacts", filter, "-created", 500, 0) } catch (x) {}
+        let branches = 0, commits = 0, prOpen = 0, prMerged = 0, patches = 0, ciRuns = 0, ciPassed = 0
+        for (let i = 0; i < recs.length; i++) {
+            let t = recs[i].getString("artifact_type")
+            let st = recs[i].getString("status")
+            if (t === "branch") branches++
+            else if (t === "commit") commits++
+            else if (t === "pull_request") {
+                if (st === "open") prOpen++
+                else if (st === "merged") prMerged++
+            } else if (t === "patch") patches++
+            else if (t === "ci_run") {
+                ciRuns++
+                if (st === "success" || st === "passed" || st === "completed") ciPassed++
+            }
+        }
+        let passRate = ciRuns > 0 ? Math.round((ciPassed / ciRuns) * 100) : 100
+        return {
+            total_artifacts: recs.length,
+            branches_tracked: branches,
+            commits_recorded: commits,
+            pull_requests: { open: prOpen, merged: prMerged, total: prOpen + prMerged },
+            staged_patches: patches,
+            ci_pass_rate_percent: passRate
+        }
+    }
+
     // ---------- 1. Authentication ----------
     let authRecord = e.auth || null
     let bypassEnabled = false
@@ -2283,6 +2639,12 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         else if (toolName === "import_federation_bundle") { result = importFederationBundle(args) }
         else if (toolName === "get_agent_analytics") { result = getAgentAnalytics(args) }
         else if (toolName === "detect_workflow_anomalies") { result = detectWorkflowAnomalies(args) }
+        else if (toolName === "link_git_commit") { result = linkGitCommit(args) }
+        else if (toolName === "link_git_pr") { result = linkGitPr(args) }
+        else if (toolName === "get_issue_git_artifacts") { result = getIssueGitArtifacts(args) }
+        else if (toolName === "stage_code_patch") { result = stageCodePatch(args) }
+        else if (toolName === "process_git_webhook") { result = processGitWebhook(args) }
+        else if (toolName === "get_project_git_status") { result = getProjectGitStatus(args) }
         else { return fail(-32602, "Unknown tool: " + toolName) }
         return ok({ content: [{ type: "text", text: JSON.stringify(result) }] })
     } catch (toolErr) {

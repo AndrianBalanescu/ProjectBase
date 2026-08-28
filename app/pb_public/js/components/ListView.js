@@ -257,6 +257,12 @@ const ListViewComponent = {
                       <i data-lucide="lock" class="w-2.5 h-2.5"></i>
                       Blocked
                     </span>
+                    <!-- Git Branch / PR badge -->
+                    <span v-if="issue.pr_url || issue.git_branch" class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/60 text-[10px] text-zinc-600 dark:text-zinc-400 font-mono shrink-0 flex items-center gap-1" :title="issue.pr_url || issue.git_branch">
+                      <span>{{ issue.pr_url ? '🔀' : '🌿' }}</span>
+                      <span class="truncate max-w-[80px]">{{ issue.pr_status || (issue.git_branch ? issue.git_branch.split('/')[issue.git_branch.split('/').length - 1] : '') }}</span>
+                    </span>
+
                     <!-- Subtask count badge -->
                     <span v-if="issue.subtasks && issue.subtasks.length > 0" class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/60 text-[10px] text-zinc-500 font-mono shrink-0">
                       {{ issue.subtasks.filter(s => s.done).length }}/{{ issue.subtasks.length }}

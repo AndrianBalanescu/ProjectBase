@@ -489,8 +489,16 @@ const KanbanBoardComponent = {
 
                 <!-- Card Footer (Labels, Due Date, Assignee) -->
                 <div class="flex items-center justify-between pt-1 border-t border-zinc-100 dark:border-zinc-800/60 text-xs">
-                  <!-- Labels -->
+                  <!-- Labels & Git -->
                   <div class="flex items-center space-x-1 overflow-hidden max-w-[140px]">
+                    <span
+                      v-if="issue.pr_url || issue.git_branch"
+                      class="px-1 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700/60 text-[9px] font-mono flex items-center gap-0.5 truncate max-w-[70px]"
+                      :title="issue.pr_url || issue.git_branch"
+                    >
+                      <span>{{ issue.pr_url ? '🔀' : '🌿' }}</span>
+                      <span class="truncate">{{ issue.pr_status || (issue.git_branch ? issue.git_branch.split('/')[issue.git_branch.split('/').length - 1] : '') }}</span>
+                    </span>
                     <span
                       v-for="lbl in (issue.labels || []).slice(0, 2)"
                       :key="lbl"

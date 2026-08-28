@@ -437,5 +437,60 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Throughput analytics failed');
     return data;
+  },
+
+  async getGitArtifacts(options = {}) {
+    const params = new URLSearchParams();
+    if (options.issueId) params.set('issue_id', options.issueId);
+    if (options.projectId) params.set('project_id', options.projectId);
+    if (options.type) params.set('type', options.type);
+    const res = await fetch(`/api/projectbase/git/artifacts?${params.toString()}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch git artifacts');
+    return data;
+  },
+
+  async linkGitArtifact(payload) {
+    const res = await fetch('/api/projectbase/git/artifacts', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to link git artifact');
+    return data;
+  },
+
+  async stageCodePatch(payload) {
+    const res = await fetch('/api/projectbase/git/patch', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to stage code patch');
+    return data;
+  },
+
+  async getGitPatch(patchId) {
+    const res = await fetch(`/api/projectbase/git/patch/${patchId}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch patch');
+    return data;
+  },
+
+  async getGitStatus(options = {}) {
+    const params = new URLSearchParams();
+    if (options.projectId) params.set('project_id', options.projectId);
+    const res = await fetch(`/api/projectbase/git/status?${params.toString()}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch git status');
+    return data;
   }
 };

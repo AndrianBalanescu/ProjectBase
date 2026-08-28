@@ -11,6 +11,15 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **Autonomous Agent Code Sandbox, Git Artifact Workspace Engine & Webhook Auto-Triage (Epic 13)**:
+  - Git Artifacts Engine (`/api/projectbase/git/artifacts`, `/api/projectbase/git/status`): Track linked code branches, commit SHAs, pull request states, CI workflow runs, and unified diff patches associated with issues.
+  - Autonomous Kanban Stage Transitions: Linking an active branch moves issues to `in_progress`; opening a PR shifts status to `in_review`; merging a PR automatically advances status to `done` and synchronizes metadata.
+  - Staged Code Patch Sandbox (`POST /api/projectbase/git/patch`, `GET /api/projectbase/git/patch/{id}`): Upload and review unified diff patches directly on issues with syntax-aware diff statistics (+additions, -deletions, files changed).
+  - Universal Git Webhook Receiver (`POST /api/projectbase/webhooks/git`): Case-insensitive GitHub/GitLab webhook receiver with regex-free token triage parsing issue identifiers from commit messages, branch names, and PR titles.
+  - FastMCP JSON-RPC 2.0 Tool Expansion: Adds `link_git_commit`, `link_git_pr`, `get_issue_git_artifacts`, `stage_code_patch`, `process_git_webhook`, and `get_project_git_status`.
+  - Frontend IssueDrawer & Board UI Enhancements: Integrated **🌿 Git & Code** artifacts panel with one-click copy `git checkout <branch>` command, PR badges, commit diff stats, and visual branch/PR indicators across Kanban and List views.
+  - Comprehensive Test Suite: 13 new integration tests in `tests/test_git_workspace_engine.py`, expanding the test surface to 283 passing tests across 17 test suites with 100% headless DOM QA pass.
+
 - **Multi-Host Federation, Real-Time Agent Stream UI & Autonomous Anomaly Detection Engine (Epic 12)**:
   - Multi-Host Federation Bridge (`/api/projectbase/federation/export`, `/api/projectbase/federation/import`, `/api/projectbase/federation/sync`): Exports portable workspace bundles with SHA-256 data integrity checksums; imports with `merge`, `overwrite`, and `skip_existing` conflict resolution strategies and foreign-key remapping.
   - Autonomous Workflow Anomaly Detection & Auto-Heal (`GET/POST /api/projectbase/analytics/anomalies`): Diagnostic engine scanning for expired agent task leases, rapid failure loops, circular deadlock cycles, and backlog starvation, with automated lock revocation and issue triage.

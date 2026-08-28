@@ -45,6 +45,15 @@ const IssueDrawerComponent = {
       relationPickerOpen: false,
       relationLoading: false,
       relationError: '',
+      gitArtifacts: [],
+      gitLoading: false,
+      gitError: '',
+      gitModalOpen: false,
+      newGitType: 'branch',
+      newGitIdent: '',
+      newGitTitle: '',
+      newGitUrl: '',
+      copiedGitBadge: false,
       drawerWidth: null, // persisted user-resized width (px); null = default
       isResizing: false,
       resizeStartX: 0,
@@ -149,6 +158,7 @@ const IssueDrawerComponent = {
             : {};
           this.loadComments();
           this.loadRelations();
+          this.loadGitArtifacts();
         }
       }
     },
@@ -169,6 +179,7 @@ const IssueDrawerComponent = {
 
     window.addEventListener('mousemove', this.onResizeMove);
     window.addEventListener('mouseup', this.onResizeEnd);
+    if (this.issue) this.loadGitArtifacts();
   },
   beforeUnmount() {
     window.removeEventListener('mousemove', this.onResizeMove);
@@ -261,6 +272,49 @@ const IssueDrawerComponent = {
         console.error('Relations load error:', err);
       } finally {
         this.relationLoading = false;
+      }
+    },
+    async loadGitArtifacts() {
+      if (!this.issue) return;
+      this.gitLoading = true;
+      this.gitError = '';
+      try {
+        const res = await API.getGitArtifacts({ issueId: this.issue.id });
+        this.gitArtifacts = Array.isArray(res.items) ? res.items : [];
+      } catch (err) {
+        this.gitError = err.message || 'Failed to load git artifacts';
+      } finally {
+        this.gitLoading = false;
+      }
+    },
+    copyGitCheckout(branch) {
+      if (!branch) return;
+      navigator.clipboard.writeText(`git checkout ${branch}`);
+      this.copiedGitBadge = true;
+      setTimeout(() => { this.copiedGitBadge = false; }, 2000);
+    },
+    async linkGitModalSubmit() {
+      if (!this.issue || !this.newGitIdent.trim()) return;
+      this.gitLoading = true;
+      try {
+        await API.linkGitArtifact({
+          issue_id: this.issue.id,
+          project_id: this.issue.project,
+          artifact_type: this.newGitType,
+          identifier: this.newGitIdent.trim(),
+          title: this.newGitTitle.trim(),
+          url: this.newGitUrl.trim(),
+          status: this.newGitType === 'pull_request' ? 'open' : 'active'
+        });
+        this.newGitIdent = '';
+        this.newGitTitle = '';
+        this.newGitUrl = '';
+        this.gitModalOpen = false;
+        await this.loadGitArtifacts();
+      } catch (err) {
+        this.gitError = err.message || 'Failed to link git artifact';
+      } finally {
+        this.gitLoading = false;
       }
     },
     async addRelation(targetId) {
@@ -1059,6 +1113,124 @@ const IssueDrawerComponent = {
                   No matching issues found
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- ========================================================= -->
+          <!-- Git & Code Workspace Artifacts (Epic 13)                  -->
+          <!-- ========================================================= -->
+          <div class="space-y-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
+            <div class="flex items-center justify-between select-none">
+              <div class="flex items-center space-x-2">
+                <label class="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>🌿 Git & Code</span>
+                </label>
+                <span v-if="gitLoading" class="animate-spin text-[10px]">⏳</span>
+                <span v-if="gitArtifacts.length > 0" class="text-xs font-mono text-zinc-500">
+                  ({{ gitArtifacts.length }})
+                </span>
+              </div>
+              <div class="flex items-center space-x-2">
+                <span v-if="copiedGitBadge" class="text-[10px] text-emerald-500 font-mono">Copied checkout!</span>
+                <button
+                  @click="gitModalOpen = !gitModalOpen"
+                  class="text-[11px] text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 flex items-center gap-1"
+                  title="Link branch, PR, or commit"
+                >
+                  <span>+ Link Code</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Inline Link Code Form -->
+            <div v-if="gitModalOpen" class="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-2 text-xs">
+              <div class="flex items-center gap-2">
+                <select v-model="newGitType" class="px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 text-xs">
+                  <option value="branch">Branch</option>
+                  <option value="pull_request">Pull Request</option>
+                  <option value="commit">Commit</option>
+                </select>
+                <input
+                  v-model="newGitIdent"
+                  :placeholder="newGitType === 'branch' ? 'feat/PB-12-auth' : (newGitType === 'commit' ? 'a1b2c3d' : '#42')"
+                  class="flex-1 px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 text-xs"
+                />
+              </div>
+              <div class="flex items-center gap-2">
+                <input
+                  v-model="newGitTitle"
+                  placeholder="Title or message (optional)"
+                  class="flex-1 px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 text-xs"
+                />
+                <input
+                  v-model="newGitUrl"
+                  placeholder="URL (optional)"
+                  class="flex-1 px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 text-xs"
+                />
+              </div>
+              <div class="flex items-center justify-end gap-2 pt-1">
+                <button @click="gitModalOpen = false" class="px-2 py-1 text-xs text-zinc-500 hover:text-zinc-700">Cancel</button>
+                <button @click="linkGitModalSubmit" class="px-2.5 py-1 text-xs font-semibold rounded bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900">Link</button>
+              </div>
+            </div>
+
+            <!-- Active Branch / PR summary pills -->
+            <div v-if="issue && (issue.git_branch || issue.pr_url)" class="flex flex-wrap items-center gap-1.5">
+              <div v-if="issue.git_branch" class="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-mono">
+                <span class="text-emerald-500">🌿</span>
+                <span class="text-zinc-800 dark:text-zinc-200 truncate max-w-[200px]">{{ issue.git_branch }}</span>
+                <button @click="copyGitCheckout(issue.git_branch)" class="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 ml-1" title="Copy git checkout command">
+                  📋
+                </button>
+              </div>
+              <div v-if="issue.pr_url" class="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 text-xs font-mono">
+                <span>🔀</span>
+                <a :href="issue.pr_url" target="_blank" rel="noopener" class="text-purple-700 dark:text-purple-400 hover:underline">
+                  PR ({{ issue.pr_status || 'open' }})
+                </a>
+              </div>
+            </div>
+
+            <!-- Artifact list -->
+            <div v-if="gitArtifacts.length > 0" class="space-y-1.5">
+              <div
+                v-for="art in gitArtifacts"
+                :key="art.id"
+                class="flex flex-col p-2 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs space-y-1"
+              >
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center space-x-2 min-w-0">
+                    <span class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 shrink-0">
+                      {{ art.artifact_type }}
+                    </span>
+                    <span class="font-mono text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+                      {{ art.identifier }}
+                    </span>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <span v-if="art.diff_stats && (art.diff_stats.additions || art.diff_stats.deletions)" class="font-mono text-[10px]">
+                      <span class="text-emerald-600 dark:text-emerald-400">+{{ art.diff_stats.additions || 0 }}</span>
+                      <span class="text-red-500 dark:text-red-400 ml-1">-{{ art.diff_stats.deletions || 0 }}</span>
+                    </span>
+                    <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded"
+                      :class="art.status === 'merged' || art.status === 'success' || art.status === 'passed' ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400' : (art.status === 'closed' || art.status === 'failed' ? 'bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400')">
+                      {{ art.status }}
+                    </span>
+                  </div>
+                </div>
+
+                <div v-if="art.title" class="text-zinc-700 dark:text-zinc-300 text-xs truncate">
+                  {{ art.title }}
+                </div>
+
+                <div class="flex items-center justify-between text-[10px] text-zinc-400">
+                  <span>Author: {{ art.author || 'unknown' }}</span>
+                  <a v-if="art.url" :href="art.url" target="_blank" rel="noopener" class="text-zinc-500 hover:underline">View ↗</a>
+                </div>
+              </div>
+            </div>
+            <div v-else-if="!gitLoading && !gitModalOpen" class="text-[11px] text-zinc-400 italic">
+              No git artifacts linked yet. Link a branch, PR, or commit above.
             </div>
           </div>
 

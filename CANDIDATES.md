@@ -80,7 +80,19 @@
 - [x] Real-time agent persona throughput analytics (MTTC in minutes, checkpoint pass rates %, velocity forecast) (`/api/projectbase/analytics/throughput`)
 - [x] FastMCP JSON-RPC 2.0 tools (`export_federation_bundle`, `import_federation_bundle`, `get_agent_analytics`, `detect_workflow_anomalies`)
 - [x] Frontend AgentsView tabs for live chat, workflow health diagnostics, persona throughput metrics, and federation sync
-- [x] 270/270 automated tests passing across 16 test suites with 100% frontend guard verification
+- [x] 270/270 automated tests passing across 16 test suites with 100% frontend guard
+
+---
+
+## Epic 13 – Autonomous Agent Code Sandbox, Git Artifact Workspace Engine & Webhook Auto-Triage (✅ Done)
+- [x] Git Artifacts Tracking Engine (`/api/projectbase/git/artifacts`, `/api/projectbase/git/status`) for branches, commit SHAs, PR states, CI workflow runs, and unified diff patches
+- [x] Autonomous Kanban Stage Transitions: active branch -> `in_progress`, open PR -> `in_review`, merged PR -> `done` with auto-sync
+- [x] Staged Code Patch Sandbox (`POST /api/projectbase/git/patch`, `GET /api/projectbase/git/patch/{id}`) for unified diff inspection and syntax-styled metrics
+- [x] Universal Git Webhook Receiver (`POST /api/projectbase/webhooks/git`) with case-insensitive GitHub/GitLab headers and regex-free issue token triage
+- [x] FastMCP JSON-RPC 2.0 tools (`link_git_commit`, `link_git_pr`, `get_issue_git_artifacts`, `stage_code_patch`, `process_git_webhook`, `get_project_git_status`)
+- [x] Frontend IssueDrawer **🌿 Git & Code** panel with 1-click copy `git checkout`, PR status chips, commit diff stats, and visual branch/PR indicators in Kanban/List
+- [x] 283/283 automated tests passing across 17 test suites with 100% headless DOM QA and frontend guard pass
+ verification
 
 ---
 

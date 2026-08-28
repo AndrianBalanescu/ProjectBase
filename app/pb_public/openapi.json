@@ -2615,6 +2615,80 @@
           "401": { "description": "Authentication required" }
         }
       }
+    },
+    "/projectbase/git/artifacts": {
+      "get": {
+        "tags": ["Git Workspace"],
+        "summary": "Query Git Artifacts",
+        "description": "Query linked branches, commits, pull requests, CI runs, and staged patches for an issue or project.",
+        "parameters": [
+          { "name": "issue_id", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Issue ID or identifier (e.g. PB-12)" },
+          { "name": "project_id", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Project ID" },
+          { "name": "type", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Artifact type filter" }
+        ],
+        "responses": {
+          "200": { "description": "List of git artifacts" },
+          "401": { "description": "Authentication required" }
+        }
+      },
+      "post": {
+        "tags": ["Git Workspace"],
+        "summary": "Link Git Artifact",
+        "description": "Link a branch, commit, PR, or CI run to an issue and auto-update Kanban status.",
+        "responses": {
+          "201": { "description": "Git artifact linked successfully" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/git/patch": {
+      "post": {
+        "tags": ["Git Workspace"],
+        "summary": "Stage Code Patch",
+        "description": "Stage a unified diff or patch for peer review and automated agent verification.",
+        "responses": {
+          "201": { "description": "Patch staged successfully" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/git/patch/{id}": {
+      "get": {
+        "tags": ["Git Workspace"],
+        "summary": "Get Staged Patch",
+        "description": "Retrieve full patch content and unified diff statistics.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Patch artifact ID or identifier" }
+        ],
+        "responses": {
+          "200": { "description": "Staged patch content" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/webhooks/git": {
+      "post": {
+        "tags": ["Git Workspace"],
+        "summary": "Universal Git Webhook Receiver",
+        "description": "Handles GitHub/GitLab push, pull_request, and CI webhooks for automated issue triage.",
+        "responses": {
+          "200": { "description": "Webhook processed and issues triaged" }
+        }
+      }
+    },
+    "/projectbase/git/status": {
+      "get": {
+        "tags": ["Git Workspace"],
+        "summary": "Project Git Status & CI Metrics",
+        "description": "Aggregated workspace/project git status, active branches, open/merged PRs, and CI pass rate.",
+        "parameters": [
+          { "name": "project_id", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Optional project filter" }
+        ],
+        "responses": {
+          "200": { "description": "Git status and CI reliability metrics" },
+          "401": { "description": "Authentication required" }
+        }
+      }
     }
   }
 }
