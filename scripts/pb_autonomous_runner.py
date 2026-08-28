@@ -70,6 +70,7 @@ class AutonomousRunner:
         self.cycle_interval = cycle_interval
         self.dry_run = dry_run
         self.cycle_count = 0
+        self.claimed_issues: set[str] = set()
         self.token = self._authenticate()
 
     def _authenticate(self) -> str:
@@ -276,11 +277,14 @@ class AutonomousRunner:
             #    if it's a backlog/todo issue, move it to in_progress and post an
             #    audit comment so humans and agents see it is being worked.
             if issue_id and not self.dry_run:
-                if target_issue.get("status") in ("backlog", "todo"):
+                is_unclaimed = target_issue.get("status") in ("backlog", "todo")
+                if is_unclaimed:
                     claimed = self.claim_issue(issue_id)
                     self.log(f"{'✓' if claimed else '✗'} Claimed [{ident}] -> in_progress")
-                commented = self.add_comment(issue_id, f"🔄 Autonomous daemon picked up `{title}` for execution (cycle {self.cycle_count}).")
-                self.log(f"{'✓' if commented else '✗'} Claim audit comment on [{ident}] {'persisted' if commented else 'FAILED (check comments schema / auth)'}")
+                if (is_unclaimed or issue_id not in self.claimed_issues) and issue_id not in self.claimed_issues:
+                    commented = self.add_comment(issue_id, f"🔄 Autonomous daemon picked up `{title}` for execution (cycle {self.cycle_count}).")
+                    self.claimed_issues.add(issue_id)
+                    self.log(f"{'✓' if commented else '✗'} Claim audit comment on [{ident}] {'persisted' if commented else 'FAILED'}")
 
             # 1. Research Phase
             research_summary = self.run_ai_research(f"{title} in {project.get('name')}")
