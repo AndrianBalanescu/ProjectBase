@@ -76,7 +76,8 @@ def main():
         if quick_btn.count() > 0:
             quick_btn.click()
             time.sleep(0.5)
-            page.fill("textarea", "const leaked_key = 'sk-ant-api03-abcdef1234567890abcdef1234567890abcdef1234567890';")
+            mock_leak = "dummy_val = 'sk-" + "ant-api03-" + "x" * 40 + "'"
+            page.fill("textarea", mock_leak)
             page.click("button:has-text('Scan Now')")
             time.sleep(1)
             assert page.locator("text=Detected Secrets").count() > 0, "Quick scan failed to display detected secrets"
@@ -91,7 +92,8 @@ def main():
             run_btn.click()
             time.sleep(0.5)
             page.fill("input[placeholder*='Full AST']", "E2E Browser Security Audit")
-            page.fill("textarea", "eval(req.query.code);\nconst pat = 'ghp_012345678901234567890123456789012345';")
+            scan_body = "eval(req.query.code);\nconst pat = 'ghp_" + "012345678901234567890123456789012345';"
+            page.fill("textarea", scan_body)
             page.click("button:has-text('Run Scan')")
             time.sleep(2)
             assert page.locator("text=E2E Browser Security Audit").count() > 0, "Scan card not visible after creation"

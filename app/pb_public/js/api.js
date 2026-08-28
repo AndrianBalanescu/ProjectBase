@@ -342,7 +342,9 @@ const API = {
   // Stats
   async getStats() {
     try {
-      const res = await fetch('/api/projectbase/stats');
+      const res = await fetch('/api/projectbase/stats', {
+        headers: this._authHeaders()
+      });
       if (!res.ok) throw new Error('Stats failed');
       return await res.json();
     } catch (err) {
