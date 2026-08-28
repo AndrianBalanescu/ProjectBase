@@ -370,6 +370,42 @@ const AgentsViewComponent = {
         scenarios: [
           { id: 'sc-1', name: 'Standard Code Generation Scenario', expected: 'exit 0' }
         ]
+      },
+      // Ephemeral Sandboxes & Dev Environments (Milestone 9 / Epic 30)
+      sandboxesList: [],
+      sandboxTemplatesList: [],
+      sandboxFleetMetrics: null,
+      selectedSandbox: null,
+      selectedSandboxExecutions: [],
+      selectedSandboxSnapshots: [],
+      isLoadingSandboxes: false,
+      isProvisioningSandbox: false,
+      isExecutingCommand: false,
+      isCreatingSnapshot: false,
+      sandboxModalOpen: false,
+      sandboxExecModalOpen: false,
+      sandboxSnapshotModalOpen: false,
+      sandboxSuccessMsg: null,
+      sandboxErrorMsg: null,
+      sandboxFilterStatus: '',
+      sandboxFilterEnv: '',
+      newSandbox: {
+        name: '',
+        environment_type: 'worktree',
+        runtime_type: 'node',
+        template_id: '',
+        memory_limit_mb: 1024,
+        ttl_seconds: 3600,
+        allocated_port: 8140,
+        env_vars_str: '{\n  "NODE_ENV": "development"\n}'
+      },
+      sandboxExecInput: {
+        command: 'npm test',
+        executed_by: 'agent'
+      },
+      newSandboxSnapshot: {
+        snapshot_name: '',
+        notes: ''
       }
     };
   },
@@ -2447,8 +2483,133 @@ const AgentsViewComponent = {
         this.evalErrorMsg = 'Failed to delete eval suite: ' + (e.message || String(e));
       }
     },
+    // Ephemeral Sandboxes & Dev Environments (Milestone 9 / Epic 30)
+    async loadSandboxesGovernanceData() {
+      this.isLoadingSandboxes = true;
+      this.sandboxErrorMsg = null;
+      try {
+        const [sandboxesRes, templatesRes, metricsRes] = await Promise.all([
+          API.listSandboxes({
+            status: this.sandboxFilterStatus || undefined,
+            environment_type: this.sandboxFilterEnv || undefined,
+            limit: 100
+          }),
+          API.listSandboxTemplates(),
+          API.getSandboxMetrics()
+        ]);
+        this.sandboxesList = sandboxesRes.sandboxes || [];
+        this.sandboxTemplatesList = templatesRes.templates || [];
+        this.sandboxFleetMetrics = metricsRes.metrics || null;
+      } catch (e) {
+        this.sandboxErrorMsg = 'Failed to load sandboxes: ' + (e.message || String(e));
+      } finally {
+        this.isLoadingSandboxes = false;
+      }
+    },
+    async triggerProvisionSandbox() {
+      this.isProvisioningSandbox = true;
+      this.sandboxErrorMsg = null;
+      this.sandboxSuccessMsg = null;
+      let parsedEnv = {};
+      try {
+        if (this.newSandbox.env_vars_str) parsedEnv = JSON.parse(this.newSandbox.env_vars_str);
+      } catch (e) {
+        this.sandboxErrorMsg = 'Invalid JSON in environment variables';
+        this.isProvisioningSandbox = false;
+        return;
+      }
+      try {
+        const res = await API.provisionSandbox({
+          name: this.newSandbox.name,
+          environment_type: this.newSandbox.environment_type,
+          runtime_type: this.newSandbox.runtime_type,
+          template_id: this.newSandbox.template_id || undefined,
+          memory_limit_mb: this.newSandbox.memory_limit_mb,
+          ttl_seconds: this.newSandbox.ttl_seconds,
+          env_vars_json: parsedEnv
+        });
+        this.sandboxSuccessMsg = res.message || `Sandbox ${res.sandbox?.name} provisioned`;
+        this.sandboxModalOpen = false;
+        await this.loadSandboxesGovernanceData();
+      } catch (e) {
+        this.sandboxErrorMsg = 'Provisioning failed: ' + (e.message || String(e));
+      } finally {
+        this.isProvisioningSandbox = false;
+      }
+    },
+    async handleSandboxAction(sandboxId, action) {
+      this.sandboxErrorMsg = null;
+      try {
+        await API.sandboxAction(sandboxId, action);
+        await this.loadSandboxesGovernanceData();
+        if (this.selectedSandbox && this.selectedSandbox.id === sandboxId) {
+          await this.inspectSandbox(sandboxId);
+        }
+      } catch (e) {
+        this.sandboxErrorMsg = `Action ${action} failed: ` + (e.message || String(e));
+      }
+    },
+    async inspectSandbox(sandboxId) {
+      try {
+        const res = await API.getSandbox(sandboxId);
+        this.selectedSandbox = res.sandbox || null;
+        this.selectedSandboxExecutions = (res.sandbox && res.sandbox.executions) || [];
+        this.selectedSandboxSnapshots = (res.sandbox && res.sandbox.snapshots) || [];
+      } catch (e) {
+        this.sandboxErrorMsg = 'Failed to fetch sandbox details: ' + (e.message || String(e));
+      }
+    },
+    async executeInSandbox() {
+      if (!this.selectedSandbox || !this.sandboxExecInput.command) return;
+      this.isExecutingCommand = true;
+      this.sandboxErrorMsg = null;
+      try {
+        await API.execInSandbox(this.selectedSandbox.id, {
+          command: this.sandboxExecInput.command,
+          executed_by: this.sandboxExecInput.executed_by || 'agent'
+        });
+        await this.inspectSandbox(this.selectedSandbox.id);
+        this.sandboxExecModalOpen = false;
+      } catch (e) {
+        this.sandboxErrorMsg = 'Command execution failed: ' + (e.message || String(e));
+      } finally {
+        this.isExecutingCommand = false;
+      }
+    },
+    async createSandboxCheckpoint() {
+      if (!this.selectedSandbox || !this.newSandboxSnapshot.snapshot_name) return;
+      this.isCreatingSnapshot = true;
+      this.sandboxErrorMsg = null;
+      try {
+        await API.createSandboxSnapshot(this.selectedSandbox.id, {
+          snapshot_name: this.newSandboxSnapshot.snapshot_name,
+          notes: this.newSandboxSnapshot.notes
+        });
+        await this.inspectSandbox(this.selectedSandbox.id);
+        this.sandboxSnapshotModalOpen = false;
+      } catch (e) {
+        this.sandboxErrorMsg = 'Snapshot failed: ' + (e.message || String(e));
+      } finally {
+        this.isCreatingSnapshot = false;
+      }
+    },
+    async cleanupIdleSandboxes() {
+      try {
+        const res = await API.cleanupIdleSandboxes();
+        this.sandboxSuccessMsg = res.message || 'Cleaned idle sandboxes';
+        await this.loadSandboxesGovernanceData();
+      } catch (e) {
+        this.sandboxErrorMsg = 'Cleanup failed: ' + (e.message || String(e));
+      }
+    },
+    async seedDefaultTemplates() {
+      try {
+        await API.seedDefaultSandboxTemplates();
+        await this.loadSandboxesGovernanceData();
+      } catch (e) {}
+    },
     isGovernanceTab(tab) {
-      return ['workload', 'anomalies', 'semantic', 'auto_heal', 'sso_rbac', 'automations', 'tenants', 'webhooks', 'observability', 'consensus', 'cluster', 'federation', 'throughput', 'swarm', 'merges', 'budget', 'evals'].includes(tab);
+      return ['workload', 'anomalies', 'semantic', 'auto_heal', 'sso_rbac', 'automations', 'tenants', 'webhooks', 'observability', 'consensus', 'cluster', 'federation', 'throughput', 'swarm', 'merges', 'budget', 'evals', 'sandboxes'].includes(tab);
     },
     onGovernanceTabSelect(tab) {
       if (!tab) return;
@@ -2462,6 +2623,8 @@ const AgentsViewComponent = {
         this.loadBudgetGovernanceData();
       } else if (tab === 'evals') {
         this.loadEvalGovernanceData();
+      } else if (tab === 'sandboxes') {
+        this.loadSandboxesGovernanceData();
       }
     }
   },
@@ -2579,7 +2742,7 @@ const AgentsViewComponent = {
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <h2 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 capitalize truncate">
-                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (activeTab === 'automations' ? 'Native Workflow Automations & AI Agent Trigger Pipelines' : (activeTab === 'tenants' ? 'Multi-Tenant Isolation & Granular Resource Quotas' : (activeTab === 'auto_heal' ? 'Autonomous AI Agent Auto-Healing & Self-Remediation Workflow Pipeline' : (activeTab === 'budget' ? 'Agent Fleet Budget & Cost Governance Hub' : (activeTab === 'evals' ? 'Agent Evaluation Benchmark Harness & Model Leaderboard' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center')))))))))))))) }}
+                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (activeTab === 'automations' ? 'Native Workflow Automations & AI Agent Trigger Pipelines' : (activeTab === 'tenants' ? 'Multi-Tenant Isolation & Granular Resource Quotas' : (activeTab === 'auto_heal' ? 'Autonomous AI Agent Auto-Healing & Self-Remediation Workflow Pipeline' : (activeTab === 'budget' ? 'Agent Fleet Budget & Cost Governance Hub' : (activeTab === 'evals' ? 'Agent Evaluation Benchmark Harness & Model Leaderboard' : (activeTab === 'sandboxes' ? 'Autonomous Ephemeral Dev Sandboxes & Worktree Container Orchestrator' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center'))))))))))))))) }}
                 </h2>
                 <span v-if="selectedSession && selectedSession.is_active && activeTab === 'chat'" class="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-400 text-[10px] font-mono font-semibold flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -2630,6 +2793,7 @@ const AgentsViewComponent = {
                     <option value="merges">🔀 Merge Matrix & Conflicts</option>
                     <option value="budget">💰 Fleet Budget & Quotas</option>
                     <option value="evals">📊 Evals & Leaderboard</option>
+                    <option value="sandboxes">📦 Ephemeral Sandboxes & Dev Envs</option>
                     <option value="federation">🌐 Multi-Cluster Federation</option>
                   </select>
                 </div>
@@ -7719,6 +7883,559 @@ const AgentsViewComponent = {
               <div class="flex items-center justify-end pt-3 border-t border-zinc-100 dark:border-zinc-800">
                 <button
                   @click="selectedEvalRun = null"
+                  class="px-4 py-1.5 rounded-lg bg-zinc-800 text-zinc-200 text-xs font-semibold hover:bg-zinc-700"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- PANE 2K: EPHEMERAL SANDBOXES & DEV ENVIRONMENTS (EPIC 30) -->
+        <!-- ========================================================= -->
+        <div v-else-if="activeTab === 'sandboxes'" class="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/30">
+          <!-- Header Banner -->
+          <div class="p-4 rounded-xl bg-gradient-to-r from-teal-900/40 via-cyan-900/30 to-zinc-900 border border-teal-700/40 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-lg">📦</span>
+                <h3 class="text-sm font-bold text-white tracking-wide">Autonomous Ephemeral Sandboxes & Dev Environments</h3>
+                <span class="px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 text-[10px] font-mono font-bold animate-pulse">SANDBOX MESH</span>
+              </div>
+              <p class="text-xs text-zinc-300 mt-1">
+                Zero-friction isolated execution environments, Git worktrees, and containerized runtimes with dynamic port allocation, live web preview URLs, and auto-TTL garbage collection.
+              </p>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <button
+                @click="loadSandboxesGovernanceData()"
+                :disabled="isLoadingSandboxes"
+                class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              >
+                <span>{{ isLoadingSandboxes ? '🔄 Syncing...' : '🔄 Refresh' }}</span>
+              </button>
+              <button
+                @click="cleanupIdleSandboxes()"
+                class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-amber-300 text-xs font-semibold flex items-center gap-1 transition-colors"
+                title="Garbage collect sandboxes that exceeded their TTL"
+              >
+                <span>🧹 Clean Expired TTLs</span>
+              </button>
+              <button
+                @click="seedDefaultTemplates()"
+                class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-cyan-300 text-xs font-semibold flex items-center gap-1 transition-colors"
+              >
+                <span>✨ Seed Blueprints</span>
+              </button>
+              <button
+                @click="sandboxModalOpen = true"
+                class="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold transition-colors shadow-xs flex items-center gap-1"
+              >
+                <span>➕ Provision Sandbox</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Toast Notifications -->
+          <div v-if="sandboxSuccessMsg" class="p-3 rounded-lg bg-emerald-950/40 border border-emerald-800/60 text-xs text-emerald-300 flex items-center justify-between">
+            <span>{{ sandboxSuccessMsg }}</span>
+            <button @click="sandboxSuccessMsg = null" class="text-emerald-400 font-bold">&times;</button>
+          </div>
+          <div v-if="sandboxErrorMsg" class="p-3 rounded-lg bg-rose-950/40 border border-rose-800/60 text-xs text-rose-300 flex items-center justify-between">
+            <span>{{ sandboxErrorMsg }}</span>
+            <button @click="sandboxErrorMsg = null" class="text-rose-400 font-bold">&times;</button>
+          </div>
+
+          <!-- KPI Summary Cards -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+              <div class="flex items-center justify-between text-zinc-500 dark:text-zinc-400 text-xs">
+                <span>Active Sandboxes</span>
+                <span class="text-teal-400 text-base">📦</span>
+              </div>
+              <div class="text-xl font-bold font-mono text-zinc-900 dark:text-zinc-100 mt-1">
+                {{ sandboxFleetMetrics ? sandboxFleetMetrics.active_sandboxes : sandboxesList.filter(s => s.status !== 'terminated').length }}
+              </div>
+              <div class="text-[10px] text-zinc-400 mt-0.5">Total managed: {{ sandboxesList.length }}</div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+              <div class="flex items-center justify-between text-zinc-500 dark:text-zinc-400 text-xs">
+                <span>Running Environments</span>
+                <span class="text-emerald-400 text-base">⚡</span>
+              </div>
+              <div class="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1">
+                {{ sandboxFleetMetrics ? sandboxFleetMetrics.running_sandboxes : sandboxesList.filter(s => s.status === 'running').length }}
+              </div>
+              <div class="text-[10px] text-zinc-400 mt-0.5">Live processes & containers</div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+              <div class="flex items-center justify-between text-zinc-500 dark:text-zinc-400 text-xs">
+                <span>Memory Allocated</span>
+                <span class="text-cyan-400 text-base">💾</span>
+              </div>
+              <div class="text-xl font-bold font-mono text-cyan-600 dark:text-cyan-400 mt-1">
+                {{ sandboxFleetMetrics ? sandboxFleetMetrics.total_allocated_memory_mb : 0 }} MB
+              </div>
+              <div class="text-[10px] text-zinc-400 mt-0.5">Across active fleet</div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+              <div class="flex items-center justify-between text-zinc-500 dark:text-zinc-400 text-xs">
+                <span>Fleet Health</span>
+                <span class="text-emerald-400 text-base">🩺</span>
+              </div>
+              <div class="text-xl font-bold font-mono text-zinc-900 dark:text-zinc-100 mt-1">
+                {{ sandboxFleetMetrics ? sandboxFleetMetrics.healthy_sandboxes : 0 }} / {{ sandboxFleetMetrics ? sandboxFleetMetrics.active_sandboxes : 0 }}
+              </div>
+              <div class="text-[10px] text-zinc-400 mt-0.5">Healthy vs degraded runtimes</div>
+            </div>
+          </div>
+
+          <!-- Main Grid: Sandboxes Fleet Table & Blueprints -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <!-- Left 2 Cols: Sandboxes Fleet List -->
+            <div class="lg:col-span-2 p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm">🌐</span>
+                  <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Live Dev Sandboxes Fleet</h4>
+                  <span class="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[10px] font-mono">{{ sandboxesList.length }}</span>
+                </div>
+                <div class="flex items-center gap-2 text-xs">
+                  <select
+                    v-model="sandboxFilterStatus"
+                    @change="loadSandboxesGovernanceData()"
+                    class="px-2 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[11px] focus:outline-none"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="running">Running</option>
+                    <option value="ready">Ready</option>
+                    <option value="paused">Paused</option>
+                    <option value="terminated">Terminated</option>
+                  </select>
+                  <select
+                    v-model="sandboxFilterEnv"
+                    @change="loadSandboxesGovernanceData()"
+                    class="px-2 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[11px] focus:outline-none"
+                  >
+                    <option value="">All Environments</option>
+                    <option value="worktree">Git Worktree</option>
+                    <option value="docker">Docker Container</option>
+                    <option value="process">Process Sandbox</option>
+                  </select>
+                </div>
+              </div>
+
+              <div v-if="sandboxesList.length" class="space-y-2.5 max-h-[500px] overflow-y-auto">
+                <div
+                  v-for="s in sandboxesList"
+                  :key="s.id"
+                  class="p-3.5 rounded-lg bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800/80 hover:border-teal-500/50 transition-colors space-y-2"
+                >
+                  <div class="flex items-start justify-between gap-2">
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <h5 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 font-mono">{{ s.name }}</h5>
+                        <span
+                          class="px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase"
+                          :class="s.status === 'running' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : (s.status === 'paused' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20')"
+                        >
+                          <span v-if="s.status === 'running'" class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse mr-1"></span>
+                          {{ s.status }}
+                        </span>
+                        <span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 border border-teal-500/20 text-[10px] font-mono">
+                          {{ s.environment_type }} / {{ s.runtime_type }}
+                        </span>
+                      </div>
+                      <p class="text-[11px] text-zinc-500 font-mono mt-0.5">
+                        Port: <span class="text-teal-400 font-bold">:{{ s.allocated_port }}</span> • URL: <a :href="s.preview_url" target="_blank" class="text-indigo-400 underline hover:text-indigo-300">{{ s.preview_url }}</a>
+                      </p>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="flex items-center gap-1.5">
+                      <button
+                        v-if="s.status === 'running'"
+                        @click="handleSandboxAction(s.id, 'stop')"
+                        class="px-2 py-1 rounded bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-[10px] font-bold"
+                        title="Pause Sandbox"
+                      >
+                        ⏸
+                      </button>
+                      <button
+                        v-if="s.status === 'paused'"
+                        @click="handleSandboxAction(s.id, 'start')"
+                        class="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold"
+                        title="Resume Sandbox"
+                      >
+                        ▶
+                      </button>
+                      <button
+                        @click="selectedSandbox = s; sandboxExecModalOpen = true"
+                        class="px-2 py-1 rounded bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-teal-400 text-[10px] font-bold"
+                        title="Execute Command"
+                      >
+                        ⚡ Exec
+                      </button>
+                      <button
+                        @click="selectedSandbox = s; sandboxSnapshotModalOpen = true"
+                        class="px-2 py-1 rounded bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-indigo-400 text-[10px] font-bold"
+                        title="Snapshot State"
+                      >
+                        📸 Snap
+                      </button>
+                      <button
+                        @click="inspectSandbox(s.id)"
+                        class="px-2 py-1 rounded bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-300 text-[10px] font-bold"
+                        title="Inspect Console & Details"
+                      >
+                        🔍 Logs
+                      </button>
+                      <button
+                        v-if="s.status !== 'terminated'"
+                        @click="handleSandboxAction(s.id, 'terminate')"
+                        class="px-2 py-1 rounded bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 text-[10px] font-bold"
+                        title="Terminate Sandbox"
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-3 gap-2 text-[10px] font-mono pt-1 border-t border-zinc-200/50 dark:border-zinc-800/50">
+                    <span class="text-zinc-500">Memory: <span class="text-zinc-300 font-bold">{{ s.memory_limit_mb }} MB</span></span>
+                    <span class="text-zinc-500">TTL: <span class="text-zinc-300 font-bold">{{ s.ttl_seconds }}s</span></span>
+                    <span class="text-zinc-500">Health: <span :class="s.health_status === 'healthy' ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'">{{ s.health_status }}</span></span>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="py-12 text-center text-xs text-zinc-400">
+                No dev sandboxes found. Provision a new sandbox to get started!
+              </div>
+            </div>
+
+            <!-- Right 1 Col: Blueprints & Templates -->
+            <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm">📐</span>
+                  <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Environment Blueprints</h4>
+                  <span class="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[10px] font-mono">{{ sandboxTemplatesList.length }}</span>
+                </div>
+              </div>
+
+              <div v-if="sandboxTemplatesList.length" class="space-y-2.5 max-h-[500px] overflow-y-auto">
+                <div
+                  v-for="t in sandboxTemplatesList"
+                  :key="t.id"
+                  class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800/80 hover:border-teal-500/50 transition-colors space-y-1.5"
+                >
+                  <div class="flex items-center justify-between">
+                    <h5 class="text-xs font-bold text-zinc-900 dark:text-zinc-100">{{ t.name }}</h5>
+                    <span class="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400 text-[10px] font-mono font-bold uppercase">{{ t.runtime_type }}</span>
+                  </div>
+                  <p class="text-[11px] text-zinc-400">{{ t.description }}</p>
+                  <div class="text-[10px] font-mono text-zinc-500 bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded">
+                    <div><span class="text-zinc-400">Build:</span> {{ t.build_command }}</div>
+                    <div><span class="text-zinc-400">Start:</span> {{ t.start_command }}</div>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="py-8 text-center text-xs text-zinc-400">
+                Click "Seed Blueprints" above to populate canonical templates.
+              </div>
+            </div>
+          </div>
+
+          <!-- Provision Sandbox Modal -->
+          <div v-if="sandboxModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-2xl space-y-4">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">➕</span>
+                  <div>
+                    <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Provision Dev Sandbox</h3>
+                    <p class="text-[11px] text-zinc-500">Launch an isolated environment with live preview URL</p>
+                  </div>
+                </div>
+                <button @click="sandboxModalOpen = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3 text-xs">
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Sandbox Name *</label>
+                  <input
+                    v-model="newSandbox.name"
+                    placeholder="e.g. test-refactor-sandbox"
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:outline-none"
+                  />
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Environment Type</label>
+                    <select
+                      v-model="newSandbox.environment_type"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:outline-none"
+                    >
+                      <option value="worktree">Git Worktree</option>
+                      <option value="docker">Docker Container</option>
+                      <option value="process">Process Sandbox</option>
+                      <option value="ephemeral_vm">Ephemeral VM</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Runtime</label>
+                    <select
+                      v-model="newSandbox.runtime_type"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:outline-none"
+                    >
+                      <option value="node">Node.js</option>
+                      <option value="python">Python</option>
+                      <option value="rust">Rust</option>
+                      <option value="pocketbase">PocketBase</option>
+                      <option value="go">Go</option>
+                      <option value="custom">Custom</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Memory Limit (MB)</label>
+                    <input
+                      type="number"
+                      v-model.number="newSandbox.memory_limit_mb"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 font-mono focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">TTL (Seconds)</label>
+                    <input
+                      type="number"
+                      v-model.number="newSandbox.ttl_seconds"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 font-mono focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Environment Variables (JSON)</label>
+                  <textarea
+                    v-model="newSandbox.env_vars_str"
+                    rows="3"
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 font-mono focus:outline-none"
+                  ></textarea>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  @click="sandboxModalOpen = false"
+                  class="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold hover:bg-zinc-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  @click="triggerProvisionSandbox()"
+                  :disabled="isProvisioningSandbox || !newSandbox.name.trim()"
+                  class="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs font-bold transition-colors shadow-xs"
+                >
+                  {{ isProvisioningSandbox ? 'Provisioning...' : 'Launch Sandbox' }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Command Execution Modal -->
+          <div v-if="sandboxExecModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-2xl space-y-4">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">⚡</span>
+                  <div>
+                    <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Execute in Sandbox</h3>
+                    <p class="text-[11px] text-zinc-500 font-mono">{{ selectedSandbox?.name }}</p>
+                  </div>
+                </div>
+                <button @click="sandboxExecModalOpen = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3 text-xs">
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Command *</label>
+                  <input
+                    v-model="sandboxExecInput.command"
+                    placeholder="e.g. npm test, cargo check, python -m pytest"
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 font-mono focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Executed By</label>
+                  <input
+                    v-model="sandboxExecInput.executed_by"
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 font-mono focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  @click="sandboxExecModalOpen = false"
+                  class="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold hover:bg-zinc-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  @click="executeInSandbox()"
+                  :disabled="isExecutingCommand || !sandboxExecInput.command.trim()"
+                  class="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs font-bold transition-colors shadow-xs"
+                >
+                  {{ isExecutingCommand ? 'Executing...' : 'Run Command' }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sandbox Snapshot Modal -->
+          <div v-if="sandboxSnapshotModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-2xl space-y-4">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">📸</span>
+                  <div>
+                    <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Capture Sandbox State Snapshot</h3>
+                    <p class="text-[11px] text-zinc-500 font-mono">{{ selectedSandbox?.name }}</p>
+                  </div>
+                </div>
+                <button @click="sandboxSnapshotModalOpen = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3 text-xs">
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Snapshot Label *</label>
+                  <input
+                    v-model="newSandboxSnapshot.snapshot_name"
+                    placeholder="e.g. pre-refactor-checkpoint"
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Notes</label>
+                  <textarea
+                    v-model="newSandboxSnapshot.notes"
+                    rows="2"
+                    placeholder="Reason for state checkpoint..."
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:outline-none"
+                  ></textarea>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  @click="sandboxSnapshotModalOpen = false"
+                  class="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold hover:bg-zinc-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  @click="createSandboxCheckpoint()"
+                  :disabled="isCreatingSnapshot || !newSandboxSnapshot.snapshot_name.trim()"
+                  class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold transition-colors shadow-xs"
+                >
+                  {{ isCreatingSnapshot ? 'Capturing...' : 'Capture Snapshot' }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sandbox Details & Terminal Log Modal -->
+          <div v-if="selectedSandbox && !sandboxExecModalOpen && !sandboxSnapshotModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="w-full max-w-3xl rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🔍</span>
+                  <div>
+                    <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 font-mono">{{ selectedSandbox.name }}</h3>
+                    <p class="text-[11px] text-zinc-500 font-mono">Port: :{{ selectedSandbox.allocated_port }} • {{ selectedSandbox.environment_type }}</p>
+                  </div>
+                </div>
+                <button @click="selectedSandbox = null" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="grid grid-cols-4 gap-2 text-xs font-mono">
+                <div class="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800">
+                  <p class="text-[10px] text-zinc-400">Status</p>
+                  <p class="font-bold text-emerald-400">{{ selectedSandbox.status }}</p>
+                </div>
+                <div class="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800">
+                  <p class="text-[10px] text-zinc-400">Memory</p>
+                  <p class="font-bold text-cyan-400">{{ selectedSandbox.memory_limit_mb }} MB</p>
+                </div>
+                <div class="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800">
+                  <p class="text-[10px] text-zinc-400">TTL</p>
+                  <p class="font-bold text-zinc-200">{{ selectedSandbox.ttl_seconds }}s</p>
+                </div>
+                <div class="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800">
+                  <p class="text-[10px] text-zinc-400">Health</p>
+                  <p class="font-bold text-emerald-400">{{ selectedSandbox.health_status }}</p>
+                </div>
+              </div>
+
+              <!-- Executions Terminal Stream -->
+              <div class="space-y-2">
+                <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center justify-between">
+                  <span>Terminal Executions & Console Stream</span>
+                  <span class="text-[10px] font-mono text-zinc-400">{{ selectedSandboxExecutions.length }} executions</span>
+                </h4>
+
+                <div v-if="selectedSandboxExecutions.length" class="space-y-2 max-h-60 overflow-y-auto">
+                  <div
+                    v-for="e in selectedSandboxExecutions"
+                    :key="e.id"
+                    class="p-2.5 rounded-lg bg-zinc-950 font-mono text-xs border border-zinc-800 space-y-1"
+                  >
+                    <div class="flex items-center justify-between text-zinc-400 text-[10px]">
+                      <span class="text-teal-400 font-bold">$ {{ e.command }}</span>
+                      <span :class="e.exit_code === 0 ? 'text-emerald-400' : 'text-rose-400'">Exit: {{ e.exit_code }} ({{ e.duration_ms }}ms)</span>
+                    </div>
+                    <pre class="text-[11px] text-zinc-300 whitespace-pre-wrap overflow-x-auto max-h-24">{{ e.stdout || e.stderr || '(No output)' }}</pre>
+                  </div>
+                </div>
+                <div v-else class="p-4 rounded-lg bg-zinc-950 font-mono text-xs text-zinc-500 text-center">
+                  No command executions recorded yet.
+                </div>
+              </div>
+
+              <!-- Snapshots History -->
+              <div class="space-y-2">
+                <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center justify-between">
+                  <span>State Snapshots</span>
+                  <span class="text-[10px] font-mono text-zinc-400">{{ selectedSandboxSnapshots.length }} snapshots</span>
+                </h4>
+                <div v-if="selectedSandboxSnapshots.length" class="space-y-1.5">
+                  <div
+                    v-for="snap in selectedSandboxSnapshots"
+                    :key="snap.id"
+                    class="p-2 rounded bg-zinc-100 dark:bg-zinc-800/80 text-xs flex items-center justify-between font-mono"
+                  >
+                    <div>
+                      <span class="font-bold text-zinc-200">{{ snap.snapshot_name }}</span>
+                      <span class="text-zinc-400 text-[10px] ml-2">{{ snap.notes }}</span>
+                    </div>
+                    <span class="text-indigo-400 text-[10px]">{{ snap.git_commit_sha }} ({{ snap.size_kb }} KB)</span>
+                  </div>
+                </div>
+                <div v-else class="text-xs text-zinc-400">No snapshots captured.</div>
+              </div>
+
+              <div class="flex items-center justify-end pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  @click="selectedSandbox = null"
                   class="px-4 py-1.5 rounded-lg bg-zinc-800 text-zinc-200 text-xs font-semibold hover:bg-zinc-700"
                 >
                   Close

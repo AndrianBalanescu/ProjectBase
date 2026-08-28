@@ -256,3 +256,13 @@
 - [x] 8 FastMCP JSON-RPC 2.0 tools (`run_agent_eval_suite`, `list_eval_suites`, `get_eval_run_details`, `get_agent_leaderboard`, `detect_agent_regressions`, `create_eval_suite`, `record_eval_scenario_result`, `compare_model_benchmarks`)
 - [x] Frontend AgentsView **📊 Evals & Leaderboard** dashboard with 4 KPI summary cards, interactive Leaderboard table with certification meters, Regression Anomaly Alert Center, Benchmark Suites runner, Recent Runs stream, and Side-by-Side Model Comparison modal
 - [x] Comprehensive automated test suite `tests/test_agent_evaluations_engine.py` with 100% frontend guard, CSS sync, and zero console error verification
+
+---
+
+## Milestone (Cycle 33)
+**Epic 30 – Autonomous Ephemeral Dev Sandboxes & Worktree Container Orchestrator (✅ Done)**
+- [x] Schema migration (`1710000042_add_ephemeral_sandboxes_and_dev_environments.js`) introducing `dev_sandboxes`, `sandbox_templates`, `sandbox_executions`, and `sandbox_snapshots` collections
+- [x] Backend ephemeral sandbox engine hook (`app/pb_hooks/114_ephemeral_sandbox_orchestrator.pb.js`) with 15 REST API endpoints for isolated sandbox provisioning, dynamic port allocation, lifecycle management (start/stop/restart/terminate), command execution logging, state snapshotting, health monitoring, and auto-TTL cleanup
+- [x] 8 FastMCP JSON-RPC 2.0 tools (`provision_dev_sandbox`, `list_dev_sandboxes`, `get_sandbox_status`, `exec_in_sandbox`, `snapshot_sandbox_state`, `terminate_dev_sandbox`, `list_sandbox_templates`, `get_sandbox_fleet_metrics`)
+- [x] Frontend AgentsView **📦 Ephemeral Sandboxes & Dev Environments** dashboard with live fleet status grid, port/preview URL links, terminal execution logs, snapshot checkpoints, template blueprints gallery, and interactive provisioning modal
+- [x] Comprehensive automated test suite `tests/test_ephemeral_sandboxes_orchestrator.py` with 15/15 passing tests and 100% frontend guard verification

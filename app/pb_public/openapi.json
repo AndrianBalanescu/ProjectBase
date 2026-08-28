@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "ProjectBase API",
-    "version": "1.28.0",
+    "version": "1.29.0",
     "description": "High-performance, ultra-lightweight Plane & Linear alternative for multi-project Kanban, sprint cycles, and autonomous AI agent orchestration.",
     "contact": {
       "name": "Andrian Balanescu",
@@ -7557,6 +7557,288 @@
         "summary": "Seed canonical benchmark suites and baseline model metrics",
         "responses": {
           "200": { "description": "Canonical benchmark suites seeded" }
+        }
+      }
+    },
+    "/projectbase/sandboxes": {
+      "get": {
+        "tags": ["Ephemeral Sandboxes & Dev Environments"],
+        "summary": "List dev sandboxes with optional status, project, session, and environment filtering",
+        "parameters": [
+          { "name": "status", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "project_id", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "session_id", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "environment_type", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer" } },
+          { "name": "offset", "in": "query", "required": false, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "List of dev sandboxes" }
+        }
+      }
+    },
+    "/projectbase/sandboxes/provision": {
+      "post": {
+        "tags": ["Ephemeral Sandboxes & Dev Environments"],
+        "summary": "Provision and launch an isolated dev sandbox or worktree environment",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "slug": { "type": "string" },
+                  "project_id": { "type": "string" },
+                  "issue_id": { "type": "string" },
+                  "session_id": { "type": "string" },
+                  "environment_type": { "type": "string" },
+                  "runtime_type": { "type": "string" },
+                  "template_id": { "type": "string" },
+                  "allocated_port": { "type": "integer" },
+                  "memory_limit_mb": { "type": "integer" },
+                  "ttl_seconds": { "type": "integer" },
+                  "auto_teardown": { "type": "boolean" },
+                  "env_vars_json": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Sandbox provisioned and running" }
+        }
+      }
+    },
+    "/projectbase/sandboxes/{id}": {
+      "get": {
+        "tags": ["Ephemeral Sandboxes & Dev Environments"],
+        "summary": "Get sandbox details, executions, and state snapshots",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Sandbox details" },
+          "404": { "description": "Sandbox not found" }
+        }
+      },
+      "delete": {
+        "tags": ["Ephemeral Sandboxes & Dev Environments"],
+        "summary": "Terminate and cleanup an ephemeral dev sandbox",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Sandbox terminated successfully" },
+          "404": { "description": "Sandbox not found" }
+        }
+      }
+    },
+    "/projectbase/sandboxes/{id}/action": {
+      "post": {
+        "tags": ["Ephemeral Sandboxes & Dev Environments"],
+        "summary": "Execute lifecycle action (start, stop, restart, terminate) on a sandbox",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": { "type": "string", "enum": ["start", "stop", "restart", "terminate", "resume", "pause"] }
+                },
+                "required": ["action"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Action executed successfully" }
+        }
+      }
+    },
+    "/projectbase/sandboxes/{id}/exec": {
+      "post": {
+        "tags": ["Ephemeral Sandboxes & Dev Environments"],
+        "summary": "Execute shell command inside sandbox and capture output",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "command": { "type": "string" },
+                  "executed_by": { "type": "string" },
+                  "exit_code": { "type": "integer" },
+                  "stdout": { "type": "string" },
+                  "stderr": { "type": "string" },
+                  "duration_ms": { "type": "integer" }
+                },
+                "required": ["command"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Command executed" }
+        }
+      }
+    },
+    "/projectbase/sandboxes/{id}/executions": {
+      "get": {
+        "tags": ["Ephemeral Sandboxes & Dev Environments"],
+        "summary": "List command execution history for a sandbox",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Execution history" }
+        }
+      }
+    },
+    "/projectbase/sandboxes/{id}/snapshot": {
+      "post": {
+        "tags": ["Ephemeral Sandboxes & Dev Environments"],
+        "summary": "Create named state and filesystem snapshot checkpoint",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "snapshot_name": { "type": "string" },
+                  "notes": { "type": "string" },
+                  "git_commit_sha": { "type": "string" },
+                  "state_hash": { "type": "string" },
+                  "file_count": { "type": "integer" },
+                  "size_kb": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Snapshot checkpoint captured" }
+        }
+      }
+    },
+    "/projectbase/sandboxes/{id}/snapshots": {
+      "get": {
+        "tags": ["Ephemeral Sandboxes & Dev Environments"],
+        "summary": "List state snapshot checkpoints for a sandbox",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "List of snapshots" }
+        }
+      }
+    },
+    "/projectbase/sandboxes/{id}/health": {
+      "post": {
+        "tags": ["Ephemeral Sandboxes & Dev Environments"],
+        "summary": "Update or report sandbox health status",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "health_status": { "type": "string", "enum": ["healthy", "degraded", "unhealthy", "unknown"] }
+                },
+                "required": ["health_status"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Health status updated" }
+        }
+      }
+    },
+    "/projectbase/sandboxes/templates": {
+      "get": {
+        "tags": ["Ephemeral Sandboxes & Dev Environments"],
+        "summary": "List available sandbox blueprint templates",
+        "responses": {
+          "200": { "description": "List of blueprint templates" }
+        }
+      },
+      "post": {
+        "tags": ["Ephemeral Sandboxes & Dev Environments"],
+        "summary": "Create or update a sandbox blueprint template",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "slug": { "type": "string" },
+                  "description": { "type": "string" },
+                  "runtime_type": { "type": "string" },
+                  "environment_type": { "type": "string" },
+                  "base_image": { "type": "string" },
+                  "build_command": { "type": "string" },
+                  "start_command": { "type": "string" },
+                  "default_port": { "type": "integer" },
+                  "memory_limit_mb": { "type": "integer" },
+                  "env_defaults_json": { "type": "object" },
+                  "is_default": { "type": "boolean" }
+                },
+                "required": ["name"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Template created successfully" }
+        }
+      }
+    },
+    "/projectbase/sandboxes/metrics": {
+      "get": {
+        "tags": ["Ephemeral Sandboxes & Dev Environments"],
+        "summary": "Retrieve fleet-wide sandbox resource allocation metrics and port utilization",
+        "responses": {
+          "200": { "description": "Fleet metrics" }
+        }
+      }
+    },
+    "/projectbase/sandboxes/cleanup-idle": {
+      "post": {
+        "tags": ["Ephemeral Sandboxes & Dev Environments"],
+        "summary": "Garbage collect and terminate idle sandboxes exceeding their TTL",
+        "responses": {
+          "200": { "description": "Cleaned count" }
+        }
+      }
+    },
+    "/projectbase/sandboxes/seed-defaults": {
+      "post": {
+        "tags": ["Ephemeral Sandboxes & Dev Environments"],
+        "summary": "Seed canonical sandbox environment blueprints",
+        "responses": {
+          "200": { "description": "Seeded canonical templates" }
         }
       }
     }

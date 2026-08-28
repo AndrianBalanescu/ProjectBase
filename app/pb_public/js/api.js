@@ -2385,5 +2385,171 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to seed default benchmarks');
     return data;
+  },
+
+  // Autonomous Ephemeral Dev Sandboxes & Worktree Container Orchestrator (Milestone 9 / Epic 30)
+  async listSandboxes(params = {}) {
+    const qp = new URLSearchParams();
+    if (params.status) qp.append('status', params.status);
+    if (params.project_id) qp.append('project_id', params.project_id);
+    if (params.session_id) qp.append('session_id', params.session_id);
+    if (params.environment_type) qp.append('environment_type', params.environment_type);
+    if (params.limit) qp.append('limit', params.limit);
+    const qs = qp.toString() ? `?${qp.toString()}` : '';
+    const res = await fetch(`/api/projectbase/sandboxes${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list sandboxes');
+    return data;
+  },
+
+  async provisionSandbox(payload = {}) {
+    const res = await fetch('/api/projectbase/sandboxes/provision', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to provision sandbox');
+    return data;
+  },
+
+  async getSandbox(id) {
+    const res = await fetch(`/api/projectbase/sandboxes/${encodeURIComponent(id)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get sandbox details');
+    return data;
+  },
+
+  async deleteSandbox(id) {
+    const res = await fetch(`/api/projectbase/sandboxes/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete sandbox');
+    return data;
+  },
+
+  async sandboxAction(id, action) {
+    const res = await fetch(`/api/projectbase/sandboxes/${encodeURIComponent(id)}/action`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ action })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to perform sandbox action');
+    return data;
+  },
+
+  async execInSandbox(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/sandboxes/${encodeURIComponent(id)}/exec`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to execute command in sandbox');
+    return data;
+  },
+
+  async listSandboxExecutions(id, params = {}) {
+    const qp = new URLSearchParams();
+    if (params.limit) qp.append('limit', params.limit);
+    const qs = qp.toString() ? `?${qp.toString()}` : '';
+    const res = await fetch(`/api/projectbase/sandboxes/${encodeURIComponent(id)}/executions${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list sandbox executions');
+    return data;
+  },
+
+  async createSandboxSnapshot(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/sandboxes/${encodeURIComponent(id)}/snapshot`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create sandbox snapshot');
+    return data;
+  },
+
+  async listSandboxSnapshots(id, params = {}) {
+    const qp = new URLSearchParams();
+    if (params.limit) qp.append('limit', params.limit);
+    const qs = qp.toString() ? `?${qp.toString()}` : '';
+    const res = await fetch(`/api/projectbase/sandboxes/${encodeURIComponent(id)}/snapshots${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list sandbox snapshots');
+    return data;
+  },
+
+  async updateSandboxHealth(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/sandboxes/${encodeURIComponent(id)}/health`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to update sandbox health');
+    return data;
+  },
+
+  async listSandboxTemplates() {
+    const res = await fetch('/api/projectbase/sandboxes/templates', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list sandbox templates');
+    return data;
+  },
+
+  async createSandboxTemplate(payload = {}) {
+    const res = await fetch('/api/projectbase/sandboxes/templates', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create sandbox template');
+    return data;
+  },
+
+  async getSandboxMetrics() {
+    const res = await fetch('/api/projectbase/sandboxes/metrics', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get sandbox metrics');
+    return data;
+  },
+
+  async cleanupIdleSandboxes() {
+    const res = await fetch('/api/projectbase/sandboxes/cleanup-idle', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to cleanup idle sandboxes');
+    return data;
+  },
+
+  async seedDefaultSandboxTemplates() {
+    const res = await fetch('/api/projectbase/sandboxes/seed-defaults', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to seed sandbox templates');
+    return data;
   }
 };

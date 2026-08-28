@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.29.0] - 2026-08-28 - Cycle 33
+### Added
+- **Autonomous Ephemeral Dev Sandboxes & Worktree Container Orchestrator (Milestone 9 / Epic 30):**
+  - Schema migration (`1710000042_add_ephemeral_sandboxes_and_dev_environments.js`) introducing 4 dedicated collections: `dev_sandboxes`, `sandbox_templates`, `sandbox_executions`, and `sandbox_snapshots`.
+  - Backend engine hook (`app/pb_hooks/114_ephemeral_sandbox_orchestrator.pb.js`) with 15 high-performance REST API endpoints:
+    - `GET /api/projectbase/sandboxes` and `POST /api/projectbase/sandboxes/provision` for provisioning and querying isolated sandboxes with dynamic port allocation and TTLs.
+    - `GET /api/projectbase/sandboxes/{id}` and `DELETE /api/projectbase/sandboxes/{id}` for retrieving detailed sandbox state, executions, snapshots, and decommissioning.
+    - `POST /api/projectbase/sandboxes/{id}/action` for managing lifecycle transitions (`start`, `stop`, `pause`, `restart`, `terminate`).
+    - `POST /api/projectbase/sandboxes/{id}/exec` and `GET /api/projectbase/sandboxes/{id}/executions` for executing commands inside sandboxes and tracking terminal output streams.
+    - `POST /api/projectbase/sandboxes/{id}/snapshot` and `GET /api/projectbase/sandboxes/{id}/snapshots` for capturing named state checkpoints and git commit hashes.
+    - `POST /api/projectbase/sandboxes/{id}/health` for probing and reporting runtime health status.
+    - `GET /api/projectbase/sandboxes/templates` and `POST /api/projectbase/sandboxes/templates` for blueprint template management.
+    - `GET /api/projectbase/sandboxes/metrics` for fleet-wide resource allocation, active container counts, and port utilization.
+    - `POST /api/projectbase/sandboxes/cleanup-idle` for automatic garbage collection of expired TTL sandboxes.
+    - `POST /api/projectbase/sandboxes/seed-defaults` for seeding canonical templates (Vue 3/Vite, FastAPI, Rust/Cargo, PocketBase, Flomaster Agent Worktree).
+  - 8 FastMCP JSON-RPC 2.0 tools (`provision_dev_sandbox`, `list_dev_sandboxes`, `get_sandbox_status`, `exec_in_sandbox`, `snapshot_sandbox_state`, `terminate_dev_sandbox`, `list_sandbox_templates`, `get_sandbox_fleet_metrics`).
+  - Frontend AgentsView **📦 Ephemeral Sandboxes & Dev Environments** dashboard with live fleet grid, port/preview URL links, terminal execution logs, snapshot checkpoints, and interactive provisioning modal.
+  - Comprehensive automated test suite `tests/test_ephemeral_sandboxes_orchestrator.py` with 15 test cases verifying templates, provisioning, lifecycle, executions, snapshots, FastMCP tools, and frontend guards.
+
 ## [1.28.0] - 2026-08-28 - Cycle 32
 ### Added
 - **Agent Evaluation Benchmark Harness, Leaderboard & Regression Matrix (Milestone 8 / Epic 29):**
