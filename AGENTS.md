@@ -49,7 +49,7 @@ docs/                  <- research, ROADMAP, TODO, architecture, COMPETITORS, FE
 scripts/               <- start.sh, build_css.sh, backup.sh, restore.sh, install-systemd.sh, deploy-demo.sh,
                           reset-demo.sh, bump_version.sh, typegen.sh, flow-cli (CLI wrapper), pb-cli,
                           mcp_server.py, pb_autonomous_runner.py, pb-autonomous-daemon.sh, install.sh, qa/, bench/
-tests/                 <- 390 tests across 27 suites
+tests/                 <- 390 tests across 27 files (test_agents_drift_guard.py, test_api.py, test_auto_heal_pipeline.py, test_autonomous_runner_sync.py, test_autoscale_orchestration.py, test_benchmarks.py, test_bulk_actions.py, test_cluster_replication.py, test_consensus_gates.py, test_css_sync.py, test_deploy_consistency.py, test_federation_analytics.py, test_fixture_hygiene.py, test_foss_schema.py, test_git_workspace_engine.py, test_issue_relations.py, test_multi_tenant_quotas.py, test_openapi_drift.py, test_sdk_observability.py, test_secret_scan.py, test_selfhosting.py, test_semantic_brain.py, test_sso_rbac_matrix.py, test_swarm_dag.py, test_webhook_automation.py, test_workflow_automations.py, test_workspace_synthesis.py)
 deploy/                <- projectbase.service, Caddyfile
 .github/workflows/ci.yml  <- CI (seeds superuser, runs tests)
 ```

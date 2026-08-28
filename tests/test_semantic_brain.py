@@ -39,7 +39,7 @@ def _request(method, path, body=None, headers=None):
         hdrs.update(headers)
     req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             resp_body = resp.read().decode("utf-8")
             return resp.status, json.loads(resp_body) if resp_body else {}
     except urllib.error.HTTPError as e:

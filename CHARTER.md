@@ -1,21 +1,22 @@
-# ProjectBase Charter
+# ProjectBase Charter — Execution-Native Architecture
 
-**Mission:** Build the world's fastest, zero-friction open-source Linear & Plane alternative — powered by PocketBase, SQLite, a zero-build Vue 3 frontend, Sortable drag-and-drop Kanban, and autonomous AI agent dispatch.
+**Mission:** Build the world's fastest, zero-friction, **execution-native AI agent orchestration and software engineering workspace** — where **agent sessions ARE live cards**, code diffs & test verdicts **ARE ground truth**, and human intent seamlessly compiles into multi-agent autonomous delivery with zero bureaucratic overhead.
 
-**Why:** Existing tools are either too heavy (Plane CE > 2.7 GB RAM), too slow to start, or closed. ProjectBase runs as a single binary on ~50 MB RAM, cold-starts in under 100 ms, and treats AI agents as first-class board members.
+**Why:** Existing issue trackers force AI agents to perform human-like administrative bookkeeping (costing 40% of their context in MCP ticket updates). ProjectBase inverts this: sessions run autonomously, and their execution state, git commits, and test proofs are streamed automatically into the workspace.
 
-**For Whom:** Solo developers, small teams, and AI-first workflows that want Linear-grade speed, fully self-hosted, with no node_modules and no build step.
+**For Whom:** Engineering teams, autonomous agent swarms, and AI-first developers seeking ultra-fast, zero-build, self-hosted orchestration without secretarial overhead.
 
 **How We Win:**
-- **Simplicity** — one binary, zero build frontend, instant SQLite.
-- **Performance** — cold start < 100 ms, ~50 MB RAM idle.
-- **AI-Native** — a built-in MCP server plus agent dispatch hooks; agents create, move, and query issues like any teammate.
-- **Fluid UX** — drag-and-drop, inline editing, real-time SSE updates.
-- **Open Source** — MIT, contributions welcome.
+- **Execution-Native:** Flomaster, Hermes, and Cursor sessions are ingested as live cards with live PID, files touched, and git diffs.
+- **Ground Truth Observability:** Completion is backed by git commits + test suites (pytest/playwright), not synthetic comments.
+- **One-Click Re-Tasking:** Fork, continue, or resume failed and completed sessions with preserved context.
+- **Simplicity & Speed:** Sub-50MB RAM footprint, single-binary PocketBase, zero-build Vue 3 frontend, instant SQLite.
+- **100% Free & Open Source:** MIT license, no paywalls, no monetization.
 
 **Success Criteria:**
-- [x] MCP server exposing `list_projects`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `move_issue`, `add_comment`, `list_cycles`
-- [x] Agent dispatch endpoint (`/api/projectbase/dispatch-agent`) and native chat view (`AgentsView`)
-- [x] Documented end-to-end agent run: create issue → move across columns via MCP (`scripts/bench/agent_workflow_bench.py`)
-- [x] Cold start < 100 ms (41.5 ms) and < 100 MB RAM under load (55.9 MB)
-- [x] Self-hosting + agent-integration docs (`docs/BENCHMARKS.md`, `deploy/`)
+- [x] Dual-engine BM25 + Dense RRF & Neural BGE-M3 Cross-Encoder Admission Brain
+- [x] FastMCP Server & Automated Workflow Engine
+- [ ] Session-native ingestion daemon & `agent_sessions` collection (Milestone 1)
+- [ ] Dual-plane workspace UI: Intent View vs Live Runs Stream (Milestone 2)
+- [ ] Visual in-browser Git Diff & Sceptic Audit Inspector (Milestone 3)
+- [ ] One-click session forking & re-tasking (Milestone 4)
