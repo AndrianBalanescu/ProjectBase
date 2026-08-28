@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.28.0] - 2026-08-28 - Cycle 32
+### Added
+- **Agent Evaluation Benchmark Harness, Leaderboard & Regression Matrix (Milestone 8 / Epic 29):**
+  - Schema migration (`1710000041_add_agent_evaluations_and_benchmarks.js`) introducing 4 dedicated collections: `eval_suites`, `eval_runs`, `eval_metrics`, and `eval_benchmarks`.
+  - Backend engine hook (`app/pb_hooks/113_agent_evaluation_benchmark_engine.pb.js`) with 12 high-performance REST API endpoints:
+    - `GET /api/projectbase/evals/suites` and `POST /api/projectbase/evals/suites` for creating, updating, and listing benchmark suites with domain filtering.
+    - `GET /api/projectbase/evals/suites/{id}` and `DELETE /api/projectbase/evals/suites/{id}` for retrieving detailed scenarios and removing suites.
+    - `POST /api/projectbase/evals/runs/trigger` for executing automated scenario evaluations against models and personas with composite score calculation.
+    - `GET /api/projectbase/evals/runs` and `GET /api/projectbase/evals/runs/{id}` for querying run histories and inspecting per-scenario metrics.
+    - `POST /api/projectbase/evals/runs/{id}/metrics` for ingesting granular scenario assertion results with latency and token telemetry.
+    - `GET /api/projectbase/evals/leaderboard` for generating ranked model/persona leaderboards with win-rates and certification status badges.
+    - `GET /api/projectbase/evals/regressions` for automated detection of accuracy drops (>5%), latency spikes (>25%), or token cost violations against baselines.
+    - `POST /api/projectbase/evals/compare` for side-by-side model comparison across accuracy, latency, and cost dimensions.
+    - `POST /api/projectbase/evals/seed-defaults` for seeding canonical benchmark suites (Coding, Tool Calling, Refactor, Security Guardrails) and model baselines.
+  - 8 FastMCP JSON-RPC 2.0 tools in `app/pb_hooks/91_mcp_server.pb.js`: `run_agent_eval_suite`, `list_eval_suites`, `get_eval_run_details`, `get_agent_leaderboard`, `detect_agent_regressions`, `create_eval_suite`, `record_eval_scenario_result`, and `compare_model_benchmarks`.
+  - Frontend AgentsView **📊 Evals & Leaderboard** dashboard with 4 KPI summary cards, interactive Leaderboard table with certification meters, Regression Anomaly Alert Center, Benchmark Suites runner, Recent Runs stream, and Side-by-Side Model Comparison modal.
+  - Comprehensive automated test suite `tests/test_agent_evaluations_engine.py` covering all 12 REST endpoints and 8 FastMCP tools.
+
 ## [1.27.0] - 2026-08-28 - Cycle 31
 ### Added
 - **Agent Fleet Budget & Cost Attribution, Token Quota Enforcement & Financial Governance Hub (Milestone 7 / Epic 28):**

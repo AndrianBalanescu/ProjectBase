@@ -7399,6 +7399,13 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         runRec.set("persona", persona);
         runRec.set("status", autoExecute ? "completed" : "running");
         runRec.set("total_scenarios", totalScenarios);
+        runRec.set("passed_scenarios", 0);
+        runRec.set("failed_scenarios", 0);
+        runRec.set("score_percentage", 0);
+        runRec.set("avg_latency_ms", 0);
+        runRec.set("total_tokens", 0);
+        runRec.set("total_cost_usd", 0);
+        e.app.save(runRec);
 
         let passed = 0;
         let failed = 0;

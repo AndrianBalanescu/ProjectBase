@@ -2251,5 +2251,139 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to reset circuit breaker');
     return data;
+  },
+
+  // Agent Evaluation Benchmark Harness, Leaderboard & Regression Matrix (Milestone 8 / Epic 29)
+  async listEvalSuites(params = {}) {
+    const qp = new URLSearchParams();
+    if (params.domain) qp.append('domain', params.domain);
+    if (params.active_only) qp.append('active_only', 'true');
+    const qs = qp.toString() ? `?${qp.toString()}` : '';
+    const res = await fetch(`/api/projectbase/evals/suites${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list evaluation suites');
+    return data;
+  },
+
+  async getEvalSuite(id) {
+    const res = await fetch(`/api/projectbase/evals/suites/${encodeURIComponent(id)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get evaluation suite');
+    return data;
+  },
+
+  async saveEvalSuite(payload = {}) {
+    const res = await fetch('/api/projectbase/evals/suites', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to save evaluation suite');
+    return data;
+  },
+
+  async deleteEvalSuite(id) {
+    const res = await fetch(`/api/projectbase/evals/suites/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete evaluation suite');
+    return data;
+  },
+
+  async triggerEvalRun(payload = {}) {
+    const res = await fetch('/api/projectbase/evals/runs/trigger', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to trigger evaluation run');
+    return data;
+  },
+
+  async listEvalRuns(params = {}) {
+    const qp = new URLSearchParams();
+    if (params.model) qp.append('model', params.model);
+    if (params.persona) qp.append('persona', params.persona);
+    if (params.suite_id) qp.append('suite_id', params.suite_id);
+    if (params.status) qp.append('status', params.status);
+    if (params.limit) qp.append('limit', params.limit);
+    const qs = qp.toString() ? `?${qp.toString()}` : '';
+    const res = await fetch(`/api/projectbase/evals/runs${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list evaluation runs');
+    return data;
+  },
+
+  async getEvalRun(id) {
+    const res = await fetch(`/api/projectbase/evals/runs/${encodeURIComponent(id)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get evaluation run');
+    return data;
+  },
+
+  async recordEvalMetric(runId, payload = {}) {
+    const res = await fetch(`/api/projectbase/evals/runs/${encodeURIComponent(runId)}/metrics`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to record evaluation metric');
+    return data;
+  },
+
+  async getEvalLeaderboard(params = {}) {
+    const qp = new URLSearchParams();
+    if (params.domain) qp.append('domain', params.domain);
+    const qs = qp.toString() ? `?${qp.toString()}` : '';
+    const res = await fetch(`/api/projectbase/evals/leaderboard${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get evaluation leaderboard');
+    return data;
+  },
+
+  async getEvalRegressions() {
+    const res = await fetch('/api/projectbase/evals/regressions', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get evaluation regressions');
+    return data;
+  },
+
+  async compareEvalModels(payload = {}) {
+    const res = await fetch('/api/projectbase/evals/compare', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to compare evaluation models');
+    return data;
+  },
+
+  async seedDefaultEvals() {
+    const res = await fetch('/api/projectbase/evals/seed-defaults', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to seed default benchmarks');
+    return data;
   }
 };

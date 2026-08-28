@@ -246,3 +246,13 @@
 - [x] 8 FastMCP JSON-RPC 2.0 tools (`get_agent_budget_status`, `set_agent_budget_policy`, `record_agent_token_usage`, `check_token_quota_availability`, `grant_emergency_budget_override`, `get_fleet_cost_analytics`, `list_cost_ledger_entries`, `get_model_pricing_matrix`)
 - [x] Frontend AgentsView **💰 Fleet Budget & Quotas** dashboard with 5 primary KPI cards, real-time model/persona spend meters, interactive budget policy manager, pre-flight in-flight quota simulator, live cost transaction ledger, and emergency override modals
 - [x] 438/438 automated tests passing across 33 test suites with 100% frontend guard, CSS sync, and zero console error verification
+
+---
+
+## Milestone (Cycle 32)
+**Epic 29 – Agent Evaluation Benchmark Harness, Leaderboard & Regression Matrix (✅ Done)**
+- [x] Schema migration (`1710000041_add_agent_evaluations_and_benchmarks.js`) introducing `eval_suites`, `eval_runs`, `eval_metrics`, and `eval_benchmarks` collections
+- [x] Backend eval benchmark engine hook (`app/pb_hooks/113_agent_evaluation_benchmark_engine.pb.js`) with 12 REST API endpoints for benchmark suite CRUD, automated scenario test execution, composite score computation, live leaderboard ranking, regression anomaly detection, and side-by-side model comparison
+- [x] 8 FastMCP JSON-RPC 2.0 tools (`run_agent_eval_suite`, `list_eval_suites`, `get_eval_run_details`, `get_agent_leaderboard`, `detect_agent_regressions`, `create_eval_suite`, `record_eval_scenario_result`, `compare_model_benchmarks`)
+- [x] Frontend AgentsView **📊 Evals & Leaderboard** dashboard with 4 KPI summary cards, interactive Leaderboard table with certification meters, Regression Anomaly Alert Center, Benchmark Suites runner, Recent Runs stream, and Side-by-Side Model Comparison modal
+- [x] Comprehensive automated test suite `tests/test_agent_evaluations_engine.py` with 100% frontend guard, CSS sync, and zero console error verification

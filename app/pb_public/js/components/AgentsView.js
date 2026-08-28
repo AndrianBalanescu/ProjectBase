@@ -333,7 +333,44 @@ const AgentsViewComponent = {
         isSimulating: false
       },
       ledgerFilterPersona: '',
-      ledgerFilterModel: ''
+      ledgerFilterModel: '',
+      // Agent Evaluation Benchmark Harness, Leaderboard & Regression Matrix (Milestone 8 / Epic 29)
+      evalSuites: [],
+      evalRuns: [],
+      evalLeaderboard: [],
+      evalRegressions: [],
+      evalSummary: null,
+      selectedEvalSuite: null,
+      selectedEvalRun: null,
+      evalComparison: null,
+      isLoadingEvals: false,
+      isTriggeringEval: false,
+      isSeedingEvals: false,
+      isComparingModels: false,
+      evalSuccessMsg: null,
+      evalErrorMsg: null,
+      evalTriggerModalOpen: false,
+      evalSuiteModalOpen: false,
+      evalCompareModalOpen: false,
+      evalTriggerModel: 'gpt-5.5',
+      evalTriggerPersona: 'coder',
+      evalTriggerSuiteSlug: 'coding-accuracy-v1',
+      evalFilterDomain: '',
+      evalFilterModel: '',
+      compareModelA: 'gpt-5.5',
+      compareModelB: 'claude-fable-5',
+      comparePersona: 'coder',
+      newEvalSuite: {
+        name: '',
+        slug: '',
+        description: '',
+        domain: 'coding',
+        pass_threshold_pct: 90,
+        timeout_seconds: 60,
+        scenarios: [
+          { id: 'sc-1', name: 'Standard Code Generation Scenario', expected: 'exit 0' }
+        ]
+      }
     };
   },
   computed: {
@@ -2298,8 +2335,120 @@ const AgentsViewComponent = {
         this.budgetErrorMsg = 'Failed to reset circuit breaker: ' + (e.message || String(e));
       }
     },
+    // Agent Evaluation Benchmark Harness, Leaderboard & Regression Matrix (Milestone 8 / Epic 29)
+    async loadEvalGovernanceData() {
+      this.isLoadingEvals = true;
+      this.evalErrorMsg = null;
+      try {
+        const [suitesRes, runsRes, lbRes, regRes] = await Promise.all([
+          API.listEvalSuites(this.evalFilterDomain ? { domain: this.evalFilterDomain } : {}),
+          API.listEvalRuns({ limit: 50, model: this.evalFilterModel || undefined }),
+          API.getEvalLeaderboard(this.evalFilterDomain ? { domain: this.evalFilterDomain } : {}),
+          API.getEvalRegressions()
+        ]);
+        this.evalSuites = suitesRes.suites || [];
+        this.evalRuns = runsRes.runs || [];
+        this.evalLeaderboard = lbRes.leaderboard || [];
+        this.evalSummary = lbRes.summary || null;
+        this.evalRegressions = regRes.regressions || [];
+      } catch (e) {
+        this.evalErrorMsg = 'Failed to load eval benchmarks: ' + (e.message || String(e));
+      } finally {
+        this.isLoadingEvals = false;
+      }
+    },
+    async triggerNewEvalRun() {
+      this.isTriggeringEval = true;
+      this.evalErrorMsg = null;
+      this.evalSuccessMsg = null;
+      try {
+        const res = await API.triggerEvalRun({
+          model: this.evalTriggerModel,
+          persona: this.evalTriggerPersona,
+          suite_slug: this.evalTriggerSuiteSlug,
+          auto_execute: true
+        });
+        this.evalSuccessMsg = `Evaluation run completed with score ${res.run?.score_percentage}% (${res.run?.passed_scenarios}/${res.run?.total_scenarios} passed)`;
+        this.evalTriggerModalOpen = false;
+        await this.loadEvalGovernanceData();
+      } catch (e) {
+        this.evalErrorMsg = 'Failed to trigger evaluation run: ' + (e.message || String(e));
+      } finally {
+        this.isTriggeringEval = false;
+      }
+    },
+    async viewEvalRunDetails(runId) {
+      try {
+        const res = await API.getEvalRun(runId);
+        this.selectedEvalRun = res;
+      } catch (e) {
+        this.evalErrorMsg = 'Failed to load run details: ' + (e.message || String(e));
+      }
+    },
+    async runModelComparison() {
+      this.isComparingModels = true;
+      this.evalErrorMsg = null;
+      try {
+        const res = await API.compareEvalModels({
+          model_a: this.compareModelA,
+          model_b: this.compareModelB,
+          persona: this.comparePersona
+        });
+        this.evalComparison = res;
+      } catch (e) {
+        this.evalErrorMsg = 'Failed to compare models: ' + (e.message || String(e));
+      } finally {
+        this.isComparingModels = false;
+      }
+    },
+    async seedEvalDefaults() {
+      this.isSeedingEvals = true;
+      this.evalErrorMsg = null;
+      try {
+        const res = await API.seedDefaultEvals();
+        this.evalSuccessMsg = res.message || 'Seeded canonical benchmark suites';
+        await this.loadEvalGovernanceData();
+      } catch (e) {
+        this.evalErrorMsg = 'Failed to seed eval benchmarks: ' + (e.message || String(e));
+      } finally {
+        this.isSeedingEvals = false;
+      }
+    },
+    async createCustomEvalSuite() {
+      if (!this.newEvalSuite.name) {
+        this.evalErrorMsg = 'Suite name is required';
+        return;
+      }
+      try {
+        await API.saveEvalSuite(this.newEvalSuite);
+        this.evalSuccessMsg = 'Evaluation suite created successfully';
+        this.evalSuiteModalOpen = false;
+        this.newEvalSuite = {
+          name: '',
+          slug: '',
+          description: '',
+          domain: 'coding',
+          pass_threshold_pct: 90,
+          timeout_seconds: 60,
+          scenarios: [{ id: 'sc-1', name: 'Standard Code Generation Scenario', expected: 'exit 0' }]
+        };
+        await this.loadEvalGovernanceData();
+      } catch (e) {
+        this.evalErrorMsg = 'Failed to create eval suite: ' + (e.message || String(e));
+      }
+    },
+    async removeEvalSuite(suiteId) {
+      if (!confirm('Are you sure you want to delete this evaluation benchmark suite?')) return;
+      try {
+        await API.deleteEvalSuite(suiteId);
+        this.evalSuccessMsg = 'Evaluation suite removed';
+        await this.loadEvalGovernanceData();
+      } catch (e) {
+        this.evalErrorMsg = 'Failed to delete eval suite: ' + (e.message || String(e));
+      }
+    },
     isGovernanceTab(tab) {
-      return ['workload', 'anomalies', 'semantic', 'auto_heal', 'sso_rbac', 'automations', 'tenants', 'webhooks', 'observability', 'consensus', 'cluster', 'federation', 'throughput', 'swarm', 'merges', 'budget'].includes(tab);
+      return ['workload', 'anomalies', 'semantic', 'auto_heal', 'sso_rbac', 'automations', 'tenants', 'webhooks', 'observability', 'consensus', 'cluster', 'federation', 'throughput', 'swarm', 'merges', 'budget', 'evals'].includes(tab);
     },
     onGovernanceTabSelect(tab) {
       if (!tab) return;
@@ -2311,6 +2460,8 @@ const AgentsViewComponent = {
         this.loadMergeMatrix();
       } else if (tab === 'budget') {
         this.loadBudgetGovernanceData();
+      } else if (tab === 'evals') {
+        this.loadEvalGovernanceData();
       }
     }
   },
@@ -2428,7 +2579,7 @@ const AgentsViewComponent = {
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <h2 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 capitalize truncate">
-                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (activeTab === 'automations' ? 'Native Workflow Automations & AI Agent Trigger Pipelines' : (activeTab === 'tenants' ? 'Multi-Tenant Isolation & Granular Resource Quotas' : (activeTab === 'auto_heal' ? 'Autonomous AI Agent Auto-Healing & Self-Remediation Workflow Pipeline' : (activeTab === 'budget' ? 'Agent Fleet Budget & Cost Governance Hub' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center'))))))))))))) }}
+                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (activeTab === 'automations' ? 'Native Workflow Automations & AI Agent Trigger Pipelines' : (activeTab === 'tenants' ? 'Multi-Tenant Isolation & Granular Resource Quotas' : (activeTab === 'auto_heal' ? 'Autonomous AI Agent Auto-Healing & Self-Remediation Workflow Pipeline' : (activeTab === 'budget' ? 'Agent Fleet Budget & Cost Governance Hub' : (activeTab === 'evals' ? 'Agent Evaluation Benchmark Harness & Model Leaderboard' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center')))))))))))))) }}
                 </h2>
                 <span v-if="selectedSession && selectedSession.is_active && activeTab === 'chat'" class="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-400 text-[10px] font-mono font-semibold flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -2478,6 +2629,7 @@ const AgentsViewComponent = {
                     <option value="swarm">🐝 Swarm Clusters & Topologies</option>
                     <option value="merges">🔀 Merge Matrix & Conflicts</option>
                     <option value="budget">💰 Fleet Budget & Quotas</option>
+                    <option value="evals">📊 Evals & Leaderboard</option>
                     <option value="federation">🌐 Multi-Cluster Federation</option>
                   </select>
                 </div>
@@ -6884,6 +7036,692 @@ const AgentsViewComponent = {
                   class="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-bold transition-colors flex items-center gap-1 shadow-xs"
                 >
                   <span>{{ isGrantingOverride ? 'Granting...' : '🔓 Grant Override' }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- PANE 2I2: AGENT EVALUATION BENCHMARK HARNESS & LEADERBOARD (EPIC 29) -->
+        <!-- ========================================================= -->
+        <div v-else-if="activeTab === 'evals'" class="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/30">
+          <!-- Header Banner -->
+          <div class="p-4 rounded-xl bg-gradient-to-r from-purple-900/40 via-indigo-900/30 to-zinc-900 border border-purple-700/40 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-lg">📊</span>
+                <h3 class="text-sm font-bold text-white tracking-wide">Agent Evaluation Benchmark Harness & Leaderboard</h3>
+                <span class="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-bold">MILESTONE 8</span>
+              </div>
+              <p class="text-xs text-zinc-300 mt-1">
+                Continuous standardized eval suites, automated scenario assertions, multi-model leaderboard ranking, and automated regression detection.
+              </p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0 flex-wrap">
+              <button
+                @click="evalTriggerModalOpen = true"
+                class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
+              >
+                <span>▶ Run Eval Benchmark</span>
+              </button>
+              <button
+                @click="evalCompareModalOpen = true; runModelComparison();"
+                class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
+              >
+                <span>⚖️ Compare Models</span>
+              </button>
+              <button
+                @click="evalSuiteModalOpen = true"
+                class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-bold transition-colors flex items-center gap-1.5"
+              >
+                <span>➕ New Suite</span>
+              </button>
+              <button
+                @click="seedEvalDefaults()"
+                :disabled="isSeedingEvals"
+                class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-100 text-xs font-bold transition-colors flex items-center gap-1.5"
+              >
+                <span>🌱 {{ isSeedingEvals ? 'Seeding...' : 'Seed Defaults' }}</span>
+              </button>
+              <button
+                @click="loadEvalGovernanceData()"
+                :disabled="isLoadingEvals"
+                class="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-100 text-xs font-bold transition-colors"
+                title="Refresh benchmarks"
+              >
+                <span>🔄</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Alert Feedback -->
+          <div v-if="evalSuccessMsg" class="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center justify-between">
+            <span>✅ {{ evalSuccessMsg }}</span>
+            <button @click="evalSuccessMsg = null" class="text-emerald-400 font-bold">&times;</button>
+          </div>
+          <div v-if="evalErrorMsg" class="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center justify-between">
+            <span>⚠️ {{ evalErrorMsg }}</span>
+            <button @click="evalErrorMsg = null" class="text-rose-400 font-bold">&times;</button>
+          </div>
+
+          <!-- KPI Summary Cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs flex items-center justify-between">
+              <div>
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Top Performing Model</p>
+                <h4 class="text-lg font-mono font-bold text-zinc-900 dark:text-zinc-100 mt-0.5">
+                  {{ evalSummary ? evalSummary.top_performing_model : (evalLeaderboard.length ? evalLeaderboard[0].model : 'gpt-5.5') }}
+                </h4>
+                <p class="text-[10px] text-purple-500 font-medium">Rank #1 overall composite</p>
+              </div>
+              <span class="text-2xl p-2.5 rounded-xl bg-purple-500/10 text-purple-400">🏆</span>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs flex items-center justify-between">
+              <div>
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Certified Models</p>
+                <h4 class="text-lg font-mono font-bold text-zinc-900 dark:text-zinc-100 mt-0.5">
+                  {{ evalSummary ? evalSummary.certified_models : evalLeaderboard.filter(b => b.certification_status === 'certified').length }}
+                  <span class="text-xs text-zinc-500 font-normal">/ {{ evalLeaderboard.length }}</span>
+                </h4>
+                <p class="text-[10px] text-emerald-500 font-medium">≥90% pass threshold</p>
+              </div>
+              <span class="text-2xl p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400">🎖️</span>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs flex items-center justify-between">
+              <div>
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Benchmark Suites</p>
+                <h4 class="text-lg font-mono font-bold text-zinc-900 dark:text-zinc-100 mt-0.5">
+                  {{ evalSuites.length }}
+                </h4>
+                <p class="text-[10px] text-blue-500 font-medium">Coding, Tool Use, Refactor & Safety</p>
+              </div>
+              <span class="text-2xl p-2.5 rounded-xl bg-blue-500/10 text-blue-400">📚</span>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs flex items-center justify-between">
+              <div>
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Detected Regressions</p>
+                <h4 class="text-lg font-mono font-bold text-zinc-900 dark:text-zinc-100 mt-0.5">
+                  {{ evalRegressions.length }}
+                </h4>
+                <p class="text-[10px]" :class="evalRegressions.length ? 'text-rose-500 font-bold' : 'text-emerald-500'">
+                  {{ evalRegressions.length ? 'Violations active' : 'Zero regressions' }}
+                </p>
+              </div>
+              <span class="text-2xl p-2.5 rounded-xl" :class="evalRegressions.length ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'">
+                {{ evalRegressions.length ? '🚨' : '✨' }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Regression Alert Banner (if regressions detected) -->
+          <div v-if="evalRegressions.length" class="p-4 rounded-xl bg-rose-950/30 border border-rose-800/60 shadow-xs space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="text-lg">🚨</span>
+                <h4 class="text-xs font-bold text-rose-300">Model Performance & Accuracy Regression Alert</h4>
+                <span class="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] font-mono font-bold">ACTION REQUIRED</span>
+              </div>
+              <span class="text-xs text-rose-400 font-mono">{{ evalRegressions.length }} anomalies</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div
+                v-for="(reg, idx) in evalRegressions"
+                :key="idx"
+                class="p-3 rounded-lg bg-zinc-900/80 border border-rose-900/60 flex items-start justify-between gap-2 text-xs"
+              >
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-bold text-white font-mono">{{ reg.model }}</span>
+                    <span class="px-1.5 py-0.5 rounded bg-zinc-800 text-[10px] text-zinc-400 font-mono">{{ reg.persona }}</span>
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold" :class="reg.severity === 'critical' ? 'bg-rose-500/20 text-rose-400' : 'bg-amber-500/20 text-amber-400'">
+                      {{ reg.severity }}
+                    </span>
+                  </div>
+                  <p class="text-[11px] text-zinc-300 mt-1">
+                    Pass Rate: <span class="font-mono text-rose-400">{{ reg.score_percentage }}%</span> (Baseline: {{ reg.baseline_pass_rate }}%, <span class="text-rose-400">{{ reg.pass_rate_delta }}%</span>)
+                  </p>
+                  <p class="text-[10px] text-zinc-400 mt-0.5">💡 {{ reg.recommendation }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Model & Persona Global Leaderboard Table -->
+          <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <div class="flex items-center gap-2">
+                <span class="text-sm">🏆</span>
+                <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Global Model & Persona Evaluation Leaderboard</h4>
+                <span class="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 text-[10px] font-mono font-bold">{{ evalLeaderboard.length }} models</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <select
+                  v-model="evalFilterDomain"
+                  @change="loadEvalGovernanceData()"
+                  class="px-2.5 py-1 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 focus:outline-none"
+                >
+                  <option value="">All Domains</option>
+                  <option value="coding">Coding & Syntax</option>
+                  <option value="reasoning">Reasoning & Architecture</option>
+                  <option value="tool_use">FastMCP Tool Calling</option>
+                  <option value="refactor">Refactor & Merges</option>
+                  <option value="security">Security & Guardrails</option>
+                </select>
+              </div>
+            </div>
+
+            <div v-if="evalLeaderboard.length" class="overflow-x-auto">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr class="border-b border-zinc-200 dark:border-zinc-800 text-[10px] uppercase font-bold text-zinc-400">
+                    <th class="py-2.5 px-2">Rank</th>
+                    <th class="py-2.5 px-2">Model & Persona</th>
+                    <th class="py-2.5 px-2">Domain</th>
+                    <th class="py-2.5 px-2">Composite Score</th>
+                    <th class="py-2.5 px-2">Pass Rate</th>
+                    <th class="py-2.5 px-2">Win Rate</th>
+                    <th class="py-2.5 px-2">Avg Latency</th>
+                    <th class="py-2.5 px-2">Cost / Task</th>
+                    <th class="py-2.5 px-2">Status</th>
+                    <th class="py-2.5 px-2 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60 font-mono">
+                  <tr v-for="item in evalLeaderboard" :key="item.id" class="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
+                    <td class="py-2.5 px-2 font-bold">
+                      <span v-if="item.rank === 1" class="text-amber-400">🥇 #1</span>
+                      <span v-else-if="item.rank === 2" class="text-zinc-300">🥈 #2</span>
+                      <span v-else-if="item.rank === 3" class="text-amber-600">🥉 #3</span>
+                      <span v-else class="text-zinc-500">#{{ item.rank }}</span>
+                    </td>
+                    <td class="py-2.5 px-2">
+                      <div class="flex items-center gap-1.5">
+                        <span class="font-bold text-zinc-900 dark:text-zinc-100">{{ item.model }}</span>
+                        <span class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-[10px]">{{ item.persona }}</span>
+                      </div>
+                    </td>
+                    <td class="py-2.5 px-2">
+                      <span class="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[10px] text-zinc-400 capitalize">{{ item.domain }}</span>
+                    </td>
+                    <td class="py-2.5 px-2">
+                      <div class="flex items-center gap-2">
+                        <div class="w-16 h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
+                          <div
+                            class="h-full rounded-full transition-all"
+                            :class="item.composite_score >= 90 ? 'bg-emerald-500' : (item.composite_score >= 75 ? 'bg-indigo-500' : 'bg-amber-500')"
+                            :style="{ width: Math.min(100, item.composite_score) + '%' }"
+                          ></div>
+                        </div>
+                        <span class="font-bold text-zinc-900 dark:text-zinc-100">{{ item.composite_score }}</span>
+                      </div>
+                    </td>
+                    <td class="py-2.5 px-2 font-bold" :class="item.avg_pass_rate >= 90 ? 'text-emerald-500' : (item.avg_pass_rate >= 75 ? 'text-indigo-400' : 'text-amber-400')">
+                      {{ item.avg_pass_rate }}%
+                    </td>
+                    <td class="py-2.5 px-2 text-zinc-400">
+                      {{ item.win_rate }}%
+                    </td>
+                    <td class="py-2.5 px-2 text-zinc-400">
+                      {{ item.avg_latency_ms }}ms
+                    </td>
+                    <td class="py-2.5 px-2 text-zinc-400">
+                      \${{ item.avg_cost_per_task ? item.avg_cost_per_task.toFixed(4) : '0.0000' }}
+                    </td>
+                    <td class="py-2.5 px-2">
+                      <span
+                        class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                        :class="item.certification_status === 'certified' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : (item.certification_status === 'under_review' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30')"
+                      >
+                        {{ item.certification_status }}
+                      </span>
+                    </td>
+                    <td class="py-2.5 px-2 text-right">
+                      <button
+                        @click="evalTriggerModel = item.model; evalTriggerPersona = item.persona; evalTriggerModalOpen = true"
+                        class="px-2 py-1 rounded bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 text-[10px] font-bold transition-colors"
+                      >
+                        ▶ Eval
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else class="py-8 text-center text-xs text-zinc-400">
+              No leaderboard baseline benchmarks registered yet. Click "Seed Defaults" or "Run Eval Benchmark".
+            </div>
+          </div>
+
+          <!-- Two-Column Grid: Suites and Live Runs -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <!-- Left: Standardized Benchmark Suites -->
+            <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm">📚</span>
+                  <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Benchmark Test Suites</h4>
+                  <span class="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[10px] font-mono">{{ evalSuites.length }}</span>
+                </div>
+                <button
+                  @click="evalSuiteModalOpen = true"
+                  class="px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-[10px] font-bold"
+                >
+                  ➕ Add Suite
+                </button>
+              </div>
+
+              <div v-if="evalSuites.length" class="space-y-2.5 max-h-96 overflow-y-auto">
+                <div
+                  v-for="s in evalSuites"
+                  :key="s.id"
+                  class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800/80 hover:border-purple-500/50 transition-colors"
+                >
+                  <div class="flex items-start justify-between gap-2">
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <h5 class="text-xs font-bold text-zinc-900 dark:text-zinc-100">{{ s.name }}</h5>
+                        <span class="px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 text-[9px] font-mono uppercase">{{ s.domain }}</span>
+                      </div>
+                      <p class="text-[11px] text-zinc-500 mt-0.5 line-clamp-2">{{ s.description || 'No description provided.' }}</p>
+                    </div>
+                    <div class="flex items-center gap-1 shrink-0">
+                      <button
+                        @click="evalTriggerSuiteSlug = s.slug; evalTriggerModalOpen = true"
+                        class="px-2 py-1 rounded bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-bold transition-colors shadow-2xs"
+                      >
+                        ▶ Run
+                      </button>
+                      <button
+                        @click="removeEvalSuite(s.id)"
+                        class="p-1 text-zinc-400 hover:text-rose-500 text-xs transition-colors"
+                        title="Delete suite"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="mt-2 pt-2 border-t border-zinc-200 dark:border-zinc-800/60 flex items-center justify-between text-[10px] font-mono text-zinc-400">
+                    <span>Scenarios: <strong class="text-zinc-200">{{ s.scenarios_count || (s.scenarios ? s.scenarios.length : 0) }}</strong></span>
+                    <span>Pass Threshold: <strong class="text-emerald-400">{{ s.pass_threshold_pct }}%</strong></span>
+                    <span>Timeout: <strong class="text-zinc-200">{{ s.timeout_seconds }}s</strong></span>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="py-6 text-center text-xs text-zinc-400">
+                No evaluation suites found.
+              </div>
+            </div>
+
+            <!-- Right: Live & Recent Eval Runs Stream -->
+            <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm">📈</span>
+                  <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Recent Evaluation Runs</h4>
+                  <span class="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[10px] font-mono">{{ evalRuns.length }}</span>
+                </div>
+              </div>
+
+              <div v-if="evalRuns.length" class="space-y-2.5 max-h-96 overflow-y-auto">
+                <div
+                  v-for="r in evalRuns"
+                  :key="r.id"
+                  @click="viewEvalRunDetails(r.id)"
+                  class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800/80 hover:border-purple-500/50 cursor-pointer transition-colors"
+                >
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-xs font-bold text-white font-mono">{{ r.model }}</span>
+                      <span class="px-1.5 py-0.5 rounded bg-zinc-800 text-[10px] text-zinc-400 font-mono">{{ r.persona }}</span>
+                      <span class="text-[10px] text-zinc-500 font-mono">({{ r.suite_slug }})</span>
+                    </div>
+                    <span
+                      class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono"
+                      :class="r.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' : (r.status === 'running' ? 'bg-blue-500/20 text-blue-400 animate-pulse' : 'bg-rose-500/20 text-rose-400')"
+                    >
+                      {{ r.status }}
+                    </span>
+                  </div>
+
+                  <div class="mt-2 grid grid-cols-4 gap-1 text-[10px] font-mono">
+                    <div class="p-1.5 rounded bg-zinc-100 dark:bg-zinc-900">
+                      <p class="text-zinc-500">Score</p>
+                      <p class="font-bold text-emerald-400">{{ r.score_percentage }}%</p>
+                    </div>
+                    <div class="p-1.5 rounded bg-zinc-100 dark:bg-zinc-900">
+                      <p class="text-zinc-500">Passed</p>
+                      <p class="font-bold text-zinc-200">{{ r.passed_scenarios }}/{{ r.total_scenarios }}</p>
+                    </div>
+                    <div class="p-1.5 rounded bg-zinc-100 dark:bg-zinc-900">
+                      <p class="text-zinc-500">Latency</p>
+                      <p class="font-bold text-zinc-200">{{ r.avg_latency_ms }}ms</p>
+                    </div>
+                    <div class="p-1.5 rounded bg-zinc-100 dark:bg-zinc-900">
+                      <p class="text-zinc-500">Cost</p>
+                      <p class="font-bold text-zinc-200">\${{ r.total_cost_usd ? r.total_cost_usd.toFixed(4) : '0.0000' }}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="py-6 text-center text-xs text-zinc-400">
+                No evaluation runs recorded yet.
+              </div>
+            </div>
+          </div>
+
+          <!-- Run Benchmark Trigger Modal -->
+          <div v-if="evalTriggerModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-2xl space-y-4">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">▶</span>
+                  <div>
+                    <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Run Benchmark Evaluation</h3>
+                    <p class="text-[11px] text-zinc-500">Evaluate model accuracy and test scenarios</p>
+                  </div>
+                </div>
+                <button @click="evalTriggerModalOpen = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3 text-xs">
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Target Model *</label>
+                  <input
+                    v-model="evalTriggerModel"
+                    placeholder="e.g. gpt-5.5, claude-fable-5, deepseek-r1"
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 font-mono focus:outline-none"
+                  />
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Persona</label>
+                    <select
+                      v-model="evalTriggerPersona"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:outline-none"
+                    >
+                      <option value="coder">Coder</option>
+                      <option value="architect">Architect</option>
+                      <option value="debugger">Debugger</option>
+                      <option value="qa">QA Engineer</option>
+                      <option value="scout">Scout</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Benchmark Suite</label>
+                    <select
+                      v-model="evalTriggerSuiteSlug"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:outline-none"
+                    >
+                      <option v-for="s in evalSuites" :key="s.id" :value="s.slug">{{ s.name }}</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  @click="evalTriggerModalOpen = false"
+                  class="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold hover:bg-zinc-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  @click="triggerNewEvalRun()"
+                  :disabled="isTriggeringEval"
+                  class="px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-xs font-bold transition-colors flex items-center gap-1 shadow-xs"
+                >
+                  <span>{{ isTriggeringEval ? 'Evaluating...' : '🚀 Start Evaluation' }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Model Side-by-Side Comparison Modal -->
+          <div v-if="evalCompareModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="w-full max-w-2xl rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-2xl space-y-4">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">⚖️</span>
+                  <div>
+                    <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Side-by-Side Model Comparison</h3>
+                    <p class="text-[11px] text-zinc-500">Benchmark comparison on identical test suites</p>
+                  </div>
+                </div>
+                <button @click="evalCompareModalOpen = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Model A</label>
+                  <input
+                    v-model="compareModelA"
+                    @change="runModelComparison()"
+                    placeholder="e.g. gpt-5.5"
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 font-mono focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Model B</label>
+                  <input
+                    v-model="compareModelB"
+                    @change="runModelComparison()"
+                    placeholder="e.g. claude-fable-5"
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 font-mono focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div v-if="evalComparison" class="space-y-3">
+                <div class="p-3 rounded-lg bg-indigo-950/40 border border-indigo-800/60 text-xs text-indigo-300">
+                  <span class="font-bold">🏆 Head-to-Head Winner: </span>
+                  <span class="font-mono font-bold text-white">{{ evalComparison.head_to_head.composite_winner }}</span>
+                  (Advantage: +{{ evalComparison.head_to_head.score_delta }} pts)
+                  <p class="text-[11px] text-zinc-300 mt-0.5">{{ evalComparison.head_to_head.recommendation }}</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 font-mono text-xs">
+                  <div class="p-3 rounded-xl bg-zinc-950/60 border border-zinc-800 space-y-2">
+                    <h5 class="font-bold text-white">{{ evalComparison.model_a.model }}</h5>
+                    <div class="flex justify-between text-[11px]"><span class="text-zinc-400">Composite:</span> <strong class="text-purple-400">{{ evalComparison.model_a.composite_score }}</strong></div>
+                    <div class="flex justify-between text-[11px]"><span class="text-zinc-400">Pass Rate:</span> <strong class="text-emerald-400">{{ evalComparison.model_a.pass_rate }}%</strong></div>
+                    <div class="flex justify-between text-[11px]"><span class="text-zinc-400">Latency:</span> <strong class="text-zinc-200">{{ evalComparison.model_a.latency_ms }}ms</strong></div>
+                    <div class="flex justify-between text-[11px]"><span class="text-zinc-400">Cost:</span> <strong class="text-zinc-200">\${{ evalComparison.model_a.cost_usd }}</strong></div>
+                  </div>
+
+                  <div class="p-3 rounded-xl bg-zinc-950/60 border border-zinc-800 space-y-2">
+                    <h5 class="font-bold text-white">{{ evalComparison.model_b.model }}</h5>
+                    <div class="flex justify-between text-[11px]"><span class="text-zinc-400">Composite:</span> <strong class="text-purple-400">{{ evalComparison.model_b.composite_score }}</strong></div>
+                    <div class="flex justify-between text-[11px]"><span class="text-zinc-400">Pass Rate:</span> <strong class="text-emerald-400">{{ evalComparison.model_b.pass_rate }}%</strong></div>
+                    <div class="flex justify-between text-[11px]"><span class="text-zinc-400">Latency:</span> <strong class="text-zinc-200">{{ evalComparison.model_b.latency_ms }}ms</strong></div>
+                    <div class="flex justify-between text-[11px]"><span class="text-zinc-400">Cost:</span> <strong class="text-zinc-200">\${{ evalComparison.model_b.cost_usd }}</strong></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  @click="evalCompareModalOpen = false"
+                  class="px-4 py-1.5 rounded-lg bg-zinc-800 text-zinc-200 text-xs font-semibold hover:bg-zinc-700"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Create Benchmark Suite Modal -->
+          <div v-if="evalSuiteModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-2xl space-y-4">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">➕</span>
+                  <div>
+                    <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Create Benchmark Suite</h3>
+                    <p class="text-[11px] text-zinc-500">Define a new standardized evaluation harness</p>
+                  </div>
+                </div>
+                <button @click="evalSuiteModalOpen = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3 text-xs">
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Suite Name *</label>
+                  <input
+                    v-model="newEvalSuite.name"
+                    placeholder="e.g. Vue 3 Reactive Bugfix Benchmark"
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:outline-none"
+                  />
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Slug Identifier</label>
+                    <input
+                      v-model="newEvalSuite.slug"
+                      placeholder="e.g. vue3-bugfix-v1"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 font-mono focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Domain</label>
+                    <select
+                      v-model="newEvalSuite.domain"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:outline-none"
+                    >
+                      <option value="coding">Coding</option>
+                      <option value="reasoning">Reasoning</option>
+                      <option value="tool_use">Tool Use</option>
+                      <option value="refactor">Refactor</option>
+                      <option value="qa">QA</option>
+                      <option value="security">Security</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Description</label>
+                  <textarea
+                    v-model="newEvalSuite.description"
+                    rows="2"
+                    placeholder="Describe the test harness focus..."
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:outline-none"
+                  ></textarea>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Pass Threshold (%)</label>
+                    <input
+                      type="number"
+                      v-model.number="newEvalSuite.pass_threshold_pct"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 font-mono focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Timeout (s)</label>
+                    <input
+                      type="number"
+                      v-model.number="newEvalSuite.timeout_seconds"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 font-mono focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  @click="evalSuiteModalOpen = false"
+                  class="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold hover:bg-zinc-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  @click="createCustomEvalSuite()"
+                  class="px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-colors shadow-xs"
+                >
+                  Create Suite
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Granular Run Details Modal -->
+          <div v-if="selectedEvalRun" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="w-full max-w-3xl rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">📋</span>
+                  <div>
+                    <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Evaluation Run Inspection</h3>
+                    <p class="text-[11px] text-zinc-500 font-mono">Run ID: {{ selectedEvalRun.id }}</p>
+                  </div>
+                </div>
+                <button @click="selectedEvalRun = null" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="grid grid-cols-4 gap-2 text-xs font-mono">
+                <div class="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800">
+                  <p class="text-[10px] text-zinc-400">Model</p>
+                  <p class="font-bold text-white">{{ selectedEvalRun.model }}</p>
+                </div>
+                <div class="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800">
+                  <p class="text-[10px] text-zinc-400">Score</p>
+                  <p class="font-bold text-emerald-400">{{ selectedEvalRun.score_percentage }}%</p>
+                </div>
+                <div class="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800">
+                  <p class="text-[10px] text-zinc-400">Passed / Total</p>
+                  <p class="font-bold text-zinc-200">{{ selectedEvalRun.passed_scenarios }}/{{ selectedEvalRun.total_scenarios }}</p>
+                </div>
+                <div class="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800">
+                  <p class="text-[10px] text-zinc-400">Avg Latency</p>
+                  <p class="font-bold text-zinc-200">{{ selectedEvalRun.avg_latency_ms }}ms</p>
+                </div>
+              </div>
+
+              <div class="space-y-2">
+                <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Scenario Assertion Metrics</h4>
+                <div v-if="selectedEvalRun.metrics && selectedEvalRun.metrics.length" class="space-y-2">
+                  <div
+                    v-for="m in selectedEvalRun.metrics"
+                    :key="m.id"
+                    class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 space-y-1.5 text-xs font-mono"
+                  >
+                    <div class="flex items-center justify-between">
+                      <span class="font-bold text-white">{{ m.scenario_name || m.scenario_id }}</span>
+                      <span
+                        class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                        :class="m.status === 'passed' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'"
+                      >
+                        {{ m.status }}
+                      </span>
+                    </div>
+                    <div class="flex items-center gap-4 text-[10px] text-zinc-400">
+                      <span>Latency: {{ m.latency_ms }}ms</span>
+                      <span>Tokens: {{ m.tokens_used }}</span>
+                      <span>Cost: \${{ m.cost_usd ? m.cost_usd.toFixed(4) : '0.0000' }}</span>
+                    </div>
+                    <div v-if="m.error_message" class="p-2 rounded bg-rose-950/40 border border-rose-900/40 text-rose-300 text-[11px]">
+                      {{ m.error_message }}
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="py-4 text-center text-xs text-zinc-400">
+                  No granular scenario metrics ingested.
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  @click="selectedEvalRun = null"
+                  class="px-4 py-1.5 rounded-lg bg-zinc-800 text-zinc-200 text-xs font-semibold hover:bg-zinc-700"
+                >
+                  Close
                 </button>
               </div>
             </div>

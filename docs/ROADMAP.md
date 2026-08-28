@@ -44,6 +44,17 @@ ProjectBase eliminates the "agent secretarial tax" (where coding agents waste 40
 - Autonomous capacity reservation, worktree isolation, and conflict prevention.
 - Neural BGE-M3 + Cross-Encoder admission brain safeguarding the intent board against duplication.
 
+### 🏁 Milestone 7: Fleet Budget & Cost Attribution, Token Quotas & Financial Governance
+- Granular budget policies across global, project, persona, and session scopes.
+- In-flight capacity reservations and atomic token consumption ledgers.
+- Automated circuit breakers and emergency override administration.
+
+### 🏁 Milestone 8: Agent Evaluation Benchmark Harness, Leaderboard & Regression Matrix
+- Continuous standardized eval suites (Coding Accuracy, Tool Calling, Refactor, Security Guardrails).
+- Per-scenario assertion metrics, latency profiling, and token cost calculation.
+- Live model leaderboard ranking with composite scores and certification status badges.
+- Automated regression detection for accuracy degradation and latency/cost spikes.
+
 ### 🏁 Milestone 6: High-Performance FOSS Zero-Build Ecosystem
 - Single binary PocketBase + Zero-build Vue 3 UMD + compiled Tailwind CSS.
 - Sub-50MB RAM footprint, instant SQLite performance, real-time SSE.
