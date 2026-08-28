@@ -58,7 +58,7 @@ def _resolve_ai_key() -> str:
 
 
 AI_API_KEY = _resolve_ai_key()
-AI_MODEL = os.environ.get("AI_MODEL") or os.environ.get("AGENT_MODEL") or "auto/coding"
+AI_MODEL = os.environ.get("AI_MODEL") or os.environ.get("AGENT_MODEL") or "premium"
 REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(REPO_DIR, "app", "pb_data", "data.db")
 if not os.path.exists(DB_PATH):
@@ -236,7 +236,7 @@ class AutonomousRunner:
                 headers={"Content-Type": "application/json", "Authorization": f"Bearer {AI_API_KEY}"},
                 method="POST"
             )
-            with urllib.request.urlopen(req, timeout=60) as resp:
+            with urllib.request.urlopen(req, timeout=120) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 return data["choices"][0]["message"]["content"]
         except Exception as e:

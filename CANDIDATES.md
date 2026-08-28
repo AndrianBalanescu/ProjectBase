@@ -1,7 +1,7 @@
 # ProjectBase – Candidate Roadmap (Epics)
 
-**Current Cycle:** 4  
-**Focus:** Build‑First Verification
+**Current Cycle:** 4
+**Focus:** Build-First Verification
 
 ## Epic 0 – Core CRUD (✅ Done)
 - Projects, issues, cycles, users
@@ -9,8 +9,8 @@
 - Schema migrations
 
 ## Epic 1 – Fluid Kanban & List Views (✅ Done)
-- SortableJS drag‑drop
-- Real‑time SSE updates
+- SortableJS drag-and-drop
+- Real-time SSE updates
 - List view with sorting/filtering
 
 ## Epic 2 – Markdown Drawer & Subtasks (✅ Done)
@@ -20,41 +20,33 @@
 
 ## Epic 3 – Custom Fields (✅ Done)
 - Text, number, select, date fields
-- Per‑project configuration
+- Per-project configuration
 
 ## Epic 4 – AI Agent Integration (✅ Done)
-- [x] FastMCP server exposing: `list_projects`, `list_issues`, `create_issue`, `update_issue`, `move_issue`
-- [x] AgentsView UI component (display active agents and sessions)
-- [x] Agent triggers in hooks (`80_agent_triggers.pb.js` – dispatch endpoint)
-- [x] MCP server implemented in `91_mcp_server.pb.js`
-- [ ] End‑to‑end test: flomaster creates an issue via MCP and moves it across columns (pending testing with real agent)
-
-**Verification:** MCP server is implemented and ready for agent integration. Testing with flomaster is the final step.
+- [x] MCP server (`app/pb_hooks/91_mcp_server.pb.js`): `list_projects`, `list_issues`, `create_issue`, `update_issue`, `move_issue`
+- [x] AgentsView UI component (`pb_public/js/components/AgentsView.js`)
+- [x] Agent dispatch endpoint (`app/pb_hooks/80_agent_triggers.pb.js`)
+- [x] Agent discovery bridge (`app/pb_hooks/90_agents.pb.js`)
 
 ## Epic 5 – Import/Export (✅ Done)
 - Linear, Plane, GitHub importers
 - CSV/JSON export
 
 ## Epic 6 – Notifications (✅ Done)
-- In‑app notifications
+- In-app notifications
 - Email (optional)
 
-## Epic 7 – Performance & Polish (🔄 Ongoing)
-- Indexes (`1710000008_performance_indexes.js`)
-- Memory optimizations
-- UI polish (dark/light themes, responsive)
-- Keyboard shortcuts
+## Epic 7 – Performance & Polish (🔨 In Progress)
+- [x] Performance indexes (migrations `1710000008` + `1710000021`)
+- [ ] Frontend keyboard shortcuts
+- [ ] UI polish (dark/light theme consistency, responsive)
+- [ ] Load benchmarking (cold start, memory under load)
 
 ---
 
-## Next Milestone (Cycle 4)
+## Next Milestone (Cycle 5)
 **Complete Epic 7 – Performance & Polish**
 
-Specifically:
-- Run performance benchmarks
-- Optimize SQL queries
-- Enhance UI responsiveness
-- Add keyboard shortcuts for common actions (create issue, move, delete)
-- Ensure dark/light theme consistency
-
-**Verification:** Run Lighthouse and check memory usage under load. Ensure cold start remains <100 ms and memory <100 MB.
+- Frontend keyboard shortcuts (`n` new issue, `e` edit, `d` delete, `Esc` close drawer)
+- UI polish (dark/light theme consistency, responsive)
+- Load benchmarking (cold start < 100 ms, < 100 MB RAM)
