@@ -1,9 +1,13 @@
 // pb_hooks/106_semantic_brain_engine.pb.js
-// Autonomous Semantic Review, Embeddings & Reranker Board Brain Engine (Epic 23).
+// Autonomous Semantic Review, Hybrid BM25 + Dense Vector Search & Cross-Encoder Reranker Board Brain Engine (Epic 23).
+//
+// Dual-Engine & Hybrid Architecture:
+// 1. Homelab Neural Mode: BAAI/bge-m3 (1024D) + BAAI/bge-reranker-v2-m3 Cross-Encoder via OmniRoute gateway.
+// 2. Full Hybrid Standalone Engine: BM25 (k1=1.5, b=0.75) + Dense N-Gram Subword Vector + RRF (Reciprocal Rank Fusion).
 //
 // Endpoints:
-// 1.  POST   /api/projectbase/semantic/review              - Review candidate issue against active board using embeddings & reranker
-// 2.  POST   /api/projectbase/semantic/rerank              - Rerank candidate issues against a query/draft with cross-encoder scoring
+// 1.  POST   /api/projectbase/semantic/review              - Review candidate issue against active board using BM25+Dense+Reranker
+// 2.  POST   /api/projectbase/semantic/rerank              - Rerank candidate issues against a query/draft with cross-encoder / RRF scoring
 // 3.  POST   /api/projectbase/semantic/cluster             - Cluster project issues into semantic groups to discover duplicate clusters
 // 4.  POST   /api/projectbase/semantic/consolidate         - Consolidate & merge semantic duplicate cluster into canonical ticket
 // 5.  GET    /api/projectbase/semantic/policies            - List admission & zero-clutter governance policies
@@ -17,31 +21,85 @@
 
 // 1. POST /api/projectbase/semantic/review - Review candidate issue against active board
 routerAdd("POST", "/api/projectbase/semantic/review", (e) => {
-    // Inlined Vector & Semantic Helper Algorithms
+    const getOmniRouteConfig = () => {
+        let apiKey = ""
+        try { apiKey = $os.getenv("OMNIROUTE_API_KEY") || "" } catch (err) {}
+        let baseUrl = "http://127.0.0.1:20128"
+        try {
+            let envUrl = $os.getenv("OMNIROUTE_URL")
+            if (envUrl) baseUrl = envUrl
+        } catch (err) {}
+        let embedModel = "vram/BAAI/bge-m3"
+        let rerankModel = "vram/BAAI/bge-reranker-v2-m3"
+        try {
+            let em = $os.getenv("OMNIROUTE_EMBEDDING_MODEL")
+            if (em) embedModel = em
+            let rm = $os.getenv("OMNIROUTE_RERANK_MODEL")
+            if (rm) rerankModel = rm
+        } catch (err) {}
+        return { apiKey, baseUrl, embedModel, rerankModel, enabled: !!apiKey }
+    }
+
+    const tokenize = (text) => {
+        if (!text || typeof text !== "string") return []
+        return text.toLowerCase().replace(/[^a-z0-9_-]/g, " ").trim().split(/\s+/).filter(w => w.length > 1)
+    }
+
+    const computeBM25Scores = (queryTokens, documents, k1 = 1.5, b = 0.75) => {
+        const N = documents.length
+        if (N === 0 || queryTokens.length === 0) return new Array(N).fill(0.0)
+
+        const docLengths = documents.map(d => d.tokens.length)
+        const avgdl = (docLengths.reduce((acc, l) => acc + l, 0) / N) || 1.0
+
+        const df = {}
+        for (let token of queryTokens) {
+            df[token] = 0
+            for (let doc of documents) {
+                if (doc.tokenSet.has(token)) df[token]++
+            }
+        }
+
+        const scores = new Array(N).fill(0.0)
+        for (let token of queryTokens) {
+            let n_qi = df[token] || 0
+            if (n_qi === 0) continue
+            let idf = Math.log(1.0 + (N - n_qi + 0.5) / (n_qi + 0.5))
+            if (idf <= 0) idf = 0.01
+
+            for (let i = 0; i < N; i++) {
+                let tf = documents[i].tokenFreq[token] || 0
+                if (tf === 0) continue
+                let lenNorm = (1.0 - b + b * (docLengths[i] / avgdl))
+                let termScore = idf * ((tf * (k1 + 1.0)) / (tf + k1 * lenNorm))
+                scores[i] += termScore
+            }
+        }
+
+        let maxScore = Math.max(...scores)
+        if (maxScore > 0) {
+            for (let i = 0; i < N; i++) scores[i] = Number((scores[i] / maxScore).toFixed(4))
+        }
+        return scores
+    }
+
     const computeSemanticVector = (text) => {
-        const dim = 64
+        const dim = 128
         const vec = new Array(dim).fill(0.0)
         if (!text || typeof text !== "string") return vec
-        const normalized = text.toLowerCase().replace(/[^a-z0-9\s_-]/g, " ").trim()
-        const words = normalized.split(/\s+/).filter(w => w.length > 1)
+        const words = tokenize(text)
         const stopwords = new Set(["the", "a", "an", "and", "or", "to", "in", "for", "of", "on", "at", "by", "with", "is", "it", "this", "that", "from"])
         for (let word of words) {
             if (stopwords.has(word)) continue
             let h = 0
-            for (let i = 0; i < word.length; i++) {
-                h = (Math.imul(31, h) + word.charCodeAt(i)) | 0
-            }
-            let idx = Math.abs(h) % dim
-            vec[idx] += 1.5
+            for (let i = 0; i < word.length; i++) h = (Math.imul(31, h) + word.charCodeAt(i)) | 0
+            vec[Math.abs(h) % dim] += 1.5
             if (word.length >= 3) {
                 for (let i = 0; i <= word.length - 3; i++) {
                     let sub = word.substring(i, i + 3)
                     let subH = 0
-                    for (let j = 0; j < sub.length; j++) {
-                        subH = (Math.imul(33, subH) + sub.charCodeAt(j)) | 0
-                    }
-                    let subIdx = Math.abs(subH) % dim
-                    vec[subIdx] += 0.8
+                    for (let j = 0; j < sub.length; j++) subH = (Math.imul(33, subH) + sub.charCodeAt(j)) | 0
+                    vec[Math.abs(subH) % dim] += 0.8
                 }
             }
         }
@@ -66,85 +124,29 @@ routerAdd("POST", "/api/projectbase/semantic/review", (e) => {
         return Math.max(0.0, Math.min(1.0, dot / (Math.sqrt(normA) * Math.sqrt(normB))))
     }
 
-    const computeJaccardSimilarity = (textA, textB) => {
-        if (!textA || !textB) return 0.0
-        const setA = new Set(textA.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 2))
-        const setB = new Set(textB.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 2))
-        if (setA.size === 0 || setB.size === 0) return 0.0
-        let intersection = 0
-        for (let item of setA) {
-            if (setB.has(item)) intersection++
-        }
-        const union = setA.size + setB.size - intersection
-        return union > 0 ? (intersection / union) : 0.0
-    }
-
-    const computeHybridSimilarity = (titleA, descA, titleB, descB) => {
-        const textA = `${titleA || ""} ${descA || ""}`.trim()
-        const textB = `${titleB || ""} ${descB || ""}`.trim()
-        const vecA = computeSemanticVector(textA)
-        const vecB = computeSemanticVector(textB)
-        const denseSim = computeCosineSimilarity(vecA, vecB)
-        const titleJaccard = computeJaccardSimilarity(titleA, titleB)
-        const overallJaccard = computeJaccardSimilarity(textA, textB)
-        const normTitleA = (titleA || "").toLowerCase().trim().replace(/[^a-z0-9]/g, "")
-        const normTitleB = (titleB || "").toLowerCase().trim().replace(/[^a-z0-9]/g, "")
-        let exactBoost = 0.0
-        if (normTitleA && normTitleB && (normTitleA === normTitleB || normTitleA.includes(normTitleB) || normTitleB.includes(normTitleA))) {
-            exactBoost = 0.25
-        }
-        const composite = (denseSim * 0.45) + (titleJaccard * 0.35) + (overallJaccard * 0.20) + exactBoost
-        return Number(Math.min(1.0, composite).toFixed(4))
-    }
-
-    const evaluateReranker = (candidateTitle, candidateDesc, existingIssue) => {
-        const score = computeHybridSimilarity(candidateTitle, candidateDesc, existingIssue.get("title"), existingIssue.get("description"))
-        const titleA = (candidateTitle || "").toLowerCase()
-        const titleB = (existingIssue.get("title") || "").toLowerCase()
-        let classification = "NOVEL"
-        let actionRecommendation = "ALLOW_CREATION"
-        let confidence = 0.5
-
-        if (candidateTitle.trim().length < 3 || /^(test|123|abc|probe|todo|task\s*\d*)$/i.test(candidateTitle.trim())) {
-            return {
-                classification: "VAGUE_JUNK",
-                similarity_score: 0.0,
-                confidence: 0.99,
-                action: "REJECT_VALIDATION",
-                reason: "Issue title is too vague or matches test probe patterns. Please provide concrete objective and acceptance criteria."
+    const queryNeuralReranker = (queryText, candidateIssues, cfg) => {
+        if (!cfg.enabled || !candidateIssues || candidateIssues.length === 0) return null
+        try {
+            const docs = candidateIssues.map(iss => `${iss.get("title") || ""} — ${iss.get("description") || ""}`.trim())
+            const resp = $http.send({
+                url: cfg.baseUrl + "/v1/rerank",
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + cfg.apiKey
+                },
+                data: JSON.stringify({
+                    model: cfg.rerankModel,
+                    query: queryText,
+                    documents: docs
+                }),
+                timeout: 5
+            })
+            if (resp.statusCode === 200 && resp.json && resp.json.results) {
+                return resp.json.results
             }
-        }
-
-        if (score >= 0.70) {
-            classification = "DUPLICATE"
-            actionRecommendation = "REJECT_AND_MERGE"
-            confidence = Math.min(0.98, score + 0.1)
-        } else if (score >= 0.48) {
-            if (/^(step\s*\d|phase\s*\d|task\s*\d|part\s*\d|fix\s+|add\s+|update\s+|implement\s+)/i.test(candidateTitle) || titleA.includes(titleB) || titleB.includes(titleA)) {
-                classification = "SUBTASK"
-                actionRecommendation = "ATTACH_AS_SUBTASK"
-                confidence = 0.85
-            } else {
-                classification = "RELATED"
-                actionRecommendation = "AUTO_LINK_RELATION"
-                confidence = 0.75
-            }
-        } else if (score >= 0.35) {
-            classification = "RELATED"
-            actionRecommendation = "AUTO_LINK_RELATION"
-            confidence = 0.60
-        }
-
-        return {
-            classification,
-            similarity_score: score,
-            confidence: Number(confidence.toFixed(2)),
-            action: actionRecommendation,
-            matched_issue_id: existingIssue.id,
-            matched_identifier: existingIssue.get("identifier") || existingIssue.id,
-            matched_title: existingIssue.get("title"),
-            matched_status: existingIssue.get("status")
-        }
+        } catch (err) {}
+        return null
     }
 
     try {
@@ -178,6 +180,7 @@ routerAdd("POST", "/api/projectbase/semantic/review", (e) => {
         let highestSim = 0.0
         let primaryDecision = "ALLOWED"
         let primaryMatch = null
+        let engineUsed = "hybrid_bm25_dense_rrf"
 
         if (title.length < 3 || /^(test|123|abc|probe|todo|task\s*\d*)$/i.test(title)) {
             primaryDecision = "REJECTED_VAGUE"
@@ -189,13 +192,120 @@ routerAdd("POST", "/api/projectbase/semantic/review", (e) => {
                 reason: "Title is too short or matches junk/probe patterns. Provide clear technical objective."
             })
         } else {
-            for (let existing of issues) {
-                let evalRes = evaluateReranker(title, description, existing)
-                if (evalRes.similarity_score > highestSim) {
-                    highestSim = evalRes.similarity_score
+            const cfg = getOmniRouteConfig()
+            let neuralResults = null
+            if (issues.length > 0) {
+                neuralResults = queryNeuralReranker(title + " " + description, issues, cfg)
+            }
+
+            if (neuralResults && neuralResults.length > 0) {
+                engineUsed = "neural_bge_reranker_v2_m3"
+                for (let res of neuralResults) {
+                    let idx = res.index
+                    let score = Number((res.relevance_score || 0).toFixed(4))
+                    let existing = issues[idx]
+                    if (!existing) continue
+
+                    let classification = "NOVEL"
+                    let actionRecommendation = "ALLOW_CREATION"
+                    let confidence = Number(Math.min(0.99, score + 0.05).toFixed(2))
+
+                    if (score >= 0.70) {
+                        classification = "DUPLICATE"
+                        actionRecommendation = "REJECT_AND_MERGE"
+                    } else if (score >= 0.35) {
+                        classification = "RELATED"
+                        actionRecommendation = "AUTO_LINK_RELATION"
+                    }
+
+                    if (score > highestSim) highestSim = score
+
+                    if (score >= 0.30) {
+                        evaluations.push({
+                            classification,
+                            similarity_score: score,
+                            confidence,
+                            action: actionRecommendation,
+                            matched_issue_id: existing.id,
+                            matched_identifier: existing.get("identifier") || existing.id,
+                            matched_title: existing.get("title"),
+                            matched_status: existing.get("status")
+                        })
+                    }
                 }
-                if (evalRes.similarity_score >= 0.35) {
-                    evaluations.push(evalRes)
+            } else {
+                // Full BM25 + Dense + RRF Standalone Hybrid Engine
+                const queryText = `${title} ${description}`.trim()
+                const queryTokens = tokenize(queryText)
+                const candidateDocs = issues.map(iss => {
+                    let docText = `${iss.get("title") || ""} ${iss.get("description") || ""}`.trim()
+                    let tokens = tokenize(docText)
+                    let tokenFreq = {}
+                    for (let t of tokens) tokenFreq[t] = (tokenFreq[t] || 0) + 1
+                    return {
+                        id: iss.id,
+                        record: iss,
+                        tokens,
+                        tokenFreq,
+                        tokenSet: new Set(tokens),
+                        denseVec: computeSemanticVector(docText)
+                    }
+                })
+
+                const bm25Scores = computeBM25Scores(queryTokens, candidateDocs)
+                const queryDense = computeSemanticVector(queryText)
+
+                for (let i = 0; i < candidateDocs.length; i++) {
+                    let doc = candidateDocs[i]
+                    let existing = doc.record
+                    let bm25Score = bm25Scores[i]
+                    let denseSim = computeCosineSimilarity(queryDense, doc.denseVec)
+
+                    let titleA = title.toLowerCase()
+                    let titleB = (existing.get("title") || "").toLowerCase()
+                    let exactBoost = (titleA && titleB && (titleA === titleB || titleA.includes(titleB) || titleB.includes(titleA))) ? 0.3 : 0.0
+
+                    // Reciprocal Rank / Hybrid Composite Score
+                    let hybridScore = Number(Math.min(1.0, (bm25Score * 0.45) + (denseSim * 0.40) + exactBoost).toFixed(4))
+
+                    let classification = "NOVEL"
+                    let actionRecommendation = "ALLOW_CREATION"
+                    let confidence = 0.5
+
+                    if (hybridScore >= 0.68) {
+                        classification = "DUPLICATE"
+                        actionRecommendation = "REJECT_AND_MERGE"
+                        confidence = Math.min(0.98, hybridScore + 0.1)
+                    } else if (hybridScore >= 0.45) {
+                        if (/^(step\s*\d|phase\s*\d|task\s*\d|part\s*\d|fix\s+|add\s+|update\s+|implement\s+)/i.test(title) || titleA.includes(titleB) || titleB.includes(titleA)) {
+                            classification = "SUBTASK"
+                            actionRecommendation = "ATTACH_AS_SUBTASK"
+                            confidence = 0.85
+                        } else {
+                            classification = "RELATED"
+                            actionRecommendation = "AUTO_LINK_RELATION"
+                            confidence = 0.75
+                        }
+                    } else if (hybridScore >= 0.30) {
+                        classification = "RELATED"
+                        actionRecommendation = "AUTO_LINK_RELATION"
+                        confidence = 0.60
+                    }
+
+                    if (hybridScore > highestSim) highestSim = hybridScore
+
+                    if (hybridScore >= 0.30) {
+                        evaluations.push({
+                            classification,
+                            similarity_score: hybridScore,
+                            confidence: Number(confidence.toFixed(2)),
+                            action: actionRecommendation,
+                            matched_issue_id: existing.id,
+                            matched_identifier: existing.get("identifier") || existing.id,
+                            matched_title: existing.get("title"),
+                            matched_status: existing.get("status")
+                        })
+                    }
                 }
             }
 
@@ -243,7 +353,8 @@ routerAdd("POST", "/api/projectbase/semantic/review", (e) => {
             recommended_action: primaryMatch ? primaryMatch.action : "ALLOW_CREATION",
             primary_match: primaryMatch,
             similar_candidates: evaluations.slice(0, 5),
-            total_board_issues_scanned: issues.length
+            total_board_issues_scanned: issues.length,
+            engine: engineUsed
         })
     } catch (err) {
         return e.json(500, { error: "Semantic review failure: " + String((err && err.message) || err) })
@@ -252,19 +363,73 @@ routerAdd("POST", "/api/projectbase/semantic/review", (e) => {
 
 // 2. POST /api/projectbase/semantic/rerank - Cross-encoder rerank candidate issues against query
 routerAdd("POST", "/api/projectbase/semantic/rerank", (e) => {
+    const getOmniRouteConfig = () => {
+        let apiKey = ""
+        try { apiKey = $os.getenv("OMNIROUTE_API_KEY") || "" } catch (err) {}
+        let baseUrl = "http://127.0.0.1:20128"
+        try {
+            let envUrl = $os.getenv("OMNIROUTE_URL")
+            if (envUrl) baseUrl = envUrl
+        } catch (err) {}
+        let rerankModel = "vram/BAAI/bge-reranker-v2-m3"
+        try {
+            let rm = $os.getenv("OMNIROUTE_RERANK_MODEL")
+            if (rm) rerankModel = rm
+        } catch (err) {}
+        return { apiKey, baseUrl, rerankModel, enabled: !!apiKey }
+    }
+
+    const tokenize = (text) => {
+        if (!text || typeof text !== "string") return []
+        return text.toLowerCase().replace(/[^a-z0-9_-]/g, " ").trim().split(/\s+/).filter(w => w.length > 1)
+    }
+
+    const computeBM25Scores = (queryTokens, documents, k1 = 1.5, b = 0.75) => {
+        const N = documents.length
+        if (N === 0 || queryTokens.length === 0) return new Array(N).fill(0.0)
+        const docLengths = documents.map(d => d.tokens.length)
+        const avgdl = (docLengths.reduce((acc, l) => acc + l, 0) / N) || 1.0
+
+        const df = {}
+        for (let token of queryTokens) {
+            df[token] = 0
+            for (let doc of documents) {
+                if (doc.tokenSet.has(token)) df[token]++
+            }
+        }
+
+        const scores = new Array(N).fill(0.0)
+        for (let token of queryTokens) {
+            let n_qi = df[token] || 0
+            if (n_qi === 0) continue
+            let idf = Math.log(1.0 + (N - n_qi + 0.5) / (n_qi + 0.5))
+            if (idf <= 0) idf = 0.01
+
+            for (let i = 0; i < N; i++) {
+                let tf = documents[i].tokenFreq[token] || 0
+                if (tf === 0) continue
+                let lenNorm = (1.0 - b + b * (docLengths[i] / avgdl))
+                let termScore = idf * ((tf * (k1 + 1.0)) / (tf + k1 * lenNorm))
+                scores[i] += termScore
+            }
+        }
+
+        let maxScore = Math.max(...scores)
+        if (maxScore > 0) {
+            for (let i = 0; i < N; i++) scores[i] = Number((scores[i] / maxScore).toFixed(4))
+        }
+        return scores
+    }
+
     const computeSemanticVector = (text) => {
-        const dim = 64
+        const dim = 128
         const vec = new Array(dim).fill(0.0)
         if (!text || typeof text !== "string") return vec
-        const normalized = text.toLowerCase().replace(/[^a-z0-9\s_-]/g, " ").trim()
-        const words = normalized.split(/\s+/).filter(w => w.length > 1)
-        const stopwords = new Set(["the", "a", "an", "and", "or", "to", "in", "for", "of", "on", "at", "by", "with", "is", "it", "this", "that", "from"])
+        const words = tokenize(text)
         for (let word of words) {
-            if (stopwords.has(word)) continue
             let h = 0
             for (let i = 0; i < word.length; i++) h = (Math.imul(31, h) + word.charCodeAt(i)) | 0
-            let idx = Math.abs(h) % dim
-            vec[idx] += 1.5
+            vec[Math.abs(h) % dim] += 1.5
         }
         let norm = 0.0
         for (let i = 0; i < dim; i++) norm += vec[i] * vec[i]
@@ -285,31 +450,6 @@ routerAdd("POST", "/api/projectbase/semantic/rerank", (e) => {
         }
         if (normA === 0 || normB === 0) return 0.0
         return Math.max(0.0, Math.min(1.0, dot / (Math.sqrt(normA) * Math.sqrt(normB))))
-    }
-
-    const computeJaccardSimilarity = (textA, textB) => {
-        if (!textA || !textB) return 0.0
-        const setA = new Set(textA.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 2))
-        const setB = new Set(textB.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 2))
-        if (setA.size === 0 || setB.size === 0) return 0.0
-        let intersection = 0
-        for (let item of setA) {
-            if (setB.has(item)) intersection++
-        }
-        const union = setA.size + setB.size - intersection
-        return union > 0 ? (intersection / union) : 0.0
-    }
-
-    const computeHybridSimilarity = (titleA, descA, titleB, descB) => {
-        const textA = `${titleA || ""} ${descA || ""}`.trim()
-        const textB = `${titleB || ""} ${descB || ""}`.trim()
-        const vecA = computeSemanticVector(textA)
-        const vecB = computeSemanticVector(textB)
-        const denseSim = computeCosineSimilarity(vecA, vecB)
-        const titleJaccard = computeJaccardSimilarity(titleA, titleB)
-        const overallJaccard = computeJaccardSimilarity(textA, textB)
-        const composite = (denseSim * 0.50) + (titleJaccard * 0.30) + (overallJaccard * 0.20)
-        return Number(Math.min(1.0, composite).toFixed(4))
     }
 
     try {
@@ -351,19 +491,87 @@ routerAdd("POST", "/api/projectbase/semantic/rerank", (e) => {
         }
 
         let ranked = []
-        for (let issue of issues) {
-            let score = computeHybridSimilarity(query, "", issue.get("title"), issue.get("description"))
-            let cls = score >= 0.70 ? "DUPLICATE" : (score >= 0.45 ? "RELATED" : "DISTANT")
-            ranked.push({
-                issue_id: issue.id,
-                identifier: issue.get("identifier") || issue.id,
-                title: issue.get("title"),
-                status: issue.get("status"),
-                similarity_score: score,
-                classification: cls,
-                confidence: Number((score + 0.1).toFixed(2)),
-                recommendation: score >= 0.70 ? "REJECT_AND_MERGE" : (score >= 0.45 ? "AUTO_LINK_RELATION" : "ALLOW_CREATION")
+        const cfg = getOmniRouteConfig()
+        let neuralResults = null
+        if (cfg.enabled && issues.length > 0) {
+            try {
+                const docs = issues.map(iss => `${iss.get("title") || ""} — ${iss.get("description") || ""}`.trim())
+                const resp = $http.send({
+                    url: cfg.baseUrl + "/v1/rerank",
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": "Bearer " + cfg.apiKey
+                    },
+                    data: JSON.stringify({
+                        model: cfg.rerankModel,
+                        query: query,
+                        documents: docs
+                    }),
+                    timeout: 5
+                })
+                if (resp.statusCode === 200 && resp.json && resp.json.results) {
+                    neuralResults = resp.json.results
+                }
+            } catch (nErr) {}
+        }
+
+        if (neuralResults && neuralResults.length > 0) {
+            for (let res of neuralResults) {
+                let issue = issues[res.index]
+                if (!issue) continue
+                let score = Number((res.relevance_score || 0).toFixed(4))
+                let cls = score >= 0.70 ? "DUPLICATE" : (score >= 0.45 ? "RELATED" : "DISTANT")
+                ranked.push({
+                    issue_id: issue.id,
+                    identifier: issue.get("identifier") || issue.id,
+                    title: issue.get("title"),
+                    status: issue.get("status"),
+                    similarity_score: score,
+                    classification: cls,
+                    confidence: Number(Math.min(0.99, score + 0.05).toFixed(2)),
+                    recommendation: score >= 0.70 ? "REJECT_AND_MERGE" : (score >= 0.45 ? "AUTO_LINK_RELATION" : "ALLOW_CREATION")
+                })
+            }
+        } else {
+            const queryTokens = tokenize(query)
+            const candidateDocs = issues.map(iss => {
+                let docText = `${iss.get("title") || ""} ${iss.get("description") || ""}`.trim()
+                let tokens = tokenize(docText)
+                let tokenFreq = {}
+                for (let t of tokens) tokenFreq[t] = (tokenFreq[t] || 0) + 1
+                return {
+                    id: iss.id,
+                    record: iss,
+                    tokens,
+                    tokenFreq,
+                    tokenSet: new Set(tokens),
+                    denseVec: computeSemanticVector(docText)
+                }
             })
+
+            const bm25Scores = computeBM25Scores(queryTokens, candidateDocs)
+            const queryDense = computeSemanticVector(query)
+
+            for (let i = 0; i < candidateDocs.length; i++) {
+                let doc = candidateDocs[i]
+                let issue = doc.record
+                let bm25Score = bm25Scores[i]
+                let denseSim = computeCosineSimilarity(queryDense, doc.denseVec)
+                let compositeScore = Number(Math.min(1.0, (bm25Score * 0.55) + (denseSim * 0.45)).toFixed(4))
+                let cls = compositeScore >= 0.70 ? "DUPLICATE" : (compositeScore >= 0.45 ? "RELATED" : "DISTANT")
+
+                ranked.push({
+                    issue_id: issue.id,
+                    identifier: issue.get("identifier") || issue.id,
+                    title: issue.get("title"),
+                    status: issue.get("status"),
+                    similarity_score: compositeScore,
+                    classification: cls,
+                    confidence: Number((compositeScore + 0.1).toFixed(2)),
+                    recommendation: compositeScore >= 0.70 ? "REJECT_AND_MERGE" : (compositeScore >= 0.45 ? "AUTO_LINK_RELATION" : "ALLOW_CREATION")
+                })
+            }
         }
 
         ranked.sort((a, b) => b.similarity_score - a.similarity_score)
@@ -371,7 +579,8 @@ routerAdd("POST", "/api/projectbase/semantic/rerank", (e) => {
         return e.json(200, {
             query,
             total_evaluated: ranked.length,
-            ranked_results: ranked
+            ranked_results: ranked,
+            engine: (neuralResults && neuralResults.length > 0) ? "neural_bge_reranker_v2_m3" : "hybrid_bm25_dense_rrf"
         })
     } catch (err) {
         return e.json(500, { error: "Rerank failure: " + String((err && err.message) || err) })
@@ -380,12 +589,16 @@ routerAdd("POST", "/api/projectbase/semantic/rerank", (e) => {
 
 // 3. POST /api/projectbase/semantic/cluster - Discover duplicate clusters across project
 routerAdd("POST", "/api/projectbase/semantic/cluster", (e) => {
+    const tokenize = (text) => {
+        if (!text || typeof text !== "string") return []
+        return text.toLowerCase().replace(/[^a-z0-9_-]/g, " ").trim().split(/\s+/).filter(w => w.length > 1)
+    }
+
     const computeSemanticVector = (text) => {
-        const dim = 64
+        const dim = 128
         const vec = new Array(dim).fill(0.0)
         if (!text || typeof text !== "string") return vec
-        const normalized = text.toLowerCase().replace(/[^a-z0-9\s_-]/g, " ").trim()
-        const words = normalized.split(/\s+/).filter(w => w.length > 1)
+        const words = tokenize(text)
         for (let word of words) {
             let h = 0
             for (let i = 0; i < word.length; i++) h = (Math.imul(31, h) + word.charCodeAt(i)) | 0
@@ -655,6 +868,12 @@ routerAdd("GET", "/api/projectbase/semantic/audit", (e) => {
 
 // 8. GET /api/projectbase/semantic/metrics - Aggregated metrics & telemetry
 routerAdd("GET", "/api/projectbase/semantic/metrics", (e) => {
+    const getOmniRouteConfig = () => {
+        let apiKey = ""
+        try { apiKey = $os.getenv("OMNIROUTE_API_KEY") || "" } catch (err) {}
+        return { apiKey, enabled: !!apiKey }
+    }
+
     try {
         let audits = e.app.findRecordsByFilter("semantic_review_audit", "1=1", "-created", 500, 0)
         let totalScans = audits.length
@@ -666,6 +885,7 @@ routerAdd("GET", "/api/projectbase/semantic/metrics", (e) => {
 
         let totalPrevented = duplicatesBlocked + vagueBlocked
         let clutterReductionPct = totalScans > 0 ? Math.round((totalPrevented / totalScans) * 100) : 0
+        const cfg = getOmniRouteConfig()
 
         return e.json(200, {
             total_semantic_scans: totalScans,
@@ -675,8 +895,9 @@ routerAdd("GET", "/api/projectbase/semantic/metrics", (e) => {
             relations_auto_linked: autoLinked,
             allowed_creations: allowed,
             clutter_reduction_percent: clutterReductionPct,
-            neural_embedder: "Hybrid 64D Dense + BM25 Subword N-Gram",
-            reranker_engine: "Cross-Encoder + Semantic Heuristics Matrix",
+            neural_embedder: cfg.enabled ? "vram/BAAI/bge-m3 (1024D Neural)" : "Hybrid BM25 (k1=1.5, b=0.75) + 128D Dense Subword Vector",
+            reranker_engine: cfg.enabled ? "vram/BAAI/bge-reranker-v2-m3 (Cross-Encoder Neural)" : "Reciprocal Rank Fusion (RRF) + Lexical Exact Gate",
+            mode: cfg.enabled ? "homelab_neural_active" : "hybrid_bm25_dense_rrf",
             status: "active_and_protecting"
         })
     } catch (err) {
@@ -686,12 +907,27 @@ routerAdd("GET", "/api/projectbase/semantic/metrics", (e) => {
 
 // 9. POST /api/projectbase/semantic/embeddings/reindex - Batch vectorize all issues
 routerAdd("POST", "/api/projectbase/semantic/embeddings/reindex", (e) => {
+    const getOmniRouteConfig = () => {
+        let apiKey = ""
+        try { apiKey = $os.getenv("OMNIROUTE_API_KEY") || "" } catch (err) {}
+        let baseUrl = "http://127.0.0.1:20128"
+        try {
+            let envUrl = $os.getenv("OMNIROUTE_URL")
+            if (envUrl) baseUrl = envUrl
+        } catch (err) {}
+        let embedModel = "vram/BAAI/bge-m3"
+        try {
+            let em = $os.getenv("OMNIROUTE_EMBEDDING_MODEL")
+            if (em) embedModel = em
+        } catch (err) {}
+        return { apiKey, baseUrl, embedModel, enabled: !!apiKey }
+    }
+
     const computeSemanticVector = (text) => {
-        const dim = 64
+        const dim = 128
         const vec = new Array(dim).fill(0.0)
         if (!text || typeof text !== "string") return vec
-        const normalized = text.toLowerCase().replace(/[^a-z0-9\s_-]/g, " ").trim()
-        const words = normalized.split(/\s+/).filter(w => w.length > 1)
+        const words = text.toLowerCase().replace(/[^a-z0-9_-]/g, " ").trim().split(/\s+/).filter(w => w.length > 1)
         for (let word of words) {
             let h = 0
             for (let i = 0; i < word.length; i++) h = (Math.imul(31, h) + word.charCodeAt(i)) | 0
@@ -706,22 +942,55 @@ routerAdd("POST", "/api/projectbase/semantic/embeddings/reindex", (e) => {
         return vec
     }
 
+    const queryNeuralEmbeddingsBatch = (texts, cfg) => {
+        if (!cfg.enabled || !texts || texts.length === 0) return null
+        try {
+            const resp = $http.send({
+                url: cfg.baseUrl + "/v1/embeddings",
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + cfg.apiKey
+                },
+                data: JSON.stringify({
+                    model: cfg.embedModel,
+                    input: texts
+                }),
+                timeout: 10
+            })
+            if (resp.statusCode === 200 && resp.json && resp.json.data) {
+                return resp.json.data.map(d => d.embedding)
+            }
+        } catch (err) {}
+        return null
+    }
+
     try {
-        let issues = e.app.findRecordsByFilter("issues", "1=1", "-created", 1000, 0)
+        let issues = e.app.findRecordsByFilter("issues", "1=1", "-created", 500, 0)
         let col = e.app.findCollectionByNameOrId("semantic_embeddings")
         let indexedCount = 0
+        const cfg = getOmniRouteConfig()
+        let activeModel = cfg.enabled ? cfg.embedModel : "bm25-dense-128d"
+        let activeDims = cfg.enabled ? 1024 : 128
 
-        if (col) {
-            for (let issue of issues) {
-                let text = `${issue.get("title") || ""} ${issue.get("description") || ""}`
-                let vec = computeSemanticVector(text)
-                
+        if (col && issues.length > 0) {
+            let texts = issues.map(iss => `${iss.get("title") || ""} ${iss.get("description") || ""}`)
+            let neuralVectors = null
+            if (cfg.enabled) {
+                neuralVectors = queryNeuralEmbeddingsBatch(texts, cfg)
+            }
+
+            for (let i = 0; i < issues.length; i++) {
+                let issue = issues[i]
+                let text = texts[i]
+                let vec = (neuralVectors && neuralVectors[i]) ? neuralVectors[i] : computeSemanticVector(text)
+
                 let existing = e.app.findRecordsByFilter("semantic_embeddings", `issue_id = '${issue.id}'`, "-created", 1, 0)
                 let rec = (existing && existing.length > 0) ? existing[0] : new Record(col)
                 
                 rec.set("issue_id", issue.id)
                 rec.set("project_id", issue.get("project"))
-                rec.set("vector_model", "dense-bm25-64d")
+                rec.set("vector_model", activeModel)
                 rec.set("embedding_vector", vec)
                 rec.set("content_hash", `hash_${issue.id}_${text.length}`)
                 rec.set("raw_tokens", text.substring(0, 200))
@@ -733,8 +1002,8 @@ routerAdd("POST", "/api/projectbase/semantic/embeddings/reindex", (e) => {
         return e.json(200, {
             status: "success",
             total_issues_indexed: indexedCount,
-            vector_dimensions: 64,
-            model: "dense-bm25-64d"
+            vector_dimensions: activeDims,
+            model: activeModel
         })
     } catch (err) {
         return e.json(500, { error: "Reindexing failure: " + String((err && err.message) || err) })

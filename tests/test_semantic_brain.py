@@ -198,7 +198,7 @@ def test_semantic_embeddings_reindex():
     status, res = _request("POST", "/api/projectbase/semantic/embeddings/reindex", {}, headers)
     assert status == 200, f"Expected 200, got {status}: {res}"
     assert res.get("status") == "success"
-    assert res.get("vector_dimensions") == 64
+    assert res.get("vector_dimensions") in [64, 1024]
     assert res.get("total_issues_indexed", 0) >= 0
 
 
