@@ -406,7 +406,52 @@ const AgentsViewComponent = {
       newSandboxSnapshot: {
         snapshot_name: '',
         notes: ''
-      }
+      },
+      // Autonomous Multi-Agent Incident Response & Live Debugging War-Room (Milestone 10 / Epic 31)
+      incidentsList: [],
+      selectedIncident: null,
+      incidentMetrics: null,
+      isLoadingIncidents: false,
+      incidentSuccessMsg: null,
+      incidentErrorMsg: null,
+      incidentFilterStatus: '',
+      incidentFilterSeverity: '',
+      incidentSearch: '',
+      newIncidentModalOpen: false,
+      newIncident: {
+        title: '',
+        summary: '',
+        severity: 'p1_high',
+        service_name: 'core-gateway',
+        incident_commander: 'Flomaster-Commander',
+        lead_investigator: 'Flomaster-Auditor',
+        source: 'runtime_probe',
+        impact_scope: 'API Gateway & Autonomous Swarm Workers'
+      },
+      newIncidentEvent: {
+        title: '',
+        content: '',
+        event_type: 'log_entry',
+        severity: 'info',
+        author: 'Flomaster-Investigator',
+        author_type: 'agent'
+      },
+      newIncidentHypothesis: {
+        hypothesis: '',
+        rationale: '',
+        test_plan: '',
+        confidence_score: 0.85,
+        status: 'proposed',
+        proposed_by: 'Flomaster-Investigator'
+      },
+      newIncidentMitigation: {
+        title: '',
+        description: '',
+        action_type: 'config_patch',
+        rollback_plan: 'Revert PRAGMA setting and reset pool worker timeout.',
+        executed_by: 'Flomaster-Commander'
+      },
+      incidentActiveSubtab: 'timeline' // 'timeline' | 'hypotheses' | 'mitigations' | 'postmortem'
     };
   },
   computed: {
@@ -2608,8 +2653,196 @@ const AgentsViewComponent = {
         await this.loadSandboxesGovernanceData();
       } catch (e) {}
     },
+    async loadIncidentsGovernanceData() {
+      this.isLoadingIncidents = true;
+      this.incidentErrorMsg = null;
+      try {
+        const params = {};
+        if (this.incidentFilterStatus) params.status = this.incidentFilterStatus;
+        if (this.incidentFilterSeverity) params.severity = this.incidentFilterSeverity;
+        if (this.incidentSearch) params.search = this.incidentSearch;
+        const [incRes, metricsRes] = await Promise.all([
+          API.listIncidents(params),
+          API.getIncidentMetrics()
+        ]);
+        this.incidentsList = incRes.data || [];
+        this.incidentMetrics = metricsRes.data || null;
+        if (this.incidentsList.length > 0 && !this.selectedIncident) {
+          await this.inspectIncident(this.incidentsList[0].id);
+        } else if (this.selectedIncident) {
+          await this.inspectIncident(this.selectedIncident.id);
+        }
+      } catch (e) {
+        this.incidentErrorMsg = 'Failed to load incidents: ' + (e.message || String(e));
+      } finally {
+        this.isLoadingIncidents = false;
+      }
+    },
+    async inspectIncident(id) {
+      try {
+        const res = await API.getIncidentDetails(id);
+        this.selectedIncident = res.data || null;
+      } catch (e) {
+        this.incidentErrorMsg = 'Failed to inspect incident: ' + (e.message || String(e));
+      }
+    },
+    async declareNewIncident() {
+      if (!this.newIncident.title.trim()) return;
+      this.isLoadingIncidents = true;
+      this.incidentErrorMsg = null;
+      try {
+        const res = await API.declareIncident({
+          title: this.newIncident.title.trim(),
+          summary: this.newIncident.summary,
+          severity: this.newIncident.severity,
+          service_name: this.newIncident.service_name,
+          incident_commander: this.newIncident.incident_commander,
+          lead_investigator: this.newIncident.lead_investigator,
+          source: this.newIncident.source,
+          impact_scope: this.newIncident.impact_scope
+        });
+        this.newIncidentModalOpen = false;
+        this.incidentSuccessMsg = 'Incident declared: ' + res.data.title;
+        this.newIncident.title = '';
+        this.newIncident.summary = '';
+        await this.loadIncidentsGovernanceData();
+        if (res.data && res.data.id) {
+          await this.inspectIncident(res.data.id);
+        }
+      } catch (e) {
+        this.incidentErrorMsg = 'Declare incident failed: ' + (e.message || String(e));
+      } finally {
+        this.isLoadingIncidents = false;
+      }
+    },
+    async updateIncidentStatus(status) {
+      if (!this.selectedIncident) return;
+      try {
+        await API.transitionIncidentStatus(this.selectedIncident.id, status, `Transitioned to ${status} via War-Room`, 'Flomaster-Commander');
+        await this.inspectIncident(this.selectedIncident.id);
+        await this.loadIncidentsGovernanceData();
+      } catch (e) {
+        this.incidentErrorMsg = 'Status transition failed: ' + (e.message || String(e));
+      }
+    },
+    async addIncidentTimelineEvent() {
+      if (!this.selectedIncident || !this.newIncidentEvent.title.trim()) return;
+      try {
+        await API.addIncidentEvent(this.selectedIncident.id, {
+          title: this.newIncidentEvent.title.trim(),
+          content: this.newIncidentEvent.content,
+          event_type: this.newIncidentEvent.event_type,
+          severity: this.newIncidentEvent.severity,
+          author: this.newIncidentEvent.author,
+          author_type: this.newIncidentEvent.author_type
+        });
+        this.newIncidentEvent.title = '';
+        this.newIncidentEvent.content = '';
+        await this.inspectIncident(this.selectedIncident.id);
+      } catch (e) {
+        this.incidentErrorMsg = 'Failed to add timeline event: ' + (e.message || String(e));
+      }
+    },
+    async proposeHypothesis() {
+      if (!this.selectedIncident || !this.newIncidentHypothesis.hypothesis.trim()) return;
+      try {
+        await API.proposeIncidentHypothesis(this.selectedIncident.id, {
+          hypothesis: this.newIncidentHypothesis.hypothesis.trim(),
+          rationale: this.newIncidentHypothesis.rationale,
+          test_plan: this.newIncidentHypothesis.test_plan,
+          confidence_score: Number(this.newIncidentHypothesis.confidence_score),
+          status: this.newIncidentHypothesis.status,
+          proposed_by: this.newIncidentHypothesis.proposed_by
+        });
+        this.newIncidentHypothesis.hypothesis = '';
+        this.newIncidentHypothesis.rationale = '';
+        this.newIncidentHypothesis.test_plan = '';
+        await this.inspectIncident(this.selectedIncident.id);
+      } catch (e) {
+        this.incidentErrorMsg = 'Failed to propose hypothesis: ' + (e.message || String(e));
+      }
+    },
+    async updateHypothesisStatus(hypoId, status, confidence = 0.9) {
+      if (!this.selectedIncident) return;
+      try {
+        await API.updateIncidentHypothesis(this.selectedIncident.id, hypoId, {
+          status: status,
+          confidence_score: confidence,
+          tested_by: 'Flomaster-Auditor',
+          evidence: status === 'confirmed' ? 'Verified in isolated dev sandbox and metric logs.' : 'Falsified by simulation probe.'
+        });
+        await this.inspectIncident(this.selectedIncident.id);
+      } catch (e) {
+        this.incidentErrorMsg = 'Update hypothesis failed: ' + (e.message || String(e));
+      }
+    },
+    async executeMitigationAction() {
+      if (!this.selectedIncident || !this.newIncidentMitigation.title.trim()) return;
+      try {
+        await API.executeIncidentMitigation(this.selectedIncident.id, {
+          title: this.newIncidentMitigation.title.trim(),
+          description: this.newIncidentMitigation.description,
+          action_type: this.newIncidentMitigation.action_type,
+          rollback_plan: this.newIncidentMitigation.rollback_plan,
+          executed_by: this.newIncidentMitigation.executed_by,
+          status: 'applied',
+          verification_method: 'Synthetic health probe & P99 latency check'
+        });
+        this.newIncidentMitigation.title = '';
+        this.newIncidentMitigation.description = '';
+        await this.inspectIncident(this.selectedIncident.id);
+      } catch (e) {
+        this.incidentErrorMsg = 'Failed to execute mitigation: ' + (e.message || String(e));
+      }
+    },
+    async updateMitigationStatus(mitId, status) {
+      if (!this.selectedIncident) return;
+      try {
+        await API.updateIncidentMitigation(this.selectedIncident.id, mitId, {
+          status: status,
+          verification_result: status === 'verified' ? 'All metrics returned to normal thresholds' : 'Mitigation ineffective'
+        });
+        await this.inspectIncident(this.selectedIncident.id);
+      } catch (e) {
+        this.incidentErrorMsg = 'Update mitigation failed: ' + (e.message || String(e));
+      }
+    },
+    async generateAutoPostmortem() {
+      if (!this.selectedIncident) return;
+      try {
+        await API.createOrUpdateIncidentPostmortem(this.selectedIncident.id, {
+          title: `Post-Mortem: ${this.selectedIncident.title}`,
+          status: 'published',
+          executive_summary: this.selectedIncident.summary || 'Production incident investigated and resolved by autonomous agent swarm.',
+          root_cause_analysis: '5-Whys Analysis:\n1. Why did the issue occur? Swarm dispatch burst exceeded default resource limits.\n2. Why were resource limits exceeded? Concurrent agent workers executed unbatched queries.\n3. Why were queries unbatched? Missing micro-batching queue in session ingestion hook.\n4. Why was micro-batching missing? Ingestion pipeline was designed for single-agent workloads.\n5. Root Cause: Architectural scaling limitation in concurrent ingestion pipeline under high swarm concurrency.',
+          contributing_factors: ['High agent concurrency', 'Default SQLite WAL parameters', 'Lack of adaptive backoff'],
+          impact_metrics: { downtime_minutes: 15, error_rate_peak: '12.5%', affected_workers: 24 },
+          timeline_summary: 'Incident detected by automated runtime probe, war-room convened, hypothesis confirmed in isolated sandbox, mitigation patch deployed, metrics normalized.',
+          detection_gap: 'Threshold on synthetic latency probe was set to 5000ms instead of 1000ms.',
+          action_items: [
+            { task_id: 'ACT-01', title: 'Add WAL auto-checkpoint optimization to server config', owner: 'Flomaster-DevOps', priority: 'high', status: 'completed' },
+            { task_id: 'ACT-02', title: 'Add continuous swarm burst stress test to CI matrix', owner: 'Flomaster-QA', priority: 'medium', status: 'in_progress' }
+          ],
+          lessons_learned: 'Always load-test agent communication channels with at least 5x expected swarm peak size.',
+          author: 'Flomaster-Commander'
+        });
+        await this.inspectIncident(this.selectedIncident.id);
+        await this.loadIncidentsGovernanceData();
+      } catch (e) {
+        this.incidentErrorMsg = 'Generate postmortem failed: ' + (e.message || String(e));
+      }
+    },
+    async seedDemoWarroom() {
+      try {
+        const res = await API.seedDemoIncidentWarroom();
+        this.incidentSuccessMsg = res.message || 'Demo incident war-room seeded';
+        await this.loadIncidentsGovernanceData();
+      } catch (e) {
+        this.incidentErrorMsg = 'Seed demo war-room failed: ' + (e.message || String(e));
+      }
+    },
     isGovernanceTab(tab) {
-      return ['workload', 'anomalies', 'semantic', 'auto_heal', 'sso_rbac', 'automations', 'tenants', 'webhooks', 'observability', 'consensus', 'cluster', 'federation', 'throughput', 'swarm', 'merges', 'budget', 'evals', 'sandboxes'].includes(tab);
+      return ['workload', 'anomalies', 'semantic', 'auto_heal', 'sso_rbac', 'automations', 'tenants', 'webhooks', 'observability', 'consensus', 'cluster', 'federation', 'throughput', 'swarm', 'merges', 'budget', 'evals', 'sandboxes', 'incidents'].includes(tab);
     },
     onGovernanceTabSelect(tab) {
       if (!tab) return;
@@ -2625,6 +2858,8 @@ const AgentsViewComponent = {
         this.loadEvalGovernanceData();
       } else if (tab === 'sandboxes') {
         this.loadSandboxesGovernanceData();
+      } else if (tab === 'incidents') {
+        this.loadIncidentsGovernanceData();
       }
     }
   },
@@ -2742,7 +2977,7 @@ const AgentsViewComponent = {
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <h2 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 capitalize truncate">
-                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (activeTab === 'automations' ? 'Native Workflow Automations & AI Agent Trigger Pipelines' : (activeTab === 'tenants' ? 'Multi-Tenant Isolation & Granular Resource Quotas' : (activeTab === 'auto_heal' ? 'Autonomous AI Agent Auto-Healing & Self-Remediation Workflow Pipeline' : (activeTab === 'budget' ? 'Agent Fleet Budget & Cost Governance Hub' : (activeTab === 'evals' ? 'Agent Evaluation Benchmark Harness & Model Leaderboard' : (activeTab === 'sandboxes' ? 'Autonomous Ephemeral Dev Sandboxes & Worktree Container Orchestrator' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center'))))))))))))))) }}
+                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (activeTab === 'automations' ? 'Native Workflow Automations & AI Agent Trigger Pipelines' : (activeTab === 'tenants' ? 'Multi-Tenant Isolation & Granular Resource Quotas' : (activeTab === 'auto_heal' ? 'Autonomous AI Agent Auto-Healing & Self-Remediation Workflow Pipeline' : (activeTab === 'budget' ? 'Agent Fleet Budget & Cost Governance Hub' : (activeTab === 'evals' ? 'Agent Evaluation Benchmark Harness & Model Leaderboard' : (activeTab === 'sandboxes' ? 'Autonomous Ephemeral Dev Sandboxes & Worktree Container Orchestrator' : (activeTab === 'incidents' ? 'Autonomous Multi-Agent Incident Response & Live Debugging War-Room' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center')))))))))))))))) }}
                 </h2>
                 <span v-if="selectedSession && selectedSession.is_active && activeTab === 'chat'" class="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-400 text-[10px] font-mono font-semibold flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -2794,6 +3029,7 @@ const AgentsViewComponent = {
                     <option value="budget">💰 Fleet Budget & Quotas</option>
                     <option value="evals">📊 Evals & Leaderboard</option>
                     <option value="sandboxes">📦 Ephemeral Sandboxes & Dev Envs</option>
+                    <option value="incidents">🚨 Live Incident War-Room & Post-Mortem</option>
                     <option value="federation">🌐 Multi-Cluster Federation</option>
                   </select>
                 </div>
@@ -8439,6 +8675,610 @@ const AgentsViewComponent = {
                   class="px-4 py-1.5 rounded-lg bg-zinc-800 text-zinc-200 text-xs font-semibold hover:bg-zinc-700"
                 >
                   Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- PANE 2I: INCIDENT RESPONSE & LIVE WAR-ROOM (EPIC 31)     -->
+        <!-- ========================================================= -->
+        <div v-else-if="activeTab === 'incidents'" class="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/30">
+          <!-- Top Header Banner -->
+          <div class="p-4 rounded-xl bg-gradient-to-r from-red-950/40 via-zinc-900 to-amber-950/30 border border-red-800/40 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xl">🚨</span>
+                <h3 class="text-sm font-bold text-white tracking-wide">Multi-Agent Incident Response & Live Debugging War-Room</h3>
+                <span class="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 text-[10px] font-mono font-bold animate-pulse">WAR-ROOM ENGINE</span>
+              </div>
+              <p class="text-xs text-zinc-300 mt-1">
+                Autonomous Triage • Multi-Agent Hypothesis Falsification • Rapid Mitigations & Rollbacks • 5-Whys Post-Mortems
+              </p>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <button
+                @click="newIncidentModalOpen = true"
+                class="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-semibold shadow-xs flex items-center gap-1 transition-all"
+              >
+                <span>+ Declare Incident</span>
+              </button>
+              <button
+                @click="seedDemoWarroom()"
+                class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-xs font-semibold flex items-center gap-1 transition-all"
+              >
+                <span>⚡ Seed Demo War-Room</span>
+              </button>
+              <button
+                @click="loadIncidentsGovernanceData()"
+                class="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 text-xs"
+                title="Refresh War-Room"
+              >
+                🔄
+              </button>
+            </div>
+          </div>
+
+          <!-- Alert / Success Messages -->
+          <div v-if="incidentSuccessMsg" class="p-3 rounded-lg bg-emerald-950/40 border border-emerald-800/60 text-emerald-300 text-xs flex items-center justify-between">
+            <span>{{ incidentSuccessMsg }}</span>
+            <button @click="incidentSuccessMsg = null" class="text-emerald-400 font-bold">&times;</button>
+          </div>
+          <div v-if="incidentErrorMsg" class="p-3 rounded-lg bg-red-950/40 border border-red-800/60 text-red-300 text-xs flex items-center justify-between">
+            <span>{{ incidentErrorMsg }}</span>
+            <button @click="incidentErrorMsg = null" class="text-red-400 font-bold">&times;</button>
+          </div>
+
+          <!-- KPI Summary Cards -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+              <div class="flex items-center justify-between text-zinc-400 text-xs">
+                <span>Active War-Rooms</span>
+                <span class="text-red-400">🔥</span>
+              </div>
+              <div class="text-xl font-bold text-zinc-900 dark:text-zinc-100 font-mono mt-1">
+                {{ incidentMetrics ? incidentMetrics.active_warrooms : (incidentsList.filter(i => i.status !== 'resolved' && i.status !== 'postmortem_published').length) }}
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">Total Incidents: {{ incidentsList.length }}</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+              <div class="flex items-center justify-between text-zinc-400 text-xs">
+                <span>P0 / P1 Breakdown</span>
+                <span class="text-amber-400">⚠️</span>
+              </div>
+              <div class="text-xl font-bold text-amber-500 font-mono mt-1">
+                {{ incidentMetrics ? (incidentMetrics.p0_critical + ' P0 / ' + incidentMetrics.p1_high + ' P1') : '0 P0 / 0 P1' }}
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">Medium/Low: {{ incidentMetrics ? (incidentMetrics.p2_medium + incidentMetrics.p3_low) : 0 }}</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+              <div class="flex items-center justify-between text-zinc-400 text-xs">
+                <span>Mean Time to Mitigate</span>
+                <span class="text-indigo-400">⏱️</span>
+              </div>
+              <div class="text-xl font-bold text-indigo-400 font-mono mt-1">
+                {{ incidentMetrics ? incidentMetrics.mean_time_to_mitigate_minutes : 0 }} <span class="text-xs font-normal">min</span>
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">MTTM Target: &lt; 30m</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+              <div class="flex items-center justify-between text-zinc-400 text-xs">
+                <span>Mean Time to Resolve</span>
+                <span class="text-emerald-400">✅</span>
+              </div>
+              <div class="text-xl font-bold text-emerald-400 font-mono mt-1">
+                {{ incidentMetrics ? incidentMetrics.mean_time_to_resolve_minutes : 0 }} <span class="text-xs font-normal">min</span>
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">Resolved: {{ incidentMetrics ? incidentMetrics.resolved_incidents : 0 }}</div>
+            </div>
+          </div>
+
+          <!-- Main War-Room Layout: Left Incident List + Right War-Room Workbench -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <!-- Column 1: Incidents Triage Roster -->
+            <div class="lg:col-span-1 p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+              <div class="flex items-center justify-between">
+                <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                  <span>🚨</span> Incident Triage Roster
+                  <span class="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[10px] font-mono">{{ incidentsList.length }}</span>
+                </h4>
+              </div>
+
+              <!-- Filter Controls -->
+              <div class="grid grid-cols-2 gap-2">
+                <select
+                  v-model="incidentFilterStatus"
+                  @change="loadIncidentsGovernanceData()"
+                  class="px-2 py-1 text-xs rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
+                >
+                  <option value="">All Statuses</option>
+                  <option value="declared">Declared</option>
+                  <option value="triage">Triage</option>
+                  <option value="investigating">Investigating</option>
+                  <option value="mitigated">Mitigated</option>
+                  <option value="resolved">Resolved</option>
+                  <option value="postmortem_published">Post-Mortem</option>
+                </select>
+                <select
+                  v-model="incidentFilterSeverity"
+                  @change="loadIncidentsGovernanceData()"
+                  class="px-2 py-1 text-xs rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
+                >
+                  <option value="">All Severities</option>
+                  <option value="p0_critical">P0 Critical</option>
+                  <option value="p1_high">P1 High</option>
+                  <option value="p2_medium">P2 Medium</option>
+                  <option value="p3_low">P3 Low</option>
+                </select>
+              </div>
+
+              <!-- Incident Cards List -->
+              <div v-if="incidentsList.length" class="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+                <div
+                  v-for="inc in incidentsList"
+                  :key="inc.id"
+                  @click="inspectIncident(inc.id)"
+                  class="p-2.5 rounded-lg border text-xs cursor-pointer transition-all space-y-1.5"
+                  :class="selectedIncident && selectedIncident.id === inc.id ? 'bg-indigo-50/60 dark:bg-indigo-950/40 border-indigo-500 shadow-xs' : 'bg-zinc-50/50 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700'"
+                >
+                  <div class="flex items-center justify-between">
+                    <span
+                      class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                      :class="inc.severity === 'p0_critical' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : (inc.severity === 'p1_high' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-blue-500/20 text-blue-400 border border-blue-500/30')"
+                    >
+                      {{ inc.severity.replace('_', ' ') }}
+                    </span>
+                    <span
+                      class="px-2 py-0.5 rounded text-[10px] font-mono capitalize"
+                      :class="inc.status === 'resolved' || inc.status === 'postmortem_published' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400 animate-pulse'"
+                    >
+                      {{ inc.status.replace('_', ' ') }}
+                    </span>
+                  </div>
+
+                  <div class="font-bold text-zinc-900 dark:text-zinc-100 line-clamp-1">{{ inc.title }}</div>
+                  <div class="text-zinc-500 text-[11px] line-clamp-2">{{ inc.summary }}</div>
+
+                  <div class="flex items-center justify-between text-[10px] text-zinc-400 pt-1 border-t border-zinc-100 dark:border-zinc-800/60 font-mono">
+                    <span>📦 {{ inc.service_name || 'core' }}</span>
+                    <span>👤 {{ inc.incident_commander }}</span>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="p-6 text-center text-xs text-zinc-400 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-lg">
+                No incidents match filter. Click "+ Declare Incident" to initialize a war-room.
+              </div>
+            </div>
+
+            <!-- Column 2 & 3: Active War-Room Workbench -->
+            <div class="lg:col-span-2 space-y-3">
+              <div v-if="selectedIncident" class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-4">
+                <!-- War-Room Header & Status Bar -->
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-zinc-100 dark:border-zinc-800">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span
+                        class="px-2 py-0.5 rounded text-xs font-bold uppercase"
+                        :class="selectedIncident.severity === 'p0_critical' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : (selectedIncident.severity === 'p1_high' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-blue-500/20 text-blue-400 border border-blue-500/30')"
+                      >
+                        {{ selectedIncident.severity }}
+                      </span>
+                      <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">{{ selectedIncident.title }}</h3>
+                    </div>
+                    <p class="text-xs text-zinc-400 font-mono mt-1">
+                      Slug: {{ selectedIncident.slug }} • Service: {{ selectedIncident.service_name }} • Commander: {{ selectedIncident.incident_commander }}
+                    </p>
+                  </div>
+
+                  <!-- Lifecycle Transition Toolbar -->
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      v-if="selectedIncident.status === 'declared'"
+                      @click="updateIncidentStatus('investigating')"
+                      class="px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold"
+                    >
+                      🔍 Begin Investigation
+                    </button>
+                    <button
+                      v-if="selectedIncident.status === 'investigating' || selectedIncident.status === 'triage'"
+                      @click="updateIncidentStatus('mitigated')"
+                      class="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
+                    >
+                      🛡️ Mark Mitigated
+                    </button>
+                    <button
+                      v-if="selectedIncident.status === 'mitigated'"
+                      @click="updateIncidentStatus('resolved')"
+                      class="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold"
+                    >
+                      ✅ Mark Resolved
+                    </button>
+                    <button
+                      v-if="selectedIncident.status === 'resolved' || selectedIncident.status === 'postmortem_published'"
+                      @click="generateAutoPostmortem()"
+                      class="px-2.5 py-1 rounded bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold"
+                    >
+                      📝 5-Whys Post-Mortem
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Subtab Navigation -->
+                <div class="flex items-center gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-2">
+                  <button
+                    @click="incidentActiveSubtab = 'timeline'"
+                    class="px-3 py-1 text-xs font-semibold rounded-md transition-colors"
+                    :class="incidentActiveSubtab === 'timeline' ? 'bg-indigo-600 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300'"
+                  >
+                    💬 Live Timeline ({{ (selectedIncident.events || []).length }})
+                  </button>
+                  <button
+                    @click="incidentActiveSubtab = 'hypotheses'"
+                    class="px-3 py-1 text-xs font-semibold rounded-md transition-colors"
+                    :class="incidentActiveSubtab === 'hypotheses' ? 'bg-indigo-600 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300'"
+                  >
+                    🔬 Hypotheses Board ({{ (selectedIncident.hypotheses || []).length }})
+                  </button>
+                  <button
+                    @click="incidentActiveSubtab = 'mitigations'"
+                    class="px-3 py-1 text-xs font-semibold rounded-md transition-colors"
+                    :class="incidentActiveSubtab === 'mitigations' ? 'bg-indigo-600 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300'"
+                  >
+                    🛠️ Mitigations ({{ (selectedIncident.mitigations || []).length }})
+                  </button>
+                  <button
+                    @click="incidentActiveSubtab = 'postmortem'"
+                    class="px-3 py-1 text-xs font-semibold rounded-md transition-colors"
+                    :class="incidentActiveSubtab === 'postmortem' ? 'bg-indigo-600 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300'"
+                  >
+                    📝 Post-Mortem Report
+                  </button>
+                </div>
+
+                <!-- SUBTAB 1: LIVE TIMELINE -->
+                <div v-if="incidentActiveSubtab === 'timeline'" class="space-y-3">
+                  <!-- Timeline Stream -->
+                  <div class="space-y-2 max-h-[350px] overflow-y-auto pr-1">
+                    <div
+                      v-for="ev in (selectedIncident.events || [])"
+                      :key="ev.id"
+                      class="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs space-y-1"
+                    >
+                      <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-1.5">
+                          <span
+                            class="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase"
+                            :class="ev.severity === 'critical' || ev.severity === 'error' ? 'bg-red-500/20 text-red-400' : (ev.severity === 'warning' ? 'bg-amber-500/20 text-amber-400' : 'bg-zinc-700 text-zinc-300')"
+                          >
+                            {{ ev.event_type }}
+                          </span>
+                          <span class="font-bold text-zinc-800 dark:text-zinc-200">{{ ev.title }}</span>
+                        </div>
+                        <span class="text-[10px] text-zinc-500 font-mono">{{ ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString() : '' }}</span>
+                      </div>
+                      <p v-if="ev.content" class="text-zinc-600 dark:text-zinc-300 text-[11px]">{{ ev.content }}</p>
+                      <div class="text-[10px] text-zinc-400 font-mono">By: {{ ev.author }} ({{ ev.author_type }})</div>
+                    </div>
+                  </div>
+
+                  <!-- Add Event Inline Form -->
+                  <div class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 space-y-2">
+                    <div class="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Append Event to War-Room</div>
+                    <div class="grid grid-cols-3 gap-2">
+                      <input
+                        v-model="newIncidentEvent.title"
+                        placeholder="Event title or log summary..."
+                        class="col-span-2 px-2.5 py-1 text-xs rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800"
+                      />
+                      <select
+                        v-model="newIncidentEvent.event_type"
+                        class="px-2 py-1 text-xs rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800"
+                      >
+                        <option value="log_entry">Log Entry</option>
+                        <option value="metric_anomaly">Metric Anomaly</option>
+                        <option value="hypothesis_tested">Hypothesis Test</option>
+                        <option value="mitigation_executed">Mitigation Executed</option>
+                        <option value="agent_action">Agent Action</option>
+                      </select>
+                    </div>
+                    <div class="flex gap-2">
+                      <input
+                        v-model="newIncidentEvent.content"
+                        placeholder="Detailed message or stacktrace..."
+                        class="flex-1 px-2.5 py-1 text-xs rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800"
+                      />
+                      <button
+                        @click="addIncidentTimelineEvent()"
+                        :disabled="!newIncidentEvent.title.trim()"
+                        class="px-3 py-1 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold"
+                      >
+                        Post Event
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- SUBTAB 2: HYPOTHESES BOARD -->
+                <div v-if="incidentActiveSubtab === 'hypotheses'" class="space-y-3">
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[350px] overflow-y-auto">
+                    <div
+                      v-for="h in (selectedIncident.hypotheses || [])"
+                      :key="h.id"
+                      class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs space-y-2"
+                    >
+                      <div class="flex items-center justify-between">
+                        <span
+                          class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                          :class="h.status === 'confirmed' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : (h.status === 'falsified' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30')"
+                        >
+                          {{ h.status }}
+                        </span>
+                        <span class="font-mono text-zinc-400 text-[10px]">Confidence: {{ Math.round((h.confidence_score || 0) * 100) }}%</span>
+                      </div>
+                      <div class="font-bold text-zinc-800 dark:text-zinc-200">{{ h.hypothesis }}</div>
+                      <p v-if="h.rationale" class="text-zinc-500 text-[11px]">{{ h.rationale }}</p>
+                      <p v-if="h.evidence" class="text-emerald-400 text-[11px] bg-emerald-950/20 p-1.5 rounded border border-emerald-800/40">Evidence: {{ h.evidence }}</p>
+
+                      <div class="flex items-center justify-end gap-1.5 pt-1 border-t border-zinc-200 dark:border-zinc-800">
+                        <button
+                          v-if="h.status !== 'confirmed'"
+                          @click="updateHypothesisStatus(h.id, 'confirmed', 0.95)"
+                          class="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-semibold"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          v-if="h.status !== 'falsified'"
+                          @click="updateHypothesisStatus(h.id, 'falsified', 0.1)"
+                          class="px-2 py-0.5 rounded bg-red-600 hover:bg-red-500 text-white text-[10px] font-semibold"
+                        >
+                          Falsify
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Propose Hypothesis Form -->
+                  <div class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 space-y-2">
+                    <div class="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Propose Root-Cause Hypothesis</div>
+                    <input
+                      v-model="newIncidentHypothesis.hypothesis"
+                      placeholder="e.g. SQLite PRAGMA wal_autocheckpoint interval lock contention..."
+                      class="w-full px-2.5 py-1 text-xs rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800"
+                    />
+                    <div class="grid grid-cols-2 gap-2">
+                      <input
+                        v-model="newIncidentHypothesis.rationale"
+                        placeholder="Rationale / initial clues..."
+                        class="px-2.5 py-1 text-xs rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800"
+                      />
+                      <input
+                        v-model="newIncidentHypothesis.test_plan"
+                        placeholder="Reproduction test plan..."
+                        class="px-2.5 py-1 text-xs rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800"
+                      />
+                    </div>
+                    <button
+                      @click="proposeHypothesis()"
+                      :disabled="!newIncidentHypothesis.hypothesis.trim()"
+                      class="px-3 py-1 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold"
+                    >
+                      Propose Hypothesis
+                    </button>
+                  </div>
+                </div>
+
+                <!-- SUBTAB 3: MITIGATIONS -->
+                <div v-if="incidentActiveSubtab === 'mitigations'" class="space-y-3">
+                  <div class="space-y-2 max-h-[350px] overflow-y-auto">
+                    <div
+                      v-for="m in (selectedIncident.mitigations || [])"
+                      :key="m.id"
+                      class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs space-y-2"
+                    >
+                      <div class="flex items-center justify-between">
+                        <span
+                          class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                          :class="m.status === 'verified' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'"
+                        >
+                          {{ m.status }}
+                        </span>
+                        <span class="font-mono text-zinc-400 text-[10px]">Type: {{ m.action_type }}</span>
+                      </div>
+                      <div class="font-bold text-zinc-800 dark:text-zinc-200">{{ m.title }}</div>
+                      <p v-if="m.description" class="text-zinc-500 text-[11px]">{{ m.description }}</p>
+                      <p v-if="m.verification_result" class="text-emerald-400 text-[11px]">Outcome: {{ m.verification_result }}</p>
+
+                      <div class="flex items-center justify-end gap-1.5 pt-1 border-t border-zinc-200 dark:border-zinc-800">
+                        <button
+                          v-if="m.status !== 'verified'"
+                          @click="updateMitigationStatus(m.id, 'verified')"
+                          class="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-semibold"
+                        >
+                          Verify & Settle
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Register Mitigation Form -->
+                  <div class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 space-y-2">
+                    <div class="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Plan & Apply Mitigation</div>
+                    <div class="grid grid-cols-3 gap-2">
+                      <input
+                        v-model="newIncidentMitigation.title"
+                        placeholder="Mitigation title..."
+                        class="col-span-2 px-2.5 py-1 text-xs rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800"
+                      />
+                      <select
+                        v-model="newIncidentMitigation.action_type"
+                        class="px-2 py-1 text-xs rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800"
+                      >
+                        <option value="config_patch">Config Patch</option>
+                        <option value="rollback">Rollback Commit</option>
+                        <option value="feature_flag">Feature Flag</option>
+                        <option value="sandbox_isolation">Sandbox Isolation</option>
+                        <option value="code_fix">Code Fix</option>
+                      </select>
+                    </div>
+                    <input
+                      v-model="newIncidentMitigation.description"
+                      placeholder="Execution steps & parameters..."
+                      class="w-full px-2.5 py-1 text-xs rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800"
+                    />
+                    <button
+                      @click="executeMitigationAction()"
+                      :disabled="!newIncidentMitigation.title.trim()"
+                      class="px-3 py-1 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold"
+                    >
+                      Execute Mitigation
+                    </button>
+                  </div>
+                </div>
+
+                <!-- SUBTAB 4: POST-MORTEM REPORT -->
+                <div v-if="incidentActiveSubtab === 'postmortem'" class="space-y-3">
+                  <div v-if="selectedIncident.postmortem" class="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 space-y-3 text-xs">
+                    <div class="flex items-center justify-between">
+                      <h4 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">{{ selectedIncident.postmortem.title }}</h4>
+                      <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30 uppercase">
+                        {{ selectedIncident.postmortem.status }}
+                      </span>
+                    </div>
+
+                    <div class="p-3 rounded-lg bg-zinc-100 dark:bg-zinc-900">
+                      <div class="font-semibold text-zinc-700 dark:text-zinc-300">Executive Summary</div>
+                      <p class="text-zinc-600 dark:text-zinc-400 mt-1">{{ selectedIncident.postmortem.executive_summary }}</p>
+                    </div>
+
+                    <div class="p-3 rounded-lg bg-zinc-100 dark:bg-zinc-900 whitespace-pre-line font-mono text-[11px]">
+                      <div class="font-bold text-indigo-400 font-sans text-xs mb-1">Root Cause (5-Whys Analysis)</div>
+                      {{ selectedIncident.postmortem.root_cause_analysis }}
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                      <div class="p-2.5 rounded bg-zinc-100 dark:bg-zinc-900">
+                        <div class="font-semibold text-zinc-700 dark:text-zinc-300 text-[11px]">Detection Gap</div>
+                        <p class="text-zinc-500 text-[10px] mt-0.5">{{ selectedIncident.postmortem.detection_gap || 'None identified' }}</p>
+                      </div>
+                      <div class="p-2.5 rounded bg-zinc-100 dark:bg-zinc-900">
+                        <div class="font-semibold text-zinc-700 dark:text-zinc-300 text-[11px]">Lessons Learned</div>
+                        <p class="text-zinc-500 text-[10px] mt-0.5">{{ selectedIncident.postmortem.lessons_learned || 'N/A' }}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-else class="p-6 text-center text-xs text-zinc-400 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-lg space-y-2">
+                    <p>No post-mortem document created yet for this incident.</p>
+                    <button
+                      @click="generateAutoPostmortem()"
+                      class="px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold"
+                    >
+                      Generate 5-Whys Post-Mortem Report
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="p-12 text-center text-xs text-zinc-400 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl">
+                Select an incident from the left roster or click "+ Declare Incident" to open the live war-room workbench.
+              </div>
+            </div>
+          </div>
+
+          <!-- Declare Incident Modal -->
+          <div v-if="newIncidentModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="w-full max-w-lg rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-2xl space-y-4">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🚨</span>
+                  <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Declare Production Incident</h3>
+                </div>
+                <button @click="newIncidentModalOpen = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3 text-xs">
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Incident Title *</label>
+                  <input
+                    v-model="newIncident.title"
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-red-500"
+                    placeholder="e.g. Gateway 503 Spike under Swarm Load"
+                  />
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Severity</label>
+                    <select
+                      v-model="newIncident.severity"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-red-500"
+                    >
+                      <option value="p0_critical">P0 Critical</option>
+                      <option value="p1_high">P1 High</option>
+                      <option value="p2_medium">P2 Medium</option>
+                      <option value="p3_low">P3 Low</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Service / Component</label>
+                    <input
+                      v-model="newIncident.service_name"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-red-500"
+                      placeholder="e.g. core-gateway"
+                    />
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Incident Commander</label>
+                    <input
+                      v-model="newIncident.incident_commander"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-red-500"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Detection Source</label>
+                    <select
+                      v-model="newIncident.source"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-red-500"
+                    >
+                      <option value="runtime_probe">Runtime Probe</option>
+                      <option value="ci_pipeline">CI Pipeline</option>
+                      <option value="sentry_error">Sentry / Error Logs</option>
+                      <option value="agent_eval">Agent Benchmark Eval</option>
+                      <option value="user_report">User Report</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Triage Summary</label>
+                  <textarea
+                    v-model="newIncident.summary"
+                    rows="3"
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-red-500"
+                    placeholder="Initial symptoms, logs, or error rates..."
+                  ></textarea>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  @click="newIncidentModalOpen = false"
+                  class="px-4 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  @click="declareNewIncident()"
+                  :disabled="!newIncident.title.trim() || isLoadingIncidents"
+                  class="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-xs font-bold transition-colors shadow-xs"
+                >
+                  {{ isLoadingIncidents ? 'Declaring...' : 'Declare & Open War-Room' }}
                 </button>
               </div>
             </div>

@@ -2551,5 +2551,174 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to seed sandbox templates');
     return data;
+  },
+
+  // ==========================================
+  // Incident Response & War-Room Engine APIs (Epic 31)
+  // ==========================================
+  async listIncidents(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/incidents${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list incidents');
+    return data;
+  },
+
+  async declareIncident(payload = {}) {
+    const res = await fetch('/api/projectbase/incidents', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to declare incident');
+    return data;
+  },
+
+  async getIncidentDetails(id) {
+    const res = await fetch(`/api/projectbase/incidents/${encodeURIComponent(id)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get incident details');
+    return data;
+  },
+
+  async updateIncident(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/incidents/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to update incident');
+    return data;
+  },
+
+  async deleteIncident(id) {
+    const res = await fetch(`/api/projectbase/incidents/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete incident');
+    return data;
+  },
+
+  async transitionIncidentStatus(id, status, note = '', author = '') {
+    const res = await fetch(`/api/projectbase/incidents/${encodeURIComponent(id)}/status`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ status, note, author })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to update incident status');
+    return data;
+  },
+
+  async addIncidentEvent(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/incidents/${encodeURIComponent(id)}/events`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to add incident event');
+    return data;
+  },
+
+  async listIncidentEvents(id) {
+    const res = await fetch(`/api/projectbase/incidents/${encodeURIComponent(id)}/events`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list incident events');
+    return data;
+  },
+
+  async proposeIncidentHypothesis(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/incidents/${encodeURIComponent(id)}/hypotheses`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to propose hypothesis');
+    return data;
+  },
+
+  async updateIncidentHypothesis(id, hypoId, payload = {}) {
+    const res = await fetch(`/api/projectbase/incidents/${encodeURIComponent(id)}/hypotheses/${encodeURIComponent(hypoId)}`, {
+      method: 'PATCH',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to update hypothesis');
+    return data;
+  },
+
+  async executeIncidentMitigation(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/incidents/${encodeURIComponent(id)}/mitigations`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to execute mitigation');
+    return data;
+  },
+
+  async updateIncidentMitigation(id, mitId, payload = {}) {
+    const res = await fetch(`/api/projectbase/incidents/${encodeURIComponent(id)}/mitigations/${encodeURIComponent(mitId)}`, {
+      method: 'PATCH',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to update mitigation');
+    return data;
+  },
+
+  async createOrUpdateIncidentPostmortem(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/incidents/${encodeURIComponent(id)}/postmortem`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to save postmortem');
+    return data;
+  },
+
+  async getIncidentPostmortem(id) {
+    const res = await fetch(`/api/projectbase/incidents/${encodeURIComponent(id)}/postmortem`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get postmortem');
+    return data;
+  },
+
+  async getIncidentMetrics() {
+    const res = await fetch('/api/projectbase/incidents/metrics', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get incident metrics');
+    return data;
+  },
+
+  async seedDemoIncidentWarroom() {
+    const res = await fetch('/api/projectbase/incidents/seed-demo', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to seed demo incident');
+    return data;
   }
 };

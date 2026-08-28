@@ -266,3 +266,13 @@
 - [x] 8 FastMCP JSON-RPC 2.0 tools (`provision_dev_sandbox`, `list_dev_sandboxes`, `get_sandbox_status`, `exec_in_sandbox`, `snapshot_sandbox_state`, `terminate_dev_sandbox`, `list_sandbox_templates`, `get_sandbox_fleet_metrics`)
 - [x] Frontend AgentsView **📦 Ephemeral Sandboxes & Dev Environments** dashboard with live fleet status grid, port/preview URL links, terminal execution logs, snapshot checkpoints, template blueprints gallery, and interactive provisioning modal
 - [x] Comprehensive automated test suite `tests/test_ephemeral_sandboxes_orchestrator.py` with 15/15 passing tests and 100% frontend guard verification
+
+---
+
+## Milestone (Cycle 34)
+**Epic 31 – Autonomous Multi-Agent Incident Response, Live Debugging War-Room & Root-Cause Post-Mortem Engine (✅ Done)**
+- [x] Schema migration (`1710000043_add_incident_warrooms_and_postmortems.js`) introducing `incidents`, `incident_events`, `incident_hypotheses`, `incident_mitigations`, and `incident_postmortems` collections
+- [x] Backend incident war-room engine hook (`app/pb_hooks/115_incident_warroom_engine.pb.js`) with 19 high-performance REST API endpoints for incident declaration, live event streaming, status transitions, hypothesis testing & falsification, mitigation tracking & verification, 5-Whys post-mortem generation, and fleet MTTR/MTTM metrics
+- [x] 8 FastMCP JSON-RPC 2.0 tools (`declare_incident`, `list_incidents`, `get_incident_details`, `add_incident_event`, `propose_incident_hypothesis`, `execute_incident_mitigation`, `update_incident_status`, `generate_incident_postmortem`)
+- [x] Frontend AgentsView **🚨 Live Incident War-Room & Post-Mortem** dashboard with KPI cards, incident triage roster with severity badges, interactive War-Room Workbench with 4 subtabs (Live Timeline Stream, Hypotheses Board with confidence meters, Mitigations Tracker, 5-Whys Post-Mortem Viewer/Editor), and "+ Declare Incident" modal
+- [x] Comprehensive automated test suite `tests/test_incident_warroom_engine.py` with 11/11 passing assertions, 471 total passing tests across 36 files, and 100% frontend guard verification

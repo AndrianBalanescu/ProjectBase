@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "ProjectBase API",
-    "version": "1.29.0",
+    "version": "1.30.0",
     "description": "High-performance, ultra-lightweight Plane & Linear alternative for multi-project Kanban, sprint cycles, and autonomous AI agent orchestration.",
     "contact": {
       "name": "Andrian Balanescu",
@@ -7839,6 +7839,412 @@
         "summary": "Seed canonical sandbox environment blueprints",
         "responses": {
           "200": { "description": "Seeded canonical templates" }
+        }
+      }
+    },
+    "/projectbase/incidents": {
+      "get": {
+        "tags": ["Incident Response & War-Room Engine"],
+        "summary": "List production incidents and war-rooms with status and severity filtering",
+        "parameters": [
+          { "name": "status", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "severity", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "project_id", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "search", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer" } },
+          { "name": "offset", "in": "query", "required": false, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "List of incidents" }
+        }
+      },
+      "post": {
+        "tags": ["Incident Response & War-Room Engine"],
+        "summary": "Declare a new production incident or regression and initialize live war-room",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string" },
+                  "slug": { "type": "string" },
+                  "summary": { "type": "string" },
+                  "project_id": { "type": "string" },
+                  "severity": { "type": "string", "enum": ["p0_critical", "p1_high", "p2_medium", "p3_low"] },
+                  "status": { "type": "string", "enum": ["declared", "triage", "investigating", "mitigated", "resolved", "postmortem_published"] },
+                  "incident_commander": { "type": "string" },
+                  "lead_investigator": { "type": "string" },
+                  "source": { "type": "string" },
+                  "impact_scope": { "type": "string" },
+                  "service_name": { "type": "string" },
+                  "tags": { "type": "array", "items": { "type": "string" } },
+                  "metadata": { "type": "object" }
+                },
+                "required": ["title"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Incident declared and war-room opened" }
+        }
+      }
+    },
+    "/projectbase/incidents/metrics": {
+      "get": {
+        "tags": ["Incident Response & War-Room Engine"],
+        "summary": "Retrieve fleet-wide incident response metrics including MTTM and MTTR",
+        "responses": {
+          "200": { "description": "Incident metrics" }
+        }
+      }
+    },
+    "/projectbase/incidents/seed-demo": {
+      "post": {
+        "tags": ["Incident Response & War-Room Engine"],
+        "summary": "Seed canonical demo incident war-room with full event stream and 5-Whys post-mortem",
+        "responses": {
+          "201": { "description": "Demo incident war-room seeded" }
+        }
+      }
+    },
+    "/projectbase/incidents/{id}": {
+      "get": {
+        "tags": ["Incident Response & War-Room Engine"],
+        "summary": "Retrieve complete incident war-room details with events timeline, hypotheses, mitigations, and post-mortem",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Incident details" }
+        }
+      },
+      "patch": {
+        "tags": ["Incident Response & War-Room Engine"],
+        "summary": "Update incident metadata, commander, or severity",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string" },
+                  "summary": { "type": "string" },
+                  "severity": { "type": "string" },
+                  "status": { "type": "string" },
+                  "incident_commander": { "type": "string" },
+                  "lead_investigator": { "type": "string" },
+                  "impact_scope": { "type": "string" },
+                  "service_name": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Incident updated" }
+        }
+      },
+      "delete": {
+        "tags": ["Incident Response & War-Room Engine"],
+        "summary": "Cascading delete an incident and associated timeline events, hypotheses, mitigations, and post-mortems",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Incident deleted" }
+        }
+      }
+    },
+    "/projectbase/incidents/{id}/status": {
+      "post": {
+        "tags": ["Incident Response & War-Room Engine"],
+        "summary": "Transition incident status with timeline audit logging and auto-timestamping",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": { "type": "string", "enum": ["declared", "triage", "investigating", "mitigated", "resolved", "postmortem_published"] },
+                  "note": { "type": "string" },
+                  "author": { "type": "string" }
+                },
+                "required": ["status"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Status updated" }
+        }
+      }
+    },
+    "/projectbase/incidents/{id}/events": {
+      "get": {
+        "tags": ["Incident Response & War-Room Engine"],
+        "summary": "List diagnostic events and log entries in incident war-room timeline",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "List of events" }
+        }
+      },
+      "post": {
+        "tags": ["Incident Response & War-Room Engine"],
+        "summary": "Append diagnostic log, metric anomaly, or action to live war-room timeline",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string" },
+                  "content": { "type": "string" },
+                  "event_type": { "type": "string" },
+                  "severity": { "type": "string" },
+                  "author": { "type": "string" },
+                  "author_type": { "type": "string" },
+                  "payload": { "type": "object" }
+                },
+                "required": ["title"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Event added to timeline" }
+        }
+      }
+    },
+    "/projectbase/incidents/{id}/hypotheses": {
+      "get": {
+        "tags": ["Incident Response & War-Room Engine"],
+        "summary": "List root-cause hypotheses for an incident",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "List of hypotheses" }
+        }
+      },
+      "post": {
+        "tags": ["Incident Response & War-Room Engine"],
+        "summary": "Propose a diagnostic root-cause hypothesis with confidence score and test plan",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "hypothesis": { "type": "string" },
+                  "rationale": { "type": "string" },
+                  "test_plan": { "type": "string" },
+                  "confidence_score": { "type": "number" },
+                  "proposed_by": { "type": "string" }
+                },
+                "required": ["hypothesis"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Hypothesis registered" }
+        }
+      }
+    },
+    "/projectbase/incidents/{id}/hypotheses/{hypoId}": {
+      "patch": {
+        "tags": ["Incident Response & War-Room Engine"],
+        "summary": "Update hypothesis status (confirmed/falsified), evidence, and confidence score",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "hypoId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "hypothesis": { "type": "string" },
+                  "status": { "type": "string", "enum": ["proposed", "investigating", "confirmed", "falsified", "inconclusive"] },
+                  "evidence": { "type": "string" },
+                  "confidence_score": { "type": "number" },
+                  "tested_by": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Hypothesis updated" }
+        }
+      }
+    },
+    "/projectbase/incidents/{id}/mitigations": {
+      "get": {
+        "tags": ["Incident Response & War-Room Engine"],
+        "summary": "List planned and executed mitigation actions",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "List of mitigations" }
+        }
+      },
+      "post": {
+        "tags": ["Incident Response & War-Room Engine"],
+        "summary": "Plan or execute a mitigation action (rollback, config patch, sandbox isolation)",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string" },
+                  "description": { "type": "string" },
+                  "action_type": { "type": "string", "enum": ["rollback", "feature_flag", "config_patch", "traffic_shedding", "sandbox_isolation", "code_fix"] },
+                  "status": { "type": "string", "enum": ["planned", "in_progress", "applied", "verified", "rolled_back", "failed"] },
+                  "rollback_plan": { "type": "string" },
+                  "executed_by": { "type": "string" }
+                },
+                "required": ["title"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Mitigation recorded" }
+        }
+      }
+    },
+    "/projectbase/incidents/{id}/mitigations/{mitId}": {
+      "patch": {
+        "tags": ["Incident Response & War-Room Engine"],
+        "summary": "Update mitigation status, verification method, and outcomes",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "mitId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": { "type": "string" },
+                  "verification_method": { "type": "string" },
+                  "verification_result": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Mitigation updated" }
+        }
+      }
+    },
+    "/projectbase/incidents/{id}/postmortem": {
+      "get": {
+        "tags": ["Incident Response & War-Room Engine"],
+        "summary": "Retrieve 5-Whys root-cause post-mortem report",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Post-mortem document" }
+        }
+      },
+      "post": {
+        "tags": ["Incident Response & War-Room Engine"],
+        "summary": "Generate or create a 5-Whys post-mortem report",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string" },
+                  "status": { "type": "string", "enum": ["draft", "review", "published", "archived"] },
+                  "executive_summary": { "type": "string" },
+                  "root_cause_analysis": { "type": "string" },
+                  "contributing_factors": { "type": "array", "items": { "type": "string" } },
+                  "impact_metrics": { "type": "object" },
+                  "timeline_summary": { "type": "string" },
+                  "detection_gap": { "type": "string" },
+                  "action_items": { "type": "array", "items": { "type": "object" } },
+                  "lessons_learned": { "type": "string" },
+                  "author": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Post-mortem created" }
+        }
+      },
+      "patch": {
+        "tags": ["Incident Response & War-Room Engine"],
+        "summary": "Update or publish 5-Whys post-mortem report",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string" },
+                  "status": { "type": "string" },
+                  "executive_summary": { "type": "string" },
+                  "root_cause_analysis": { "type": "string" },
+                  "contributing_factors": { "type": "array", "items": { "type": "string" } },
+                  "impact_metrics": { "type": "object" },
+                  "timeline_summary": { "type": "string" },
+                  "detection_gap": { "type": "string" },
+                  "action_items": { "type": "array", "items": { "type": "object" } },
+                  "lessons_learned": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Post-mortem updated" }
         }
       }
     }

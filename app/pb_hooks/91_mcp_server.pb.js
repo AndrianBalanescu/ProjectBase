@@ -2067,6 +2067,140 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
                 type: "object",
                 properties: {}
             }
+        },
+        {
+            name: "declare_incident",
+            description: "Declare a new production incident or regression with title, severity, summary, source, and assign commander.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    title: { type: "string", description: "Incident summary title" },
+                    summary: { type: "string", description: "Triage narrative and initial assessment" },
+                    severity: { type: "string", description: "p0_critical|p1_high|p2_medium|p3_low (default: p2_medium)" },
+                    project_id: { type: "string", description: "Optional project ID" },
+                    incident_commander: { type: "string", description: "Assigned commander agent or user" },
+                    lead_investigator: { type: "string", description: "Lead technical investigator" },
+                    source: { type: "string", description: "ci_pipeline|sentry_error|runtime_probe|user_report|agent_eval|manual" },
+                    service_name: { type: "string", description: "Target service or component name" },
+                    impact_scope: { type: "string", description: "Affected users or blast radius" }
+                },
+                required: ["title"]
+            }
+        },
+        {
+            name: "list_incidents",
+            description: "List production incidents and war-rooms with status, severity, and service filters.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    status: { type: "string", description: "declared|triage|investigating|mitigated|resolved|postmortem_published" },
+                    severity: { type: "string", description: "p0_critical|p1_high|p2_medium|p3_low" },
+                    project_id: { type: "string", description: "Optional project ID" },
+                    search: { type: "string", description: "Search keyword in title or summary" }
+                }
+            }
+        },
+        {
+            name: "get_incident_details",
+            description: "Retrieve comprehensive incident war-room details including events timeline, hypotheses, mitigations, and post-mortem.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    incident_id: { type: "string", description: "Incident ID or slug" }
+                },
+                required: ["incident_id"]
+            }
+        },
+        {
+            name: "add_incident_event",
+            description: "Append a live diagnostic event, log entry, metric anomaly, or status note to the incident war-room timeline.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    incident_id: { type: "string", description: "Incident ID" },
+                    title: { type: "string", description: "Event title" },
+                    content: { type: "string", description: "Detailed log or message body" },
+                    event_type: { type: "string", description: "status_change|hypothesis_tested|mitigation_executed|metric_anomaly|log_entry|agent_action|communication" },
+                    severity: { type: "string", description: "info|warning|error|critical" },
+                    author: { type: "string", description: "Agent or user name" },
+                    author_type: { type: "string", description: "agent|human|system|ci" },
+                    payload: { type: "object", description: "Optional structured payload" }
+                },
+                required: ["incident_id", "title"]
+            }
+        },
+        {
+            name: "propose_incident_hypothesis",
+            description: "Propose, test, or update a root-cause diagnostic hypothesis with confidence score and evidence.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    incident_id: { type: "string", description: "Incident ID" },
+                    hypothesis_id: { type: "string", description: "Optional hypothesis ID to update existing" },
+                    hypothesis: { type: "string", description: "Root-cause hypothesis statement" },
+                    rationale: { type: "string", description: "Clues and reasoning" },
+                    status: { type: "string", description: "proposed|investigating|confirmed|falsified|inconclusive" },
+                    test_plan: { type: "string", description: "Reproduction / test plan" },
+                    evidence: { type: "string", description: "Test findings and observations" },
+                    confidence_score: { type: "number", description: "Confidence score (0.0 - 1.0)" },
+                    tested_by: { type: "string", description: "Agent that tested the hypothesis" }
+                },
+                required: ["incident_id"]
+            }
+        },
+        {
+            name: "execute_incident_mitigation",
+            description: "Record, execute, or verify an incident mitigation action (rollback, config patch, sandbox isolation, code fix).",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    incident_id: { type: "string", description: "Incident ID" },
+                    mitigation_id: { type: "string", description: "Optional mitigation ID to update existing" },
+                    title: { type: "string", description: "Mitigation action title" },
+                    description: { type: "string", description: "Execution details" },
+                    action_type: { type: "string", description: "rollback|feature_flag|config_patch|traffic_shedding|sandbox_isolation|code_fix" },
+                    status: { type: "string", description: "planned|in_progress|applied|verified|rolled_back|failed" },
+                    executed_by: { type: "string", description: "Agent executing the mitigation" },
+                    verification_method: { type: "string", description: "Verification check method" },
+                    verification_result: { type: "string", description: "Outcome / check result" }
+                },
+                required: ["incident_id"]
+            }
+        },
+        {
+            name: "update_incident_status",
+            description: "Transition incident lifecycle status (triage, investigating, mitigated, resolved, postmortem_published) with automatic timeline recording.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    incident_id: { type: "string", description: "Incident ID" },
+                    status: { type: "string", description: "declared|triage|investigating|mitigated|resolved|postmortem_published" },
+                    note: { type: "string", description: "Optional status transition note" },
+                    author: { type: "string", description: "Agent or user triggering transition" }
+                },
+                required: ["incident_id", "status"]
+            }
+        },
+        {
+            name: "generate_incident_postmortem",
+            description: "Generate, update, or publish a comprehensive 5-Whys root-cause post-mortem with preventative action items.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    incident_id: { type: "string", description: "Incident ID" },
+                    title: { type: "string", description: "Post-mortem title" },
+                    status: { type: "string", description: "draft|review|published|archived" },
+                    executive_summary: { type: "string", description: "Executive overview" },
+                    root_cause_analysis: { type: "string", description: "5-Whys root cause analysis" },
+                    contributing_factors: { type: "array", items: { type: "string" }, description: "List of contributing factors" },
+                    impact_metrics: { type: "object", description: "Downtime, error rate peak, affected workers" },
+                    timeline_summary: { type: "string", description: "Chronological narrative" },
+                    detection_gap: { type: "string", description: "Detection gap explanation" },
+                    action_items: { type: "array", items: { type: "object" }, description: "Preventative action items" },
+                    lessons_learned: { type: "string", description: "Key takeaways" }
+                },
+                required: ["incident_id"]
+            }
         }
     ]
 
@@ -7883,6 +8017,225 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         };
     };
 
+    const declareIncident = (a) => {
+        let title = a.title || "";
+        if (!title.trim()) throw new Error("title is required");
+        let col = e.app.findCollectionByNameOrId("incidents");
+        let rec = new Record(col);
+        let slug = ("inc-" + Date.now().toString(36) + "-" + Math.random().toString(36).substring(2, 6)).toLowerCase();
+        let nowIso = new Date().toISOString();
+        rec.set("title", title.trim());
+        rec.set("slug", slug);
+        rec.set("summary", a.summary || "");
+        rec.set("project_id", a.project_id || "");
+        rec.set("severity", a.severity || "p2_medium");
+        rec.set("status", "declared");
+        rec.set("incident_commander", a.incident_commander || "Flomaster-Commander");
+        rec.set("lead_investigator", a.lead_investigator || "");
+        rec.set("source", a.source || "manual");
+        rec.set("service_name", a.service_name || "core");
+        rec.set("impact_scope", a.impact_scope || "");
+        rec.set("started_at", nowIso);
+        rec.set("detected_at", nowIso);
+        rec.set("tags_json", JSON.stringify([]));
+        rec.set("metadata_json", JSON.stringify({}));
+        e.app.save(rec);
+
+        try {
+            let evCol = e.app.findCollectionByNameOrId("incident_events");
+            let ev = new Record(evCol);
+            ev.set("incident_id", rec.id);
+            ev.set("event_type", "status_change");
+            ev.set("author", rec.get("incident_commander"));
+            ev.set("author_type", "agent");
+            ev.set("title", "Incident Declared: " + rec.get("title"));
+            ev.set("content", rec.get("summary") || "Incident war-room declared.");
+            ev.set("payload_json", JSON.stringify({}));
+            ev.set("severity", rec.get("severity") === "p0_critical" ? "critical" : "warning");
+            ev.set("timestamp", nowIso);
+            e.app.save(ev);
+        } catch (err) {}
+
+        return { id: rec.id, title: rec.get("title"), slug: rec.get("slug"), severity: rec.get("severity"), status: rec.get("status") };
+    };
+
+    const listIncidents = (a) => {
+        let parts = [];
+        if (a.status) parts.push("status = '" + a.status + "'");
+        if (a.severity) parts.push("severity = '" + a.severity + "'");
+        if (a.project_id) parts.push("project_id = '" + a.project_id + "'");
+        if (a.search) parts.push("(title ~ '" + a.search + "' || summary ~ '" + a.search + "')");
+        let filter = parts.join(" && ");
+        let records = e.app.findRecordsByFilter("incidents", filter || "id != ''", "-created", 100, 0);
+        return records.map(r => ({
+            id: r.id,
+            title: r.get("title"),
+            slug: r.get("slug"),
+            summary: r.get("summary"),
+            severity: r.get("severity"),
+            status: r.get("status"),
+            incident_commander: r.get("incident_commander"),
+            service_name: r.get("service_name"),
+            started_at: r.get("started_at"),
+            mitigated_at: r.get("mitigated_at"),
+            resolved_at: r.get("resolved_at")
+        }));
+    };
+
+    const getIncidentDetails = (a) => {
+        let id = a.incident_id || "";
+        if (!id) throw new Error("incident_id is required");
+        let rec = null;
+        try { rec = e.app.findRecordById("incidents", id); } catch(err) {
+            try { rec = e.app.findFirstRecordByFilter("incidents", "slug = '" + id + "'"); } catch(e2) {
+                throw new Error("Incident not found: " + id);
+            }
+        }
+        let evs = e.app.findRecordsByFilter("incident_events", "incident_id = '" + rec.id + "'", "+timestamp", 100, 0);
+        let hypos = e.app.findRecordsByFilter("incident_hypotheses", "incident_id = '" + rec.id + "'", "-confidence_score", 100, 0);
+        let mits = e.app.findRecordsByFilter("incident_mitigations", "incident_id = '" + rec.id + "'", "-created", 100, 0);
+        let pm = null;
+        try { pm = e.app.findFirstRecordByFilter("incident_postmortems", "incident_id = '" + rec.id + "'"); } catch(err) {}
+
+        return {
+            id: rec.id,
+            title: rec.get("title"),
+            slug: rec.get("slug"),
+            summary: rec.get("summary"),
+            severity: rec.get("severity"),
+            status: rec.get("status"),
+            incident_commander: rec.get("incident_commander"),
+            lead_investigator: rec.get("lead_investigator"),
+            service_name: rec.get("service_name"),
+            started_at: rec.get("started_at"),
+            mitigated_at: rec.get("mitigated_at"),
+            resolved_at: rec.get("resolved_at"),
+            events_count: evs.length,
+            hypotheses_count: hypos.length,
+            mitigations_count: mits.length,
+            has_postmortem: !!pm
+        };
+    };
+
+    const addIncidentEvent = (a) => {
+        let incId = a.incident_id || "";
+        if (!incId) throw new Error("incident_id is required");
+        let title = a.title || "";
+        if (!title.trim()) throw new Error("title is required");
+        let inc = e.app.findRecordById("incidents", incId);
+        let evCol = e.app.findCollectionByNameOrId("incident_events");
+        let ev = new Record(evCol);
+        let nowIso = new Date().toISOString();
+        ev.set("incident_id", inc.id);
+        ev.set("event_type", a.event_type || "log_entry");
+        ev.set("author", a.author || "Flomaster-Investigator");
+        ev.set("author_type", a.author_type || "agent");
+        ev.set("title", title.trim());
+        ev.set("content", a.content || "");
+        ev.set("payload_json", JSON.stringify(a.payload || {}));
+        ev.set("severity", a.severity || "info");
+        ev.set("timestamp", nowIso);
+        e.app.save(ev);
+        return { id: ev.id, incident_id: inc.id, title: ev.get("title"), timestamp: ev.get("timestamp") };
+    };
+
+    const proposeIncidentHypothesis = (a) => {
+        let incId = a.incident_id || "";
+        if (!incId) throw new Error("incident_id is required");
+        let inc = e.app.findRecordById("incidents", incId);
+        let col = e.app.findCollectionByNameOrId("incident_hypotheses");
+        let rec = null;
+        if (a.hypothesis_id) {
+            rec = e.app.findRecordById("incident_hypotheses", a.hypothesis_id);
+        } else {
+            rec = new Record(col);
+            rec.set("incident_id", inc.id);
+            rec.set("proposed_by", a.proposed_by || "Flomaster-Investigator");
+        }
+        if (a.hypothesis) rec.set("hypothesis", a.hypothesis);
+        if (a.rationale) rec.set("rationale", a.rationale);
+        if (a.status) rec.set("status", a.status);
+        if (a.test_plan) rec.set("test_plan", a.test_plan);
+        if (a.evidence) rec.set("evidence", a.evidence);
+        if (a.confidence_score !== undefined) rec.set("confidence_score", Number(a.confidence_score));
+        if (a.tested_by) rec.set("tested_by", a.tested_by);
+        if (a.status === "confirmed" || a.status === "falsified") rec.set("tested_at", new Date().toISOString());
+        e.app.save(rec);
+        return { id: rec.id, incident_id: inc.id, hypothesis: rec.get("hypothesis"), status: rec.get("status"), confidence_score: rec.get("confidence_score") };
+    };
+
+    const executeIncidentMitigation = (a) => {
+        let incId = a.incident_id || "";
+        if (!incId) throw new Error("incident_id is required");
+        let inc = e.app.findRecordById("incidents", incId);
+        let col = e.app.findCollectionByNameOrId("incident_mitigations");
+        let rec = null;
+        if (a.mitigation_id) {
+            rec = e.app.findRecordById("incident_mitigations", a.mitigation_id);
+        } else {
+            rec = new Record(col);
+            rec.set("incident_id", inc.id);
+            rec.set("executed_by", a.executed_by || "Flomaster-Commander");
+        }
+        if (a.title) rec.set("title", a.title);
+        if (a.description) rec.set("description", a.description);
+        if (a.action_type) rec.set("action_type", a.action_type);
+        if (a.status) rec.set("status", a.status);
+        if (a.status === "applied" && !rec.get("executed_at")) rec.set("executed_at", new Date().toISOString());
+        if (a.verification_method) rec.set("verification_method", a.verification_method);
+        if (a.verification_result) rec.set("verification_result", a.verification_result);
+        e.app.save(rec);
+        return { id: rec.id, incident_id: inc.id, title: rec.get("title"), status: rec.get("status") };
+    };
+
+    const updateIncidentStatus = (a) => {
+        let incId = a.incident_id || "";
+        if (!incId) throw new Error("incident_id is required");
+        let status = a.status || "";
+        if (!status) throw new Error("status is required");
+        let inc = e.app.findRecordById("incidents", incId);
+        let oldStatus = inc.get("status");
+        inc.set("status", status);
+        let nowIso = new Date().toISOString();
+        if (status === "mitigated" && !inc.get("mitigated_at")) inc.set("mitigated_at", nowIso);
+        if (status === "resolved" && !inc.get("resolved_at")) {
+            inc.set("resolved_at", nowIso);
+            if (!inc.get("mitigated_at")) inc.set("mitigated_at", nowIso);
+        }
+        e.app.save(inc);
+        return { id: inc.id, old_status: oldStatus, new_status: status };
+    };
+
+    const generateIncidentPostmortem = (a) => {
+        let incId = a.incident_id || "";
+        if (!incId) throw new Error("incident_id is required");
+        let inc = e.app.findRecordById("incidents", incId);
+        let pm = null;
+        try { pm = e.app.findFirstRecordByFilter("incident_postmortems", "incident_id = '" + inc.id + "'"); } catch(err) {}
+        if (!pm) {
+            let pmCol = e.app.findCollectionByNameOrId("incident_postmortems");
+            pm = new Record(pmCol);
+            pm.set("incident_id", inc.id);
+            pm.set("slug", "pm-" + inc.get("slug"));
+        }
+        pm.set("title", a.title || ("Post-Mortem: " + inc.get("title")));
+        pm.set("status", a.status || "published");
+        pm.set("executive_summary", a.executive_summary || inc.get("summary") || "");
+        pm.set("root_cause_analysis", a.root_cause_analysis || "");
+        if (a.contributing_factors) pm.set("contributing_factors_json", JSON.stringify(a.contributing_factors));
+        if (a.impact_metrics) pm.set("impact_metrics_json", JSON.stringify(a.impact_metrics));
+        if (a.timeline_summary) pm.set("timeline_summary", a.timeline_summary);
+        if (a.detection_gap) pm.set("detection_gap", a.detection_gap);
+        if (a.action_items) pm.set("action_items_json", JSON.stringify(a.action_items));
+        if (a.lessons_learned) pm.set("lessons_learned", a.lessons_learned);
+        if (pm.get("status") === "published") pm.set("published_at", new Date().toISOString());
+        e.app.save(pm);
+        inc.set("postmortem_id", pm.id);
+        if (pm.get("status") === "published") inc.set("status", "postmortem_published");
+        e.app.save(inc);
+        return { id: pm.id, incident_id: inc.id, title: pm.get("title"), status: pm.get("status") };
+    };
+
     // ---------- 1. Authentication ----------
     let authRecord = e.auth || null
     let bypassEnabled = false
@@ -8095,6 +8448,14 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         else if (toolName === "terminate_dev_sandbox") { result = terminateDevSandbox(args) }
         else if (toolName === "list_sandbox_templates") { result = listSandboxTemplates(args) }
         else if (toolName === "get_sandbox_fleet_metrics") { result = getSandboxFleetMetrics(args) }
+        else if (toolName === "declare_incident") { result = declareIncident(args) }
+        else if (toolName === "list_incidents") { result = listIncidents(args) }
+        else if (toolName === "get_incident_details") { result = getIncidentDetails(args) }
+        else if (toolName === "add_incident_event") { result = addIncidentEvent(args) }
+        else if (toolName === "propose_incident_hypothesis") { result = proposeIncidentHypothesis(args) }
+        else if (toolName === "execute_incident_mitigation") { result = executeIncidentMitigation(args) }
+        else if (toolName === "update_incident_status") { result = updateIncidentStatus(args) }
+        else if (toolName === "generate_incident_postmortem") { result = generateIncidentPostmortem(args) }
         else { return fail(-32602, "Unknown tool: " + toolName) }
         return ok({ content: [{ type: "text", text: JSON.stringify(result) }] })
     } catch (toolErr) {

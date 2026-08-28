@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.30.0] - 2026-08-28 - Cycle 34
+### Added
+- **Autonomous Multi-Agent Incident Response, Live Debugging War-Room & Root-Cause Post-Mortem Engine (Milestone 10 / Epic 31):**
+  - Schema migration (`1710000043_add_incident_warrooms_and_postmortems.js`) introducing 5 dedicated collections: `incidents`, `incident_events`, `incident_hypotheses`, `incident_mitigations`, and `incident_postmortems`.
+  - Backend engine hook (`app/pb_hooks/115_incident_warroom_engine.pb.js`) with 19 high-performance REST API endpoints:
+    - `GET /api/projectbase/incidents` and `POST /api/projectbase/incidents` for querying incidents and declaring new production incidents/regressions with automated initial event recording.
+    - `GET /api/projectbase/incidents/{id}`, `PATCH /api/projectbase/incidents/{id}`, and `DELETE /api/projectbase/incidents/{id}` for retrieving full war-room details (timeline events, hypotheses, mitigations, post-mortem), updating metadata, and cascading cleanups.
+    - `POST /api/projectbase/incidents/{id}/status` for managing lifecycle transitions (`declared` -> `triage` -> `investigating` -> `mitigated` -> `resolved` -> `postmortem_published`) with automated timestamping (MTTM/MTTR) and event recording.
+    - `POST /api/projectbase/incidents/{id}/events` and `GET /api/projectbase/incidents/{id}/events` for streaming live diagnostic logs, metric anomalies, actions, and status updates.
+    - `POST /api/projectbase/incidents/{id}/hypotheses`, `PATCH /api/projectbase/incidents/{id}/hypotheses/{hypoId}`, and `GET /api/projectbase/incidents/{id}/hypotheses` for proposing, testing, and confirming/falsifying root-cause hypotheses with confidence scoring and evidence capture.
+    - `POST /api/projectbase/incidents/{id}/mitigations`, `PATCH /api/projectbase/incidents/{id}/mitigations/{mitId}`, and `GET /api/projectbase/incidents/{id}/mitigations` for planning and executing mitigations (rollbacks, config patches, sandbox isolations, code fixes) and tracking verification outcomes.
+    - `POST /api/projectbase/incidents/{id}/postmortem`, `GET /api/projectbase/incidents/{id}/postmortem`, and `PATCH /api/projectbase/incidents/{id}/postmortem` for generating, updating, and publishing comprehensive 5-Whys root-cause post-mortems with preventative action items.
+    - `GET /api/projectbase/incidents/metrics` for fleet-wide incident metrics, active war-rooms count, P0/P1 breakdown, and Mean Time to Mitigate / Resolve (MTTM/MTTR).
+    - `POST /api/projectbase/incidents/seed-demo` for seeding canonical production incident war-rooms with full event timelines and published post-mortems.
+  - 8 FastMCP JSON-RPC 2.0 tools in `app/pb_hooks/91_mcp_server.pb.js`:
+    - `declare_incident`, `list_incidents`, `get_incident_details`, `add_incident_event`, `propose_incident_hypothesis`, `execute_incident_mitigation`, `update_incident_status`, and `generate_incident_postmortem`.
+  - Frontend AgentsView **🚨 Live Incident War-Room & Post-Mortem** dashboard:
+    - 4 KPI summary cards (Active War-Rooms, P0/P1 Breakdown, Mean Time to Mitigate, Mean Time to Resolve).
+    - Incident Triage Roster with severity pills, status badges, search filtering, and "+ Declare Incident" modal.
+    - Real-time War-Room Workbench with 4 subtabs: Live Event Timeline Stream with inline composer, Hypotheses Board with confidence meters and quick Confirm/Falsify actions, Mitigations & Rollback Tracker with verification workflows, and 5-Whys Post-Mortem Viewer/Editor.
+  - Comprehensive automated pytest suite `tests/test_incident_warroom_engine.py` covering all 19 endpoints, status transitions, hypothesis falsification, mitigation verification, post-mortem generation, and FastMCP JSON-RPC tools.
+
 ## [1.29.0] - 2026-08-28 - Cycle 33
 ### Added
 - **Autonomous Ephemeral Dev Sandboxes & Worktree Container Orchestrator (Milestone 9 / Epic 30):**
