@@ -45,7 +45,23 @@ const AgentsViewComponent = {
       newNodeRegion: 'homelab',
       clusterSuccessMsg: null,
       clusterErrorMsg: null,
-      isSyncingCluster: false
+      isSyncingCluster: false,
+      webhookEndpoints: [],
+      webhookDeliveries: [],
+      webhookDlq: [],
+      newWebhookName: '',
+      newWebhookUrl: '',
+      newWebhookPlatform: 'slack',
+      newWebhookEvents: 'issue.*, agent.*',
+      newWebhookSecret: '',
+      testEventName: 'issue.created',
+      testPayloadTitle: 'Verify Webhook Security Gateway',
+      webhookSuccessMsg: null,
+      webhookErrorMsg: null,
+      isDispatchingWebhook: false,
+      dlqRetrying: false,
+      transformPreview: null,
+      previewPlatform: 'slack'
     };
   },
   computed: {
@@ -425,6 +441,111 @@ const AgentsViewComponent = {
       } finally {
         this.isSyncingCluster = false;
       }
+    },
+    async loadWebhookState() {
+      try {
+        const [epRes, delRes, dlqRes] = await Promise.all([
+          API.listWebhookEndpoints(),
+          API.listWebhookDeliveries({ limit: 25 }),
+          API.getWebhookDlq()
+        ]);
+        this.webhookEndpoints = (epRes && epRes.endpoints) || [];
+        this.webhookDeliveries = (delRes && delRes.deliveries) || [];
+        this.webhookDlq = (dlqRes && dlqRes.dlq) || [];
+      } catch (e) {
+        console.warn('Failed to load webhook state', e);
+      }
+    },
+    async createNewWebhookEndpoint() {
+      if (!this.newWebhookName.trim() || !this.newWebhookUrl.trim()) {
+        this.webhookErrorMsg = 'Endpoint Name and Destination URL are required';
+        return;
+      }
+      this.webhookErrorMsg = null;
+      this.webhookSuccessMsg = null;
+      try {
+        const eventsList = this.newWebhookEvents.split(',').map(s => s.trim()).filter(Boolean);
+        const res = await API.registerWebhookEndpoint({
+          name: this.newWebhookName.trim(),
+          url: this.newWebhookUrl.trim(),
+          platform: this.newWebhookPlatform,
+          events: eventsList.length ? eventsList : ['*'],
+          secret: this.newWebhookSecret.trim() || undefined
+        });
+        this.webhookSuccessMsg = `Registered webhook endpoint ${(res.endpoint && res.endpoint.name) || this.newWebhookName}`;
+        this.newWebhookName = '';
+        this.newWebhookUrl = '';
+        this.newWebhookSecret = '';
+        await this.loadWebhookState();
+        setTimeout(() => { this.webhookSuccessMsg = null; }, 3000);
+      } catch (e) {
+        this.webhookErrorMsg = e.message || String(e);
+      }
+    },
+    async removeWebhookEndpoint(id) {
+      if (!confirm('Are you sure you want to delete this webhook endpoint?')) return;
+      try {
+        await API.deleteWebhookEndpoint(id);
+        await this.loadWebhookState();
+      } catch (e) {
+        this.webhookErrorMsg = e.message || String(e);
+      }
+    },
+    async testDispatchWebhook() {
+      if (!this.testEventName.trim()) return;
+      this.isDispatchingWebhook = true;
+      this.webhookErrorMsg = null;
+      this.webhookSuccessMsg = null;
+      try {
+        const res = await API.dispatchWebhookEvent({
+          event: this.testEventName.trim(),
+          payload: {
+            title: this.testPayloadTitle.trim(),
+            description: 'Triggered from ProjectBase Webhook Gateway & DLQ console',
+            actor: 'System Admin / Flomaster',
+            timestamp: new Date().toISOString()
+          },
+          simulate_network: true
+        });
+        this.webhookSuccessMsg = `Dispatched '${this.testEventName}' to ${res.dispatched_count || 0} endpoint(s)`;
+        await this.loadWebhookState();
+        setTimeout(() => { this.webhookSuccessMsg = null; }, 3000);
+      } catch (e) {
+        this.webhookErrorMsg = e.message || String(e);
+      } finally {
+        this.isDispatchingWebhook = false;
+      }
+    },
+    async retryDlq(itemId) {
+      this.dlqRetrying = true;
+      try {
+        await API.retryDlqMessage({ item_id: itemId || 'all' });
+        await this.loadWebhookState();
+      } catch (e) {
+        this.webhookErrorMsg = e.message || String(e);
+      } finally {
+        this.dlqRetrying = false;
+      }
+    },
+    async purgeDlq(itemId) {
+      try {
+        await API.purgeDlqMessage(itemId || 'all');
+        await this.loadWebhookState();
+      } catch (e) {
+        this.webhookErrorMsg = e.message || String(e);
+      }
+    },
+    async loadTransformPreview() {
+      try {
+        const res = await API.previewWebhookTransform({
+          platform: this.previewPlatform,
+          event: this.testEventName.trim() || 'issue.created',
+          title: this.testPayloadTitle.trim() || 'Sample Event'
+        });
+        this.transformPreview = res;
+      } catch (e) {
+        console.warn('Transform preview failed', e);
+      }
     }
   },
   template: `
@@ -541,7 +662,7 @@ const AgentsViewComponent = {
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <h2 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 capitalize truncate">
-                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center'))))) }}
+                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center')))))) }}
                 </h2>
                 <span v-if="selectedSession && selectedSession.is_active && activeTab === 'chat'" class="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-400 text-[10px] font-mono font-semibold flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -585,6 +706,11 @@ const AgentsViewComponent = {
                   class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors"
                   :class="activeTab === 'cluster' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
                 >🌐 Cluster & Edge</button>
+                <button
+                  @click="activeTab = 'webhooks'; loadWebhookState();"
+                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors"
+                  :class="activeTab === 'webhooks' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                >📡 Webhooks & DLQ</button>
               </div>
             </div>
           </div>
@@ -1199,6 +1325,302 @@ const AgentsViewComponent = {
               class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors"
             >
               Add Node
+            </button>
+          </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- TAB: OUTBOUND WEBHOOK SECURITY GATEWAY & DLQ              -->
+        <!-- ========================================================= -->
+        <div
+          v-if="activeTab === 'webhooks'"
+          class="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/30"
+        >
+          <!-- Status Messages -->
+          <div v-if="webhookSuccessMsg" class="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center justify-between">
+            <span>{{ webhookSuccessMsg }}</span>
+            <button @click="webhookSuccessMsg = null" class="text-emerald-500 hover:text-emerald-400 font-bold">&times;</button>
+          </div>
+          <div v-if="webhookErrorMsg" class="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-xs font-semibold flex items-center justify-between">
+            <span>{{ webhookErrorMsg }}</span>
+            <button @click="webhookErrorMsg = null" class="text-red-500 hover:text-red-400 font-bold">&times;</button>
+          </div>
+
+          <!-- Webhook Gateway Status Cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Endpoints Fleet</div>
+              <div class="text-base font-bold text-zinc-900 dark:text-zinc-100 font-mono mt-0.5">
+                {{ webhookEndpoints.length }} Active
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">Slack, Discord, Telegram, Agent</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Delivery Log</div>
+              <div class="text-base font-bold text-zinc-900 dark:text-zinc-100 font-mono mt-0.5">
+                {{ webhookDeliveries.length }} Dispatches
+              </div>
+              <div class="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5">Audit Trail Active</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Dead-Letter Queue (DLQ)</div>
+              <div class="text-base font-bold font-mono mt-0.5" :class="webhookDlq.length > 0 ? 'text-amber-500' : 'text-zinc-900 dark:text-zinc-100'">
+                {{ webhookDlq.length }} Failed
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">Exponential Backoff + Jitter</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Security Gateway</div>
+              <div class="text-base font-bold text-indigo-600 dark:text-indigo-400 font-mono mt-0.5">
+                HMAC-SHA256
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">300s Replay Protection</div>
+            </div>
+          </div>
+
+          <!-- Dispatcher & Transformation Testing Console -->
+          <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
+                ⚡ Interactive Event Dispatcher & Payload Previewer
+              </h3>
+              <div class="flex items-center gap-2">
+                <button
+                  @click="loadWebhookState"
+                  class="px-2.5 py-1 text-[11px] rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium transition-colors"
+                >
+                  🔄 Refresh
+                </button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <input
+                v-model="testEventName"
+                type="text"
+                placeholder="Event Name (e.g. issue.created)"
+                class="p-2 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 font-mono"
+              />
+              <input
+                v-model="testPayloadTitle"
+                type="text"
+                placeholder="Payload Title / Summary"
+                class="p-2 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200"
+              />
+              <div class="flex items-center gap-2">
+                <select
+                  v-model="previewPlatform"
+                  class="p-2 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200"
+                >
+                  <option value="slack">Slack (Blocks)</option>
+                  <option value="discord">Discord (Embeds)</option>
+                  <option value="telegram">Telegram (HTML)</option>
+                  <option value="agent">Agent / REST (JSON)</option>
+                </select>
+                <button
+                  @click="testDispatchWebhook"
+                  :disabled="isDispatchingWebhook"
+                  class="flex-1 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold transition-colors truncate"
+                >
+                  {{ isDispatchingWebhook ? 'Dispatching...' : 'Dispatch Event' }}
+                </button>
+                <button
+                  @click="loadTransformPreview"
+                  class="px-3 py-2 rounded-lg bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold transition-colors"
+                >
+                  Preview
+                </button>
+              </div>
+            </div>
+
+            <!-- Transformation Preview Modal/Box -->
+            <div v-if="transformPreview" class="p-3 rounded-lg bg-zinc-950 text-emerald-400 font-mono text-[11px] overflow-x-auto space-y-1 border border-zinc-800">
+              <div class="flex items-center justify-between text-zinc-400 border-b border-zinc-800 pb-1">
+                <span>Transformed Payload ({{ transformPreview.platform }})</span>
+                <span v-if="transformPreview.headers && transformPreview.headers['X-ProjectBase-Signature']" class="text-[10px] text-zinc-500 font-mono">{{ transformPreview.headers['X-ProjectBase-Signature'].substring(0, 24) }}...</span>
+              </div>
+              <pre class="mt-1 text-[10px] leading-relaxed">{{ JSON.stringify(transformPreview.transformed_payload, null, 2) }}</pre>
+            </div>
+          </div>
+
+          <!-- Registered Endpoints Table -->
+          <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
+              Registered Outbound Webhook Endpoints
+            </h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr class="border-b border-zinc-200 dark:border-zinc-800 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                    <th class="py-2 px-2">Name</th>
+                    <th class="py-2 px-2">Platform</th>
+                    <th class="py-2 px-2">URL</th>
+                    <th class="py-2 px-2">Events</th>
+                    <th class="py-2 px-2">Dispatches</th>
+                    <th class="py-2 px-2">Status</th>
+                    <th class="py-2 px-2 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60 font-mono">
+                  <tr v-if="webhookEndpoints.length === 0">
+                    <td colspan="7" class="py-4 text-center text-zinc-400 font-sans">
+                      No webhook endpoints configured yet. Register one below.
+                    </td>
+                  </tr>
+                  <tr v-for="ep in webhookEndpoints" :key="ep.id" class="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
+                    <td class="py-2 px-2 font-bold text-zinc-900 dark:text-zinc-100">{{ ep.name }}</td>
+                    <td class="py-2 px-2">
+                      <span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold"
+                        :class="ep.platform === 'slack' ? 'bg-amber-500/20 text-amber-500' : (ep.platform === 'discord' ? 'bg-indigo-500/20 text-indigo-400' : (ep.platform === 'telegram' ? 'bg-sky-500/20 text-sky-400' : 'bg-zinc-500/20 text-zinc-400'))">
+                        {{ ep.platform }}
+                      </span>
+                    </td>
+                    <td class="py-2 px-2 text-zinc-600 dark:text-zinc-400 truncate max-w-[200px]" :title="ep.url">{{ ep.url }}</td>
+                    <td class="py-2 px-2 text-zinc-500 text-[11px]">{{ Array.isArray(ep.events) ? ep.events.join(', ') : ep.events }}</td>
+                    <td class="py-2 px-2 text-zinc-500">{{ ep.stats ? ep.stats.total_dispatched : 0 }}</td>
+                    <td class="py-2 px-2">
+                      <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                        :class="ep.active ? 'bg-emerald-500/10 text-emerald-500' : 'bg-zinc-500/10 text-zinc-500'">
+                        {{ ep.active ? 'Active' : 'Disabled' }}
+                      </span>
+                    </td>
+                    <td class="py-2 px-2 text-right">
+                      <button
+                        @click="removeWebhookEndpoint(ep.id)"
+                        class="px-2 py-0.5 rounded bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[10px] font-semibold transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Dead-Letter Queue (DLQ) Inspector -->
+          <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
+                  Dead-Letter Queue (DLQ) & Failure Diagnostic
+                </h3>
+                <span v-if="webhookDlq.length > 0" class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 text-[10px] font-bold">
+                  {{ webhookDlq.length }} Pending Replay
+                </span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  v-if="webhookDlq.length > 0"
+                  @click="retryDlq('all')"
+                  :disabled="dlqRetrying"
+                  class="px-2.5 py-1 text-[11px] rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold transition-colors"
+                >
+                  {{ dlqRetrying ? 'Replaying...' : 'Replay All' }}
+                </button>
+                <button
+                  v-if="webhookDlq.length > 0"
+                  @click="purgeDlq('all')"
+                  class="px-2.5 py-1 text-[11px] rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500/20 text-zinc-600 dark:text-zinc-400 hover:text-red-500 font-medium transition-colors"
+                >
+                  Flush DLQ
+                </button>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr class="border-b border-zinc-200 dark:border-zinc-800 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                    <th class="py-2 px-2">Delivery ID</th>
+                    <th class="py-2 px-2">Endpoint</th>
+                    <th class="py-2 px-2">Event</th>
+                    <th class="py-2 px-2">Error Reason</th>
+                    <th class="py-2 px-2">Retries</th>
+                    <th class="py-2 px-2">Status</th>
+                    <th class="py-2 px-2 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60 font-mono">
+                  <tr v-if="webhookDlq.length === 0">
+                    <td colspan="7" class="py-4 text-center text-zinc-400 font-sans">
+                      DLQ is empty. All webhook deliveries operating nominally.
+                    </td>
+                  </tr>
+                  <tr v-for="item in webhookDlq" :key="item.id" class="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
+                    <td class="py-2 px-2 font-bold text-zinc-900 dark:text-zinc-100">{{ item.delivery_id }}</td>
+                    <td class="py-2 px-2 text-zinc-600 dark:text-zinc-400">{{ item.endpoint_name || item.endpoint_id }}</td>
+                    <td class="py-2 px-2 text-indigo-500 font-bold">{{ item.event }}</td>
+                    <td class="py-2 px-2 text-red-500 truncate max-w-[200px]" :title="item.error_message">{{ item.error_message }}</td>
+                    <td class="py-2 px-2 text-zinc-500">{{ item.retry_count }}/{{ item.max_retries || 3 }}</td>
+                    <td class="py-2 px-2">
+                      <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                        :class="item.status === 'resolved' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'">
+                        {{ item.status }}
+                      </span>
+                    </td>
+                    <td class="py-2 px-2 text-right space-x-1">
+                      <button
+                        v-if="item.status !== 'resolved'"
+                        @click="retryDlq(item.id)"
+                        class="px-2 py-0.5 rounded bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-500 text-[10px] font-semibold transition-colors"
+                      >
+                        Replay
+                      </button>
+                      <button
+                        @click="purgeDlq(item.id)"
+                        class="px-2 py-0.5 rounded bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[10px] font-semibold transition-colors"
+                      >
+                        Purge
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Register Outbound Webhook Form -->
+          <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Register New Outbound Webhook Endpoint</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
+              <input
+                v-model="newWebhookName"
+                type="text"
+                placeholder="Endpoint Name (e.g. Slack Ops)"
+                class="p-2 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200"
+              />
+              <input
+                v-model="newWebhookUrl"
+                type="text"
+                placeholder="Destination URL (https://hooks.slack.com/...)"
+                class="p-2 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 font-mono"
+              />
+              <select
+                v-model="newWebhookPlatform"
+                class="p-2 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200"
+              >
+                <option value="slack">Slack</option>
+                <option value="discord">Discord</option>
+                <option value="telegram">Telegram</option>
+                <option value="agent">Agent / REST</option>
+                <option value="custom">Custom Webhook</option>
+              </select>
+              <input
+                v-model="newWebhookEvents"
+                type="text"
+                placeholder="Events (e.g. issue.*, dag.*, *)"
+                class="p-2 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 font-mono"
+              />
+            </div>
+            <button
+              @click="createNewWebhookEndpoint"
+              class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors"
+            >
+              Register Webhook
             </button>
           </div>
         </div>

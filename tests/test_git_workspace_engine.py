@@ -14,6 +14,7 @@ import os
 import time
 import urllib.parse
 import urllib.request
+import uuid
 import pytest
 
 BASE_URL = os.environ.get("PROJECTBASE_URL", "http://127.0.0.1:8120")
@@ -22,7 +23,7 @@ SUPERUSER_PASSWORD = os.environ.get("PROJECTBASE_PASSWORD", "superdev123")
 
 
 def _uid():
-    return f"t{int(time.time() * 1000) % 10000000}"
+    return f"t{uuid.uuid4().hex[:8]}"
 
 
 def _request(method, path, body=None, headers=None):
@@ -57,7 +58,7 @@ def _auth_token():
 
 def _create_test_project_and_issue(token, prefix="GIT"):
     u = _uid()
-    proj_ident = f"G{u[-3:]}"
+    proj_ident = f"G{u[-5:].upper()}"
     status, proj = _request(
         "POST",
         "/api/collections/projects/records",

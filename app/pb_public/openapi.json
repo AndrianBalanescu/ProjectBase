@@ -3094,6 +3094,211 @@
           "401": { "description": "Authentication required" }
         }
       }
+    },
+    "/projectbase/webhooks/endpoints": {
+      "post": {
+        "tags": ["Webhook Automation"],
+        "summary": "Register Outbound Webhook Endpoint",
+        "description": "Register or update an outbound webhook endpoint with HMAC secret, target platform, and event filters.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "url": { "type": "string" },
+                  "platform": { "type": "string", "enum": ["slack", "discord", "telegram", "agent", "custom"] },
+                  "events": { "type": "array", "items": { "type": "string" } },
+                  "secret": { "type": "string" },
+                  "active": { "type": "boolean" },
+                  "retry_policy": { "type": "object" },
+                  "headers": { "type": "object" },
+                  "template": { "type": "string" }
+                },
+                "required": ["name", "url"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Webhook endpoint registered successfully" },
+          "400": { "description": "Missing required fields" },
+          "500": { "description": "Registration failed" }
+        }
+      },
+      "get": {
+        "tags": ["Webhook Automation"],
+        "summary": "List Webhook Endpoints",
+        "description": "List all configured outbound webhook endpoints with delivery stats.",
+        "responses": {
+          "200": { "description": "List of configured webhook endpoints" }
+        }
+      }
+    },
+    "/projectbase/webhooks/endpoints/{id}": {
+      "get": {
+        "tags": ["Webhook Automation"],
+        "summary": "Get Webhook Endpoint",
+        "description": "Retrieve specific webhook endpoint configuration.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Webhook endpoint configuration" },
+          "404": { "description": "Endpoint not found" }
+        }
+      },
+      "delete": {
+        "tags": ["Webhook Automation"],
+        "summary": "Delete Webhook Endpoint",
+        "description": "Delete or decommission a webhook endpoint.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Webhook endpoint deleted successfully" },
+          "404": { "description": "Endpoint not found" }
+        }
+      }
+    },
+    "/projectbase/webhooks/dispatch": {
+      "post": {
+        "tags": ["Webhook Automation"],
+        "summary": "Dispatch Webhook Event",
+        "description": "Dispatch webhook event with declarative payload formatting and cryptographic HMAC-SHA256 signing.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "event": { "type": "string" },
+                  "payload": { "type": "object" },
+                  "target_endpoint_id": { "type": "string" },
+                  "simulate_network": { "type": "boolean" },
+                  "force_fail": { "type": "boolean" }
+                },
+                "required": ["event"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Webhook dispatch outcome" },
+          "400": { "description": "Missing event parameter" }
+        }
+      }
+    },
+    "/projectbase/webhooks/verify": {
+      "post": {
+        "tags": ["Webhook Automation"],
+        "summary": "Verify Webhook Signature & Replay Guard",
+        "description": "Cryptographically verify HMAC-SHA256 signature and enforce 300s replay tolerance.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "secret": { "type": "string" },
+                  "payload": { "description": "Payload string or object" },
+                  "signature": { "type": "string" },
+                  "timestamp": { "type": "number" },
+                  "tolerance_seconds": { "type": "number" }
+                },
+                "required": ["secret", "signature", "timestamp"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Cryptographic signature verified successfully" },
+          "401": { "description": "Signature mismatch or replay window expired" }
+        }
+      }
+    },
+    "/projectbase/webhooks/deliveries": {
+      "get": {
+        "tags": ["Webhook Automation"],
+        "summary": "List Webhook Deliveries",
+        "description": "Query historical webhook deliveries and audit log.",
+        "parameters": [
+          { "name": "status", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "endpoint_id", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "event", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "List of delivery audit logs" }
+        }
+      }
+    },
+    "/projectbase/webhooks/dlq": {
+      "get": {
+        "tags": ["Webhook Automation"],
+        "summary": "Inspect Dead-Letter Queue",
+        "description": "Get failed webhook messages in the Dead-Letter Queue (DLQ) with retry metadata.",
+        "responses": {
+          "200": { "description": "Dead-Letter Queue telemetry and item list" }
+        }
+      }
+    },
+    "/projectbase/webhooks/dlq/retry": {
+      "post": {
+        "tags": ["Webhook Automation"],
+        "summary": "Retry DLQ Messages",
+        "description": "Replay failed dead-letter queue messages.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "item_id": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "DLQ replay results" }
+        }
+      }
+    },
+    "/projectbase/webhooks/dlq/{id}": {
+      "delete": {
+        "tags": ["Webhook Automation"],
+        "summary": "Purge DLQ Message",
+        "description": "Purge specific DLQ item or flush entire queue.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "DLQ item purged" },
+          "404": { "description": "DLQ item not found" }
+        }
+      }
+    },
+    "/projectbase/webhooks/transforms/preview": {
+      "get": {
+        "tags": ["Webhook Automation"],
+        "summary": "Preview Payload Transforms",
+        "description": "Preview platform-specific payload formatting for Slack, Discord, Telegram, or Agent targets.",
+        "parameters": [
+          { "name": "platform", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "event", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "title", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "description", "in": "query", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Formatted platform payload and preview signature" }
+        }
+      }
     }
   }
 }

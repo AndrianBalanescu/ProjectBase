@@ -677,5 +677,115 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to reconcile edge sync');
     return data;
+  },
+
+  async listWebhookEndpoints() {
+    const res = await fetch('/api/projectbase/webhooks/endpoints', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch webhook endpoints');
+    return data;
+  },
+
+  async registerWebhookEndpoint(payload) {
+    const res = await fetch('/api/projectbase/webhooks/endpoints', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to register webhook endpoint');
+    return data;
+  },
+
+  async deleteWebhookEndpoint(id) {
+    const res = await fetch(`/api/projectbase/webhooks/endpoints/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete webhook endpoint');
+    return data;
+  },
+
+  async dispatchWebhookEvent(payload) {
+    const res = await fetch('/api/projectbase/webhooks/dispatch', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to dispatch webhook event');
+    return data;
+  },
+
+  async verifyWebhookSignature(payload) {
+    const res = await fetch('/api/projectbase/webhooks/verify', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to verify webhook signature');
+    return data;
+  },
+
+  async listWebhookDeliveries(params = {}) {
+    const q = new URLSearchParams();
+    if (params.status) q.set('status', params.status);
+    if (params.endpoint_id) q.set('endpoint_id', params.endpoint_id);
+    if (params.event) q.set('event', params.event);
+    if (params.limit) q.set('limit', params.limit);
+    const res = await fetch(`/api/projectbase/webhooks/deliveries?${q.toString()}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch webhook deliveries');
+    return data;
+  },
+
+  async getWebhookDlq() {
+    const res = await fetch('/api/projectbase/webhooks/dlq', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch webhook DLQ');
+    return data;
+  },
+
+  async retryDlqMessage(payload = {}) {
+    const res = await fetch('/api/projectbase/webhooks/dlq/retry', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to retry DLQ messages');
+    return data;
+  },
+
+  async purgeDlqMessage(id = 'all') {
+    const res = await fetch(`/api/projectbase/webhooks/dlq/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to purge DLQ message');
+    return data;
+  },
+
+  async previewWebhookTransform(params = {}) {
+    const q = new URLSearchParams();
+    if (params.platform) q.set('platform', params.platform);
+    if (params.event) q.set('event', params.event);
+    if (params.title) q.set('title', params.title);
+    if (params.description) q.set('description', params.description);
+    const res = await fetch(`/api/projectbase/webhooks/transforms/preview?${q.toString()}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to preview webhook transform');
+    return data;
   }
 };

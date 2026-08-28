@@ -11,6 +11,15 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **Webhook Automation Engine & Outbound Webhook Security Gateway (Epic 16)**:
+  - Webhook endpoint fleet management (`POST/GET /api/projectbase/webhooks/endpoints`, `GET/DELETE /api/projectbase/webhooks/endpoints/{id}`) with platform adapters for Slack, Discord, Telegram, Agent, and custom targets.
+  - Cryptographic HMAC-SHA256 signing and verification (`POST /api/projectbase/webhooks/dispatch`, `POST /api/projectbase/webhooks/verify`) with constant-time comparison and a configurable timestamp replay window.
+  - Declarative event filters and platform-native payload transforms (`GET /api/projectbase/webhooks/transforms/preview`) for Slack blocks, Discord embeds, Telegram HTML, and agent JSON envelopes.
+  - Delivery audit history (`GET /api/projectbase/webhooks/deliveries`) plus a persistent Dead-Letter Queue (`GET/POST/DELETE /api/projectbase/webhooks/dlq*`) with exponential retry backoff and jitter metadata.
+  - Seven FastMCP JSON-RPC 2.0 tools (`register_webhook_endpoint`, `list_webhook_endpoints`, `dispatch_webhook_event`, `verify_webhook_signature`, `get_webhook_dlq`, `retry_dlq_message`, `preview_webhook_transform`) for autonomous agents.
+  - AgentsView **📡 Webhooks & DLQ** dashboard with endpoint registration, live delivery/DLQ telemetry, dispatcher, transform preview, replay, and purge actions.
+  - 9 new integration tests in `tests/test_webhook_automation.py`, bringing the baseline to 321 tests across 20 suites (100% passing).
+
 - **Distributed Cross-Cluster Replication, High-Availability Failover & Edge SQLite Sync (Epic 15)**:
   - Cluster Peer Node Management (`POST /api/projectbase/cluster/nodes/register`, `GET /api/projectbase/cluster/nodes`, `POST /api/projectbase/cluster/nodes/heartbeat`, `DELETE /api/projectbase/cluster/nodes/{id}`): Dynamic discovery, role orchestration (primary, replica, edge, witness), region labeling, and heartbeat telemetry with sequence numbers.
   - Replication Delta Log Stream (`GET /api/projectbase/cluster/sync/pull`, `POST /api/projectbase/cluster/sync/push`): High-throughput delta change stream pulling and pushing with Lamport/vector clock conflict resolution, Last-Write-Wins (LWW) determinism, and split-brain fencing barriers.
