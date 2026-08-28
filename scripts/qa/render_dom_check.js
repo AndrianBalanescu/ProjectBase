@@ -562,7 +562,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
           return bar ? (bar.textContent || '').includes('3 selected') : false;
         });
         // Apply status 'todo' via the bulk bar status select (single match).
-        const applyStatus = page.locator('.fixed.bottom-5.left-1\\/2 label:has-text("Status") select');
+        const applyStatus = page.locator('#bulk-actions-bar label:has-text("Status") select, [class*="bottom-5"] label:has-text("Status") select').first();
         await applyStatus.selectOption('todo');
         await page.waitForTimeout(800);
         range.applyMovedAll = await page.evaluate(async (ids) => {
@@ -684,7 +684,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
         await page.waitForTimeout(3000);
         await page.evaluate(() => { location.hash = '#/pb/board'; });
         await page.waitForTimeout(1500);
-        const cfCard = page.locator('.kanban-card-drag-handle:has-text("CFPrb")').first();
+        const cfCard = page.locator(`.kanban-card-drag-handle[data-issue-id="${cfProbeId}"], .kanban-card-drag-handle:has-text("${cfProbeTitle}")`).first();
         if (await cfCard.count()) {
           await cfCard.locator('button[title^="Select for bulk actions"]').click();
           await page.waitForTimeout(400);
@@ -695,12 +695,12 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
               Array.from(bar.querySelectorAll('select')).some((s) => Array.from(s.options).some((o) => o.value === 'effort'));
           });
           if (customField.pickerShown) {
-            const cfFieldSelect = page.locator('.fixed.bottom-5.left-1\\/2 select').filter({ has: page.locator('option[value="effort"]') }).first();
+            const cfFieldSelect = page.locator('#bulk-actions-bar select, [class*="bottom-5"] select').filter({ has: page.locator('option[value="effort"]') }).first();
             await cfFieldSelect.selectOption('effort');
             await page.waitForTimeout(300);
-            const cfValue = page.locator('.fixed.bottom-5.left-1\\/2 input[type="number"]').first();
+            const cfValue = page.locator('#bulk-actions-bar input[type="number"], [class*="bottom-5"] input[type="number"]').first();
             await cfValue.fill('42');
-            await page.locator('.fixed.bottom-5.left-1\\/2 button:has-text("Apply")').first().click();
+            await page.locator('#bulk-actions-bar button:has-text("Apply"), [class*="bottom-5"] button:has-text("Apply")').first().click();
             await page.waitForTimeout(1200);
             customField.updated = await page.evaluate(async (id) => {
               let token = null;

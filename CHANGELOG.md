@@ -11,6 +11,13 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **Autonomous Workspace Synthesis & Cross-Project Knowledge Retrieval (Epic 11)**:
+  - Deep Semantic & Full-Text Workspace Search (`GET/POST /api/projectbase/workspace/search`): Universal search indexing across issues, comments, checkpoints, and telemetry logs with term scoring, token match weighting, type filtering, and project scoping.
+  - Cross-Project Blocker & Deadlock Detection (`GET /api/projectbase/workspace/blockers`): Detects cross-project issue dependencies, circular dependency cycles via Kahn's algorithm, calculates dependency graph depth and longest critical paths, and ranks top blocker issues.
+  - Automated Sprint Retrospectives & Productivity Metrics (`GET/POST /api/projectbase/workspace/retrospective`): Computes cycle completion rates, story point velocity, persona contributions, average cycle time, and generates automated Markdown retrospectives with recommendations.
+  - FastMCP Collaboration Tools: Exposes `workspace_search`, `get_workspace_blockers`, and `generate_retrospective` over JSON-RPC 2.0.
+  - Comprehensive Test Suite: 13 new integration tests in `tests/test_workspace_synthesis.py` bringing the verified suite to 258 passing tests.
+
 - **Autonomous Agent Swarm Choreography & Task Graph Decomposition (Epic 10)**:
   - Task Graph DAG Decomposition (`POST /api/projectbase/dag/decompose`): Decomposes parent goals into child tasks with persona assignments (`architect`, `coder`, `reviewer`, `qa`, `security`), estimated points, and dependency edges (`blocks` / `blocked_by`), with Kahn's algorithm cycle detection preventing circular task deadlock.
   - Topological DAG Execution Status (`GET /api/projectbase/dag/status`): Computes real-time execution states, ready vs blocked candidate tasks, progress percentages, active agent leases, and DAG completion status.

@@ -2343,6 +2343,149 @@
           }
         }
       }
+    },
+    "/projectbase/workspace/search": {
+      "get": {
+        "tags": [
+          "Workspace Synthesis"
+        ],
+        "summary": "Workspace Knowledge Search",
+        "description": "Deep semantic & full-text workspace knowledge search across issues, comments, telemetry, and validation checkpoints.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Search query"
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "Filter by project"
+          },
+          {
+            "name": "types",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "Comma-separated list of types (issues, comments, telemetry, checkpoints)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 20 },
+            "description": "Max results"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Workspace Synthesis"
+        ],
+        "summary": "Workspace Knowledge Search (POST)",
+        "description": "POST endpoint for deep workspace knowledge search with JSON body.",
+        "responses": {
+          "200": {
+            "description": "Search results"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        }
+      }
+    },
+    "/projectbase/workspace/blockers": {
+      "get": {
+        "tags": [
+          "Workspace Synthesis"
+        ],
+        "summary": "Detect Workspace Blockers",
+        "description": "Analyzes dependency graph, detects cross-project blockers, circular deadlock warnings, and critical path items.",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "Optional project filter"
+          },
+          {
+            "name": "include_cross_project",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "boolean", "default": true },
+            "description": "Include cross-project dependencies"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Blocker analysis"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        }
+      }
+    },
+    "/projectbase/workspace/retrospective": {
+      "get": {
+        "tags": [
+          "Workspace Synthesis"
+        ],
+        "summary": "Generate Sprint Retrospective",
+        "description": "Computes velocity metrics, agent productivity, quality gates, and AI recommendations for sprint/cycle.",
+        "parameters": [
+          {
+            "name": "cycle_id",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "Cycle filter"
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "Project filter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sprint retrospective report"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Workspace Synthesis"
+        ],
+        "summary": "Generate Sprint Retrospective (POST)",
+        "description": "POST endpoint for generating sprint retrospective report with JSON payload.",
+        "responses": {
+          "200": {
+            "description": "Sprint retrospective report"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        }
+      }
     }
   }
 }

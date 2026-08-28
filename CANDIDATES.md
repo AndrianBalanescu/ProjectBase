@@ -63,10 +63,17 @@
 - [x] FastMCP JSON-RPC 2.0 & Python client tools (`decompose_task_graph`, `get_dag_status`, `execute_dag_step`, `split_subtasks`, `submit_validation_checkpoint`, `get_validation_checkpoints`)
 - [x] 245/245 automated tests passing across 14 test suites with warm cold-start at 51.8 ms
 
+## Epic 11 – Autonomous Workspace Synthesis & Cross-Project Knowledge Retrieval (✅ Done)
+- [x] Vector-free SQLite FTS5 / tokenized semantic workspace indexing across issues, comments, checkpoints, and telemetry (`/api/projectbase/workspace/search`)
+- [x] Dynamic cross-project blocker detection, circular deadlock warnings, and critical path analysis (`/api/projectbase/workspace/blockers`)
+- [x] Automated sprint/cycle retrospective generation and agent productivity metrics (`/api/projectbase/workspace/retrospective`)
+- [x] FastMCP collaboration tools (`workspace_search`, `get_workspace_blockers`, `generate_retrospective`)
+- [x] 258/258 automated tests passing across 15 test suites with 100% headless DOM QA pass
+
 ---
 
-## Next Milestone (Cycle 11)
-**Epic 11 – Autonomous Workspace Synthesis & Cross-Project Knowledge Retrieval**
-- Vector-free SQLite FTS5 semantic workspace indexing across issues, comments, and telemetry
-- Dynamic cross-project blocker detection and dependency alerting
-- Automated sprint retrospective generation and agent productivity metrics
+## Next Milestone (Cycle 12)
+**Epic 12 – Advanced Real-Time Autonomous Collaboration & Production Multi-Host Federation**
+- Federated multi-instance ProjectBase sync & cross-workspace event bridge
+- Real-time agent collaboration streaming UI & visual execution DAG graph
+- Automated anomaly detection & agent throughput benchmarking

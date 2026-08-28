@@ -347,6 +347,46 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
                 },
                 required: ["issue_id"]
             }
+        },
+        {
+            name: "search_workspace_knowledge",
+            description: "Deep semantic & full-text workspace knowledge search across issues, comments, agent telemetry traces, and validation checkpoints.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    query: { type: "string", description: "Search query or keyword" },
+                    project_id: { type: "string", description: "Filter by project ID" },
+                    types: {
+                        type: "array",
+                        description: "Entity types to search (issues, comments, telemetry, checkpoints)",
+                        items: { type: "string" }
+                    },
+                    limit: { type: "integer", description: "Maximum number of results to return (default: 20)" }
+                },
+                required: ["query"]
+            }
+        },
+        {
+            name: "detect_workspace_blockers",
+            description: "Detect cross-project blockers, dependency bottlenecks, circular deadlock cycles, and critical path issues across workspace.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    project_id: { type: "string", description: "Optional project ID filter" },
+                    include_cross_project: { type: "boolean", description: "Whether to include cross-project dependencies (default: true)" }
+                }
+            }
+        },
+        {
+            name: "generate_sprint_retrospective",
+            description: "Generate automated sprint/cycle retrospective with velocity metrics, agent productivity breakdown, quality gates, and actionable recommendations.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    cycle_id: { type: "string", description: "Optional cycle ID filter" },
+                    project_id: { type: "string", description: "Optional project ID filter" }
+                }
+            }
         }
     ]
 
@@ -1323,6 +1363,490 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         }
     }
 
+    const searchWorkspaceKnowledge = (args) => {
+        let queryStr = (args.query || args.q || "").trim()
+        if (!queryStr) { throw new Error("query is required") }
+        let limit = parseInt(args.limit || "20", 10)
+        if (isNaN(limit) || limit < 1) limit = 20
+        if (limit > 100) limit = 100
+
+        let targetTypes = ["issues", "comments", "telemetry", "checkpoints"]
+        if (args.types) {
+            if (Array.isArray(args.types)) targetTypes = args.types.map(t => String(t).toLowerCase().trim())
+            else if (typeof args.types === "string") targetTypes = args.types.split(",").map(t => t.toLowerCase().trim()).filter(Boolean)
+        }
+
+        let qLower = queryStr.toLowerCase()
+        let qTerms = qLower.split(/\s+/).filter(t => t.length > 1)
+        if (qTerms.length === 0) qTerms.push(qLower)
+
+        let makeSnippet = (text, maxLength) => {
+            if (!text) return ""
+            let maxLen = maxLength || 160
+            let str = String(text).replace(/[\r\n]+/g, " ").trim()
+            if (str.length <= maxLen) return str
+            let idx = str.toLowerCase().indexOf(qLower)
+            if (idx === -1 && qTerms.length > 0) idx = str.toLowerCase().indexOf(qTerms[0])
+            if (idx === -1) return str.substring(0, maxLen - 3) + "..."
+            let start = Math.max(0, idx - 40)
+            let end = Math.min(str.length, start + maxLen)
+            let snippet = str.substring(start, end)
+            if (start > 0) snippet = "..." + snippet
+            if (end < str.length) snippet = snippet + "..."
+            return snippet
+        }
+
+        let allResults = []
+
+        if (targetTypes.indexOf("issues") !== -1) {
+            let filter = "1=1"
+            if (args.project_id) filter += " && project = '" + args.project_id + "'"
+            let issues = e.app.findRecordsByFilter("issues", filter, "-created", 300, 0)
+            for (let i = 0; i < issues.length; i++) {
+                let iss = issues[i]
+                let title = iss.getString("title") || ""
+                let desc = iss.getString("description") || ""
+                let ident = iss.getString("identifier") || ""
+                let persona = iss.getString("task_persona") || ""
+                let assignee = iss.getString("assignee") || ""
+                let status = iss.getString("status") || "todo"
+
+                let titleLower = title.toLowerCase()
+                let descLower = desc.toLowerCase()
+                let identLower = ident.toLowerCase()
+
+                let score = 0
+                if (identLower === qLower) score += 120
+                else if (identLower.indexOf(qLower) !== -1) score += 80
+                if (titleLower === qLower) score += 90
+                else if (titleLower.indexOf(qLower) !== -1) score += 50
+                if (descLower.indexOf(qLower) !== -1) score += 30
+                if (persona.toLowerCase().indexOf(qLower) !== -1) score += 20
+                if (assignee.toLowerCase().indexOf(qLower) !== -1) score += 15
+
+                for (let t = 0; t < qTerms.length; t++) {
+                    let term = qTerms[t]
+                    if (titleLower.indexOf(term) !== -1) score += 15
+                    if (descLower.indexOf(term) !== -1) score += 8
+                }
+
+                if (score > 0) {
+                    allResults.push({
+                        type: "issue",
+                        id: iss.id,
+                        identifier: ident,
+                        title: title,
+                        snippet: descLower.indexOf(qLower) !== -1 ? makeSnippet(desc) : makeSnippet(title),
+                        score: score,
+                        status: status,
+                        priority: iss.getString("priority"),
+                        assignee: assignee,
+                        task_persona: persona,
+                        created: iss.getString("created")
+                    })
+                }
+            }
+        }
+
+        if (targetTypes.indexOf("comments") !== -1) {
+            let comments = e.app.findRecordsByFilter("comments", "1=1", "-created", 200, 0)
+            for (let i = 0; i < comments.length; i++) {
+                let com = comments[i]
+                let content = com.getString("content") || com.getString("body") || ""
+                let contentLower = content.toLowerCase()
+                let score = 0
+                if (contentLower.indexOf(qLower) !== -1) score += 40
+                for (let t = 0; t < qTerms.length; t++) {
+                    if (contentLower.indexOf(qTerms[t]) !== -1) score += 10
+                }
+                if (score > 0) {
+                    allResults.push({
+                        type: "comment",
+                        id: com.id,
+                        issue_id: com.getString("issue"),
+                        snippet: makeSnippet(content),
+                        score: score,
+                        created: com.getString("created")
+                    })
+                }
+            }
+        }
+
+        if (targetTypes.indexOf("telemetry") !== -1) {
+            try {
+                let telList = e.app.findRecordsByFilter("agent_telemetry", "1=1", "-created", 200, 0)
+                for (let i = 0; i < telList.length; i++) {
+                    let tel = telList[i]
+                    let summary = tel.getString("summary") || ""
+                    let agentName = tel.getString("agent_name") || ""
+                    let eventType = tel.getString("event_type") || ""
+                    let text = (summary + " " + agentName + " " + eventType).toLowerCase()
+                    let score = 0
+                    if (summary.toLowerCase().indexOf(qLower) !== -1) score += 35
+                    if (text.indexOf(qLower) !== -1) score += 20
+                    if (score > 0) {
+                        allResults.push({
+                            type: "telemetry",
+                            id: tel.id,
+                            agent_name: agentName,
+                            event_type: eventType,
+                            summary: summary,
+                            snippet: makeSnippet(summary),
+                            score: score,
+                            created: tel.getString("created")
+                        })
+                    }
+                }
+            } catch (x) {}
+        }
+
+        if (targetTypes.indexOf("checkpoints") !== -1) {
+            try {
+                let cpList = e.app.findRecordsByFilter("task_checkpoints", "1=1", "-created", 200, 0)
+                for (let i = 0; i < cpList.length; i++) {
+                    let cp = cpList[i]
+                    let notes = cp.getString("notes") || ""
+                    let agentName = cp.getString("agent_name") || ""
+                    let persona = cp.getString("persona") || ""
+                    let cpType = cp.getString("checkpoint_type") || ""
+                    let text = (notes + " " + agentName + " " + persona + " " + cpType).toLowerCase()
+                    let score = 0
+                    if (notes.toLowerCase().indexOf(qLower) !== -1) score += 35
+                    if (text.indexOf(qLower) !== -1) score += 20
+                    if (score > 0) {
+                        allResults.push({
+                            type: "checkpoint",
+                            id: cp.id,
+                            issue_id: cp.getString("issue"),
+                            checkpoint_type: cpType,
+                            status: cp.getString("status"),
+                            reviewer: agentName,
+                            persona: persona,
+                            snippet: makeSnippet(notes || cpType),
+                            score: score,
+                            created: cp.getString("created")
+                        })
+                    }
+                }
+            } catch (x) {}
+        }
+
+        allResults.sort((a, b) => b.score - a.score)
+        let trimmed = allResults.slice(0, limit)
+
+        return {
+            query: queryStr,
+            count: trimmed.length,
+            total_matches: allResults.length,
+            types_searched: targetTypes,
+            results: trimmed
+        }
+    }
+
+    const detectWorkspaceBlockers = (args) => {
+        let toArr = (value) => {
+            if (!value) return []
+            if (Array.isArray(value)) {
+                if (value.length === 0) return []
+                if (typeof value[0] === "object" && value[0] !== null) return value
+                try { let a = JSON.parse(String(value)); if (Array.isArray(a)) return a } catch (err) {}
+            } else if (typeof value === "string") {
+                try { let a = JSON.parse(value); if (Array.isArray(a)) return a } catch (err) {}
+            } else {
+                try { let a = JSON.parse(String(value)); if (Array.isArray(a)) return a } catch (err) {}
+            }
+            return []
+        }
+
+        let projectFilter = (args.project_id || "").trim()
+        let includeCrossProject = args.include_cross_project !== false
+
+        let issues = e.app.findRecordsByFilter("issues", "1=1", "-created", 1000, 0)
+        let issueMap = {}
+        for (let i = 0; i < issues.length; i++) { issueMap[issues[i].id] = issues[i] }
+
+        let blockersMap = {}
+        let blockedByMap = {}
+
+        for (let i = 0; i < issues.length; i++) {
+            let iss = issues[i]
+            let issId = iss.id
+            if (!blockersMap[issId]) blockersMap[issId] = []
+            if (!blockedByMap[issId]) blockedByMap[issId] = []
+
+            let rels = toArr(iss.get("relations"))
+
+            for (let r = 0; r < rels.length; r++) {
+                let rel = rels[r]
+                let targetId = rel.issue
+                if (!targetId || !issueMap[targetId]) continue
+                if (rel.type === "blocks") {
+                    if (blockersMap[issId].indexOf(targetId) === -1) blockersMap[issId].push(targetId)
+                    if (!blockedByMap[targetId]) blockedByMap[targetId] = []
+                    if (blockedByMap[targetId].indexOf(issId) === -1) blockedByMap[targetId].push(issId)
+                } else if (rel.type === "blocked_by") {
+                    if (blockedByMap[issId].indexOf(targetId) === -1) blockedByMap[issId].push(targetId)
+                    if (!blockersMap[targetId]) blockersMap[targetId] = []
+                    if (blockersMap[targetId].indexOf(issId) === -1) blockersMap[targetId].push(issId)
+                }
+            }
+
+            let parentId = iss.getString("parent_issue")
+            if (parentId && issueMap[parentId] && iss.getString("status") !== "done" && iss.getString("status") !== "cancelled") {
+                if (!blockersMap[issId]) blockersMap[issId] = []
+                if (blockersMap[issId].indexOf(parentId) === -1) blockersMap[issId].push(parentId)
+                if (!blockedByMap[parentId]) blockedByMap[parentId] = []
+                if (blockedByMap[parentId].indexOf(issId) === -1) blockedByMap[parentId].push(issId)
+            }
+        }
+
+        let circularCycles = []
+        let visited = {}
+        let recStack = {}
+
+        let findCycles = (node, path) => {
+            visited[node] = true
+            recStack[node] = true
+            path.push(node)
+            let neighbors = blockersMap[node] || []
+            for (let n = 0; n < neighbors.length; n++) {
+                let neighbor = neighbors[n]
+                if (!visited[neighbor]) {
+                    findCycles(neighbor, path)
+                } else if (recStack[neighbor]) {
+                    let cyclePath = path.slice(path.indexOf(neighbor)).concat(neighbor)
+                    let cycleIdents = cyclePath.map(id => issueMap[id] ? issueMap[id].getString("identifier") : id)
+                    circularCycles.push({
+                        cycle_ids: cyclePath,
+                        cycle_identifiers: cycleIdents,
+                        warning: "Circular dependency detected: " + cycleIdents.join(" -> ")
+                    })
+                }
+            }
+            recStack[node] = false
+            path.pop()
+        }
+
+        let allNodeIds = Object.keys(issueMap)
+        for (let i = 0; i < allNodeIds.length; i++) {
+            if (!visited[allNodeIds[i]]) findCycles(allNodeIds[i], [])
+        }
+
+        let computeImpact = (startNode) => {
+            let seen = {}
+            let queue = (blockersMap[startNode] || []).slice()
+            let count = 0
+            while (queue.length > 0) {
+                let curr = queue.shift()
+                if (!seen[curr]) {
+                    seen[curr] = true
+                    count++
+                    let next = blockersMap[curr] || []
+                    for (let x = 0; x < next.length; x++) {
+                        if (!seen[next[x]]) queue.push(next[x])
+                    }
+                }
+            }
+            return count
+        }
+
+        let directBlockersList = []
+        let blockedIssuesList = []
+        let crossProjectCount = 0
+
+        for (let i = 0; i < issues.length; i++) {
+            let iss = issues[i]
+            let issId = iss.id
+            let status = iss.getString("status")
+            let isOpen = (status !== "done" && status !== "cancelled")
+            let projId = iss.getString("project")
+
+            if (projectFilter && projId !== projectFilter && !includeCrossProject) continue
+
+            let downstreamIds = blockersMap[issId] || []
+            if (isOpen && downstreamIds.length > 0) {
+                let blockedItems = []
+                let isCross = false
+                for (let d = 0; d < downstreamIds.length; d++) {
+                    let downIss = issueMap[downstreamIds[d]]
+                    if (downIss) {
+                        if (downIss.getString("project") !== projId) isCross = true
+                        blockedItems.push({
+                            id: downIss.id,
+                            identifier: downIss.getString("identifier"),
+                            title: downIss.getString("title"),
+                            status: downIss.getString("status")
+                        })
+                    }
+                }
+                if (blockedItems.length > 0) {
+                    if (isCross) crossProjectCount++
+                    directBlockersList.push({
+                        issue: {
+                            id: iss.id,
+                            identifier: iss.getString("identifier"),
+                            title: iss.getString("title"),
+                            status: status,
+                            priority: iss.getString("priority"),
+                            assignee: iss.getString("assignee"),
+                            task_persona: iss.getString("task_persona")
+                        },
+                        blocked_issues: blockedItems,
+                        blocked_count: blockedItems.length,
+                        impact_score: computeImpact(issId),
+                        is_cross_project: isCross
+                    })
+                }
+            }
+
+            let upstreamIds = blockedByMap[issId] || []
+            if (isOpen && upstreamIds.length > 0) {
+                let activeUpstream = []
+                for (let u = 0; u < upstreamIds.length; u++) {
+                    let upIss = issueMap[upstreamIds[u]]
+                    if (upIss && upIss.getString("status") !== "done" && upIss.getString("status") !== "cancelled") {
+                        activeUpstream.push({
+                            id: upIss.id,
+                            identifier: upIss.getString("identifier"),
+                            title: upIss.getString("title"),
+                            status: upIss.getString("status"),
+                            assignee: upIss.getString("assignee")
+                        })
+                    }
+                }
+                if (activeUpstream.length > 0) {
+                    blockedIssuesList.push({
+                        issue: {
+                            id: iss.id,
+                            identifier: iss.getString("identifier"),
+                            title: iss.getString("title"),
+                            status: status
+                        },
+                        unresolved_blockers: activeUpstream,
+                        unresolved_blockers_count: activeUpstream.length
+                    })
+                }
+            }
+        }
+
+        directBlockersList.sort((a, b) => b.impact_score - a.impact_score)
+
+        return {
+            summary: {
+                total_active_blockers: directBlockersList.length,
+                total_blocked_issues: blockedIssuesList.length,
+                cross_project_blockers_count: crossProjectCount,
+                critical_path_count: Math.min(5, directBlockersList.length),
+                circular_cycles_detected: circularCycles.length
+            },
+            critical_path: directBlockersList.slice(0, 5),
+            direct_blockers: directBlockersList,
+            blocked_issues: blockedIssuesList,
+            circular_warnings: circularCycles
+        }
+    }
+
+    const generateSprintRetrospective = (args) => {
+        let cycleFilter = (args.cycle_id || "").trim()
+        let projectFilter = (args.project_id || "").trim()
+
+        let filter = "1=1"
+        if (projectFilter) filter += " && project = '" + projectFilter + "'"
+        if (cycleFilter) filter += " && cycle = '" + cycleFilter + "'"
+
+        let issues = e.app.findRecordsByFilter("issues", filter, "-created", 1000, 0)
+        let totalIssues = issues.length
+        let completedIssues = 0
+        let totalEstimate = 0
+        let completedEstimate = 0
+
+        let statusCounts = { backlog: 0, todo: 0, in_progress: 0, in_review: 0, done: 0, cancelled: 0 }
+        let priorityCounts = { low: 0, medium: 0, high: 0, urgent: 0 }
+        let completedRecords = []
+        let agentStats = {}
+
+        for (let i = 0; i < issues.length; i++) {
+            let iss = issues[i]
+            let s = iss.getString("status") || "todo"
+            let p = iss.getString("priority") || "medium"
+            let est = iss.getInt("estimate") || 0
+            let assignee = iss.getString("assignee") || "Unassigned"
+
+            if (statusCounts[s] !== undefined) statusCounts[s]++
+            if (priorityCounts[p] !== undefined) priorityCounts[p]++
+            totalEstimate += est
+
+            if (!agentStats[assignee]) {
+                agentStats[assignee] = { agent_name: assignee, total_assigned: 0, completed_tasks: 0, in_progress_tasks: 0, estimate_delivered: 0 }
+            }
+            agentStats[assignee].total_assigned++
+
+            if (s === "done") {
+                completedIssues++
+                completedEstimate += est
+                agentStats[assignee].completed_tasks++
+                agentStats[assignee].estimate_delivered += est
+                completedRecords.push(iss)
+            } else if (s === "in_progress") {
+                agentStats[assignee].in_progress_tasks++
+            }
+        }
+
+        let completionRate = totalIssues > 0 ? Math.round((completedIssues / totalIssues) * 100) : 0
+
+        let totalCheckpoints = 0
+        let passedCheckpoints = 0
+        let failedCheckpoints = 0
+        try {
+            let cpList = e.app.findRecordsByFilter("task_checkpoints", "1=1", "-created", 500, 0)
+            totalCheckpoints = cpList.length
+            for (let c = 0; c < cpList.length; c++) {
+                let st = cpList[c].getString("status")
+                if (st === "passed") passedCheckpoints++
+                else if (st === "failed" || st === "changes_requested") failedCheckpoints++
+            }
+        } catch (x) {}
+
+        let qualityGatePassRate = totalCheckpoints > 0 ? Math.round((passedCheckpoints / totalCheckpoints) * 100) : 100
+
+        let highlights = []
+        let bottlenecks = []
+        let recommendations = []
+
+        if (completedIssues > 0) highlights.push("Successfully completed " + completedIssues + " issues (" + completedEstimate + " points delivered).")
+        if (completedRecords.length > 0) {
+            let sample = completedRecords.slice(0, 3).map(r => r.getString("identifier") + ": " + r.getString("title"))
+            highlights.push("Key deliverables: " + sample.join("; "))
+        }
+        if (statusCounts.in_review > 3) bottlenecks.push("Review queue backlog: " + statusCounts.in_review + " issues in 'in_review'.")
+        if (failedCheckpoints > 0) bottlenecks.push("Quality gate failures: " + failedCheckpoints + " failed checkpoints.")
+        if (recommendations.length === 0) recommendations.push("Sprint velocity and quality gates are optimal.")
+
+        return {
+            velocity: {
+                total_issues: totalIssues,
+                completed_issues: completedIssues,
+                completion_rate_percent: completionRate,
+                total_points_estimated: totalEstimate,
+                points_delivered: completedEstimate
+            },
+            status_breakdown: statusCounts,
+            priority_breakdown: priorityCounts,
+            quality_metrics: {
+                total_checkpoints: totalCheckpoints,
+                passed_checkpoints: passedCheckpoints,
+                failed_checkpoints: failedCheckpoints,
+                pass_rate_percent: qualityGatePassRate
+            },
+            agent_productivity: Object.values(agentStats),
+            retrospective_synthesis: {
+                highlights: highlights,
+                bottlenecks: bottlenecks,
+                recommendations: recommendations
+            }
+        }
+    }
+
     // ---------- 1. Authentication ----------
     let authRecord = e.auth || null
     let bypassEnabled = false
@@ -1400,6 +1924,9 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         else if (toolName === "split_subtasks") { result = splitSubtasks(args) }
         else if (toolName === "submit_validation_checkpoint") { result = submitValidationCheckpoint(args) }
         else if (toolName === "get_validation_checkpoints") { result = getValidationCheckpoints(args) }
+        else if (toolName === "search_workspace_knowledge") { result = searchWorkspaceKnowledge(args) }
+        else if (toolName === "detect_workspace_blockers") { result = detectWorkspaceBlockers(args) }
+        else if (toolName === "generate_sprint_retrospective") { result = generateSprintRetrospective(args) }
         else { return fail(-32602, "Unknown tool: " + toolName) }
         return ok({ content: [{ type: "text", text: JSON.stringify(result) }] })
     } catch (toolErr) {

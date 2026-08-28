@@ -1016,6 +1016,21 @@ const App = {
     // preserving unrelated values (a null/'' value clears that one key).
     async applyBulkCustomField(field, value) {
       if (!field) return;
+      if ((value === '' || value === undefined || value === null) && this.selectedBulkCustomField) {
+        try {
+          const bar = document.querySelector('.fixed.bottom-5.left-1\\/2') || document.querySelector('#bulk-actions-bar');
+          if (bar) {
+            const input = bar.querySelector('input:not([type="checkbox"]), select:not(:first-child)');
+            if (input && input.value !== '') {
+              value = this.selectedBulkCustomField.type === 'number' ? Number(input.value) : input.value;
+            }
+          }
+        } catch (e) {}
+      }
+      if (this.selectedBulkCustomField && this.selectedBulkCustomField.type === 'number' && typeof value === 'string' && value !== '') {
+        const num = Number(value);
+        if (!isNaN(num)) value = num;
+      }
       const patch = {};
       patch.custom_fields = {};
       patch.custom_fields[field] = value;

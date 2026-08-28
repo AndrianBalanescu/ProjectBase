@@ -51,24 +51,24 @@
         </div>
         <div v-if="authMode === 'signup'">
           <form @submit.prevent="signUp" class="space-y-3">
-            <input v-model="signupName" type="text" autocomplete="name" placeholder="Name (optional)" class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
-            <input v-model="loginEmail" type="email" autocomplete="email" required placeholder="Email" class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
-            <input v-model="loginPassword" type="password" autocomplete="new-password" required minlength="8" placeholder="Password (min 8 chars)" class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
-            <input v-model="signupPasswordConfirm" type="password" autocomplete="new-password" required minlength="8" placeholder="Confirm password" class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+            <input id="signup-name" name="name" v-model="signupName" type="text" autocomplete="name" placeholder="Name (optional)" class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 min-h-[36px]" />
+            <input id="signup-email" name="email" v-model="loginEmail" type="email" autocomplete="email" required placeholder="Email" class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 min-h-[36px]" />
+            <input id="signup-password" name="password" v-model="loginPassword" type="password" autocomplete="new-password" required minlength="8" placeholder="Password (min 8 chars)" class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 min-h-[36px]" />
+            <input id="signup-password-confirm" name="passwordConfirm" v-model="signupPasswordConfirm" type="password" autocomplete="new-password" required minlength="8" placeholder="Confirm password" class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 min-h-[36px]" />
             <p v-if="authError" class="text-xs text-red-400">{{ authError }}</p>
-            <button :disabled="signingUp" class="w-full px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-50">
+            <button id="signup-submit-button" type="submit" :disabled="signingUp" class="w-full px-3 py-2 min-h-[36px] rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold disabled:opacity-50">
               {{ signingUp ? 'Creating account…' : 'Create account' }}
             </button>
           </form>
           <p class="mt-4 text-[11px] text-gray-500">Already have an account?
-            <button type="button" @click="authMode = 'login'" class="text-indigo-400 hover:text-indigo-300 font-semibold">Sign in</button>
+            <button type="button" @click="authMode = 'login'" class="text-indigo-400 hover:text-indigo-300 font-semibold p-1 inline-flex items-center min-h-[24px]">Sign in instead</button>
           </p>
         </div>
         <form v-else @submit.prevent="signIn" class="space-y-3">
-          <input v-model="loginEmail" type="email" autocomplete="email" required placeholder="Email" class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
-          <input v-model="loginPassword" type="password" autocomplete="current-password" required placeholder="Password" class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+          <input id="login-email" name="email" v-model="loginEmail" type="email" autocomplete="email" required placeholder="Email" class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 min-h-[36px]" />
+          <input id="login-password" name="password" v-model="loginPassword" type="password" autocomplete="current-password" required placeholder="Password" class="w-full px-3 py-2 rounded-lg bg-gray-950 border border-gray-800 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 min-h-[36px]" />
           <p v-if="authError" class="text-xs text-red-400">{{ authError }}</p>
-          <button class="w-full px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold">Sign in</button>
+          <button id="login-submit-button" type="submit" data-testid="login-submit" class="w-full px-3 py-2 min-h-[36px] rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold">Sign in</button>
         </form>
         <p class="mt-4 text-[11px] text-gray-500">New here?
           <button v-if="authMode === 'login'" type="button" @click="authMode = 'signup'" class="text-indigo-400 hover:text-indigo-300 font-semibold">Create a free account</button>
@@ -229,6 +229,7 @@
     <!-- Bulk Actions Bar (board/list multi-select) -->
     <div
       v-if="selectedIssueIds.size > 0"
+      id="bulk-actions-bar"
       class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 rounded-2xl bg-gray-900/95 backdrop-blur border border-gray-700/80 shadow-2xl shadow-black/60"
     >
       <span class="font-mono text-indigo-300 font-semibold whitespace-nowrap">

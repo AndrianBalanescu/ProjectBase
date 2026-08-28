@@ -327,5 +327,43 @@ const API = {
     } catch (err) {
       return null;
     }
+  },
+
+  // Workspace Synthesis & Knowledge Retrieval (Epic 11)
+  async searchWorkspace(query, options = {}) {
+    const params = new URLSearchParams({ q: query || '' });
+    if (options.projectId) params.set('project_id', options.projectId);
+    if (options.limit) params.set('limit', options.limit);
+    if (options.types) params.set('types', Array.isArray(options.types) ? options.types.join(',') : options.types);
+    const res = await fetch(`/api/projectbase/workspace/search?${params.toString()}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Workspace search failed');
+    return data;
+  },
+
+  async getWorkspaceBlockers(options = {}) {
+    const params = new URLSearchParams();
+    if (options.projectId) params.set('project_id', options.projectId);
+    if (options.includeCrossProject !== undefined) params.set('include_cross_project', options.includeCrossProject);
+    const res = await fetch(`/api/projectbase/workspace/blockers?${params.toString()}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Blocker analysis failed');
+    return data;
+  },
+
+  async getWorkspaceRetrospective(options = {}) {
+    const params = new URLSearchParams();
+    if (options.cycleId) params.set('cycle_id', options.cycleId);
+    if (options.projectId) params.set('project_id', options.projectId);
+    const res = await fetch(`/api/projectbase/workspace/retrospective?${params.toString()}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Retrospective generation failed');
+    return data;
   }
 };
