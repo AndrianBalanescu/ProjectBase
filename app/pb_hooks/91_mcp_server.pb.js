@@ -11,7 +11,7 @@
 //            never enabled in production)
 //
 // Methods:   initialize | ping | tools/list | tools/call
-// Tools:     list_projects, list_issues, get_issue, create_issue, update_issue, move_issue, add_comment, list_cycles
+// Tools:     list_projects, list_issues, get_issue, create_issue, update_issue, move_issue, add_comment, list_cycles, list_milestones, get_stats
 //
 // NOTE (PB JSVM scoping): routerAdd callbacks are invoked from Go in a fresh
 // scope, so all helpers and constants are inlined inside the handler.
@@ -114,6 +114,25 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
                     status: { type: "string", description: "upcoming|active|completed" }
                 },
                 required: ["project_id"]
+            }
+        },
+        {
+            name: "list_milestones",
+            description: "List milestones, optionally filtered by project_id and status.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    project_id: { type: "string" },
+                    status: { type: "string", description: "planned|in_progress|achieved|missed" }
+                }
+            }
+        },
+        {
+            name: "get_stats",
+            description: "Get high-level workspace statistics, counts, and completion rates.",
+            inputSchema: {
+                type: "object",
+                properties: {}
             }
         }
     ]
@@ -327,6 +346,67 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         return out
     }
 
+    const listMilestones = (args) => {
+        let conditions = []
+        if (args.project_id) {
+            let pid = (args.project_id + "").replace(/'/g, "\\'")
+            conditions.push("project = '" + pid + "'")
+        }
+        if (args.status) {
+            let st = (args.status + "").replace(/'/g, "\\'")
+            conditions.push("status = '" + st + "'")
+        }
+        let filter = conditions.length > 0 ? conditions.join(" && ") : "1=1"
+        let records = e.app.findRecordsByFilter("milestones", filter, "target_date", 200, 0)
+        let out = []
+        for (let i = 0; i < records.length; i++) {
+            let r = records[i]
+            out.push({
+                id: r.id,
+                name: r.getString("name"),
+                description: r.getString("description"),
+                status: r.getString("status"),
+                target_date: r.getString("target_date"),
+                project: r.getString("project")
+            })
+        }
+        return out
+    }
+
+    const getStats = () => {
+        let projects = e.app.findRecordsByFilter("projects", "1=1", "-created", 100, 0)
+        let issues = e.app.findRecordsByFilter("issues", "1=1", "-created", 1000, 0)
+        let cycles = e.app.findRecordsByFilter("cycles", "1=1", "-created", 100, 0)
+        let milestones = e.app.findRecordsByFilter("milestones", "1=1", "-created", 100, 0)
+
+        let statusCounts = {
+            backlog: 0,
+            todo: 0,
+            in_progress: 0,
+            in_review: 0,
+            done: 0,
+            cancelled: 0
+        }
+        for (let i = 0; i < issues.length; i++) {
+            let st = issues[i].getString("status")
+            if (statusCounts[st] !== undefined) {
+                statusCounts[st]++
+            }
+        }
+        let totalIssues = issues.length
+        let doneIssues = statusCounts.done || 0
+        let completionRate = totalIssues > 0 ? Math.round((doneIssues / totalIssues) * 100) : 0
+
+        return {
+            total_projects: projects.length,
+            total_issues: totalIssues,
+            total_cycles: cycles.length,
+            total_milestones: milestones.length,
+            completion_rate: completionRate,
+            by_status: statusCounts
+        }
+    }
+
     // ---------- 1. Authentication ----------
     let authRecord = e.auth || null
     let bypassEnabled = false
@@ -386,6 +466,8 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         else if (toolName === "move_issue") { result = moveIssue(args) }
         else if (toolName === "add_comment") { result = addComment(args) }
         else if (toolName === "list_cycles") { result = listCycles(args) }
+        else if (toolName === "list_milestones") { result = listMilestones(args) }
+        else if (toolName === "get_stats") { result = getStats() }
         else { return fail(-32602, "Unknown tool: " + toolName) }
         return ok({ content: [{ type: "text", text: JSON.stringify(result) }] })
     } catch (toolErr) {

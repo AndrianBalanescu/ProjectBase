@@ -2873,7 +2873,7 @@ def test_fastmcp_jsonrpc_endpoint_suite():
     st, res = _request("POST", "/api/projectbase/mcp", {"jsonrpc": "2.0", "method": "tools/list", "id": 2}, headers=headers)
     assert st == 200
     tools = [t["name"] for t in res.get("result", {}).get("tools", [])]
-    for required in ["list_projects", "list_issues", "get_issue", "create_issue", "update_issue", "move_issue", "add_comment", "list_cycles"]:
+    for required in ["list_projects", "list_issues", "get_issue", "create_issue", "update_issue", "move_issue", "add_comment", "list_cycles", "list_milestones", "get_stats"]:
         assert required in tools, f"missing tool {required} in tools/list"
 
     # 3. list_projects
@@ -2943,6 +2943,24 @@ def test_fastmcp_jsonrpc_endpoint_suite():
         assert st == 200
         cycles = json.loads(res["result"]["content"][0]["text"])
         assert isinstance(cycles, list)
+
+        # 10. list_milestones
+        st, res = _request("POST", "/api/projectbase/mcp", {
+            "jsonrpc": "2.0", "method": "tools/call", "params": {"name": "list_milestones", "arguments": {"project_id": pid}}, "id": 10
+        }, headers=headers)
+        assert st == 200
+        milestones = json.loads(res["result"]["content"][0]["text"])
+        assert isinstance(milestones, list)
+
+        # 11. get_stats
+        st, res = _request("POST", "/api/projectbase/mcp", {
+            "jsonrpc": "2.0", "method": "tools/call", "params": {"name": "get_stats", "arguments": {}}, "id": 11
+        }, headers=headers)
+        assert st == 200
+        stats = json.loads(res["result"]["content"][0]["text"])
+        assert "total_projects" in stats
+        assert "total_issues" in stats
+        assert "completion_rate" in stats
     finally:
         _request("DELETE", f"/api/collections/issues/records/{issue_id}", headers={"Authorization": token})
 
