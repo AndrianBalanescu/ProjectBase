@@ -1991,7 +1991,7 @@
           "FastMCP Server"
         ],
         "summary": "FastMCP JSON-RPC 2.0 Endpoint",
-        "description": "JSON-RPC 2.0 endpoint implementing Model Context Protocol (MCP) over HTTP for autonomous AI agents (Flomaster, Hermes). Exposes tools: list_projects, list_issues, create_issue, update_issue, move_issue. Requires Bearer authentication.",
+        "description": "JSON-RPC 2.0 endpoint implementing Model Context Protocol (MCP) over HTTP for autonomous AI agents (Flomaster, Hermes, Cursor, Claude). Exposes tools: list_projects, list_issues, get_issue, create_issue, update_issue, move_issue, add_comment, list_cycles. Requires Bearer authentication.",
         "requestBody": {
           "required": true,
           "content": {

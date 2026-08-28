@@ -87,3 +87,30 @@ def test_global_created_index_migration_present():
     assert "idx_issues_created" in src
     assert "issues (created DESC)" in src
     assert "CREATE INDEX IF NOT EXISTS" in src
+
+
+def test_agent_workflow_bench_smoke(tmp_path):
+    """Verify the automated agent workflow benchmark runs end-to-end against a scratch instance."""
+    agent_bench = os.path.join(REPO_ROOT, "scripts", "bench", "agent_workflow_bench.py")
+    assert os.path.isfile(agent_bench), f"missing agent benchmark {agent_bench}"
+
+    out = tmp_path / "agent_bench.json"
+    proc = subprocess.run(
+        [
+            sys.executable, agent_bench,
+            "--cycles", "2",
+            "--json", str(out),
+        ],
+        capture_output=True, text=True, timeout=300,
+    )
+    assert proc.returncode == 0, f"agent bench failed:\n{proc.stdout[-2000:]}\n{proc.stderr[-2000:]}"
+
+    data = json.loads(out.read_text())
+    assert data["schema"] == "projectbase-agent-workflow-v1"
+    assert data["cycles_completed"] == 2
+    assert 0 < data["cold_start"]["warm_dir_ms"] < 2000
+    assert 10 <= data["ram_mb"]["idle_after_boot"] < 500
+    assert "create_issue" in data["tool_latencies"]
+    assert "move_issue" in data["tool_latencies"]
+    assert "add_comment" in data["tool_latencies"]
+

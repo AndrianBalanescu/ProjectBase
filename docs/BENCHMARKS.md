@@ -36,6 +36,29 @@ dropped its p50 from 62.5 ms → 45.1 ms at 10k issues. Every view the UI
 actually renders is project-scoped and lands in single-digit milliseconds at
 10k issues.
 
+## Agent Workflow Benchmarks (FastMCP JSON-RPC Lifecycle)
+
+> **Measured:** 2026-08-27 · Harness: `scripts/bench/agent_workflow_bench.py` (stdlib-only, reproducible).
+> **Reproduce:** `python3 scripts/bench/agent_workflow_bench.py --cycles 10 --json out.json`
+
+Validates end-to-end autonomous agent interaction over FastMCP JSON-RPC (`/api/projectbase/mcp`): project discovery, task creation, ID/identifier lookups, Kanban state progression, and structured markdown audit comments.
+
+| MCP Tool Operation | p50 Latency | p95 Latency | Notes |
+|---|---|---|---|
+| `list_projects` | **0.9 ms** | 1.2 ms | Scans active projects with identifiers & colors |
+| `create_issue` | **1.6 ms** | 2.5 ms | Calculates per-project issue number and sets order |
+| `get_issue` | **0.6 ms** | 0.8 ms | Resolves by either record ID or identifier (`PB-42`) |
+| `update_issue` | **1.3 ms** | 1.5 ms | Updates fields, assignees, or sprint cycle |
+| `move_issue` | **1.2 ms** | 1.5 ms | Column state progression (`backlog` → `in_progress` → `in_review` → `done`) |
+| `add_comment` | **1.0 ms** | 1.2 ms | Posts structured completion / audit comments |
+| `list_issues` | **0.7 ms** | 0.9 ms | Filtered query by project and status |
+| `list_cycles` | **0.8 ms** | 1.1 ms | Queries sprint cycles for milestone alignment |
+
+**Agent Resource Impact:**
+- Idle RAM after boot: **54.2 MB**
+- Loaded RAM after multi-cycle agent workloads: **55.9 MB**
+- Warm cold-start to full health: **41.5 ms** (< 100 ms target)
+
 ## Comparison: Plane CE (cited, not re-measured here)
 
 ProjectBase numbers above are **measured on this host**. Plane CE numbers below

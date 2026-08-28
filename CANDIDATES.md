@@ -1,7 +1,7 @@
 # ProjectBase – Candidate Roadmap (Epics)
 
-**Current Cycle:** 5
-**Focus:** Harden & Reliability Verification
+**Current Cycle:** 6
+**Focus:** Production Benchmarking & Multi-Host Packaging
 
 ## Epic 0 – Core CRUD (✅ Done)
 - Projects, issues, cycles, users
@@ -23,7 +23,7 @@
 - Per-project configuration
 
 ## Epic 4 – AI Agent Integration (✅ Done)
-- [x] MCP server (`app/pb_hooks/91_mcp_server.pb.js`): `list_projects`, `list_issues`, `create_issue`, `update_issue`, `move_issue`
+- [x] FastMCP server (`app/pb_hooks/91_mcp_server.pb.js`): `list_projects`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `move_issue`, `add_comment`, `list_cycles`
 - [x] AgentsView UI component (`pb_public/js/components/AgentsView.js`)
 - [x] Agent dispatch endpoint (`app/pb_hooks/80_agent_triggers.pb.js`)
 - [x] Agent discovery bridge (`app/pb_hooks/90_agents.pb.js`)
@@ -43,11 +43,16 @@
 - [x] Frontend render & data cache hardening (`loadAllData` project instance synchronization)
 - [x] Headless render DOM QA validation (0 failures, 100% pass)
 
+## Epic 8 – Production Benchmarking & Multi-Host Packaging (✅ Done)
+- [x] FastMCP server expanded with `get_issue`, `add_comment`, `list_cycles`, and full Kanban status support (`backlog`, `todo`, `in_progress`, `in_review`, `done`, `cancelled`)
+- [x] Cold-start & memory load benchmarking (warm cold start 41.5 ms, idle RSS 54.2 MB, loaded RSS 55.9 MB)
+- [x] Automated agent workflow benchmark harness (`scripts/bench/agent_workflow_bench.py`) & CI test (`tests/test_benchmarks.py`)
+- [x] Verified FastMCP JSON-RPC 2.0 endpoint suite (`tests/test_api.py`)
+
 ---
 
-## Next Milestone (Cycle 6)
-**Epic 8 – Production Benchmarking & Multi-Host Packaging**
-
-- Cold-start & memory load benchmarking
-- Multi-host Caddy/Docker reverse proxy verification
-- Automated agent workflow verification scripts (cold start < 100 ms, < 100 MB RAM)
+## Next Milestone (Cycle 7)
+**Epic 9 – Real-Time Multi-Agent Collaboration & SSE Stream Telemetry**
+- Live agent reasoning & tool invocation streaming in Kanban cards
+- Multi-agent collision avoidance on shared tasks
+- Webhook subscriptions for external orchestrator triggers

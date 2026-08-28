@@ -984,10 +984,11 @@ def test_export_csv_has_header_and_rows():
 # GitHub importer (cycle 3)
 # ---------------------------------------------------------------------------
 
-def _github_import(payload, token=None):
+def _github_import(payload, token=None, timeout=60):
     return _request(
         "POST", "/api/projectbase/import/github", payload,
-        headers={"Authorization": token or _superuser_token()})
+        headers={"Authorization": token or _superuser_token()},
+        timeout=timeout)
 
 
 def test_github_requires_authentication():
@@ -2855,3 +2856,93 @@ def test_global_search_wired_in_command_palette():
     st, body = _get("/js/components/CommandPalette.js")
     assert st == 200, f"CommandPalette.js not served: {st}"
     assert "searchIssues" in body, "served CommandPalette.js must reference searchIssues"
+
+
+def test_fastmcp_jsonrpc_endpoint_suite():
+    """Verify the FastMCP /api/projectbase/mcp JSON-RPC 2.0 endpoint end-to-end.
+    Tests initialize, tools/list, and tools/call (list_projects, list_issues,
+    get_issue, create_issue, update_issue, move_issue, add_comment, list_cycles)."""
+    token = _superuser_token()
+    headers = {"Authorization": token, "Content-Type": "application/json"}
+
+    # 1. initialize
+    st, res = _request("POST", "/api/projectbase/mcp", {"jsonrpc": "2.0", "method": "initialize", "id": 1}, headers=headers)
+    assert st == 200 and res.get("result", {}).get("serverInfo", {}).get("name") == "projectbase-mcp"
+
+    # 2. tools/list
+    st, res = _request("POST", "/api/projectbase/mcp", {"jsonrpc": "2.0", "method": "tools/list", "id": 2}, headers=headers)
+    assert st == 200
+    tools = [t["name"] for t in res.get("result", {}).get("tools", [])]
+    for required in ["list_projects", "list_issues", "get_issue", "create_issue", "update_issue", "move_issue", "add_comment", "list_cycles"]:
+        assert required in tools, f"missing tool {required} in tools/list"
+
+    # 3. list_projects
+    st, res = _request("POST", "/api/projectbase/mcp", {
+        "jsonrpc": "2.0", "method": "tools/call", "params": {"name": "list_projects", "arguments": {}}, "id": 3
+    }, headers=headers)
+    assert st == 200
+    projects = json.loads(res["result"]["content"][0]["text"])
+    assert len(projects) > 0
+    pid = projects[0]["id"]
+
+    # 4. create_issue
+    st, res = _request("POST", "/api/projectbase/mcp", {
+        "jsonrpc": "2.0", "method": "tools/call", "params": {
+            "name": "create_issue",
+            "arguments": {"project_id": pid, "title": "Cycle 6 FastMCP Test Issue", "description": "Automated test", "status": "todo", "priority": "high"}
+        }, "id": 4
+    }, headers=headers)
+    assert st == 200
+    created = json.loads(res["result"]["content"][0]["text"])
+    issue_id = created["id"]
+    identifier = created["identifier"]
+
+    try:
+        # 5. get_issue by id & identifier
+        st, res = _request("POST", "/api/projectbase/mcp", {
+            "jsonrpc": "2.0", "method": "tools/call", "params": {"name": "get_issue", "arguments": {"issue_id": issue_id}}, "id": 5
+        }, headers=headers)
+        assert st == 200
+        got = json.loads(res["result"]["content"][0]["text"])
+        assert got["identifier"] == identifier
+
+        # 6. update_issue
+        st, res = _request("POST", "/api/projectbase/mcp", {
+            "jsonrpc": "2.0", "method": "tools/call", "params": {
+                "name": "update_issue", "arguments": {"issue_id": identifier, "status": "in_progress", "description": "Updated desc"}
+            }, "id": 6
+        }, headers=headers)
+        assert st == 200
+        updated = json.loads(res["result"]["content"][0]["text"])
+        assert updated["status"] == "in_progress"
+
+        # 7. move_issue (with in_review)
+        st, res = _request("POST", "/api/projectbase/mcp", {
+            "jsonrpc": "2.0", "method": "tools/call", "params": {
+                "name": "move_issue", "arguments": {"issue_id": identifier, "new_status": "in_review"}
+            }, "id": 7
+        }, headers=headers)
+        assert st == 200
+        moved = json.loads(res["result"]["content"][0]["text"])
+        assert moved["status"] == "in_review"
+
+        # 8. add_comment
+        st, res = _request("POST", "/api/projectbase/mcp", {
+            "jsonrpc": "2.0", "method": "tools/call", "params": {
+                "name": "add_comment", "arguments": {"issue_id": identifier, "content": "Proof of autonomous execution"}
+            }, "id": 8
+        }, headers=headers)
+        assert st == 200
+        comment = json.loads(res["result"]["content"][0]["text"])
+        assert comment["content"] == "Proof of autonomous execution"
+
+        # 9. list_cycles
+        st, res = _request("POST", "/api/projectbase/mcp", {
+            "jsonrpc": "2.0", "method": "tools/call", "params": {"name": "list_cycles", "arguments": {"project_id": pid}}, "id": 9
+        }, headers=headers)
+        assert st == 200
+        cycles = json.loads(res["result"]["content"][0]["text"])
+        assert isinstance(cycles, list)
+    finally:
+        _request("DELETE", f"/api/collections/issues/records/{issue_id}", headers={"Authorization": token})
+

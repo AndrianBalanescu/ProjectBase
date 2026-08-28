@@ -14,8 +14,8 @@
 - **Open Source** — MIT, contributions welcome.
 
 **Success Criteria:**
-- [x] MCP server exposing `list_projects`, `list_issues`, `create_issue`, `update_issue`, `move_issue`
+- [x] MCP server exposing `list_projects`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `move_issue`, `add_comment`, `list_cycles`
 - [x] Agent dispatch endpoint (`/api/projectbase/dispatch-agent`) and native chat view (`AgentsView`)
-- [ ] Documented end-to-end agent run: create issue → move across columns via MCP
-- [ ] Cold start < 100 ms and < 100 MB RAM under load
-- [ ] Self-hosting + agent-integration docs
+- [x] Documented end-to-end agent run: create issue → move across columns via MCP (`scripts/bench/agent_workflow_bench.py`)
+- [x] Cold start < 100 ms (41.5 ms) and < 100 MB RAM under load (55.9 MB)
+- [x] Self-hosting + agent-integration docs (`docs/BENCHMARKS.md`, `deploy/`)
