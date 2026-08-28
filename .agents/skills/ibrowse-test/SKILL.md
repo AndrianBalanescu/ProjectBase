@@ -9,6 +9,21 @@ This skill turns iBrowse / Headless Chromium into an **uncompromising, sceptic Q
 
 ---
 
+## 🔑 Authentication & Environment Credentials
+
+The skill has pre-configured access to ProjectBase authentication:
+
+- **Target App URL:** `http://127.0.0.1:8120/` (or `http://homelab:8120/`)
+- **Superuser Email:** `f@flow.com`
+- **Superuser Password:** `superdev123`
+- **iBrowse Service URL:** `http://127.0.0.1:3000` (or `http://homelab:3000`)
+- **iBrowse API Key:** `$IBROWSE_API_KEY` (auto-read from environment)
+- **Local Storage Auth Keys:** `pb_auth` and `pocketbase_auth` (stores `{"token": "...", "record": {...}}`)
+
+When driving the browser, iBrowse will automatically log in if the login modal or `/login` screen is presented, or inject the valid auth token directly into `localStorage`.
+
+---
+
 ## 🎯 Mandatory Audit Checklist (Zero Compromise)
 
 Whenever UI, CSS, Vue templates, or user interactions are modified or audited, this skill verifies:
@@ -35,16 +50,16 @@ Whenever UI, CSS, Vue templates, or user interactions are modified or audited, t
 
 ## 🛠️ How to Execute the Sceptic Audit
 
-### Option 1: Automated Sceptic Audit Runner (Recommended)
+### Option 1: Automated Sceptic Audit Runner (Instant Local Playwright)
 ```bash
-# Run the complete headless sceptic audit suite
+# Run the complete headless sceptic audit suite with computed style & DOM checks
 bash scripts/qa/qa-render.sh 8120
 
-# Run full interactive multi-scenario E2E audit
+# Run full interactive 10-scenario E2E audit with login & assertion verification
 bash scripts/qa/run_10_ibrowse_e2e.sh
 ```
 
-### Option 2: Live Homelab iBrowse Automation
+### Option 2: Live Homelab iBrowse Agent Automation
 ```bash
 # Trigger iBrowse container on homelab (:3000)
 bash /home/ubuntu/flow/scripts/qa/flow-ibrowse.sh http://127.0.0.1:8120/
@@ -59,6 +74,7 @@ Every run produces a structured audit report with numerical evidence:
 ```markdown
 ### 🛡️ iBrowse Sceptic Audit Report
 - **Target URL:** `http://127.0.0.1:8120/#/pb/board`
+- **Auth Used:** `f@flow.com` (Superuser Admin)
 - **Result:** ✅ PASS / ❌ VETO
 - **Console Errors:** 0
 - **Page / Unhandled Errors:** 0
