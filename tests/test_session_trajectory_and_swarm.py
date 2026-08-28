@@ -71,7 +71,7 @@ def _mcp_call(method, params, token=None):
     hdrs = {}
     if token:
         hdrs["Authorization"] = f"Bearer {token}"
-    return _request("POST", "/projectbase/mcp", {
+    return _request("POST", "/api/projectbase/mcp", {
         "jsonrpc": "2.0",
         "id": "test-req-traj",
         "method": method,

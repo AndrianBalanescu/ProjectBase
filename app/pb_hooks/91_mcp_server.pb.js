@@ -5959,6 +5959,7 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
     }
 
     const recordSessionTrajectoryStep = (args) => {
+        args = args || {};
         if (!args.session_id) throw new Error("session_id is required");
         let trajectoryCol = null;
         try { trajectoryCol = e.app.findCollectionByNameOrId("session_trajectories"); } catch (x) {}
@@ -6042,6 +6043,7 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
     };
 
     const getSessionTrajectories = (args) => {
+        args = args || {};
         if (!args.session_id) throw new Error("session_id is required");
         let conditions = ["(session_id = {:sid} || session = {:sid})"];
         let params = { sid: args.session_id };
@@ -6097,6 +6099,7 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
     };
 
     const getSessionTrajectorySummary = (args) => {
+        args = args || {};
         if (!args.session_id) throw new Error("session_id is required");
         let conditions = ["(session_id = {:sid} || session = {:sid})"];
         let params = { sid: args.session_id };
@@ -6146,9 +6149,20 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
                 failureCount += 1;
             }
 
-            const touched = r.get("files_touched");
-            if (Array.isArray(touched)) {
-                touched.forEach(f => { if (f) filesSet.add(f); });
+            let touched = r.get("files_touched");
+            if (touched) {
+                if (typeof touched === "string") {
+                    try { touched = JSON.parse(touched); } catch (x) {}
+                } else if (Array.isArray(touched) && touched.length > 0 && typeof touched[0] === "number") {
+                    try {
+                        let s = "";
+                        for (let i = 0; i < touched.length; i++) { s += String.fromCharCode(touched[i]); }
+                        touched = JSON.parse(s);
+                    } catch (x) {}
+                }
+                if (Array.isArray(touched)) {
+                    touched.forEach(f => { if (f && typeof f === "string") filesSet.add(f); });
+                }
             }
         });
 
@@ -6181,6 +6195,7 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
     };
 
     const createSwarmCluster = (args) => {
+        args = args || {};
         let clusterCol = null;
         try { clusterCol = e.app.findCollectionByNameOrId("swarm_clusters"); } catch (x) {}
         if (!clusterCol) throw new Error("swarm_clusters collection not found");
@@ -6269,6 +6284,7 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
     };
 
     const listSwarmClusters = (args) => {
+        args = args || {};
         let conditions = ["1=1"];
         let params = {};
         if (args.status) {
@@ -6286,7 +6302,16 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         }
 
         const filter = conditions.join(" && ");
-        const records = e.app.findRecordsByFilter("swarm_clusters", filter, "-created", 100, 0, params);
+        let records = [];
+        try {
+            records = e.app.findRecordsByFilter("swarm_clusters", filter, "-created", 100, 0, params);
+        } catch (x) {
+            try {
+                records = e.app.findRecordsByFilter("swarm_clusters", filter, "", 100, 0, params);
+            } catch (y) {
+                records = [];
+            }
+        }
 
         return {
             count: records.length,
@@ -6310,6 +6335,7 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
     };
 
     const getSwarmClusterDetails = (args) => {
+        args = args || {};
         if (!args.cluster_id) throw new Error("cluster_id is required");
         let cluster = null;
         try {
@@ -6350,6 +6376,7 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
     };
 
     const addSwarmClusterWorkers = (args) => {
+        args = args || {};
         if (!args.cluster_id) throw new Error("cluster_id is required");
         let cluster = null;
         try {
@@ -6416,6 +6443,7 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
     };
 
     const updateSwarmClusterStatus = (args) => {
+        args = args || {};
         if (!args.cluster_id) throw new Error("cluster_id is required");
         let cluster = null;
         try {

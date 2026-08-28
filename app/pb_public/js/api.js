@@ -1896,5 +1896,104 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to dispatch session swarm');
     return data;
+  },
+
+  async recordSessionTrajectory(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/trajectories`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to record session trajectory');
+    return data;
+  },
+
+  async getSessionTrajectories(id, params = {}) {
+    const qp = new URLSearchParams();
+    if (params.step_type) qp.append('step_type', params.step_type);
+    if (params.tool_name) qp.append('tool_name', params.tool_name);
+    if (params.status) qp.append('status', params.status);
+    if (params.limit) qp.append('limit', params.limit);
+    const qs = qp.toString() ? `?${qp.toString()}` : '';
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/trajectories${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch session trajectories');
+    return data;
+  },
+
+  async getSessionTrajectorySummary(id) {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/trajectories/summary`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch trajectory summary');
+    return data;
+  },
+
+  async createSwarmCluster(payload = {}) {
+    const res = await fetch('/api/projectbase/swarm/clusters', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create swarm cluster');
+    return data;
+  },
+
+  async listSwarmClusters(params = {}) {
+    const qp = new URLSearchParams();
+    if (params.status) qp.append('status', params.status);
+    if (params.project) qp.append('project', params.project);
+    const qs = qp.toString() ? `?${qp.toString()}` : '';
+    const res = await fetch(`/api/projectbase/swarm/clusters${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list swarm clusters');
+    return data;
+  },
+
+  async getSwarmCluster(id) {
+    const res = await fetch(`/api/projectbase/swarm/clusters/${encodeURIComponent(id)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch swarm cluster');
+    return data;
+  },
+
+  async addSwarmClusterWorkers(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/swarm/clusters/${encodeURIComponent(id)}/workers`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to add swarm cluster workers');
+    return data;
+  },
+
+  async updateSwarmClusterStatus(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/swarm/clusters/${encodeURIComponent(id)}/status`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to update swarm cluster status');
+    return data;
+  },
+
+  async getSwarmClusterMetrics(id) {
+    const res = await fetch(`/api/projectbase/swarm/clusters/${encodeURIComponent(id)}/metrics`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch swarm cluster metrics');
+    return data;
   }
 };

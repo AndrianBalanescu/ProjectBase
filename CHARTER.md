@@ -20,3 +20,4 @@
 - [x] Dual-plane workspace UI: Intent View vs Live Runs Stream (Milestone 2)
 - [x] Visual in-browser Git Diff & Sceptic Audit Inspector (Milestone 3)
 - [x] One-click session branching, DAG continuation & Human Intervention Gate (Milestone 4)
+- [x] Live step-by-step trajectory stream, tool telemetry & autonomous swarm choreography hub (Milestone 5)

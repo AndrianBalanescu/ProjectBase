@@ -13,23 +13,198 @@
 // 10. POST /api/projectbase/swarm/clusters/{id}/status        - Update cluster lifecycle state (pause, resume, abort, complete)
 // 11. GET  /api/projectbase/swarm/clusters/{id}/metrics       - Aggregate cluster performance metrics across all workers
 
+// 1. POST /api/projectbase/sessions/{id}/trajectories
 routerAdd("POST", "/api/projectbase/sessions/{id}/trajectories", (e) => {
     try {
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";
-        return handleRecordTrajectory(e, id);
+        const body = e.requestInfo().body || {};
+        const sessionId = (id || body.session_id || "").trim();
+
+        if (!sessionId) {
+            return e.json(400, { error: "session_id is required" });
+        }
+
+        let trajectoryCol = null;
+        try { trajectoryCol = e.app.findCollectionByNameOrId("session_trajectories"); } catch (x) {}
+        if (!trajectoryCol) return e.json(500, { error: "session_trajectories collection not found" });
+
+        let sessionRecord = null;
+        try {
+            sessionRecord = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: sessionId });
+        } catch (x) {}
+
+        let nextStepNumber = 1;
+        if (typeof body.step_number === "number") {
+            nextStepNumber = body.step_number;
+        } else {
+            try {
+                const lastSteps = e.app.findRecordsByFilter("session_trajectories", "session_id = {:sid}", "-step_number", 1, 0, { sid: sessionId });
+                if (lastSteps && lastSteps.length > 0) {
+                    nextStepNumber = (lastSteps[0].getInt("step_number") || 0) + 1;
+                }
+            } catch (x) {}
+        }
+
+        const stepType = body.step_type || "thought";
+        const toolName = body.tool_name || "";
+        const durationMs = typeof body.duration_ms === "number" ? body.duration_ms : 0;
+        const tokensPrompt = typeof body.tokens_prompt === "number" ? body.tokens_prompt : 0;
+        const tokensCompletion = typeof body.tokens_completion === "number" ? body.tokens_completion : 0;
+        const tokensReasoning = typeof body.tokens_reasoning === "number" ? body.tokens_reasoning : 0;
+        const stepCost = typeof body.cost_usd === "number" ? body.cost_usd : 0.0;
+        const stepStatus = body.status || "success";
+
+        const rec = new Record(trajectoryCol);
+        rec.set("session_id", sessionId);
+        if (sessionRecord) rec.set("session", sessionRecord.getString("id"));
+        rec.set("step_number", nextStepNumber);
+        rec.set("step_type", stepType);
+        rec.set("tool_name", toolName);
+        rec.set("tool_input", body.tool_input || {});
+        rec.set("tool_output", body.tool_output || {});
+        rec.set("thought_text", body.thought_text || "");
+        rec.set("duration_ms", durationMs);
+        rec.set("tokens_prompt", tokensPrompt);
+        rec.set("tokens_completion", tokensCompletion);
+        rec.set("tokens_reasoning", tokensReasoning);
+        rec.set("cost_usd", stepCost);
+        rec.set("status", stepStatus);
+        rec.set("error_message", body.error_message || "");
+        rec.set("files_touched", body.files_touched || []);
+        rec.set("metadata", body.metadata || {});
+        e.app.save(rec);
+
+        if (sessionRecord) {
+            const curSteps = sessionRecord.getInt("total_steps") || 0;
+            const curTokens = sessionRecord.getInt("total_tokens") || 0;
+            const curCost = sessionRecord.getFloat("total_cost_usd") || 0.0;
+            const totalStepTokens = tokensPrompt + tokensCompletion + tokensReasoning;
+
+            sessionRecord.set("total_steps", curSteps + 1);
+            sessionRecord.set("total_tokens", curTokens + totalStepTokens);
+            sessionRecord.set("total_cost_usd", parseFloat((curCost + stepCost).toFixed(6)));
+            sessionRecord.set("current_step_type", stepType);
+            if (toolName) sessionRecord.set("active_tool", toolName);
+            if (body.thought_text && (!sessionRecord.getString("trajectory_summary") || curSteps % 5 === 0)) {
+                sessionRecord.set("trajectory_summary", (body.thought_text).substring(0, 240));
+            }
+            try { e.app.save(sessionRecord); } catch (x) {}
+        }
+
+        return e.json(201, {
+            success: true,
+            id: rec.getString("id"),
+            session_id: sessionId,
+            step_number: nextStepNumber,
+            step_type: stepType,
+            tool_name: toolName,
+            status: stepStatus,
+            duration_ms: durationMs,
+            tokens: tokensPrompt + tokensCompletion + tokensReasoning,
+            cost_usd: stepCost,
+            created: rec.getString("created")
+        });
     } catch (err) {
         return e.json(500, { error: "Failed to record trajectory step: " + err.message });
     }
 });
 
+// 2. POST /api/projectbase/sessions/trajectories
 routerAdd("POST", "/api/projectbase/sessions/trajectories", (e) => {
     try {
-        return handleRecordTrajectory(e, null);
+        const body = e.requestInfo().body || {};
+        const sessionId = (body.session_id || "").trim();
+
+        if (!sessionId) {
+            return e.json(400, { error: "session_id is required" });
+        }
+
+        let trajectoryCol = null;
+        try { trajectoryCol = e.app.findCollectionByNameOrId("session_trajectories"); } catch (x) {}
+        if (!trajectoryCol) return e.json(500, { error: "session_trajectories collection not found" });
+
+        let sessionRecord = null;
+        try {
+            sessionRecord = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: sessionId });
+        } catch (x) {}
+
+        let nextStepNumber = 1;
+        if (typeof body.step_number === "number") {
+            nextStepNumber = body.step_number;
+        } else {
+            try {
+                const lastSteps = e.app.findRecordsByFilter("session_trajectories", "session_id = {:sid}", "-step_number", 1, 0, { sid: sessionId });
+                if (lastSteps && lastSteps.length > 0) {
+                    nextStepNumber = (lastSteps[0].getInt("step_number") || 0) + 1;
+                }
+            } catch (x) {}
+        }
+
+        const stepType = body.step_type || "thought";
+        const toolName = body.tool_name || "";
+        const durationMs = typeof body.duration_ms === "number" ? body.duration_ms : 0;
+        const tokensPrompt = typeof body.tokens_prompt === "number" ? body.tokens_prompt : 0;
+        const tokensCompletion = typeof body.tokens_completion === "number" ? body.tokens_completion : 0;
+        const tokensReasoning = typeof body.tokens_reasoning === "number" ? body.tokens_reasoning : 0;
+        const stepCost = typeof body.cost_usd === "number" ? body.cost_usd : 0.0;
+        const stepStatus = body.status || "success";
+
+        const rec = new Record(trajectoryCol);
+        rec.set("session_id", sessionId);
+        if (sessionRecord) rec.set("session", sessionRecord.getString("id"));
+        rec.set("step_number", nextStepNumber);
+        rec.set("step_type", stepType);
+        rec.set("tool_name", toolName);
+        rec.set("tool_input", body.tool_input || {});
+        rec.set("tool_output", body.tool_output || {});
+        rec.set("thought_text", body.thought_text || "");
+        rec.set("duration_ms", durationMs);
+        rec.set("tokens_prompt", tokensPrompt);
+        rec.set("tokens_completion", tokensCompletion);
+        rec.set("tokens_reasoning", tokensReasoning);
+        rec.set("cost_usd", stepCost);
+        rec.set("status", stepStatus);
+        rec.set("error_message", body.error_message || "");
+        rec.set("files_touched", body.files_touched || []);
+        rec.set("metadata", body.metadata || {});
+        e.app.save(rec);
+
+        if (sessionRecord) {
+            const curSteps = sessionRecord.getInt("total_steps") || 0;
+            const curTokens = sessionRecord.getInt("total_tokens") || 0;
+            const curCost = sessionRecord.getFloat("total_cost_usd") || 0.0;
+            const totalStepTokens = tokensPrompt + tokensCompletion + tokensReasoning;
+
+            sessionRecord.set("total_steps", curSteps + 1);
+            sessionRecord.set("total_tokens", curTokens + totalStepTokens);
+            sessionRecord.set("total_cost_usd", parseFloat((curCost + stepCost).toFixed(6)));
+            sessionRecord.set("current_step_type", stepType);
+            if (toolName) sessionRecord.set("active_tool", toolName);
+            if (body.thought_text && (!sessionRecord.getString("trajectory_summary") || curSteps % 5 === 0)) {
+                sessionRecord.set("trajectory_summary", (body.thought_text).substring(0, 240));
+            }
+            try { e.app.save(sessionRecord); } catch (x) {}
+        }
+
+        return e.json(201, {
+            success: true,
+            id: rec.getString("id"),
+            session_id: sessionId,
+            step_number: nextStepNumber,
+            step_type: stepType,
+            tool_name: toolName,
+            status: stepStatus,
+            duration_ms: durationMs,
+            tokens: tokensPrompt + tokensCompletion + tokensReasoning,
+            cost_usd: stepCost,
+            created: rec.getString("created")
+        });
     } catch (err) {
         return e.json(500, { error: "Failed to record trajectory step: " + err.message });
     }
 });
 
+// 3. POST /api/projectbase/sessions/trajectories/bulk
 routerAdd("POST", "/api/projectbase/sessions/trajectories/bulk", (e) => {
     try {
         const info = e.requestInfo();
@@ -127,97 +302,7 @@ routerAdd("POST", "/api/projectbase/sessions/trajectories/bulk", (e) => {
     }
 });
 
-function handleRecordTrajectory(e, idFromPath) {
-    const info = e.requestInfo();
-    const body = info.body || {};
-    const sessionId = (idFromPath || body.session_id || "").trim();
-
-    if (!sessionId) {
-        return e.json(400, { error: "session_id is required either in path or body" });
-    }
-
-    let trajectoryCol = null;
-    try { trajectoryCol = e.app.findCollectionByNameOrId("session_trajectories"); } catch (x) {}
-    if (!trajectoryCol) return e.json(500, { error: "session_trajectories collection not found" });
-
-    let sessionRecord = null;
-    try {
-        sessionRecord = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: sessionId });
-    } catch (x) {}
-
-    let nextStepNumber = 1;
-    if (typeof body.step_number === "number") {
-        nextStepNumber = body.step_number;
-    } else {
-        try {
-            const lastSteps = e.app.findRecordsByFilter("session_trajectories", "session_id = {:sid}", "-step_number", 1, 0, { sid: sessionId });
-            if (lastSteps && lastSteps.length > 0) {
-                nextStepNumber = (lastSteps[0].getInt("step_number") || 0) + 1;
-            }
-        } catch (x) {}
-    }
-
-    const stepType = body.step_type || "thought";
-    const toolName = body.tool_name || "";
-    const durationMs = typeof body.duration_ms === "number" ? body.duration_ms : 0;
-    const tokensPrompt = typeof body.tokens_prompt === "number" ? body.tokens_prompt : 0;
-    const tokensCompletion = typeof body.tokens_completion === "number" ? body.tokens_completion : 0;
-    const tokensReasoning = typeof body.tokens_reasoning === "number" ? body.tokens_reasoning : 0;
-    const stepCost = typeof body.cost_usd === "number" ? body.cost_usd : 0.0;
-    const stepStatus = body.status || "success";
-
-    const rec = new Record(trajectoryCol);
-    rec.set("session_id", sessionId);
-    if (sessionRecord) rec.set("session", sessionRecord.getString("id"));
-    rec.set("step_number", nextStepNumber);
-    rec.set("step_type", stepType);
-    rec.set("tool_name", toolName);
-    rec.set("tool_input", body.tool_input || {});
-    rec.set("tool_output", body.tool_output || {});
-    rec.set("thought_text", body.thought_text || "");
-    rec.set("duration_ms", durationMs);
-    rec.set("tokens_prompt", tokensPrompt);
-    rec.set("tokens_completion", tokensCompletion);
-    rec.set("tokens_reasoning", tokensReasoning);
-    rec.set("cost_usd", stepCost);
-    rec.set("status", stepStatus);
-    rec.set("error_message", body.error_message || "");
-    rec.set("files_touched", body.files_touched || []);
-    rec.set("metadata", body.metadata || {});
-    e.app.save(rec);
-
-    if (sessionRecord) {
-        const curSteps = sessionRecord.getInt("total_steps") || 0;
-        const curTokens = sessionRecord.getInt("total_tokens") || 0;
-        const curCost = sessionRecord.getFloat("total_cost_usd") || 0.0;
-        const totalStepTokens = tokensPrompt + tokensCompletion + tokensReasoning;
-
-        sessionRecord.set("total_steps", curSteps + 1);
-        sessionRecord.set("total_tokens", curTokens + totalStepTokens);
-        sessionRecord.set("total_cost_usd", parseFloat((curCost + stepCost).toFixed(6)));
-        sessionRecord.set("current_step_type", stepType);
-        if (toolName) sessionRecord.set("active_tool", toolName);
-        if (body.thought_text && (!sessionRecord.getString("trajectory_summary") || curSteps % 5 === 0)) {
-            sessionRecord.set("trajectory_summary", (body.thought_text).substring(0, 240));
-        }
-        try { e.app.save(sessionRecord); } catch (x) {}
-    }
-
-    return e.json(201, {
-        success: true,
-        id: rec.getString("id"),
-        session_id: sessionId,
-        step_number: nextStepNumber,
-        step_type: stepType,
-        tool_name: toolName,
-        status: stepStatus,
-        duration_ms: durationMs,
-        tokens: tokensPrompt + tokensCompletion + tokensReasoning,
-        cost_usd: stepCost,
-        created: rec.getString("created")
-    });
-}
-
+// 4. GET /api/projectbase/sessions/{id}/trajectories
 routerAdd("GET", "/api/projectbase/sessions/{id}/trajectories", (e) => {
     try {
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";
@@ -288,6 +373,7 @@ routerAdd("GET", "/api/projectbase/sessions/{id}/trajectories", (e) => {
     }
 });
 
+// 5. GET /api/projectbase/sessions/{id}/trajectories/summary
 routerAdd("GET", "/api/projectbase/sessions/{id}/trajectories/summary", (e) => {
     try {
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";
@@ -340,9 +426,20 @@ routerAdd("GET", "/api/projectbase/sessions/{id}/trajectories/summary", (e) => {
                 failureCount += 1;
             }
 
-            const touched = r.get("files_touched");
-            if (Array.isArray(touched)) {
-                touched.forEach(f => { if (f) filesSet.add(f); });
+            let touched = r.get("files_touched");
+            if (touched) {
+                if (typeof touched === "string") {
+                    try { touched = JSON.parse(touched); } catch (x) {}
+                } else if (Array.isArray(touched) && touched.length > 0 && typeof touched[0] === "number") {
+                    try {
+                        let s = "";
+                        for (let i = 0; i < touched.length; i++) { s += String.fromCharCode(touched[i]); }
+                        touched = JSON.parse(s);
+                    } catch (x) {}
+                }
+                if (Array.isArray(touched)) {
+                    touched.forEach(f => { if (f && typeof f === "string") filesSet.add(f); });
+                }
             }
         });
 
@@ -379,6 +476,7 @@ routerAdd("GET", "/api/projectbase/sessions/{id}/trajectories/summary", (e) => {
 
 // Swarm Clusters Orchestration Endpoints
 
+// 6. POST /api/projectbase/swarm/clusters
 routerAdd("POST", "/api/projectbase/swarm/clusters", (e) => {
     try {
         const info = e.requestInfo();
@@ -475,6 +573,7 @@ routerAdd("POST", "/api/projectbase/swarm/clusters", (e) => {
     }
 });
 
+// 7. GET /api/projectbase/swarm/clusters
 routerAdd("GET", "/api/projectbase/swarm/clusters", (e) => {
     try {
         const query = e.requestInfo().query || {};
@@ -497,7 +596,16 @@ routerAdd("GET", "/api/projectbase/swarm/clusters", (e) => {
         }
 
         const filter = conditions.join(" && ");
-        const records = e.app.findRecordsByFilter("swarm_clusters", filter, "-created", 100, 0, params);
+        let records = [];
+        try {
+            records = e.app.findRecordsByFilter("swarm_clusters", filter, "-created", 100, 0, params);
+        } catch (x) {
+            try {
+                records = e.app.findRecordsByFilter("swarm_clusters", filter, "", 100, 0, params);
+            } catch (y) {
+                records = [];
+            }
+        }
 
         const clusters = records.map(r => ({
             id: r.getString("id"),
@@ -527,6 +635,7 @@ routerAdd("GET", "/api/projectbase/swarm/clusters", (e) => {
     }
 });
 
+// 8. GET /api/projectbase/swarm/clusters/{id}
 routerAdd("GET", "/api/projectbase/swarm/clusters/{id}", (e) => {
     try {
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";
@@ -581,6 +690,7 @@ routerAdd("GET", "/api/projectbase/swarm/clusters/{id}", (e) => {
     }
 });
 
+// 9. POST /api/projectbase/swarm/clusters/{id}/workers
 routerAdd("POST", "/api/projectbase/swarm/clusters/{id}/workers", (e) => {
     try {
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";
@@ -653,6 +763,7 @@ routerAdd("POST", "/api/projectbase/swarm/clusters/{id}/workers", (e) => {
     }
 });
 
+// 10. POST /api/projectbase/swarm/clusters/{id}/status
 routerAdd("POST", "/api/projectbase/swarm/clusters/{id}/status", (e) => {
     try {
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";
@@ -705,6 +816,7 @@ routerAdd("POST", "/api/projectbase/swarm/clusters/{id}/status", (e) => {
     }
 });
 
+// 11. GET /api/projectbase/swarm/clusters/{id}/metrics
 routerAdd("GET", "/api/projectbase/swarm/clusters/{id}/metrics", (e) => {
     try {
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";

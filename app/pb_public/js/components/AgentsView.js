@@ -250,7 +250,27 @@ const AgentsViewComponent = {
       allSessionConflicts: [],
       isLoadingDag: false,
       swarmModalOpen: false,
-      isDispatchingSwarm: false
+      isDispatchingSwarm: false,
+      // Step Trajectories & Autonomous Swarm Clusters (Milestone 5 / Epic 26)
+      sessionTrajectoriesList: [],
+      sessionTrajectorySummary: null,
+      isLoadingTrajectories: false,
+      selectedTrajectoryStep: null,
+      trajectoryStepTypeFilter: '',
+      swarmClustersList: [],
+      selectedSwarmCluster: null,
+      isLoadingSwarmClusters: false,
+      clusterModalOpen: false,
+      clusterNameInput: '',
+      clusterObjectiveInput: '',
+      clusterTopologyInput: 'hierarchical',
+      clusterConcurrencyInput: 4,
+      clusterWorkerRoleInput: 'implementer',
+      clusterWorkerPromptInput: '',
+      clusterWorkerModelInput: 'gpt-5.5',
+      isCreatingCluster: false,
+      clusterSuccessMsg: null,
+      clusterErrorMsg: null
     };
   },
   computed: {
@@ -1618,7 +1638,8 @@ const AgentsViewComponent = {
         await Promise.all([
           this.loadSessionObservability(sid),
           this.loadSessionDag(sid),
-          this.loadSessionInterventions(sid)
+          this.loadSessionInterventions(sid),
+          this.loadSessionTrajectories(sid)
         ]);
       }
     },
@@ -1820,6 +1841,124 @@ const AgentsViewComponent = {
       } catch (e) {
         console.error('Clipboard copy failed:', e);
       }
+    },
+    async loadSessionTrajectories(id) {
+      if (!id) return;
+      this.isLoadingTrajectories = true;
+      try {
+        const [trajRes, summaryRes] = await Promise.all([
+          API.getSessionTrajectories(id, { limit: 100 }).catch(() => null),
+          API.getSessionTrajectorySummary(id).catch(() => null)
+        ]);
+        this.sessionTrajectoriesList = (trajRes && trajRes.trajectories) || [];
+        this.sessionTrajectorySummary = summaryRes;
+        if (this.sessionTrajectoriesList.length > 0 && !this.selectedTrajectoryStep) {
+          this.selectedTrajectoryStep = this.sessionTrajectoriesList[0];
+        }
+      } catch (e) {
+        console.error('Failed to load session trajectories:', e);
+      } finally {
+        this.isLoadingTrajectories = false;
+      }
+    },
+    async loadSwarmClusters() {
+      this.isLoadingSwarmClusters = true;
+      try {
+        const res = await API.listSwarmClusters({ project: this.currentProject ? this.currentProject.id : '' });
+        this.swarmClustersList = (res && res.clusters) || [];
+        if (this.swarmClustersList.length > 0 && !this.selectedSwarmCluster) {
+          await this.selectSwarmCluster(this.swarmClustersList[0].cluster_id || this.swarmClustersList[0].id);
+        }
+      } catch (e) {
+        console.error('Failed to load swarm clusters:', e);
+      } finally {
+        this.isLoadingSwarmClusters = false;
+      }
+    },
+    async selectSwarmCluster(clusterId) {
+      if (!clusterId) return;
+      try {
+        const [details, metrics] = await Promise.all([
+          API.getSwarmCluster(clusterId).catch(() => null),
+          API.getSwarmClusterMetrics(clusterId).catch(() => null)
+        ]);
+        this.selectedSwarmCluster = details ? { ...details, metrics } : null;
+      } catch (e) {
+        console.error('Failed to select swarm cluster:', e);
+      }
+    },
+    openClusterModal() {
+      this.clusterNameInput = 'Swarm-' + Math.random().toString(36).substring(2, 7);
+      this.clusterObjectiveInput = '';
+      this.clusterTopologyInput = 'hierarchical';
+      this.clusterConcurrencyInput = 4;
+      this.clusterModalOpen = true;
+    },
+    async handleCreateSwarmCluster() {
+      if (!this.clusterObjectiveInput.trim()) return;
+      this.isCreatingCluster = true;
+      try {
+        const res = await API.createSwarmCluster({
+          name: this.clusterNameInput.trim() || undefined,
+          objective: this.clusterObjectiveInput.trim(),
+          topology: this.clusterTopologyInput,
+          max_concurrency: parseInt(this.clusterConcurrencyInput || 4, 10),
+          project_id: this.currentProject ? this.currentProject.id : undefined,
+          workers: [
+            { role: 'researcher', model: 'rc/perplexity-sonar-reasoning-pro', prompt: 'Scout market & requirements' },
+            { role: 'implementer', model: 'claude-fable-5', prompt: 'Execute architecture code' },
+            { role: 'auditor', model: 'deepseek/deepseek-r1-distill-llama-70b', prompt: 'Audit tests and ground truth' }
+          ]
+        });
+        this.clusterSuccessMsg = 'Swarm cluster deployed: ' + res.cluster_id;
+        this.clusterModalOpen = false;
+        await this.loadSwarmClusters();
+        if (res.cluster_id) await this.selectSwarmCluster(res.cluster_id);
+      } catch (e) {
+        this.clusterErrorMsg = 'Failed to create cluster: ' + (e.message || String(e));
+      } finally {
+        this.isCreatingCluster = false;
+      }
+    },
+    async handleUpdateClusterStatus(clusterId, status) {
+      if (!clusterId) return;
+      try {
+        await API.updateSwarmClusterStatus(clusterId, { status });
+        this.clusterSuccessMsg = `Cluster status updated to ${status}`;
+        await this.loadSwarmClusters();
+        await this.selectSwarmCluster(clusterId);
+      } catch (e) {
+        this.clusterErrorMsg = 'Status update failed: ' + (e.message || String(e));
+      }
+    },
+    async handleAddClusterWorker(clusterId) {
+      if (!clusterId) return;
+      try {
+        const role = this.clusterWorkerRoleInput || 'implementer';
+        await API.addSwarmClusterWorkers(clusterId, {
+          workers: [{
+            role: role,
+            model: this.clusterWorkerModelInput || 'gpt-5.5',
+            prompt: this.clusterWorkerPromptInput || undefined
+          }]
+        });
+        this.clusterSuccessMsg = `Worker (${role}) added to cluster`;
+        this.clusterWorkerPromptInput = '';
+        await this.selectSwarmCluster(clusterId);
+        await this.loadSwarmClusters();
+      } catch (e) {
+        this.clusterErrorMsg = 'Failed to add worker: ' + (e.message || String(e));
+      }
+    },
+    isGovernanceTab(tab) {
+      return ['workload', 'anomalies', 'semantic', 'auto_heal', 'sso_rbac', 'automations', 'tenants', 'webhooks', 'observability', 'consensus', 'cluster', 'federation', 'throughput', 'swarm'].includes(tab);
+    },
+    onGovernanceTabSelect(tab) {
+      if (!tab) return;
+      this.activeTab = tab;
+      if (tab === 'swarm') {
+        this.loadSwarmClusters();
+      }
     }
   },
   template: `
@@ -1983,6 +2122,7 @@ const AgentsViewComponent = {
                     <option value="cluster">🌐 Cluster & Edge Sync</option>
                     <option value="throughput">📊 MTTC Analytics</option>
                     <option value="observability">📚 SDK & Observability</option>
+                    <option value="swarm">🐝 Swarm Clusters & Topologies</option>
                     <option value="federation">🌐 Multi-Cluster Federation</option>
                   </select>
                 </div>
@@ -5054,6 +5194,363 @@ const AgentsViewComponent = {
         </div>
 
         <!-- ========================================================= -->
+        <!-- PANE 2L: AUTONOMOUS SWARM CHOREOGRAPHY & CLUSTERS (EPIC 26)-->
+        <!-- ========================================================= -->
+        <div
+          v-else-if="activeTab === 'swarm'"
+          class="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/30"
+        >
+          <!-- Header Banner -->
+          <div class="p-4 rounded-xl bg-gradient-to-r from-amber-950/40 via-indigo-950/30 to-zinc-900 border border-amber-600/30 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-lg">🐝</span>
+                <h3 class="text-sm font-bold text-white tracking-wide">Autonomous Swarm Choreography & Cluster Hub</h3>
+                <span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">SWARM DAG</span>
+              </div>
+              <p class="text-xs text-zinc-300 mt-1">
+                Multi-agent swarm coordination across Hierarchical, Flat Fanout, Pipeline, and Adversarial Critique topologies with live worker telemetry.
+              </p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button
+                @click="loadSwarmClusters()"
+                class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-bold transition-colors flex items-center gap-1.5"
+              >
+                <span>🔄</span>
+                <span>Refresh Clusters</span>
+              </button>
+              <button
+                @click="openClusterModal()"
+                class="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
+              >
+                <span>✨</span>
+                <span>Deploy Swarm Cluster</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Alert Messages -->
+          <div v-if="clusterSuccessMsg" class="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-mono">
+            {{ clusterSuccessMsg }}
+          </div>
+          <div v-if="clusterErrorMsg" class="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs font-mono">
+            {{ clusterErrorMsg }}
+          </div>
+
+          <!-- Swarm Cluster KPI Row -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Active Clusters</div>
+              <div class="text-xl font-bold font-mono text-zinc-900 dark:text-zinc-100 mt-1">
+                {{ swarmClustersList.filter(c => c.status === 'running').length }}/{{ swarmClustersList.length }}
+              </div>
+            </div>
+            <div class="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Live Swarm Workers</div>
+              <div class="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1">
+                {{ swarmClustersList.reduce((acc, c) => acc + (c.total_workers || 0), 0) }}
+              </div>
+            </div>
+            <div class="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Total Swarm Steps</div>
+              <div class="text-xl font-bold font-mono text-indigo-600 dark:text-indigo-400 mt-1">
+                {{ swarmClustersList.reduce((acc, c) => acc + (c.total_steps || 0), 0) }}
+              </div>
+            </div>
+            <div class="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Swarm Spend USD</div>
+              <div class="text-xl font-bold font-mono text-amber-600 dark:text-amber-400 mt-1">
+                $ {{ swarmClustersList.reduce((acc, c) => acc + (c.total_cost_usd || 0), 0).toFixed(4) }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Main 2-Column Dashboard -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <!-- Left: Clusters List -->
+            <div class="lg:col-span-5 space-y-3">
+              <div class="flex items-center justify-between">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">Deployed Clusters</h4>
+                <span class="text-[10px] text-zinc-400 font-mono">{{ swarmClustersList.length }} total</span>
+              </div>
+
+              <div v-if="isLoadingSwarmClusters" class="py-12 text-center text-xs text-zinc-400">Loading swarm clusters...</div>
+              <div v-else-if="swarmClustersList.length === 0" class="p-8 text-center text-xs text-zinc-400 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                No active swarm clusters deployed. Click "Deploy Swarm Cluster" above to launch a multi-agent cluster.
+              </div>
+              <div v-else class="space-y-2.5 max-h-[600px] overflow-y-auto pr-1">
+                <div
+                  v-for="c in swarmClustersList"
+                  :key="c.cluster_id || c.id"
+                  @click="selectSwarmCluster(c.cluster_id || c.id)"
+                  class="p-3.5 rounded-xl border transition-all cursor-pointer space-y-2"
+                  :class="selectedSwarmCluster && (selectedSwarmCluster.cluster_id === c.cluster_id || selectedSwarmCluster.id === c.id) ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-400 dark:border-amber-700 shadow-sm' : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'"
+                >
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span class="text-sm">🐝</span>
+                      <span class="font-bold text-xs text-zinc-900 dark:text-zinc-100 truncate">{{ c.name }}</span>
+                    </div>
+                    <span
+                      class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                      :class="{
+                        'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300': c.status === 'running',
+                        'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300': c.status === 'paused',
+                        'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300': c.status === 'completed',
+                        'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300': c.status === 'failed' || c.status === 'aborted'
+                      }"
+                    >
+                      {{ c.status }}
+                    </span>
+                  </div>
+
+                  <div class="text-[11px] text-zinc-600 dark:text-zinc-400 line-clamp-2">
+                    {{ c.objective }}
+                  </div>
+
+                  <div class="flex items-center justify-between text-[10px] font-mono text-zinc-500 pt-1 border-t border-zinc-100 dark:border-zinc-800/80">
+                    <span class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 capitalize font-sans font-semibold">
+                      {{ c.topology }}
+                    </span>
+                    <span>{{ c.total_workers || 0 }} workers · max {{ c.max_concurrency || 4 }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Selected Swarm Cluster Inspector -->
+            <div class="lg:col-span-7 space-y-3">
+              <div v-if="!selectedSwarmCluster" class="p-12 text-center text-xs text-zinc-400 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                Select a swarm cluster from the left to inspect its active worker agents, execution DAG, and live metrics.
+              </div>
+              <div v-else class="space-y-3">
+                <!-- Cluster Detail Header Card -->
+                <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3 shadow-xs">
+                  <div class="flex items-center justify-between gap-2 flex-wrap">
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <h4 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">{{ selectedSwarmCluster.name }}</h4>
+                        <span class="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[10px] font-mono text-zinc-500">{{ selectedSwarmCluster.cluster_id }}</span>
+                      </div>
+                      <p class="text-xs text-zinc-500 mt-0.5">{{ selectedSwarmCluster.objective }}</p>
+                    </div>
+
+                    <!-- Cluster Control Actions -->
+                    <div class="flex items-center gap-1.5">
+                      <button
+                        v-if="selectedSwarmCluster.status === 'running'"
+                        @click="handleUpdateClusterStatus(selectedSwarmCluster.cluster_id, 'paused')"
+                        class="px-2.5 py-1 rounded bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 text-xs font-bold hover:bg-amber-200 transition-colors"
+                      >
+                        ⏸️ Pause
+                      </button>
+                      <button
+                        v-if="selectedSwarmCluster.status === 'paused'"
+                        @click="handleUpdateClusterStatus(selectedSwarmCluster.cluster_id, 'running')"
+                        class="px-2.5 py-1 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-xs font-bold hover:bg-emerald-200 transition-colors"
+                      >
+                        ▶️ Resume
+                      </button>
+                      <button
+                        v-if="selectedSwarmCluster.status !== 'completed'"
+                        @click="handleUpdateClusterStatus(selectedSwarmCluster.cluster_id, 'completed')"
+                        class="px-2.5 py-1 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-xs font-bold hover:bg-indigo-200 transition-colors"
+                      >
+                        ✓ Complete
+                      </button>
+                      <button
+                        v-if="selectedSwarmCluster.status !== 'aborted' && selectedSwarmCluster.status !== 'completed'"
+                        @click="handleUpdateClusterStatus(selectedSwarmCluster.cluster_id, 'aborted')"
+                        class="px-2.5 py-1 rounded bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 text-xs font-bold hover:bg-rose-200 transition-colors"
+                      >
+                        ⏹️ Abort
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Topology and Metrics Badges -->
+                  <div class="grid grid-cols-3 gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800 text-xs">
+                    <div class="p-2 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                      <div class="text-[9px] font-semibold text-zinc-400 uppercase">Topology</div>
+                      <div class="font-bold text-zinc-800 dark:text-zinc-200 capitalize mt-0.5">{{ selectedSwarmCluster.topology }}</div>
+                    </div>
+                    <div class="p-2 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                      <div class="text-[9px] font-semibold text-zinc-400 uppercase">Workers</div>
+                      <div class="font-bold text-zinc-800 dark:text-zinc-200 font-mono mt-0.5">{{ (selectedSwarmCluster.workers || []).length }} agents</div>
+                    </div>
+                    <div class="p-2 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                      <div class="text-[9px] font-semibold text-zinc-400 uppercase">Spend Rollup</div>
+                      <div class="font-bold text-amber-600 dark:text-amber-400 font-mono mt-0.5">$ {{ (selectedSwarmCluster.total_cost_usd || 0).toFixed(4) }}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Member Worker Agents Table -->
+                <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3 shadow-xs">
+                  <div class="flex items-center justify-between">
+                    <h5 class="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">Cluster Worker Agents</h5>
+                    <span class="text-[10px] text-zinc-400 font-mono">{{ (selectedSwarmCluster.workers || []).length }} live nodes</span>
+                  </div>
+
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr class="border-b border-zinc-200 dark:border-zinc-800 text-[10px] uppercase font-bold text-zinc-400">
+                          <th class="py-2 px-2">Agent Name</th>
+                          <th class="py-2 px-2">Swarm Role</th>
+                          <th class="py-2 px-2">Model</th>
+                          <th class="py-2 px-2">Status</th>
+                          <th class="py-2 px-2 text-right">Steps</th>
+                          <th class="py-2 px-2 text-right">Tokens</th>
+                          <th class="py-2 px-2 text-right">Spend</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                        <tr
+                          v-for="w in (selectedSwarmCluster.workers || [])"
+                          :key="w.session_id || w.id"
+                          class="hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+                        >
+                          <td class="py-2 px-2 font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                            <span>🤖</span>
+                            <span>{{ w.agent_name }}</span>
+                          </td>
+                          <td class="py-2 px-2">
+                            <span class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[10px] font-mono font-semibold capitalize">
+                              {{ w.swarm_role || w.role || 'worker' }}
+                            </span>
+                          </td>
+                          <td class="py-2 px-2 font-mono text-[10px] text-zinc-500">{{ w.model || 'gpt-5.5' }}</td>
+                          <td class="py-2 px-2">
+                            <span
+                              class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
+                              :class="w.status === 'running' || w.is_active ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'"
+                            >
+                              {{ w.status || 'idle' }}
+                            </span>
+                          </td>
+                          <td class="py-2 px-2 text-right font-mono font-bold">{{ w.total_steps || 0 }}</td>
+                          <td class="py-2 px-2 text-right font-mono text-zinc-500">{{ w.total_tokens || 0 }}</td>
+                          <td class="py-2 px-2 text-right font-mono text-amber-600 dark:text-amber-400">$ {{ (w.total_cost_usd || 0).toFixed(4) }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <!-- Quick Add Worker Form -->
+                  <div class="pt-3 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
+                    <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Add Worker Node to Swarm</div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <select
+                        v-model="clusterWorkerRoleInput"
+                        class="px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-indigo-500"
+                      >
+                        <option value="researcher">Researcher</option>
+                        <option value="implementer">Implementer</option>
+                        <option value="auditor">Auditor</option>
+                        <option value="tester">Tester</option>
+                        <option value="reviewer">Reviewer</option>
+                        <option value="arbiter">Arbiter</option>
+                      </select>
+                      <input
+                        v-model="clusterWorkerPromptInput"
+                        class="flex-1 min-w-[200px] px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-indigo-500"
+                        placeholder="Task instructions for new worker..."
+                      />
+                      <button
+                        @click="handleAddClusterWorker(selectedSwarmCluster.cluster_id)"
+                        class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-colors shadow-xs shrink-0"
+                      >
+                        + Spawn Worker
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Deploy Swarm Cluster Modal -->
+          <div v-if="clusterModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="w-full max-w-lg rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-2xl space-y-4">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🐝</span>
+                  <div>
+                    <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Deploy Autonomous Swarm Cluster</h3>
+                    <p class="text-[11px] text-zinc-500">Launch a multi-agent choreography cluster with automated role dispatch</p>
+                  </div>
+                </div>
+                <button @click="clusterModalOpen = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3 text-xs">
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Cluster Name</label>
+                  <input
+                    v-model="clusterNameInput"
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-indigo-500"
+                    placeholder="e.g. Feature Delivery Swarm"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Mission Objective</label>
+                  <textarea
+                    v-model="clusterObjectiveInput"
+                    rows="3"
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-indigo-500"
+                    placeholder="High-level goal for swarm cluster (e.g. Build, test, and verify step trajectory stream)..."
+                  ></textarea>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Swarm Topology</label>
+                    <select
+                      v-model="clusterTopologyInput"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="hierarchical">Hierarchical (Coordinator + Workers)</option>
+                      <option value="flat_fanout">Flat Fan-Out (Parallel Scouts)</option>
+                      <option value="pipeline_linear">Linear Pipeline (Sequential Stages)</option>
+                      <option value="adversarial_critique">Adversarial Critique (ProBuilder vs Sceptic)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Max Concurrency</label>
+                    <input
+                      type="number"
+                      v-model.number="clusterConcurrencyInput"
+                      min="1"
+                      max="16"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-indigo-500 font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  @click="clusterModalOpen = false"
+                  class="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 text-zinc-700 dark:text-zinc-300 text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  @click="handleCreateSwarmCluster"
+                  :disabled="isCreatingCluster || !clusterObjectiveInput.trim()"
+                  class="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-bold transition-colors flex items-center gap-1 shadow-xs"
+                >
+                  <span>{{ isCreatingCluster ? 'Deploying...' : '🚀 Deploy Swarm' }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================================= -->
         <!-- PANE 2J: EXECUTION PLANE & LIVE RUNS STREAM (EPIC 24)     -->
         <!-- ========================================================= -->
         <div
@@ -5365,6 +5862,15 @@ const AgentsViewComponent = {
                   >
                     <span>📊</span>
                     <span>Logs & Telemetry</span>
+                  </button>
+                  <button
+                    @click="sessionObservabilityTab = 'trajectory'"
+                    class="px-2.5 py-1 rounded font-medium text-[11px] transition-colors flex items-center gap-1 shrink-0"
+                    :class="sessionObservabilityTab === 'trajectory' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                  >
+                    <span>📈</span>
+                    <span>Trajectories</span>
+                    <span v-if="sessionTrajectoriesList && sessionTrajectoriesList.length" class="px-1 py-0.5 rounded bg-zinc-300 dark:bg-zinc-700 text-[9px] font-mono">{{ sessionTrajectoriesList.length }}</span>
                   </button>
                 </div>
 
@@ -5748,6 +6254,133 @@ const AgentsViewComponent = {
                       >
                         {{ f }}
                       </span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- TAB 5: LIVE STEP TRAJECTORY & TELEMETRY STREAM (EPIC 26) -->
+                <div v-if="sessionObservabilityTab === 'trajectory'" class="space-y-3 flex-1 flex flex-col min-h-0">
+                  <!-- KPI Summary Cards -->
+                  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    <div class="p-2 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                      <div class="text-[9px] font-semibold text-zinc-400 uppercase">Total Steps</div>
+                      <div class="text-sm font-bold text-zinc-900 dark:text-zinc-100 font-mono mt-0.5">
+                        {{ (sessionTrajectorySummary && sessionTrajectorySummary.total_steps) || (sessionTrajectoriesList && sessionTrajectoriesList.length) || selectedSessionRun.total_steps || 0 }}
+                      </div>
+                    </div>
+                    <div class="p-2 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                      <div class="text-[9px] font-semibold text-zinc-400 uppercase">Duration</div>
+                      <div class="text-sm font-bold text-indigo-600 dark:text-indigo-400 font-mono mt-0.5">
+                        {{ (sessionTrajectorySummary && sessionTrajectorySummary.total_duration_ms) || 0 }}ms
+                      </div>
+                    </div>
+                    <div class="p-2 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                      <div class="text-[9px] font-semibold text-zinc-400 uppercase">Tokens Consumed</div>
+                      <div class="text-sm font-bold text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">
+                        {{ (sessionTrajectorySummary && sessionTrajectorySummary.total_tokens) || selectedSessionRun.total_tokens || 0 }}
+                      </div>
+                    </div>
+                    <div class="p-2 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                      <div class="text-[9px] font-semibold text-zinc-400 uppercase">Spend USD</div>
+                      <div class="text-sm font-bold text-amber-600 dark:text-amber-400 font-mono mt-0.5">
+                        $ {{ ((sessionTrajectorySummary && sessionTrajectorySummary.total_cost_usd) || selectedSessionRun.total_cost_usd || 0).toFixed(4) }}
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Tool Latency Profiling Bar -->
+                  <div v-if="sessionTrajectorySummary && sessionTrajectorySummary.tool_profiling && sessionTrajectorySummary.tool_profiling.length" class="p-2 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs">
+                    <div class="text-[10px] font-semibold text-zinc-400 uppercase mb-1.5 flex items-center justify-between">
+                      <span>🛠️ Tool Execution Profiling</span>
+                      <span class="text-zinc-500 font-mono">{{ sessionTrajectorySummary.tool_profiling.length }} tools profiled</span>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                      <div
+                        v-for="tp in sessionTrajectorySummary.tool_profiling"
+                        :key="tp.tool_name"
+                        class="px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-[10px] flex items-center gap-1.5"
+                      >
+                        <span class="font-bold text-zinc-800 dark:text-zinc-200 font-mono">{{ tp.tool_name }}</span>
+                        <span class="px-1 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-mono">{{ tp.call_count }}x</span>
+                        <span class="text-zinc-400 font-mono">{{ tp.avg_duration_ms }}ms avg</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Step Trajectory Timeline Stream -->
+                  <div class="flex-1 flex flex-col min-h-0">
+                    <div class="flex items-center justify-between mb-1.5">
+                      <span class="text-[10px] font-semibold text-zinc-400 uppercase">Chronological Trajectory Stream</span>
+                      <button
+                        @click="loadSessionTrajectories(selectedSessionRun.id || selectedSessionRun.session_id)"
+                        class="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                      >
+                        <span>🔄</span>
+                        <span>Refresh Steps</span>
+                      </button>
+                    </div>
+
+                    <div v-if="isLoadingTrajectories" class="py-8 text-center text-xs text-zinc-400">Loading trajectory telemetry stream...</div>
+                    <div v-else-if="!sessionTrajectoriesList || sessionTrajectoriesList.length === 0" class="py-8 text-center text-xs text-zinc-400 bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                      No discrete trajectory steps recorded yet for this session run.
+                    </div>
+                    <div v-else class="flex-1 overflow-y-auto space-y-2 max-h-[360px] pr-1">
+                      <div
+                        v-for="step in sessionTrajectoriesList"
+                        :key="step.id || step.step_number"
+                        class="p-2.5 rounded-lg border transition-all bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-xs space-y-1.5"
+                      >
+                        <div class="flex items-center justify-between gap-2">
+                          <div class="flex items-center gap-1.5">
+                            <span class="px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-mono font-bold text-[10px]">
+                              #{{ step.step_number }}
+                            </span>
+                            <span
+                              class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                              :class="{
+                                'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300': step.step_type === 'thought',
+                                'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300': step.step_type === 'tool_call',
+                                'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300': step.step_type === 'tool_result' || step.step_type === 'checkpoint',
+                                'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300': step.step_type === 'error' || step.status === 'failed',
+                                'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300': step.step_type === 'user_intervention' || step.step_type === 'gate_event'
+                              }"
+                            >
+                              {{ step.step_type }}
+                            </span>
+                            <span v-if="step.tool_name" class="font-mono font-bold text-zinc-800 dark:text-zinc-200 text-[11px]">
+                              {{ step.tool_name }}()
+                            </span>
+                          </div>
+
+                          <div class="flex items-center gap-2 text-[10px] font-mono text-zinc-400">
+                            <span v-if="step.duration_ms">{{ step.duration_ms }}ms</span>
+                            <span v-if="step.tokens_total" class="text-zinc-500">{{ step.tokens_total }} tok</span>
+                            <span v-if="step.cost_usd" class="text-amber-500 font-semibold">$ {{ step.cost_usd.toFixed(4) }}</span>
+                          </div>
+                        </div>
+
+                        <!-- Thought Text -->
+                        <div v-if="step.thought_text" class="text-zinc-800 dark:text-zinc-200 text-[11px] leading-relaxed bg-zinc-50/80 dark:bg-zinc-900/60 p-2 rounded border border-zinc-100 dark:border-zinc-800/60 font-sans">
+                          {{ step.thought_text }}
+                        </div>
+
+                        <!-- Tool Input -->
+                        <div v-if="step.tool_input && Object.keys(step.tool_input).length" class="space-y-0.5">
+                          <div class="text-[9px] font-semibold text-zinc-400 uppercase">Input Payload</div>
+                          <pre class="p-1.5 rounded bg-zinc-900 text-zinc-300 text-[10px] font-mono overflow-x-auto whitespace-pre-wrap select-text">{{ typeof step.tool_input === 'string' ? step.tool_input : JSON.stringify(step.tool_input, null, 2) }}</pre>
+                        </div>
+
+                        <!-- Tool Output -->
+                        <div v-if="step.tool_output && Object.keys(step.tool_output).length" class="space-y-0.5">
+                          <div class="text-[9px] font-semibold text-zinc-400 uppercase">Output Result</div>
+                          <pre class="p-1.5 rounded bg-zinc-900 text-zinc-300 text-[10px] font-mono overflow-x-auto whitespace-pre-wrap max-h-32 select-text">{{ typeof step.tool_output === 'string' ? step.tool_output : JSON.stringify(step.tool_output, null, 2) }}</pre>
+                        </div>
+
+                        <!-- Error Message -->
+                        <div v-if="step.error_message" class="p-2 rounded bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-[11px] font-mono">
+                          🚨 {{ step.error_message }}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

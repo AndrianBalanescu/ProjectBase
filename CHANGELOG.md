@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.25.0] - 2026-08-28 - Cycle 28
+### Added
+- **Live Step-by-Step Trajectory Stream, Tool Execution Telemetry & Autonomous Swarm Choreography Hub (Milestone 5 / Epic 26):**
+  - Schema migration (`1710000038_add_session_trajectories_and_swarm.js`) extending `agent_sessions` with `total_steps`, `total_tokens`, `total_cost_usd`, `current_step_type`, `active_tool`, `swarm_role`, `swarm_parent_id`, `swarm_cluster_id`, and `trajectory_summary`, plus new `session_trajectories` and `swarm_clusters` collections.
+  - Backend engine hook (`app/pb_hooks/110_session_trajectories_swarm_engine.pb.js`) with 11 endpoints for step timeline recording (`POST /api/projectbase/sessions/{id}/trajectories`), bulk ingestion (`POST /trajectories/bulk`), chronological step retrieval with filtering (`GET /trajectories`), deep trajectory profiling & tool latency summaries (`GET /trajectories/summary`), swarm cluster initialization (`POST /api/projectbase/swarm/clusters`), cluster queries (`GET /clusters` and `GET /clusters/{id}`), dynamic worker additions (`POST /clusters/{id}/workers`), cascading lifecycle state transitions (`POST /clusters/{id}/status`), and swarm execution metrics aggregation (`GET /clusters/{id}/metrics`).
+  - 8 FastMCP JSON-RPC 2.0 tools: `record_session_trajectory_step`, `get_session_trajectories`, `get_session_trajectory_summary`, `create_swarm_cluster`, `list_swarm_clusters`, `get_swarm_cluster_details`, `add_swarm_cluster_workers`, `update_swarm_cluster_status`.
+  - Frontend AgentsView with 📈 **Live Step Trajectory Stream** showing chronological reasoning steps, expandable tool input/output inspectors, latency ms meters, token spend breakdowns (prompt, completion, reasoning), USD cost counters, and dedicated 🐝 **Autonomous Swarm Choreography & Cluster Hub** dashboard with topology selectors (Hierarchical, Flat Fanout, Pipeline, Adversarial Critique), live worker node pools, and cluster lifecycle control buttons.
+  - Complete automated test suite in `tests/test_session_trajectory_and_swarm.py` bringing total verified tests to 423 across 31 test suites with 100% frontend guard and headless browser E2E verification.
+
 ## [1.24.0] - 2026-08-28 - Cycle 27
 ### Added
 - **One-Click Session Branching, Re-Tasking & Human Intervention Gate (Milestone 4 / Epic 25):**

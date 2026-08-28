@@ -24,6 +24,7 @@ migrate((app) => {
     const json = (name) => new JSONField({ name })
     const select = (name, values) => new SelectField({ name, values })
     const relation = (name, collectionId, options = {}) => new RelationField({ name, collectionId, ...options })
+    const auto = (name, onCreate, onUpdate) => new AutodateField({ name, onCreate, onUpdate })
 
     const hasField = (col, name) => {
         try {
@@ -113,7 +114,9 @@ migrate((app) => {
         select("status", ["in_progress", "success", "failed", "cancelled"]),
         text("error_message"),
         json("files_touched"),
-        json("metadata")
+        json("metadata"),
+        auto("created", true, false),
+        auto("updated", true, true)
     ])
 
     // 3. Create swarm_clusters collection
@@ -130,7 +133,9 @@ migrate((app) => {
         number("total_steps"),
         number("total_tokens"),
         number("total_cost_usd"),
-        json("metadata")
+        json("metadata"),
+        auto("created", true, false),
+        auto("updated", true, true)
     ])
 }, (app) => {
     // Rollback hook

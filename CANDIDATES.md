@@ -216,3 +216,13 @@
 - [x] 8 FastMCP JSON-RPC 2.0 tools for session branching, steering injection, gate management, and conflict arbitration
 - [x] Frontend AgentsView **🌿 DAG Lineage** tree visualizer, **💬 Interventions & Control** console with live steering prompt injection, pause/resume controls, 1-click Human Gate approval buttons, and **🔀 1-Click Branch Modal**
 - [x] 418/418 automated tests passing across 30 test suites with 100% frontend guard, CSS sync, and full headless browser E2E verification
+
+---
+
+## Milestone (Cycle 28)
+**Epic 26 – Live Step-by-Step Trajectory Stream, Tool Execution Telemetry & Autonomous Swarm Choreography Hub (✅ Done)**
+- [x] Schema migration (`1710000038_add_session_trajectories_and_swarm.js`) adding discrete trajectory tracking, tool execution profiling, `session_trajectories` and `swarm_clusters` collections
+- [x] Backend trajectory and swarm choreography hook (`app/pb_hooks/110_session_trajectories_swarm_engine.pb.js`) with 11 endpoints for step timeline recording, bulk ingestion, tool profiling summaries, multi-agent swarm cluster initialization, and cascading lifecycle management
+- [x] 8 FastMCP JSON-RPC 2.0 tools (`record_session_trajectory_step`, `get_session_trajectories`, `get_session_trajectory_summary`, `create_swarm_cluster`, `list_swarm_clusters`, `get_swarm_cluster_details`, `add_swarm_cluster_workers`, `update_swarm_cluster_status`)
+- [x] Frontend AgentsView **📈 Live Step Trajectory Stream** with real-time tool latency profiling, token consumption meters, cost tracking, input/output inspection, and dedicated **🐝 Autonomous Swarm Choreography & Cluster Hub** dashboard
+- [x] 423/423 automated tests passing across 31 test suites with 100% frontend guard, CSS sync, and zero console error headless browser E2E verification
