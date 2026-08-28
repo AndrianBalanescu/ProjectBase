@@ -3604,6 +3604,320 @@
           "200": { "description": "Consensus analytics metrics" }
         }
       }
+    },
+    "/projectbase/sso/providers": {
+      "get": {
+        "tags": ["SSO & Identity Federation"],
+        "summary": "List SSO Identity Providers",
+        "description": "List configured enterprise SSO providers (Google, GitHub Enterprise, Okta, Keycloak).",
+        "responses": {
+          "200": { "description": "List of SSO identity providers" }
+        }
+      },
+      "post": {
+        "tags": ["SSO & Identity Federation"],
+        "summary": "Register or Update SSO Provider",
+        "description": "Register or configure enterprise SSO provider metadata, client credentials, and default role.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "provider_key": { "type": "string" },
+                  "name": { "type": "string" },
+                  "provider_type": { "type": "string" }
+                },
+                "required": ["provider_key", "name"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "SSO provider configured" }
+        }
+      }
+    },
+    "/projectbase/sso/providers/{id}": {
+      "delete": {
+        "tags": ["SSO & Identity Federation"],
+        "summary": "Delete SSO Provider",
+        "description": "Delete an enterprise SSO provider configuration.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "SSO provider deleted" }
+        }
+      }
+    },
+    "/projectbase/sso/providers/{id}/discovery": {
+      "get": {
+        "tags": ["SSO & Identity Federation"],
+        "summary": "Get SSO Provider OIDC Discovery",
+        "description": "Retrieve OIDC .well-known/openid-configuration metadata for an identity provider.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "OIDC discovery document" }
+        }
+      }
+    },
+    "/projectbase/sso/auth/exchange": {
+      "post": {
+        "tags": ["SSO & Identity Federation"],
+        "summary": "Exchange SSO Auth Token & JIT Provision",
+        "description": "Exchange authorization token or code, verify provider identity, and perform Just-In-Time (JIT) user account creation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "provider_key": { "type": "string" },
+                  "code": { "type": "string" },
+                  "email": { "type": "string" },
+                  "name": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Authentication result and session token" }
+        }
+      }
+    },
+    "/projectbase/rbac/roles": {
+      "get": {
+        "tags": ["Granular Workspace RBAC"],
+        "summary": "List RBAC Roles",
+        "description": "List all workspace system roles (owner, admin, maintainer, member, agent, viewer, auditor) and custom roles.",
+        "responses": {
+          "200": { "description": "List of RBAC roles" }
+        }
+      },
+      "post": {
+        "tags": ["Granular Workspace RBAC"],
+        "summary": "Create or Update Custom RBAC Role",
+        "description": "Create a custom RBAC role with fine-grained capabilities mapping.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role_key": { "type": "string" },
+                  "name": { "type": "string" },
+                  "description": { "type": "string" },
+                  "capabilities": { "type": "array", "items": { "type": "string" } }
+                },
+                "required": ["role_key", "name"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Custom role created or updated" }
+        }
+      }
+    },
+    "/projectbase/rbac/roles/{id}": {
+      "delete": {
+        "tags": ["Granular Workspace RBAC"],
+        "summary": "Delete Custom RBAC Role",
+        "description": "Delete a custom RBAC role (protected system roles cannot be deleted).",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Custom role deleted" }
+        }
+      }
+    },
+    "/projectbase/rbac/matrix": {
+      "get": {
+        "tags": ["Granular Workspace RBAC"],
+        "summary": "Get 2D RBAC Permissions Matrix",
+        "description": "Retrieve full 2D matrix of roles vs fine-grained capabilities.",
+        "responses": {
+          "200": { "description": "2D permissions matrix" }
+        }
+      }
+    },
+    "/projectbase/rbac/check": {
+      "post": {
+        "tags": ["Granular Workspace RBAC"],
+        "summary": "Check Actor RBAC Permission",
+        "description": "Evaluate fine-grained capability check for user or agent against requested permission.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "actor_id": { "type": "string" },
+                  "capability": { "type": "string" },
+                  "project_id": { "type": "string" }
+                },
+                "required": ["actor_id", "capability"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Permission evaluation result (allowed: true/false)" }
+        }
+      }
+    },
+    "/projectbase/rbac/assignments": {
+      "get": {
+        "tags": ["Granular Workspace RBAC"],
+        "summary": "List User & Agent Role Assignments",
+        "description": "Query workspace and per-project role assignments.",
+        "responses": {
+          "200": { "description": "List of role assignments" }
+        }
+      }
+    },
+    "/projectbase/rbac/assign": {
+      "post": {
+        "tags": ["Granular Workspace RBAC"],
+        "summary": "Assign Role to User or Agent",
+        "description": "Assign or update RBAC role for user or agent in workspace or project.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": { "type": "string" },
+                  "role_key": { "type": "string" },
+                  "project_id": { "type": "string" }
+                },
+                "required": ["user_id", "role_key"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Role assigned" }
+        }
+      }
+    },
+    "/projectbase/rbac/assignments/{id}": {
+      "delete": {
+        "tags": ["Granular Workspace RBAC"],
+        "summary": "Revoke Role Assignment",
+        "description": "Revoke a user or agent role assignment.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Role assignment revoked" }
+        }
+      }
+    },
+    "/projectbase/rbac/tokens/create": {
+      "post": {
+        "tags": ["Granular Workspace RBAC"],
+        "summary": "Generate Scoped API Token",
+        "description": "Generate a scoped API token with specific capability constraints and TTL.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "user_or_agent_id": { "type": "string" },
+                  "scopes": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Scoped API token generated" }
+        }
+      }
+    },
+    "/projectbase/rbac/tokens": {
+      "get": {
+        "tags": ["Granular Workspace RBAC"],
+        "summary": "List Scoped API Tokens",
+        "description": "List active scoped API tokens.",
+        "responses": {
+          "200": { "description": "List of active tokens" }
+        }
+      }
+    },
+    "/projectbase/rbac/tokens/revoke": {
+      "post": {
+        "tags": ["Granular Workspace RBAC"],
+        "summary": "Revoke Scoped API Token",
+        "description": "Revoke an active scoped API token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token_id": { "type": "string" }
+                },
+                "required": ["token_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Token revoked" }
+        }
+      }
+    },
+    "/projectbase/rbac/audit-logs": {
+      "get": {
+        "tags": ["Granular Workspace RBAC"],
+        "summary": "Query Security Audit Logs",
+        "description": "Query immutable security and access event audit trail.",
+        "parameters": [
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer" } },
+          { "name": "event_type", "in": "query", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Security audit logs" }
+        }
+      }
+    },
+    "/projectbase/rbac/audit-logs/export": {
+      "post": {
+        "tags": ["Granular Workspace RBAC"],
+        "summary": "Export Security Audit Logs",
+        "description": "Export security audit log events in JSON or CSV format.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "format": { "type": "string", "enum": ["json", "csv"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Exported audit log data" }
+        }
+      }
     }
   }
 }

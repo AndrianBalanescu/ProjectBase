@@ -966,5 +966,187 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to fetch consensus metrics');
     return data;
+  },
+
+  async getSsoProviders() {
+    const res = await fetch('/api/projectbase/sso/providers', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch SSO providers');
+    return data;
+  },
+
+  async configureSsoProvider(payload) {
+    const res = await fetch('/api/projectbase/sso/providers', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to configure SSO provider');
+    return data;
+  },
+
+  async deleteSsoProvider(id) {
+    const res = await fetch(`/api/projectbase/sso/providers/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete SSO provider');
+    return data;
+  },
+
+  async getSsoDiscovery(id) {
+    const res = await fetch(`/api/projectbase/sso/providers/${encodeURIComponent(id)}/discovery`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch SSO discovery');
+    return data;
+  },
+
+  async exchangeSsoToken(payload) {
+    const res = await fetch('/api/projectbase/sso/auth/exchange', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to exchange SSO token');
+    return data;
+  },
+
+  async getRbacRoles() {
+    const res = await fetch('/api/projectbase/rbac/roles', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch RBAC roles');
+    return data;
+  },
+
+  async createRbacRole(payload) {
+    const res = await fetch('/api/projectbase/rbac/roles', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to save RBAC role');
+    return data;
+  },
+
+  async deleteRbacRole(id) {
+    const res = await fetch(`/api/projectbase/rbac/roles/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete RBAC role');
+    return data;
+  },
+
+  async getRbacMatrix() {
+    const res = await fetch('/api/projectbase/rbac/matrix', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch RBAC matrix');
+    return data;
+  },
+
+  async checkRbacPermission(payload) {
+    const res = await fetch('/api/projectbase/rbac/check', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to check RBAC permission');
+    return data;
+  },
+
+  async getRbacAssignments() {
+    const res = await fetch('/api/projectbase/rbac/assignments', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch RBAC assignments');
+    return data;
+  },
+
+  async assignRbacRole(payload) {
+    const res = await fetch('/api/projectbase/rbac/assign', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to assign RBAC role');
+    return data;
+  },
+
+  async revokeRbacAssignment(id) {
+    const res = await fetch(`/api/projectbase/rbac/assignments/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to revoke RBAC assignment');
+    return data;
+  },
+
+  async createScopedToken(payload) {
+    const res = await fetch('/api/projectbase/rbac/tokens/create', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create scoped token');
+    return data;
+  },
+
+  async getScopedTokens() {
+    const res = await fetch('/api/projectbase/rbac/tokens', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch scoped tokens');
+    return data;
+  },
+
+  async revokeScopedToken(id) {
+    const res = await fetch('/api/projectbase/rbac/tokens/revoke', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ token_id: id })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to revoke scoped token');
+    return data;
+  },
+
+  async getSecurityAuditLogs(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/rbac/audit-logs${query ? '?' + query : ''}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch security audit logs');
+    return data;
+  },
+
+  async exportSecurityAuditLogs(payload = {}) {
+    const res = await fetch('/api/projectbase/rbac/audit-logs/export', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to export audit logs');
+    return data;
   }
 };

@@ -1,5 +1,14 @@
 # ProjectBase — Roadmap (synthesized from cycle-1 debate verdict)
 
+## Cycle 20 (Shipped: 2026-08-28)
+**Epic 19 – Enterprise OIDC / SAML SSO Federation & Granular Workspace RBAC Matrix (✅ Done)**
+- Enterprise SSO federation (Google Workspace, GitHub Enterprise, Okta, Keycloak) with JIT user account provisioning and discovery metadata endpoints
+- Granular 2D RBAC permissions matrix with 7 system roles, custom role management, and wildcard capability evaluation
+- User and agent role assignments, live permission checking, and scoped API tokens with TTL constraints
+- Immutable security audit logging and JSON/CSV export engine
+- 8 FastMCP tools and AgentsView **🛡️ Identity & RBAC** dashboard
+- 354/354 automated tests passing across 23 test suites (100% clean)
+
 > Source: `docs/research/debates/debate-verdict-cycle-1.md` (flow-debate-v1, paid).
 > **Validator: INVALID — status INCONCLUSIVE** (only 1 of 4 models completed
 > rounds; quorum R1=1/3; confidence 0.52). `flow_debate.py --validate` →

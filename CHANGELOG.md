@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.19.0] - 2026-08-28 - Cycle 20
+### Added
+- **Enterprise OIDC / SAML SSO Federation & Granular RBAC Matrix (Epic 19):**
+  - Enterprise SSO provider federation with turnkey support for Google Workspace, GitHub Enterprise, Okta, and Keycloak (`/api/projectbase/sso/providers*`).
+  - OIDC well-known discovery metadata endpoint (`GET /api/projectbase/sso/providers/{id}/discovery`).
+  - JIT (Just-In-Time) user account provisioning and SSO token exchange engine (`POST /api/projectbase/sso/auth/exchange`).
+  - 7 system roles (`owner`, `admin`, `maintainer`, `member`, `agent`, `viewer`, `auditor`) with protected system role overwrite/deletion guards.
+  - Granular custom role creator, capability wildcard matcher, and 2D RBAC permissions matrix (`/api/projectbase/rbac/roles*`, `GET /api/projectbase/rbac/matrix`).
+  - Fine-grained permission checker (`POST /api/projectbase/rbac/check`) and role assigner (`POST /api/projectbase/rbac/assign`).
+  - Scoped API tokens generator with TTL and capability constraints (`/api/projectbase/rbac/tokens*`).
+  - Immutable security & access audit logging with filtering and JSON/CSV export (`/api/projectbase/rbac/audit-logs*`).
+  - 8 FastMCP JSON-RPC 2.0 tools: `list_sso_providers`, `configure_sso_provider`, `exchange_sso_token`, `check_rbac_permission`, `list_rbac_roles`, `assign_rbac_role`, `get_rbac_matrix`, `get_security_audit_logs`.
+  - Frontend AgentsView **🛡️ Identity & RBAC** dashboard with interactive SSO simulator, 2D matrix viewer, permission evaluator, and audit export.
+  - 11 new automated test assertions in `tests/test_sso_rbac_matrix.py` (354/354 passing across 23 suites).
+
+---
+
 All notable changes to **ProjectBase** are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),

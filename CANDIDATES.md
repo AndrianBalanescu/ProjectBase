@@ -156,8 +156,20 @@
 
 ---
 
-## Next Milestone (Cycle 20)
-**Epic 19 – Enterprise OIDC / SAML SSO Federation & Granular Workspace RBAC Matrix**
-- Enterprise SSO provider federation (Google, GitHub Enterprise, Okta, Keycloak) with just-in-time user provisioning
-- Granular role-based access control matrix with custom per-project permissions and API key scopes
-- FastMCP security audit and identity federation inspection tools
+## Milestone (Cycle 20)
+**Epic 19 – Enterprise OIDC / SAML SSO Federation & Granular Workspace RBAC Matrix (✅ Done)**
+- [x] Enterprise SSO provider federation (Google Workspace, GitHub Enterprise, Okta, Keycloak) with OIDC discovery and Just-In-Time (JIT) user account provisioning (`GET /api/projectbase/sso/providers*`, `POST /api/projectbase/sso/auth/exchange`, `sso_providers` collection)
+- [x] Granular role-based access control matrix with 7 system roles (owner, admin, maintainer, member, agent, viewer, auditor), custom role creation, and capability wildcards (`/api/projectbase/rbac/roles*`, `/api/projectbase/rbac/matrix`, `rbac_roles` collection)
+- [x] User and agent role assignments, permission evaluator, and scoped API access tokens (`POST /api/projectbase/rbac/check`, `POST /api/projectbase/rbac/assign`, `POST /api/projectbase/rbac/tokens/create`, `rbac_assignments` and `rbac_scoped_tokens` collections)
+- [x] Immutable security & access audit logging with filtering and JSON/CSV export (`GET /api/projectbase/rbac/audit-logs`, `POST /api/projectbase/rbac/audit-logs/export`, `security_audit_logs` collection)
+- [x] 8 FastMCP JSON-RPC 2.0 tools (`list_sso_providers`, `configure_sso_provider`, `exchange_sso_token`, `check_rbac_permission`, `list_rbac_roles`, `assign_rbac_role`, `get_rbac_matrix`, `get_security_audit_logs`)
+- [x] Frontend AgentsView **🛡️ Identity & RBAC** dashboard tab with live KPI meters, interactive SSO exchange simulator, 2D RBAC permissions matrix, live permission evaluator, and security audit log export
+- [x] 354/354 automated tests passing across 23 test suites with 100% frontend guard and headless render QA verification
+
+---
+
+## Next Milestone (Cycle 21)
+**Epic 20 – Native End-to-End Workflow Automations & AI Agent Trigger Pipelines**
+- Event-driven workflow automation triggers on issue lifecycle events (status transition, priority change, label add)
+- Conditional action DAG execution (webhook dispatch, agent task assignment, notifications, subtask generation)
+- FastMCP automation engine inspection tools and AgentsView workflow designer

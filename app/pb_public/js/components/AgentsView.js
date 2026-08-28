@@ -103,7 +103,45 @@ const AgentsViewComponent = {
       manualBallotPersona: 'SecurityAuditor',
       manualBallotVote: 'approve',
       manualBallotConfidence: 0.95,
-      manualBallotReason: 'Verified architecture rules, authentication headers and test coverage.'
+      manualBallotReason: 'Verified architecture rules, authentication headers and test coverage.',
+      ssoProviders: [],
+      ssoLoading: false,
+      ssoSelectedProvider: null,
+      newSsoProviderKey: 'google',
+      newSsoName: '',
+      newSsoIssuerUrl: '',
+      newSsoClientId: '',
+      newSsoClientSecret: '',
+      newSsoDiscoveryUrl: '',
+      newSsoScopes: 'openid profile email',
+      newSsoJit: true,
+      newSsoDefaultRole: 'member',
+      ssoSuccessMsg: null,
+      ssoErrorMsg: null,
+      ssoTestEmail: 'federated_dev@example.com',
+      ssoTestName: 'Federated Dev User',
+      ssoTestResult: null,
+      isTestingSso: false,
+      rbacRoles: [],
+      rbacMatrix: [],
+      rbacAssignments: [],
+      rbacAuditLogs: [],
+      rbacAuditFilter: '',
+      selectedRbacRole: null,
+      testRbacActor: 'flomaster-autonomous-agent',
+      testRbacCap: 'issues:create',
+      testRbacResult: null,
+      isCheckingRbac: false,
+      newRoleKey: '',
+      newRoleName: '',
+      newRoleDesc: '',
+      newRoleCapsStr: 'issues:read, issues:create, agents:dispatch',
+      newAssignUser: '',
+      newAssignRole: 'member',
+      newAssignProject: 'all',
+      rbacSuccessMsg: null,
+      rbacErrorMsg: null,
+      isLoadingSsoRbac: false
     };
   },
   computed: {
@@ -794,6 +832,177 @@ const AgentsViewComponent = {
       } catch (e) {
         this.consensusErrorMsg = e.message || String(e);
       }
+    },
+    async loadSsoRbacState() {
+      this.isLoadingSsoRbac = true;
+      try {
+        const [provRes, rolesRes, matrixRes, assignRes, auditRes] = await Promise.all([
+          API.getSsoProviders(),
+          API.getRbacRoles(),
+          API.getRbacMatrix(),
+          API.getRbacAssignments(),
+          API.getSecurityAuditLogs({ limit: 25 })
+        ]);
+        this.ssoProviders = (provRes && provRes.providers) || [];
+        this.rbacRoles = (rolesRes && rolesRes.roles) || [];
+        this.rbacMatrix = (matrixRes && matrixRes.matrix) || [];
+        this.rbacAssignments = (assignRes && assignRes.assignments) || [];
+        this.rbacAuditLogs = (auditRes && auditRes.audit_logs) || [];
+      } catch (e) {
+        console.warn('Failed to load SSO/RBAC state', e);
+      } finally {
+        this.isLoadingSsoRbac = false;
+      }
+    },
+    async saveSsoProvider() {
+      if (!this.newSsoProviderKey || !this.newSsoName) {
+        this.ssoErrorMsg = 'Provider Key and Name are required';
+        return;
+      }
+      try {
+        await API.configureSsoProvider({
+          provider_key: this.newSsoProviderKey,
+          name: this.newSsoName,
+          provider_type: 'oidc',
+          issuer_url: this.newSsoIssuerUrl,
+          client_id: this.newSsoClientId,
+          client_secret: this.newSsoClientSecret,
+          discovery_url: this.newSsoDiscoveryUrl,
+          scopes: this.newSsoScopes,
+          jit_provisioning: this.newSsoJit,
+          default_role: this.newSsoDefaultRole,
+          enabled: true
+        });
+        this.ssoSuccessMsg = `Provider '${this.newSsoName}' configured successfully!`;
+        this.newSsoName = '';
+        this.newSsoClientId = '';
+        this.newSsoClientSecret = '';
+        await this.loadSsoRbacState();
+        setTimeout(() => { this.ssoSuccessMsg = null; }, 3000);
+      } catch (e) {
+        this.ssoErrorMsg = e.message || String(e);
+      }
+    },
+    async deleteSsoProvider(id) {
+      if (!confirm('Delete this SSO provider configuration?')) return;
+      try {
+        await API.deleteSsoProvider(id);
+        await this.loadSsoRbacState();
+      } catch (e) {
+        this.ssoErrorMsg = e.message || String(e);
+      }
+    },
+    async testSsoExchange(providerKey) {
+      this.isTestingSso = true;
+      this.ssoTestResult = null;
+      try {
+        const res = await API.exchangeSsoToken({
+          provider_key: providerKey || 'google',
+          email: this.ssoTestEmail,
+          name: this.ssoTestName,
+          role: 'member'
+        });
+        this.ssoTestResult = res;
+      } catch (e) {
+        this.ssoTestResult = { success: false, error: e.message || String(e) };
+      } finally {
+        this.isTestingSso = false;
+      }
+    },
+    async createCustomRole() {
+      if (!this.newRoleKey || !this.newRoleName) {
+        this.rbacErrorMsg = 'Role key and name are required';
+        return;
+      }
+      try {
+        const caps = this.newRoleCapsStr.split(',').map(s => s.trim()).filter(Boolean);
+        await API.createRbacRole({
+          role_key: this.newRoleKey,
+          name: this.newRoleName,
+          description: this.newRoleDesc,
+          capabilities: caps
+        });
+        this.rbacSuccessMsg = `Custom role '${this.newRoleName}' created successfully!`;
+        this.newRoleKey = '';
+        this.newRoleName = '';
+        this.newRoleDesc = '';
+        await this.loadSsoRbacState();
+        setTimeout(() => { this.rbacSuccessMsg = null; }, 3000);
+      } catch (e) {
+        this.rbacErrorMsg = e.message || String(e);
+      }
+    },
+    async deleteCustomRole(id) {
+      if (!confirm('Delete this custom role?')) return;
+      try {
+        await API.deleteRbacRole(id);
+        await this.loadSsoRbacState();
+      } catch (e) {
+        this.rbacErrorMsg = e.message || String(e);
+      }
+    },
+    async assignUserRole() {
+      if (!this.newAssignUser) {
+        this.rbacErrorMsg = 'User ID or Agent ID is required';
+        return;
+      }
+      try {
+        await API.assignRbacRole({
+          user_id: this.newAssignUser,
+          role_key: this.newAssignRole,
+          project_id: this.newAssignProject,
+          user_type: this.newAssignUser.includes('agent') ? 'agent' : 'user'
+        });
+        this.rbacSuccessMsg = `Role '${this.newAssignRole}' assigned to '${this.newAssignUser}'!`;
+        this.newAssignUser = '';
+        await this.loadSsoRbacState();
+        setTimeout(() => { this.rbacSuccessMsg = null; }, 3000);
+      } catch (e) {
+        this.rbacErrorMsg = e.message || String(e);
+      }
+    },
+    async revokeUserRole(id) {
+      if (!confirm('Revoke this role assignment?')) return;
+      try {
+        await API.revokeRbacAssignment(id);
+        await this.loadSsoRbacState();
+      } catch (e) {
+        this.rbacErrorMsg = e.message || String(e);
+      }
+    },
+    async checkPermissionTest() {
+      if (!this.testRbacActor || !this.testRbacCap) return;
+      this.isCheckingRbac = true;
+      this.testRbacResult = null;
+      try {
+        const res = await API.checkRbacPermission({
+          actor_id: this.testRbacActor,
+          capability: this.testRbacCap,
+          project_id: 'all'
+        });
+        this.testRbacResult = res;
+      } catch (e) {
+        this.testRbacResult = { allowed: false, reason: e.message || String(e) };
+      } finally {
+        this.isCheckingRbac = false;
+      }
+    },
+    async exportAuditLogs(fmt) {
+      try {
+        const res = await API.exportSecurityAuditLogs({ format: fmt });
+        if (fmt === 'csv' && res && res.data) {
+          const blob = new Blob([res.data], { type: 'text/csv' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `projectbase_security_audit_${Date.now()}.csv`;
+          a.click();
+        } else {
+          alert(`Exported ${(res && res.record_count) || 0} audit log entries.`);
+        }
+      } catch (e) {
+        alert('Export failed: ' + (e.message || String(e)));
+      }
     }
   },
   template: `
@@ -910,7 +1119,7 @@ const AgentsViewComponent = {
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <h2 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 capitalize truncate">
-                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center')))))))) }}
+                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center'))))))))) }}
                 </h2>
                 <span v-if="selectedSession && selectedSession.is_active && activeTab === 'chat'" class="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-400 text-[10px] font-mono font-semibold flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -969,6 +1178,11 @@ const AgentsViewComponent = {
                   class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
                   :class="activeTab === 'consensus' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
                 >⚖️ Consensus & Gates</button>
+                <button
+                  @click="activeTab = 'sso_rbac'; loadSsoRbacState();"
+                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
+                  :class="activeTab === 'sso_rbac' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                >🛡️ Identity & RBAC</button>
               </div>
             </div>
           </div>
@@ -2503,6 +2717,363 @@ const AgentsViewComponent = {
                   >
                     Submit & Cryptographically Sign Ballot
                   </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- PANE 2J: ENTERPRISE SSO FEDERATION & GRANULAR RBAC MATRIX -->
+        <!-- ========================================================= -->
+        <div
+          v-if="activeTab === 'sso_rbac'"
+          class="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/40"
+        >
+          <!-- Top KPI / Metric Banner -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center gap-3">
+              <span class="text-2xl">🛡️</span>
+              <div>
+                <div class="text-[10px] text-zinc-400 font-medium">SSO Providers</div>
+                <div class="text-base font-bold text-zinc-900 dark:text-zinc-100">{{ ssoProviders.length }} Configured</div>
+              </div>
+            </div>
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center gap-3">
+              <span class="text-2xl">👥</span>
+              <div>
+                <div class="text-[10px] text-zinc-400 font-medium">RBAC Roles</div>
+                <div class="text-base font-bold text-indigo-600 dark:text-indigo-400">{{ rbacRoles.length }} Roles Active</div>
+              </div>
+            </div>
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center gap-3">
+              <span class="text-2xl">🔑</span>
+              <div>
+                <div class="text-[10px] text-zinc-400 font-medium">Assignments</div>
+                <div class="text-base font-bold text-emerald-600 dark:text-emerald-400">{{ rbacAssignments.length }} Grantees</div>
+              </div>
+            </div>
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center gap-3">
+              <span class="text-2xl">📜</span>
+              <div>
+                <div class="text-[10px] text-zinc-400 font-medium">Audit Events</div>
+                <div class="text-base font-bold text-amber-600 dark:text-amber-400">{{ rbacAuditLogs.length }} Logged</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Alert Messages -->
+          <div v-if="ssoSuccessMsg" class="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-2">
+            <span>✓</span> {{ ssoSuccessMsg }}
+          </div>
+          <div v-if="ssoErrorMsg" class="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs flex items-center gap-2">
+            <span>⚠️</span> {{ ssoErrorMsg }}
+          </div>
+          <div v-if="rbacSuccessMsg" class="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-2">
+            <span>✓</span> {{ rbacSuccessMsg }}
+          </div>
+          <div v-if="rbacErrorMsg" class="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs flex items-center gap-2">
+            <span>⚠️</span> {{ rbacErrorMsg }}
+          </div>
+
+          <!-- Main 2-Column Grid -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <!-- Left Column: SSO Identity Providers & JIT Provisioning (5 cols) -->
+            <div class="lg:col-span-5 space-y-4">
+              <!-- Configured SSO Providers Card -->
+              <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                    <span>🌐 Enterprise Identity Providers</span>
+                    <span class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[10px] font-mono text-zinc-500">{{ ssoProviders.length }}</span>
+                  </h3>
+                  <button
+                    @click="loadSsoRbacState"
+                    class="text-[10px] text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                  >
+                    🔄 Refresh
+                  </button>
+                </div>
+
+                <div class="space-y-2">
+                  <div
+                    v-for="prov in ssoProviders"
+                    :key="prov.id"
+                    class="p-3 rounded-lg border border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-950/40 space-y-2"
+                  >
+                    <div class="flex items-center justify-between">
+                      <div class="flex items-center gap-2">
+                        <span class="text-base">{{ prov.provider_key.includes('google') ? '🔴' : (prov.provider_key.includes('github') ? '🐙' : (prov.provider_key.includes('okta') ? '🔷' : '🔑')) }}</span>
+                        <div>
+                          <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100">{{ prov.name }}</div>
+                          <div class="text-[10px] text-zinc-400 font-mono">{{ prov.provider_key }} ({{ prov.provider_type.toUpperCase() }})</div>
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-1.5">
+                        <span
+                          class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
+                          :class="prov.enabled ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400'"
+                        >
+                          {{ prov.enabled ? 'Active' : 'Disabled' }}
+                        </span>
+                        <button
+                          @click="testSsoExchange(prov.provider_key)"
+                          class="px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 text-[10px] font-semibold"
+                          title="Test Token Exchange"
+                        >
+                          ⚡ Test
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="text-[10px] text-zinc-500 dark:text-zinc-400 space-y-0.5 font-mono">
+                      <div><span class="text-zinc-400">Issuer:</span> {{ prov.issuer_url || '—' }}</div>
+                      <div><span class="text-zinc-400">JIT Provisioning:</span> {{ prov.jit_provisioning ? '✓ Enabled' : '✗ Disabled' }} (Default Role: <span class="text-indigo-500 font-semibold">{{ prov.default_role }}</span>)</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 1-Click SSO Token Exchange Simulator -->
+              <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+                <h3 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center justify-between">
+                  <span>🧪 SSO JIT Exchange Simulator</span>
+                  <span class="text-[10px] text-zinc-400">Mock Provider Token</span>
+                </h3>
+                <div class="space-y-2 text-xs">
+                  <div>
+                    <label class="text-[10px] font-medium text-zinc-500 block mb-1">User Email to Provision</label>
+                    <input
+                      v-model="ssoTestEmail"
+                      type="email"
+                      class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-indigo-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label class="text-[10px] font-medium text-zinc-500 block mb-1">Display Name</label>
+                    <input
+                      v-model="ssoTestName"
+                      type="text"
+                      class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <button
+                    @click="testSsoExchange('google')"
+                    :disabled="isTestingSso"
+                    class="w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors disabled:opacity-50"
+                  >
+                    {{ isTestingSso ? 'Authenticating...' : 'Simulate Google OIDC Exchange & Provision JIT' }}
+                  </button>
+
+                  <div v-if="ssoTestResult" class="p-3 rounded-lg bg-zinc-900 text-zinc-100 font-mono text-[10px] space-y-1 mt-2">
+                    <div class="text-emerald-400 font-bold">✓ Token Exchange Succeeded:</div>
+                    <div>User: {{ ssoTestResult.user && ssoTestResult.user.email }}</div>
+                    <div>Role: {{ ssoTestResult.user && ssoTestResult.user.role }}</div>
+                    <div>Token: {{ ssoTestResult.token || ssoTestResult.session_token }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Configure New Provider Card -->
+              <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+                <h3 class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Add Enterprise Provider</h3>
+                <div class="space-y-2 text-xs">
+                  <div>
+                    <label class="text-[10px] font-medium text-zinc-500 block mb-1">Provider Type / Key</label>
+                    <input
+                      v-model="newSsoProviderKey"
+                      placeholder="e.g. okta-staging, azure-ad, auth0"
+                      class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label class="text-[10px] font-medium text-zinc-500 block mb-1">Display Name</label>
+                    <input
+                      v-model="newSsoName"
+                      placeholder="e.g. Corporate Okta SSO"
+                      class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label class="text-[10px] font-medium text-zinc-500 block mb-1">Issuer Base URL</label>
+                    <input
+                      v-model="newSsoIssuerUrl"
+                      placeholder="https://auth.company.com"
+                      class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-indigo-500 font-mono"
+                    />
+                  </div>
+                  <div class="grid grid-cols-2 gap-2">
+                    <div>
+                      <label class="text-[10px] font-medium text-zinc-500 block mb-1">Client ID</label>
+                      <input
+                        v-model="newSsoClientId"
+                        class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label class="text-[10px] font-medium text-zinc-500 block mb-1">Default Role</label>
+                      <select
+                        v-model="newSsoDefaultRole"
+                        class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none"
+                      >
+                        <option value="member">member</option>
+                        <option value="maintainer">maintainer</option>
+                        <option value="admin">admin</option>
+                        <option value="viewer">viewer</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button
+                    @click="saveSsoProvider"
+                    class="w-full py-1.5 rounded-lg bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-bold transition-colors mt-2"
+                  >
+                    Save SSO Provider
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Column: Visual RBAC Matrix, Assignments & Audit Logs (7 cols) -->
+            <div class="lg:col-span-7 space-y-4">
+              <!-- Interactive Visual RBAC Matrix -->
+              <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                    <span>🛡️ Granular RBAC Permissions Matrix</span>
+                    <span class="px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 text-[10px] font-mono font-bold">{{ rbacRoles.length }} Roles</span>
+                  </h3>
+                </div>
+
+                <div class="overflow-x-auto max-h-[300px] border border-zinc-200 dark:border-zinc-800 rounded-lg">
+                  <table class="w-full text-left text-xs">
+                    <thead class="bg-zinc-100 dark:bg-zinc-800/80 sticky top-0 text-[10px] font-bold text-zinc-600 dark:text-zinc-300 uppercase">
+                      <tr>
+                        <th class="p-2">Capability</th>
+                        <th v-for="r in rbacRoles" :key="r.role_key" class="p-2 text-center">{{ r.role_key }}</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800 font-mono text-[10px]">
+                      <tr v-for="row in rbacMatrix" :key="row.capability_key" class="hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+                        <td class="p-2 font-sans font-medium text-zinc-800 dark:text-zinc-200">
+                          <div>{{ row.name }}</div>
+                          <div class="text-[9px] text-zinc-400 font-mono">{{ row.capability_key }}</div>
+                        </td>
+                        <td v-for="r in rbacRoles" :key="r.role_key" class="p-2 text-center">
+                          <span v-if="row.access && row.access[r.role_key]" class="text-emerald-500 font-bold">✓</span>
+                          <span v-else class="text-zinc-300 dark:text-zinc-700">—</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Permission Checker Simulator & Role Assignment -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <!-- 1-Click Permission Checker -->
+                <div class="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-2.5">
+                  <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100">🔍 Live Permission Evaluator</h4>
+                  <div class="space-y-1.5 text-xs">
+                    <div>
+                      <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Actor (User/Agent ID)</label>
+                      <input
+                        v-model="testRbacActor"
+                        class="w-full px-2 py-1 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Required Capability</label>
+                      <input
+                        v-model="testRbacCap"
+                        placeholder="e.g. issues:create, agents:dispatch"
+                        class="w-full px-2 py-1 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono"
+                      />
+                    </div>
+                    <button
+                      @click="checkPermissionTest"
+                      :disabled="isCheckingRbac"
+                      class="w-full py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors"
+                    >
+                      Evaluate Permission
+                    </button>
+                    <div v-if="testRbacResult" class="p-2 rounded bg-zinc-50 dark:bg-zinc-950 border text-[10px] font-mono" :class="testRbacResult.allowed ? 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400' : 'border-red-500/30 text-red-600 dark:text-red-400'">
+                      {{ testRbacResult.allowed ? '✓ PERMISSION ALLOWED' : '✗ PERMISSION DENIED' }}: {{ testRbacResult.reason }}
+                    </div>
+                  </div>
+                </div>
+
+                <!-- User Role Assignment Card -->
+                <div class="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-2.5">
+                  <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100">👥 Assign User / Agent Role</h4>
+                  <div class="space-y-1.5 text-xs">
+                    <div>
+                      <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Grantee (User Email or Agent ID)</label>
+                      <input
+                        v-model="newAssignUser"
+                        placeholder="agent-orchestrator or dev@flow.com"
+                        class="w-full px-2 py-1 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Role</label>
+                      <select
+                        v-model="newAssignRole"
+                        class="w-full px-2 py-1 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs"
+                      >
+                        <option v-for="r in rbacRoles" :key="r.role_key" :value="r.role_key">{{ r.name }} ({{ r.role_key }})</option>
+                      </select>
+                    </div>
+                    <button
+                      @click="assignUserRole"
+                      class="w-full py-1 rounded bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-bold transition-colors"
+                    >
+                      Assign Role
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Security & Access Audit Log Viewer -->
+              <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                    <span>📜 Security & Access Audit Trail</span>
+                    <span class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[10px] font-mono text-zinc-500">{{ rbacAuditLogs.length }} events</span>
+                  </h3>
+                  <div class="flex items-center gap-1.5">
+                    <button
+                      @click="exportAuditLogs('json')"
+                      class="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 text-[10px] font-medium"
+                    >
+                      JSON
+                    </button>
+                    <button
+                      @click="exportAuditLogs('csv')"
+                      class="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 text-[10px] font-medium"
+                    >
+                      CSV
+                    </button>
+                  </div>
+                </div>
+
+                <div class="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
+                  <div v-if="rbacAuditLogs.length === 0" class="text-center py-4 text-xs text-zinc-400">
+                    No security audit events recorded yet.
+                  </div>
+                  <div
+                    v-for="log in rbacAuditLogs"
+                    :key="log.id"
+                    class="p-2 rounded bg-zinc-50/50 dark:bg-zinc-950/40 border border-zinc-200/80 dark:border-zinc-800/60 flex items-center justify-between text-[10px] font-mono"
+                  >
+                    <div class="flex items-center gap-2">
+                      <span :class="log.status === 'success' ? 'text-emerald-500' : 'text-red-500'">{{ log.status === 'success' ? '●' : '▲' }}</span>
+                      <div>
+                        <span class="font-bold text-zinc-800 dark:text-zinc-200">{{ log.event_type }}</span>
+                        <span class="text-zinc-400"> by {{ log.actor_id }}</span>
+                      </div>
+                    </div>
+                    <span class="text-zinc-400">{{ fmtTime(log.created) }}</span>
+                  </div>
                 </div>
               </div>
             </div>
