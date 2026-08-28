@@ -3918,6 +3918,192 @@
           "200": { "description": "Exported audit log data" }
         }
       }
+    },
+    "/projectbase/automations/rules": {
+      "get": {
+        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "summary": "List Automation Rules",
+        "description": "List configured event-driven workflow automation rules and active DAG pipelines.",
+        "parameters": [
+          { "name": "project", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "event_type", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "is_active", "in": "query", "required": false, "schema": { "type": "boolean" } }
+        ],
+        "responses": {
+          "200": { "description": "List of workflow automation rules" }
+        }
+      },
+      "post": {
+        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "summary": "Create or Update Automation Rule",
+        "description": "Create or update an event-driven workflow automation rule with conditional DAG execution.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "description": { "type": "string" },
+                  "event_type": { "type": "string" },
+                  "trigger_conditions": { "type": "object" },
+                  "action_pipeline": { "type": "array" }
+                },
+                "required": ["name", "event_type"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Automation rule created or updated" }
+        }
+      }
+    },
+    "/projectbase/automations/rules/{id}": {
+      "delete": {
+        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "summary": "Delete Automation Rule",
+        "description": "Decommission and delete an automation rule by ID.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Automation rule deleted" }
+        }
+      }
+    },
+    "/projectbase/automations/rules/{id}/toggle": {
+      "post": {
+        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "summary": "Toggle Automation Rule Active State",
+        "description": "Enable or disable a workflow automation rule.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Toggled active state" }
+        }
+      }
+    },
+    "/projectbase/automations/rules/{id}/test": {
+      "post": {
+        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "summary": "Test Execute Automation Rule",
+        "description": "Simulate and test rule execution against a test payload.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "type": "object" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Test execution result and step breakdown" }
+        }
+      }
+    },
+    "/projectbase/automations/runs": {
+      "get": {
+        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "summary": "List Workflow Execution Runs",
+        "description": "List execution run history with duration, status, and entity filters.",
+        "parameters": [
+          { "name": "rule_id", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "entity_id", "in": "query", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "List of workflow execution runs" }
+        }
+      }
+    },
+    "/projectbase/automations/runs/{id}": {
+      "get": {
+        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "summary": "Get Workflow Run Details",
+        "description": "Retrieve full execution trace and DAG step breakdown for a workflow run.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Detailed workflow execution trace" }
+        }
+      }
+    },
+    "/projectbase/automations/runs/{id}/cancel": {
+      "post": {
+        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "summary": "Cancel Workflow Run",
+        "description": "Cancel an in-flight workflow execution run.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Workflow run cancelled" }
+        }
+      }
+    },
+    "/projectbase/automations/runs/{id}/retry": {
+      "post": {
+        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "summary": "Retry Workflow Run",
+        "description": "Re-execute a failed or completed workflow execution run.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Retried workflow run" }
+        }
+      }
+    },
+    "/projectbase/automations/trigger": {
+      "post": {
+        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "summary": "Dispatch Event into Automation Engine",
+        "description": "Manually fire an event trigger and execute all matching active pipelines.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "event_type": { "type": "string" },
+                  "payload": { "type": "object" }
+                },
+                "required": ["event_type"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Fired automation pipelines" }
+        }
+      }
+    },
+    "/projectbase/automations/metrics": {
+      "get": {
+        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "summary": "Get Automation Engine Metrics",
+        "description": "Retrieve real-time workflow automation metrics, success rate, and duration telemetry.",
+        "responses": {
+          "200": { "description": "Automation engine metrics" }
+        }
+      }
+    },
+    "/projectbase/automations/templates": {
+      "get": {
+        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "summary": "List Blueprint Automation Templates",
+        "description": "Retrieve standard pre-configured starter workflow blueprints.",
+        "responses": {
+          "200": { "description": "List of workflow blueprints" }
+        }
+      }
     }
   }
 }

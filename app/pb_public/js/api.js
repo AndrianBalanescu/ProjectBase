@@ -1148,5 +1148,125 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to export audit logs');
     return data;
+  },
+
+  async getAutomationRules(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/automations/rules${query ? '?' + query : ''}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch automation rules');
+    return data;
+  },
+
+  async createAutomationRule(payload) {
+    const res = await fetch('/api/projectbase/automations/rules', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to save automation rule');
+    return data;
+  },
+
+  async deleteAutomationRule(id) {
+    const res = await fetch(`/api/projectbase/automations/rules/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete automation rule');
+    return data;
+  },
+
+  async toggleAutomationRule(id) {
+    const res = await fetch(`/api/projectbase/automations/rules/${encodeURIComponent(id)}/toggle`, {
+      method: 'POST',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to toggle automation rule');
+    return data;
+  },
+
+  async testAutomationRule(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/automations/rules/${encodeURIComponent(id)}/test`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to test automation rule');
+    return data;
+  },
+
+  async getAutomationRuns(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/automations/runs${query ? '?' + query : ''}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch automation runs');
+    return data;
+  },
+
+  async getAutomationRunDetails(id) {
+    const res = await fetch(`/api/projectbase/automations/runs/${encodeURIComponent(id)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch automation run details');
+    return data;
+  },
+
+  async cancelAutomationRun(id) {
+    const res = await fetch(`/api/projectbase/automations/runs/${encodeURIComponent(id)}/cancel`, {
+      method: 'POST',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to cancel automation run');
+    return data;
+  },
+
+  async retryAutomationRun(id) {
+    const res = await fetch(`/api/projectbase/automations/runs/${encodeURIComponent(id)}/retry`, {
+      method: 'POST',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to retry automation run');
+    return data;
+  },
+
+  async triggerAutomation(payload) {
+    const res = await fetch('/api/projectbase/automations/trigger', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to trigger automation');
+    return data;
+  },
+
+  async getAutomationMetrics() {
+    const res = await fetch('/api/projectbase/automations/metrics', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch automation metrics');
+    return data;
+  },
+
+  async getAutomationTemplates() {
+    const res = await fetch('/api/projectbase/automations/templates', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch automation templates');
+    return data;
   }
 };

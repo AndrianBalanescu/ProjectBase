@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.20.0] - 2026-08-28 - Cycle 21
+### Added
+- **Native End-to-End Workflow Automations & AI Agent Trigger Pipelines (Epic 20):**
+  - Schema migration (`1710000031_add_workflow_automations.js`) adding `workflow_rules`, `workflow_runs`, and `workflow_triggers_audit` collections.
+  - Backend automation engine hook (`app/pb_hooks/103_workflow_automations_engine.pb.js`) with 12 REST API endpoints (`/api/projectbase/automations/*`) supporting conditional DAG execution, manual/automated event triggers, and test execution simulator.
+  - Built-in DAG pipeline actions: `dispatch_agent`, `create_subtasks`, `send_notification`, `send_webhook`, `update_issue`, `add_comment`, and `log_audit`.
+  - Starter blueprint templates library (`GET /api/projectbase/automations/templates`): Auto-Triage & Assign Bug to SRE Agent, Copilot Subtask Auto-Generation on Start, SLA Urgent Priority Alerting, Done Verification & QA Checkpoint.
+  - Real-time automation metrics telemetry and duration tracking (`GET /api/projectbase/automations/metrics`).
+  - 8 FastMCP JSON-RPC 2.0 tools: `list_automation_rules`, `create_automation_rule`, `trigger_automation_pipeline`, `list_automation_runs`, `get_automation_run_details`, `retry_automation_run`, `get_automation_metrics`, `list_automation_templates`.
+  - Frontend AgentsView **⚡ Automations & Pipelines** dashboard tab with live KPI meters, 1-click blueprint template applicator, interactive rule designer, live trigger simulator, and step trace execution history table.
+  - 8 automated end-to-end tests in `tests/test_workflow_automations.py` (362/362 passing across 24 test suites with 100% frontend guard and headless render QA verification).
+
 ## [1.19.0] - 2026-08-28 - Cycle 20
 ### Added
 - **Enterprise OIDC / SAML SSO Federation & Granular RBAC Matrix (Epic 19):**

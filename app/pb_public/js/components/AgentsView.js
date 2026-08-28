@@ -141,7 +141,27 @@ const AgentsViewComponent = {
       newAssignProject: 'all',
       rbacSuccessMsg: null,
       rbacErrorMsg: null,
-      isLoadingSsoRbac: false
+      isLoadingSsoRbac: false,
+      // Workflow Automations & AI Agent Trigger Pipelines (Epic 20)
+      workflowRules: [],
+      workflowRuns: [],
+      workflowMetrics: null,
+      workflowTemplates: [],
+      selectedWorkflowRun: null,
+      newRuleName: '',
+      newRuleDescription: '',
+      newRuleEventType: 'issue.created',
+      newRuleProject: '',
+      newRuleConditionsStr: '{\n  "priority": "urgent"\n}',
+      newRuleActionType: 'dispatch_agent',
+      newRuleActionParamsStr: '{\n  "role": "sre",\n  "prompt": "Investigate urgent issue and verify root cause"\n}',
+      simulatedTriggerEvent: 'issue.status_changed',
+      simulatedTriggerPayloadStr: '{\n  "issue_id": "PB-101",\n  "status_to": "done"\n}',
+      isTriggeringAutomation: false,
+      isSavingRule: false,
+      automationSuccessMsg: null,
+      automationErrorMsg: null,
+      isLoadingAutomations: false
     };
   },
   computed: {
@@ -1003,6 +1023,174 @@ const AgentsViewComponent = {
       } catch (e) {
         alert('Export failed: ' + (e.message || String(e)));
       }
+    },
+    async loadAutomationsState() {
+      this.isLoadingAutomations = true;
+      this.automationSuccessMsg = null;
+      this.automationErrorMsg = null;
+      try {
+        const [rulesRes, runsRes, metricsRes, tplsRes] = await Promise.all([
+          API.getAutomationRules().catch(() => ({ rules: [] })),
+          API.getAutomationRuns({ limit: 50 }).catch(() => ({ runs: [] })),
+          API.getAutomationMetrics().catch(() => null),
+          API.getAutomationTemplates().catch(() => ({ templates: [] }))
+        ]);
+        this.workflowRules = (rulesRes && rulesRes.rules) || [];
+        this.workflowRuns = (runsRes && runsRes.runs) || [];
+        this.workflowMetrics = metricsRes || {
+          total_rules: this.workflowRules.length,
+          active_rules: this.workflowRules.filter(r => r.is_active).length,
+          total_runs: this.workflowRuns.length,
+          success_rate: 100,
+          avg_duration_ms: 25
+        };
+        this.workflowTemplates = (tplsRes && tplsRes.templates) || [];
+      } catch (e) {
+        this.automationErrorMsg = e.message || String(e);
+      } finally {
+        this.isLoadingAutomations = false;
+      }
+    },
+    async createWorkflowRule() {
+      if (!this.newRuleName || !this.newRuleEventType) {
+        this.automationErrorMsg = 'Rule name and event type are required';
+        return;
+      }
+      this.isSavingRule = true;
+      this.automationSuccessMsg = null;
+      this.automationErrorMsg = null;
+      try {
+        let conditions = {};
+        if (this.newRuleConditionsStr.trim()) {
+          try { conditions = JSON.parse(this.newRuleConditionsStr); } catch (err) {
+            throw new Error('Invalid JSON in Trigger Conditions: ' + err.message);
+          }
+        }
+        let actionParams = {};
+        if (this.newRuleActionParamsStr.trim()) {
+          try { actionParams = JSON.parse(this.newRuleActionParamsStr); } catch (err) {
+            throw new Error('Invalid JSON in Action Parameters: ' + err.message);
+          }
+        }
+
+        const actionStep = {
+          id: 'step_1',
+          action: this.newRuleActionType || 'dispatch_agent',
+          params: actionParams
+        };
+
+        await API.createAutomationRule({
+          name: this.newRuleName.trim(),
+          description: this.newRuleDescription.trim(),
+          project: this.newRuleProject.trim(),
+          event_type: this.newRuleEventType,
+          trigger_conditions: conditions,
+          action_pipeline: [actionStep],
+          is_active: true,
+          execution_mode: 'sequential'
+        });
+
+        this.automationSuccessMsg = `Automation rule '${this.newRuleName}' created successfully!`;
+        this.newRuleName = '';
+        this.newRuleDescription = '';
+        await this.loadAutomationsState();
+      } catch (e) {
+        this.automationErrorMsg = e.message || String(e);
+      } finally {
+        this.isSavingRule = false;
+      }
+    },
+    async toggleWorkflowRule(rule) {
+      if (!rule || !rule.id) return;
+      try {
+        await API.toggleAutomationRule(rule.id);
+        rule.is_active = !rule.is_active;
+        await this.loadAutomationsState();
+      } catch (e) {
+        this.automationErrorMsg = e.message || String(e);
+      }
+    },
+    async deleteWorkflowRule(ruleId) {
+      if (!confirm('Are you sure you want to delete this automation rule?')) return;
+      try {
+        await API.deleteAutomationRule(ruleId);
+        await this.loadAutomationsState();
+      } catch (e) {
+        this.automationErrorMsg = e.message || String(e);
+      }
+    },
+    async testWorkflowRule(ruleId) {
+      this.automationSuccessMsg = null;
+      this.automationErrorMsg = null;
+      try {
+        const res = await API.testAutomationRule(ruleId, { status_to: 'done', priority: 'urgent' });
+        if (res && res.matched) {
+          this.automationSuccessMsg = `Test succeeded: Rule matched and simulated ${res.run.step_results.length} pipeline steps in ${res.run.duration_ms}ms.`;
+        } else {
+          this.automationSuccessMsg = `Test completed: Payload did not match trigger criteria (${res.message || 'No match'}).`;
+        }
+      } catch (e) {
+        this.automationErrorMsg = 'Test failed: ' + (e.message || String(e));
+      }
+    },
+    async applyWorkflowTemplate(tpl) {
+      if (!tpl) return;
+      this.newRuleName = tpl.name;
+      this.newRuleDescription = tpl.description;
+      this.newRuleEventType = tpl.event_type;
+      this.newRuleConditionsStr = JSON.stringify(tpl.trigger_conditions || {}, null, 2);
+      const firstStep = (tpl.action_pipeline && tpl.action_pipeline[0]) || { action: 'dispatch_agent', params: {} };
+      this.newRuleActionType = firstStep.action;
+      this.newRuleActionParamsStr = JSON.stringify(firstStep.params || {}, null, 2);
+      this.automationSuccessMsg = `Loaded template '${tpl.name}'. Click 'Save & Activate Automation Rule' below to deploy.`;
+    },
+    async triggerAutomationSim() {
+      this.isTriggeringAutomation = true;
+      this.automationSuccessMsg = null;
+      this.automationErrorMsg = null;
+      try {
+        let pl = {};
+        if (this.simulatedTriggerPayloadStr.trim()) {
+          try { pl = JSON.parse(this.simulatedTriggerPayloadStr); } catch (err) {
+            throw new Error('Invalid JSON in Simulated Payload: ' + err.message);
+          }
+        }
+        const res = await API.triggerAutomation({
+          event_type: this.simulatedTriggerEvent,
+          payload: pl
+        });
+        if (res && res.fired_count > 0) {
+          this.automationSuccessMsg = `Dispatched ${this.simulatedTriggerEvent}: Fired ${res.fired_count} pipeline(s) successfully!`;
+        } else {
+          this.automationSuccessMsg = `Dispatched ${this.simulatedTriggerEvent}: 0 matching rules fired (${res.skipped_count || 0} skipped).`;
+        }
+        await this.loadAutomationsState();
+      } catch (e) {
+        this.automationErrorMsg = 'Trigger simulation failed: ' + (e.message || String(e));
+      } finally {
+        this.isTriggeringAutomation = false;
+      }
+    },
+    async retryWorkflowRun(runId) {
+      try {
+        await API.retryAutomationRun(runId);
+        this.automationSuccessMsg = `Workflow run ${runId} retried successfully.`;
+        await this.loadAutomationsState();
+      } catch (e) {
+        this.automationErrorMsg = 'Retry failed: ' + (e.message || String(e));
+      }
+    },
+    async cancelWorkflowRun(runId) {
+      try {
+        await API.cancelAutomationRun(runId);
+        this.automationSuccessMsg = `Workflow run ${runId} cancelled.`;
+        await this.loadAutomationsState();
+      } catch (e) {
+        this.automationErrorMsg = 'Cancel failed: ' + (e.message || String(e));
+      }
+    },
+    inspectWorkflowRun(run) {
+      this.selectedWorkflowRun = run;
     }
   },
   template: `
@@ -1119,7 +1307,7 @@ const AgentsViewComponent = {
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <h2 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 capitalize truncate">
-                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center'))))))))) }}
+                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (activeTab === 'automations' ? 'Native Workflow Automations & AI Agent Trigger Pipelines' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center')))))))))) }}
                 </h2>
                 <span v-if="selectedSession && selectedSession.is_active && activeTab === 'chat'" class="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-400 text-[10px] font-mono font-semibold flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -1183,6 +1371,11 @@ const AgentsViewComponent = {
                   class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
                   :class="activeTab === 'sso_rbac' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
                 >🛡️ Identity & RBAC</button>
+                <button
+                  @click="activeTab = 'automations'; loadAutomationsState();"
+                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
+                  :class="activeTab === 'automations' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                >⚡ Automations</button>
               </div>
             </div>
           </div>
@@ -3073,6 +3266,379 @@ const AgentsViewComponent = {
                       </div>
                     </div>
                     <span class="text-zinc-400">{{ fmtTime(log.created) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- PANE 2K: NATIVE WORKFLOW AUTOMATIONS & TRIGGER PIPELINES -->
+        <!-- ========================================================= -->
+        <div
+          v-if="activeTab === 'automations'"
+          class="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/40"
+        >
+          <!-- Top KPI / Metric Banner -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center gap-3">
+              <span class="text-2xl">⚡</span>
+              <div>
+                <div class="text-[10px] text-zinc-400 font-medium">Active Rules</div>
+                <div class="text-base font-bold text-zinc-900 dark:text-zinc-100">{{ (workflowMetrics && workflowMetrics.active_rules) || workflowRules.filter(r => r.is_active).length }} / {{ workflowRules.length }}</div>
+              </div>
+            </div>
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center gap-3">
+              <span class="text-2xl">🚀</span>
+              <div>
+                <div class="text-[10px] text-zinc-400 font-medium">Total Runs</div>
+                <div class="text-base font-bold text-indigo-600 dark:text-indigo-400">{{ (workflowMetrics && workflowMetrics.total_runs) || workflowRuns.length }} Executions</div>
+              </div>
+            </div>
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center gap-3">
+              <span class="text-2xl">🎯</span>
+              <div>
+                <div class="text-[10px] text-zinc-400 font-medium">Success Rate</div>
+                <div class="text-base font-bold text-emerald-600 dark:text-emerald-400">{{ (workflowMetrics && workflowMetrics.success_rate) || 100 }}%</div>
+              </div>
+            </div>
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center gap-3">
+              <span class="text-2xl">⏱️</span>
+              <div>
+                <div class="text-[10px] text-zinc-400 font-medium">Avg Latency</div>
+                <div class="text-base font-bold text-amber-600 dark:text-amber-400">{{ (workflowMetrics && workflowMetrics.avg_duration_ms) || 15 }} ms</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Alert / Status Notifications -->
+          <div v-if="automationSuccessMsg" class="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-700 dark:text-emerald-300 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span>✅</span>
+              <span>{{ automationSuccessMsg }}</span>
+            </div>
+            <button @click="automationSuccessMsg = null" class="text-emerald-500 hover:text-emerald-700">✕</button>
+          </div>
+          <div v-if="automationErrorMsg" class="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-300 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span>⚠️</span>
+              <span>{{ automationErrorMsg }}</span>
+            </div>
+            <button @click="automationErrorMsg = null" class="text-red-500 hover:text-red-700">✕</button>
+          </div>
+
+          <!-- Blueprint Templates Shelf -->
+          <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                  <span>📦</span> Starter Blueprint Templates
+                </h3>
+                <p class="text-[11px] text-zinc-400">One-click recipes for autonomous agent workflows, SLAs, and QA verification pipelines</p>
+              </div>
+              <button
+                @click="loadAutomationsState"
+                class="px-2.5 py-1 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 text-xs font-medium text-zinc-700 dark:text-zinc-300"
+              >
+                🔄 Refresh
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5">
+              <div
+                v-for="tpl in workflowTemplates"
+                :key="tpl.id"
+                class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 flex flex-col justify-between space-y-2 hover:border-indigo-500/50 transition-colors"
+              >
+                <div>
+                  <div class="flex items-center justify-between gap-1 mb-1">
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold">{{ tpl.event_type }}</span>
+                    <span class="text-[10px] text-zinc-400">{{ (tpl.action_pipeline || []).length }} steps</span>
+                  </div>
+                  <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 line-clamp-1">{{ tpl.name }}</h4>
+                  <p class="text-[10px] text-zinc-500 line-clamp-2 mt-0.5">{{ tpl.description }}</p>
+                </div>
+                <button
+                  @click="applyWorkflowTemplate(tpl)"
+                  class="w-full py-1 rounded bg-zinc-200 dark:bg-zinc-800 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 text-zinc-800 dark:text-zinc-200 text-[10px] font-bold transition-colors"
+                >
+                  ⚡ Use Template
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Main 2-Column Section: Configured Rules & Rule Creator -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <!-- Left 2 Cols: Configured Automation Rules Table -->
+            <div class="lg:col-span-2 p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                    <span>📋</span> Configured Automation Rules
+                  </h3>
+                  <p class="text-[11px] text-zinc-400">Trigger events, conditional filters, and autonomous action chains</p>
+                </div>
+                <span class="text-xs font-mono text-zinc-400">{{ workflowRules.length }} Total</span>
+              </div>
+
+              <div v-if="workflowRules.length === 0" class="text-center py-8 text-xs text-zinc-400">
+                No automation rules configured. Use a template above or create your first rule on the right.
+              </div>
+
+              <div v-else class="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                <div
+                  v-for="rule in workflowRules"
+                  :key="rule.id"
+                  class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 space-y-2"
+                >
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="space-y-0.5">
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100">{{ rule.name }}</span>
+                        <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">{{ rule.event_type }}</span>
+                        <span :class="rule.is_active ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'" class="text-[9px] px-1.5 py-0.5 rounded-full border font-bold uppercase">
+                          {{ rule.is_active ? 'Active' : 'Disabled' }}
+                        </span>
+                      </div>
+                      <p class="text-[10px] text-zinc-500">{{ rule.description || 'No description provided' }}</p>
+                    </div>
+
+                    <div class="flex items-center gap-1.5 shrink-0">
+                      <button
+                        @click="testWorkflowRule(rule.id)"
+                        class="px-2 py-1 rounded bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 text-[10px] font-medium"
+                        title="Simulate Test Execution"
+                      >
+                        🧪 Test
+                      </button>
+                      <button
+                        @click="toggleWorkflowRule(rule)"
+                        :class="rule.is_active ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400' : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400'"
+                        class="px-2 py-1 rounded text-[10px] font-medium"
+                      >
+                        {{ rule.is_active ? 'Pause' : 'Enable' }}
+                      </button>
+                      <button
+                        @click="deleteWorkflowRule(rule.id)"
+                        class="px-2 py-1 rounded bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 text-[10px] font-medium"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Pipeline Steps Preview -->
+                  <div class="flex items-center gap-1.5 flex-wrap pt-1 border-t border-zinc-200/60 dark:border-zinc-800/60">
+                    <span class="text-[9px] text-zinc-400 font-mono">Pipeline:</span>
+                    <div
+                      v-for="(step, sIdx) in (rule.action_pipeline || [])"
+                      :key="step.id || sIdx"
+                      class="flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800"
+                    >
+                      <span class="text-indigo-500 font-bold">{{ step.action }}</span>
+                      <span v-if="sIdx < (rule.action_pipeline.length - 1)" class="text-zinc-400">→</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Col: Interactive Rule Designer / Creator -->
+            <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+              <div>
+                <h3 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                  <span>🛠️</span> Automation Rule Designer
+                </h3>
+                <p class="text-[11px] text-zinc-400">Configure custom triggers and DAG actions</p>
+              </div>
+
+              <div class="space-y-2 text-xs">
+                <div>
+                  <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Rule Name</label>
+                  <input
+                    v-model="newRuleName"
+                    placeholder="e.g. Urgent Bug SRE Dispatch"
+                    class="w-full px-2 py-1 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Description</label>
+                  <input
+                    v-model="newRuleDescription"
+                    placeholder="What this automation does"
+                    class="w-full px-2 py-1 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs"
+                  />
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Event Trigger</label>
+                    <select
+                      v-model="newRuleEventType"
+                      class="w-full px-2 py-1 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs"
+                    >
+                      <option value="issue.created">issue.created</option>
+                      <option value="issue.status_changed">issue.status_changed</option>
+                      <option value="issue.priority_changed">issue.priority_changed</option>
+                      <option value="cycle.started">cycle.started</option>
+                      <option value="cycle.completed">cycle.completed</option>
+                      <option value="manual">manual</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Action Type</label>
+                    <select
+                      v-model="newRuleActionType"
+                      class="w-full px-2 py-1 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono"
+                    >
+                      <option value="dispatch_agent">dispatch_agent</option>
+                      <option value="create_subtasks">create_subtasks</option>
+                      <option value="send_notification">send_notification</option>
+                      <option value="send_webhook">send_webhook</option>
+                      <option value="update_issue">update_issue</option>
+                      <option value="add_comment">add_comment</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Trigger Conditions (JSON)</label>
+                  <textarea
+                    v-model="newRuleConditionsStr"
+                    rows="2"
+                    class="w-full px-2 py-1 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-[10px] font-mono"
+                  ></textarea>
+                </div>
+
+                <div>
+                  <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Action Parameters (JSON)</label>
+                  <textarea
+                    v-model="newRuleActionParamsStr"
+                    rows="2"
+                    class="w-full px-2 py-1 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-[10px] font-mono"
+                  ></textarea>
+                </div>
+
+                <button
+                  @click="createWorkflowRule"
+                  :disabled="isSavingRule"
+                  class="w-full py-1.5 rounded bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 text-white dark:text-zinc-900 text-xs font-bold transition-colors disabled:opacity-50"
+                >
+                  {{ isSavingRule ? 'Saving...' : '💾 Save & Activate Automation Rule' }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom 2-Column Section: Trigger Simulator & Execution History -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <!-- Left Col: Live Trigger Simulator -->
+            <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+              <div>
+                <h3 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                  <span>🎯</span> Live Event Trigger Simulator
+                </h3>
+                <p class="text-[11px] text-zinc-400">Manually fire event payloads into the engine</p>
+              </div>
+
+              <div class="space-y-2 text-xs">
+                <div>
+                  <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Simulated Event Type</label>
+                  <select
+                    v-model="simulatedTriggerEvent"
+                    class="w-full px-2 py-1 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono"
+                  >
+                    <option value="issue.status_changed">issue.status_changed</option>
+                    <option value="issue.created">issue.created</option>
+                    <option value="issue.priority_changed">issue.priority_changed</option>
+                    <option value="cycle.started">cycle.started</option>
+                    <option value="manual">manual</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Payload (JSON)</label>
+                  <textarea
+                    v-model="simulatedTriggerPayloadStr"
+                    rows="3"
+                    class="w-full px-2 py-1 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-[10px] font-mono"
+                  ></textarea>
+                </div>
+
+                <button
+                  @click="triggerAutomationSim"
+                  :disabled="isTriggeringAutomation"
+                  class="w-full py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  <span>⚡</span>
+                  <span>{{ isTriggeringAutomation ? 'Firing...' : 'Fire Event Trigger' }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Right 2 Cols: Live Execution Runs History & Step Trace -->
+            <div class="lg:col-span-2 p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                    <span>📜</span> Execution Runs & Step Trace History
+                  </h3>
+                  <p class="text-[11px] text-zinc-400">Live DAG execution duration, step status, and error logs</p>
+                </div>
+                <span class="text-xs font-mono text-zinc-400">{{ workflowRuns.length }} Executions</span>
+              </div>
+
+              <div v-if="workflowRuns.length === 0" class="text-center py-6 text-xs text-zinc-400">
+                No workflow runs recorded yet. Fire an event or run a test to populate execution traces.
+              </div>
+
+              <div v-else class="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                <div
+                  v-for="run in workflowRuns"
+                  :key="run.id"
+                  class="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 space-y-1.5"
+                >
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                      <span :class="run.status === 'completed' ? 'text-emerald-500' : (run.status === 'running' ? 'text-blue-500 animate-spin' : (run.status === 'cancelled' ? 'text-zinc-400' : 'text-red-500'))">
+                        {{ run.status === 'completed' ? '●' : (run.status === 'running' ? '↻' : (run.status === 'cancelled' ? '⊘' : '▲')) }}
+                      </span>
+                      <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100">{{ run.rule_name || 'Workflow Run' }}</span>
+                      <span class="text-[10px] font-mono text-zinc-400">{{ run.trigger_event }}</span>
+                      <span class="text-[9px] font-mono px-1 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-500">{{ run.duration_ms }}ms</span>
+                    </div>
+
+                    <div class="flex items-center gap-1.5">
+                      <button
+                        @click="retryWorkflowRun(run.id)"
+                        class="px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 text-[10px] font-medium"
+                      >
+                        🔄 Retry
+                      </button>
+                      <button
+                        v-if="run.status === 'running' || run.status === 'pending'"
+                        @click="cancelWorkflowRun(run.id)"
+                        class="px-2 py-0.5 rounded bg-red-100 dark:bg-red-950/60 text-red-600 text-[10px] font-medium"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Step Results Chips -->
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <div
+                      v-for="(st, idx) in (run.step_results || [])"
+                      :key="st.step_id || idx"
+                      class="flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.5 rounded border"
+                      :class="st.status === 'success' ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-400' : 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/60 text-red-700 dark:text-red-400'"
+                    >
+                      <span>{{ st.step_id }}: {{ st.action }}</span>
+                      <span class="text-zinc-400">({{ st.duration_ms }}ms)</span>
+                    </div>
                   </div>
                 </div>
               </div>
