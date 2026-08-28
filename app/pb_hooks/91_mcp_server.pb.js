@@ -1541,6 +1541,120 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
                     }
                 }
             }
+        },
+        {
+            name: "record_session_trajectory_step",
+            description: "Record a discrete execution trajectory step (thought, tool_call, tool_result, error) with duration and token telemetry for an agent session.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    session_id: { type: "string", description: "Target session ID" },
+                    step_type: { type: "string", description: "thought|tool_call|tool_result|diff|checkpoint|error|user_intervention|gate_event" },
+                    tool_name: { type: "string", description: "Tool name if step_type is tool_call/tool_result" },
+                    tool_input: { type: "object", description: "Input arguments to the tool" },
+                    tool_output: { type: "object", description: "Output result from the tool" },
+                    thought_text: { type: "string", description: "Reasoning thought text" },
+                    duration_ms: { type: "number", description: "Execution latency in ms" },
+                    tokens_prompt: { type: "number", description: "Prompt tokens consumed" },
+                    tokens_completion: { type: "number", description: "Completion tokens generated" },
+                    tokens_reasoning: { type: "number", description: "Reasoning tokens spent" },
+                    cost_usd: { type: "number", description: "Estimated cost in USD" },
+                    status: { type: "string", description: "in_progress|success|failed|cancelled" },
+                    error_message: { type: "string", description: "Error text if failed" }
+                },
+                required: ["session_id"]
+            }
+        },
+        {
+            name: "get_session_trajectories",
+            description: "Retrieve chronological trajectory timeline with tool inputs, outputs, and reasoning steps for an agent session.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    session_id: { type: "string", description: "Target session ID" },
+                    step_type: { type: "string", description: "Optional filter by step type" },
+                    tool_name: { type: "string", description: "Optional filter by tool name" },
+                    status: { type: "string", description: "Optional filter by status" },
+                    limit: { type: "number", description: "Max steps to return" }
+                },
+                required: ["session_id"]
+            }
+        },
+        {
+            name: "get_session_trajectory_summary",
+            description: "Retrieve aggregate trajectory profiling metrics (steps, tools, duration, tokens, cost, failure rate) for an agent session.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    session_id: { type: "string", description: "Target session ID" }
+                },
+                required: ["session_id"]
+            }
+        },
+        {
+            name: "create_swarm_cluster",
+            description: "Initialize a multi-agent swarm cluster with designated topology, objective, and optional initial workers.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    cluster_id: { type: "string", description: "Optional unique cluster ID" },
+                    name: { type: "string", description: "Cluster name" },
+                    objective: { type: "string", description: "High-level cluster mission/objective" },
+                    topology: { type: "string", description: "hierarchical|flat_fanout|pipeline_linear|adversarial_critique" },
+                    max_concurrency: { type: "number", description: "Max parallel agents" },
+                    coordinator_session_id: { type: "string", description: "Session ID of the coordinator" },
+                    project_id: { type: "string", description: "Project identifier or ID" },
+                    workers: { type: "array", description: "Optional array of worker specs" }
+                },
+                required: ["objective"]
+            }
+        },
+        {
+            name: "list_swarm_clusters",
+            description: "List multi-agent swarm clusters with status, topology, worker counts, and aggregated metrics.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    status: { type: "string", description: "Optional filter by status" },
+                    project_id: { type: "string", description: "Optional filter by project" }
+                }
+            }
+        },
+        {
+            name: "get_swarm_cluster_details",
+            description: "Get detailed status, member worker agent sessions, and aggregated metrics for a swarm cluster.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    cluster_id: { type: "string", description: "Cluster ID or record ID" }
+                },
+                required: ["cluster_id"]
+            }
+        },
+        {
+            name: "add_swarm_cluster_workers",
+            description: "Add worker agent session(s) with specific swarm roles to an existing swarm cluster.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    cluster_id: { type: "string", description: "Target swarm cluster ID" },
+                    workers: { type: "array", description: "Array of worker specs [{role, agent_name, model, prompt}]" }
+                },
+                required: ["cluster_id", "workers"]
+            }
+        },
+        {
+            name: "update_swarm_cluster_status",
+            description: "Control swarm cluster lifecycle execution (running|paused|completed|failed|aborted) with cascading worker control.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    cluster_id: { type: "string", description: "Target swarm cluster ID" },
+                    status: { type: "string", description: "running|paused|completed|failed|aborted" },
+                    cascade: { type: "boolean", description: "Whether to cascade status to child worker sessions" }
+                },
+                required: ["cluster_id", "status"]
+            }
         }
     ]
 
@@ -5634,13 +5748,17 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
             filter = "project = {:p}";
             params = { p: projectId };
         }
-        const allSessions = e.app.findRecordsByFilter("agent_sessions", filter, "created", 500, 0, params);
+        const allSessions = e.app.findRecordsByFilter("agent_sessions", filter, "-created", 5000, 0, params);
 
         let sessionMap = {};
         allSessions.forEach(s => {
-            const sid = s.getString("session_id") || s.getString("id");
-            sessionMap[sid] = s;
+            const sid = s.getString("session_id");
+            const rid = s.getString("id");
+            if (sid) sessionMap[sid] = s;
+            if (rid) sessionMap[rid] = s;
         });
+        sessionMap[target.getString("id")] = target;
+        if (target.getString("session_id")) sessionMap[target.getString("session_id")] = target;
 
         let current = target;
         let root = target;
@@ -5651,8 +5769,19 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
             visited.add(sid);
             root = current;
             const parentSid = current.getString("parent_session_id");
-            if (!parentSid || !sessionMap[parentSid]) break;
-            current = sessionMap[parentSid];
+            if (!parentSid) break;
+            let pRec = sessionMap[parentSid];
+            if (!pRec) {
+                try {
+                    pRec = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: parentSid });
+                    if (pRec) {
+                        sessionMap[pRec.getString("id")] = pRec;
+                        if (pRec.getString("session_id")) sessionMap[pRec.getString("session_id")] = pRec;
+                    }
+                } catch (x) {}
+            }
+            if (!pRec) break;
+            current = pRec;
         }
 
         const rootSid = root.getString("session_id") || root.getString("id");
@@ -5665,7 +5794,7 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
             allSessions.forEach(s => {
                 const sid = s.getString("session_id") || s.getString("id");
                 const psid = s.getString("parent_session_id");
-                if (psid && dagNodeIds.has(psid) && !dagNodeIds.has(sid)) {
+                if (psid && (dagNodeIds.has(psid) || (sessionMap[psid] && dagNodeIds.has(sessionMap[psid].getString("session_id")))) && !dagNodeIds.has(sid)) {
                     dagNodeIds.add(sid);
                     expanded = true;
                 }
@@ -5828,6 +5957,507 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
             workers: spawnedSessions
         };
     }
+
+    const recordSessionTrajectoryStep = (args) => {
+        if (!args.session_id) throw new Error("session_id is required");
+        let trajectoryCol = null;
+        try { trajectoryCol = e.app.findCollectionByNameOrId("session_trajectories"); } catch (x) {}
+        if (!trajectoryCol) throw new Error("session_trajectories collection not found");
+
+        let sessionRecord = null;
+        try {
+            sessionRecord = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: args.session_id });
+        } catch (x) {}
+
+        let nextStepNumber = 1;
+        if (typeof args.step_number === "number") {
+            nextStepNumber = args.step_number;
+        } else {
+            try {
+                const lastSteps = e.app.findRecordsByFilter("session_trajectories", "session_id = {:sid}", "-step_number", 1, 0, { sid: args.session_id });
+                if (lastSteps && lastSteps.length > 0) {
+                    nextStepNumber = (lastSteps[0].getInt("step_number") || 0) + 1;
+                }
+            } catch (x) {}
+        }
+
+        const stepType = args.step_type || "thought";
+        const toolName = args.tool_name || "";
+        const durationMs = typeof args.duration_ms === "number" ? args.duration_ms : 0;
+        const tokensPrompt = typeof args.tokens_prompt === "number" ? args.tokens_prompt : 0;
+        const tokensCompletion = typeof args.tokens_completion === "number" ? args.tokens_completion : 0;
+        const tokensReasoning = typeof args.tokens_reasoning === "number" ? args.tokens_reasoning : 0;
+        const stepCost = typeof args.cost_usd === "number" ? args.cost_usd : 0.0;
+        const stepStatus = args.status || "success";
+
+        const rec = new Record(trajectoryCol);
+        rec.set("session_id", args.session_id);
+        if (sessionRecord) rec.set("session", sessionRecord.getString("id"));
+        rec.set("step_number", nextStepNumber);
+        rec.set("step_type", stepType);
+        rec.set("tool_name", toolName);
+        rec.set("tool_input", args.tool_input || {});
+        rec.set("tool_output", args.tool_output || {});
+        rec.set("thought_text", args.thought_text || "");
+        rec.set("duration_ms", durationMs);
+        rec.set("tokens_prompt", tokensPrompt);
+        rec.set("tokens_completion", tokensCompletion);
+        rec.set("tokens_reasoning", tokensReasoning);
+        rec.set("cost_usd", stepCost);
+        rec.set("status", stepStatus);
+        rec.set("error_message", args.error_message || "");
+        rec.set("files_touched", args.files_touched || []);
+        rec.set("metadata", args.metadata || {});
+        e.app.save(rec);
+
+        if (sessionRecord) {
+            const curSteps = sessionRecord.getInt("total_steps") || 0;
+            const curTokens = sessionRecord.getInt("total_tokens") || 0;
+            const curCost = sessionRecord.getFloat("total_cost_usd") || 0.0;
+            const totalStepTokens = tokensPrompt + tokensCompletion + tokensReasoning;
+
+            sessionRecord.set("total_steps", curSteps + 1);
+            sessionRecord.set("total_tokens", curTokens + totalStepTokens);
+            sessionRecord.set("total_cost_usd", parseFloat((curCost + stepCost).toFixed(6)));
+            sessionRecord.set("current_step_type", stepType);
+            if (toolName) sessionRecord.set("active_tool", toolName);
+            if (args.thought_text && (!sessionRecord.getString("trajectory_summary") || curSteps % 5 === 0)) {
+                sessionRecord.set("trajectory_summary", (args.thought_text).substring(0, 240));
+            }
+            try { e.app.save(sessionRecord); } catch (x) {}
+        }
+
+        return {
+            success: true,
+            id: rec.getString("id"),
+            session_id: args.session_id,
+            step_number: nextStepNumber,
+            step_type: stepType,
+            tool_name: toolName,
+            status: stepStatus,
+            duration_ms: durationMs,
+            tokens_total: tokensPrompt + tokensCompletion + tokensReasoning,
+            cost_usd: stepCost
+        };
+    };
+
+    const getSessionTrajectories = (args) => {
+        if (!args.session_id) throw new Error("session_id is required");
+        let conditions = ["(session_id = {:sid} || session = {:sid})"];
+        let params = { sid: args.session_id };
+
+        try {
+            const sRec = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: args.session_id });
+            if (sRec) {
+                params.sid = sRec.getString("session_id") || args.session_id;
+                params.recid = sRec.getString("id");
+                conditions = ["(session_id = {:sid} || session = {:recid} || session_id = {:recid})"];
+            }
+        } catch (x) {}
+
+        if (args.step_type) {
+            conditions.push("step_type = {:step_type}");
+            params.step_type = args.step_type;
+        }
+        if (args.tool_name) {
+            conditions.push("tool_name = {:tool_name}");
+            params.tool_name = args.tool_name;
+        }
+        if (args.status) {
+            conditions.push("status = {:status}");
+            params.status = args.status;
+        }
+
+        const filter = conditions.join(" && ");
+        const limit = Math.min(parseInt(args.limit) || 200, 1000);
+        const offset = parseInt(args.offset) || 0;
+        const records = e.app.findRecordsByFilter("session_trajectories", filter, "step_number", limit, offset, params);
+
+        return {
+            session_id: args.session_id,
+            count: records.length,
+            trajectories: records.map(r => ({
+                id: r.getString("id"),
+                session_id: r.getString("session_id"),
+                step_number: r.getInt("step_number"),
+                step_type: r.getString("step_type"),
+                tool_name: r.getString("tool_name"),
+                tool_input: r.get("tool_input"),
+                tool_output: r.get("tool_output"),
+                thought_text: r.getString("thought_text"),
+                duration_ms: r.getInt("duration_ms"),
+                tokens_total: (r.getInt("tokens_prompt") || 0) + (r.getInt("tokens_completion") || 0) + (r.getInt("tokens_reasoning") || 0),
+                cost_usd: r.getFloat("cost_usd"),
+                status: r.getString("status"),
+                error_message: r.getString("error_message"),
+                files_touched: r.get("files_touched"),
+                created: r.getString("created")
+            }))
+        };
+    };
+
+    const getSessionTrajectorySummary = (args) => {
+        if (!args.session_id) throw new Error("session_id is required");
+        let conditions = ["(session_id = {:sid} || session = {:sid})"];
+        let params = { sid: args.session_id };
+
+        try {
+            const sRec = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: args.session_id });
+            if (sRec) {
+                params.sid = sRec.getString("session_id") || args.session_id;
+                params.recid = sRec.getString("id");
+                conditions = ["(session_id = {:sid} || session = {:recid} || session_id = {:recid})"];
+            }
+        } catch (x) {}
+
+        const filter = conditions.join(" && ");
+        const records = e.app.findRecordsByFilter("session_trajectories", filter, "step_number", 1000, 0, params);
+
+        let totalDuration = 0;
+        let totalTokens = 0;
+        let totalCost = 0.0;
+        let stepTypeCounts = {};
+        let toolCounts = {};
+        let toolDurations = {};
+        let failureCount = 0;
+        let filesSet = new Set();
+
+        records.forEach(r => {
+            const st = r.getString("step_type") || "thought";
+            const tool = r.getString("tool_name");
+            const dur = r.getInt("duration_ms") || 0;
+            const promptTok = r.getInt("tokens_prompt") || 0;
+            const compTok = r.getInt("tokens_completion") || 0;
+            const reasTok = r.getInt("tokens_reasoning") || 0;
+            const cost = r.getFloat("cost_usd") || 0.0;
+            const status = r.getString("status") || "success";
+
+            totalDuration += dur;
+            totalTokens += (promptTok + compTok + reasTok);
+            totalCost += cost;
+
+            stepTypeCounts[st] = (stepTypeCounts[st] || 0) + 1;
+            if (tool) {
+                toolCounts[tool] = (toolCounts[tool] || 0) + 1;
+                toolDurations[tool] = (toolDurations[tool] || 0) + dur;
+            }
+
+            if (status === "failed" || r.getString("error_message")) {
+                failureCount += 1;
+            }
+
+            const touched = r.get("files_touched");
+            if (Array.isArray(touched)) {
+                touched.forEach(f => { if (f) filesSet.add(f); });
+            }
+        });
+
+        let toolProfiling = [];
+        Object.keys(toolCounts).forEach(t => {
+            const c = toolCounts[t];
+            const d = toolDurations[t] || 0;
+            toolProfiling.push({
+                tool_name: t,
+                call_count: c,
+                total_duration_ms: d,
+                avg_duration_ms: c > 0 ? Math.round(d / c) : 0
+            });
+        });
+        toolProfiling.sort((a, b) => b.call_count - a.call_count);
+
+        return {
+            session_id: args.session_id,
+            total_steps: records.length,
+            total_duration_ms: totalDuration,
+            total_tokens: totalTokens,
+            total_cost_usd: parseFloat(totalCost.toFixed(6)),
+            failure_count: failureCount,
+            success_rate: records.length > 0 ? parseFloat((((records.length - failureCount) / records.length) * 100).toFixed(1)) : 100.0,
+            step_type_breakdown: stepTypeCounts,
+            tool_profiling: toolProfiling,
+            files_touched_count: filesSet.size,
+            files_touched: Array.from(filesSet)
+        };
+    };
+
+    const createSwarmCluster = (args) => {
+        let clusterCol = null;
+        try { clusterCol = e.app.findCollectionByNameOrId("swarm_clusters"); } catch (x) {}
+        if (!clusterCol) throw new Error("swarm_clusters collection not found");
+
+        const clusterId = (args.cluster_id || ("cluster_" + Math.random().toString(36).substring(2, 10))).trim();
+        const name = (args.name || ("Swarm Cluster " + clusterId.substring(8))).trim();
+        const objective = (args.objective || "").trim();
+        const topology = args.topology || "hierarchical";
+        const maxConcurrency = typeof args.max_concurrency === "number" ? args.max_concurrency : 4;
+        let coordinatorSid = (args.coordinator_session_id || "").trim();
+
+        let projectRecord = null;
+        if (args.project_id) {
+            try {
+                projectRecord = e.app.findFirstRecordByFilter("projects", "id = {:p} || slug = {:p} || name = {:p}", { p: args.project_id });
+            } catch (x) {}
+        }
+
+        const clusterRec = new Record(clusterCol);
+        clusterRec.set("cluster_id", clusterId);
+        clusterRec.set("name", name);
+        clusterRec.set("objective", objective);
+        if (projectRecord) clusterRec.set("project", projectRecord.getString("id"));
+        clusterRec.set("coordinator_session_id", coordinatorSid);
+        clusterRec.set("topology", topology);
+        clusterRec.set("status", "running");
+        clusterRec.set("max_concurrency", maxConcurrency);
+        clusterRec.set("total_workers", 0);
+        clusterRec.set("total_steps", 0);
+        clusterRec.set("total_tokens", 0);
+        clusterRec.set("total_cost_usd", 0.0);
+        clusterRec.set("metadata", args.metadata || {});
+        e.app.save(clusterRec);
+
+        let initialWorkers = [];
+        if (Array.isArray(args.workers) && args.workers.length > 0) {
+            let sessionCol = null;
+            try { sessionCol = e.app.findCollectionByNameOrId("agent_sessions"); } catch (x) {}
+
+            if (sessionCol) {
+                args.workers.forEach((w, idx) => {
+                    const wSid = (w.session_id || ("sess_worker_" + Math.random().toString(36).substring(2, 10))).trim();
+                    const wRole = w.swarm_role || w.role || "implementer";
+                    const wName = w.agent_name || ("Worker-" + (idx + 1) + " [" + wRole + "]");
+
+                    const wRec = new Record(sessionCol);
+                    wRec.set("session_id", wSid);
+                    wRec.set("agent_name", wName);
+                    wRec.set("role", wRole);
+                    wRec.set("swarm_role", wRole);
+                    wRec.set("swarm_cluster_id", clusterId);
+                    wRec.set("swarm_parent_id", coordinatorSid);
+                    wRec.set("status", "running");
+                    wRec.set("is_active", true);
+                    wRec.set("model", w.model || "gpt-5.5");
+                    wRec.set("prompt", w.prompt || objective);
+                    if (projectRecord) wRec.set("project", projectRecord.getString("id"));
+                    if (w.issue_id) wRec.set("issue", w.issue_id);
+                    e.app.save(wRec);
+
+                    initialWorkers.push({
+                        session_id: wSid,
+                        agent_name: wName,
+                        swarm_role: wRole,
+                        model: w.model || "gpt-5.5"
+                    });
+                });
+
+                clusterRec.set("total_workers", initialWorkers.length);
+                e.app.save(clusterRec);
+            }
+        }
+
+        return {
+            success: true,
+            cluster_id: clusterId,
+            id: clusterRec.getString("id"),
+            name: name,
+            objective: objective,
+            topology: topology,
+            status: "running",
+            max_concurrency: maxConcurrency,
+            total_workers: initialWorkers.length,
+            workers: initialWorkers
+        };
+    };
+
+    const listSwarmClusters = (args) => {
+        let conditions = ["1=1"];
+        let params = {};
+        if (args.status) {
+            conditions.push("status = {:status}");
+            params.status = args.status;
+        }
+        if (args.project_id) {
+            let pid = args.project_id;
+            try {
+                const prec = e.app.findFirstRecordByFilter("projects", "id = {:p} || slug = {:p} || name = {:p}", { p: pid });
+                if (prec) pid = prec.getString("id");
+            } catch (x) {}
+            conditions.push("project = {:p}");
+            params.p = pid;
+        }
+
+        const filter = conditions.join(" && ");
+        const records = e.app.findRecordsByFilter("swarm_clusters", filter, "-created", 100, 0, params);
+
+        return {
+            count: records.length,
+            clusters: records.map(r => ({
+                id: r.getString("id"),
+                cluster_id: r.getString("cluster_id"),
+                name: r.getString("name"),
+                objective: r.getString("objective"),
+                project: r.getString("project"),
+                coordinator_session_id: r.getString("coordinator_session_id"),
+                topology: r.getString("topology"),
+                status: r.getString("status"),
+                max_concurrency: r.getInt("max_concurrency"),
+                total_workers: r.getInt("total_workers"),
+                total_steps: r.getInt("total_steps"),
+                total_tokens: r.getInt("total_tokens"),
+                total_cost_usd: r.getFloat("total_cost_usd"),
+                created: r.getString("created")
+            }))
+        };
+    };
+
+    const getSwarmClusterDetails = (args) => {
+        if (!args.cluster_id) throw new Error("cluster_id is required");
+        let cluster = null;
+        try {
+            cluster = e.app.findFirstRecordByFilter("swarm_clusters", "id = {:id} || cluster_id = {:id}", { id: args.cluster_id });
+        } catch (x) {}
+        if (!cluster) throw new Error("Swarm cluster not found: " + args.cluster_id);
+
+        const clusterId = cluster.getString("cluster_id");
+        const workerSessions = e.app.findRecordsByFilter("agent_sessions", "swarm_cluster_id = {:cid}", "-created", 200, 0, { cid: clusterId });
+
+        return {
+            id: cluster.getString("id"),
+            cluster_id: clusterId,
+            name: cluster.getString("name"),
+            objective: cluster.getString("objective"),
+            project: cluster.getString("project"),
+            coordinator_session_id: cluster.getString("coordinator_session_id"),
+            topology: cluster.getString("topology"),
+            status: cluster.getString("status"),
+            max_concurrency: cluster.getInt("max_concurrency"),
+            total_workers: workerSessions.length,
+            workers: workerSessions.map(w => ({
+                id: w.getString("id"),
+                session_id: w.getString("session_id"),
+                agent_name: w.getString("agent_name"),
+                swarm_role: w.getString("swarm_role") || w.getString("role"),
+                status: w.getString("status"),
+                is_active: w.getBool("is_active"),
+                model: w.getString("model"),
+                total_steps: w.getInt("total_steps") || 0,
+                total_tokens: w.getInt("total_tokens") || 0,
+                total_cost_usd: w.getFloat("total_cost_usd") || 0.0
+            })),
+            total_steps: cluster.getInt("total_steps"),
+            total_tokens: cluster.getInt("total_tokens"),
+            total_cost_usd: cluster.getFloat("total_cost_usd")
+        };
+    };
+
+    const addSwarmClusterWorkers = (args) => {
+        if (!args.cluster_id) throw new Error("cluster_id is required");
+        let cluster = null;
+        try {
+            cluster = e.app.findFirstRecordByFilter("swarm_clusters", "id = {:id} || cluster_id = {:id}", { id: args.cluster_id });
+        } catch (x) {}
+        if (!cluster) throw new Error("Swarm cluster not found: " + args.cluster_id);
+
+        const clusterId = cluster.getString("cluster_id");
+        const workers = Array.isArray(args.workers) ? args.workers : [args];
+
+        let sessionCol = null;
+        try { sessionCol = e.app.findCollectionByNameOrId("agent_sessions"); } catch (x) {}
+        if (!sessionCol) throw new Error("agent_sessions collection not found");
+
+        let addedWorkers = [];
+        workers.forEach((w, idx) => {
+            const sid = (w.session_id || ("sess_worker_" + Math.random().toString(36).substring(2, 10))).trim();
+            const wRole = w.swarm_role || w.role || "implementer";
+            const wName = w.agent_name || ("Worker-" + (cluster.getInt("total_workers") + idx + 1) + " [" + wRole + "]");
+
+            let existing = null;
+            try {
+                existing = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: sid });
+            } catch (x) {}
+
+            if (existing) {
+                existing.set("swarm_cluster_id", clusterId);
+                existing.set("swarm_role", wRole);
+                if (w.swarm_parent_id || cluster.getString("coordinator_session_id")) {
+                    existing.set("swarm_parent_id", w.swarm_parent_id || cluster.getString("coordinator_session_id"));
+                }
+                e.app.save(existing);
+                addedWorkers.push({ session_id: sid, agent_name: existing.getString("agent_name"), swarm_role: wRole });
+            } else {
+                const rec = new Record(sessionCol);
+                rec.set("session_id", sid);
+                rec.set("agent_name", wName);
+                rec.set("role", wRole);
+                rec.set("swarm_role", wRole);
+                rec.set("swarm_cluster_id", clusterId);
+                rec.set("swarm_parent_id", w.swarm_parent_id || cluster.getString("coordinator_session_id"));
+                rec.set("status", "running");
+                rec.set("is_active", true);
+                rec.set("model", w.model || "gpt-5.5");
+                rec.set("prompt", w.prompt || cluster.getString("objective"));
+                if (cluster.getString("project")) rec.set("project", cluster.getString("project"));
+                if (w.issue_id) rec.set("issue", w.issue_id);
+                e.app.save(rec);
+                addedWorkers.push({ session_id: sid, agent_name: wName, swarm_role: wRole });
+            }
+        });
+
+        const allWorkers = e.app.findRecordsByFilter("agent_sessions", "swarm_cluster_id = {:cid}", "-created", 500, 0, { cid: clusterId });
+        cluster.set("total_workers", allWorkers.length);
+        e.app.save(cluster);
+
+        return {
+            success: true,
+            cluster_id: clusterId,
+            added_count: addedWorkers.length,
+            total_workers: allWorkers.length,
+            workers: addedWorkers
+        };
+    };
+
+    const updateSwarmClusterStatus = (args) => {
+        if (!args.cluster_id) throw new Error("cluster_id is required");
+        let cluster = null;
+        try {
+            cluster = e.app.findFirstRecordByFilter("swarm_clusters", "id = {:id} || cluster_id = {:id}", { id: args.cluster_id });
+        } catch (x) {}
+        if (!cluster) throw new Error("Swarm cluster not found: " + args.cluster_id);
+
+        const clusterId = cluster.getString("cluster_id");
+        const targetStatus = args.status;
+        if (!["running", "paused", "completed", "failed", "aborted"].includes(targetStatus)) {
+            throw new Error("Invalid status: " + targetStatus);
+        }
+
+        cluster.set("status", targetStatus);
+        e.app.save(cluster);
+
+        if (args.cascade !== false) {
+            const workers = e.app.findRecordsByFilter("agent_sessions", "swarm_cluster_id = {:cid}", "-created", 500, 0, { cid: clusterId });
+            workers.forEach(w => {
+                if (targetStatus === "paused") {
+                    w.set("is_paused", true);
+                } else if (targetStatus === "running") {
+                    w.set("is_paused", false);
+                    w.set("status", "running");
+                    w.set("is_active", true);
+                } else if (targetStatus === "completed") {
+                    w.set("status", "completed");
+                    w.set("is_active", false);
+                } else if (targetStatus === "aborted" || targetStatus === "failed") {
+                    w.set("status", targetStatus === "aborted" ? "cancelled" : "failed");
+                    w.set("is_active", false);
+                }
+                try { e.app.save(w); } catch (x) {}
+            });
+        }
+
+        return {
+            success: true,
+            cluster_id: clusterId,
+            status: targetStatus
+        };
+    };
 
     // ---------- 1. Authentication ----------
     let authRecord = e.auth || null
@@ -6001,6 +6631,14 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         else if (toolName === "get_session_dag") { result = getSessionDag(args) }
         else if (toolName === "arbitrate_session_conflicts") { result = arbitrateSessionConflicts(args) }
         else if (toolName === "dispatch_session_swarm") { result = dispatchSessionSwarm(args) }
+        else if (toolName === "record_session_trajectory_step") { result = recordSessionTrajectoryStep(args) }
+        else if (toolName === "get_session_trajectories") { result = getSessionTrajectories(args) }
+        else if (toolName === "get_session_trajectory_summary") { result = getSessionTrajectorySummary(args) }
+        else if (toolName === "create_swarm_cluster") { result = createSwarmCluster(args) }
+        else if (toolName === "list_swarm_clusters") { result = listSwarmClusters(args) }
+        else if (toolName === "get_swarm_cluster_details") { result = getSwarmClusterDetails(args) }
+        else if (toolName === "add_swarm_cluster_workers") { result = addSwarmClusterWorkers(args) }
+        else if (toolName === "update_swarm_cluster_status") { result = updateSwarmClusterStatus(args) }
         else { return fail(-32602, "Unknown tool: " + toolName) }
         return ok({ content: [{ type: "text", text: JSON.stringify(result) }] })
     } catch (toolErr) {

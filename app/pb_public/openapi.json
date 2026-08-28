@@ -6663,6 +6663,240 @@
           "201": { "description": "Swarm child sessions dispatched" }
         }
       }
+    },
+    "/projectbase/sessions/{id}/trajectories": {
+      "post": {
+        "tags": ["Agent Step Trajectories & Telemetry"],
+        "summary": "Record a discrete execution trajectory step with duration, tokens, and tool input/output",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "step_type": { "type": "string" },
+                  "tool_name": { "type": "string" },
+                  "tool_input": { "type": "object" },
+                  "tool_output": { "type": "object" },
+                  "thought_text": { "type": "string" },
+                  "duration_ms": { "type": "number" },
+                  "tokens_prompt": { "type": "number" },
+                  "tokens_completion": { "type": "number" },
+                  "tokens_reasoning": { "type": "number" },
+                  "cost_usd": { "type": "number" },
+                  "status": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Trajectory step recorded" },
+          "400": { "description": "Invalid payload" }
+        }
+      },
+      "get": {
+        "tags": ["Agent Step Trajectories & Telemetry"],
+        "summary": "Retrieve chronological trajectory timeline for an agent session",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "step_type", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "tool_name", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer" } },
+          { "name": "offset", "in": "query", "required": false, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Trajectory steps timeline" },
+          "500": { "description": "Failed to fetch trajectories" }
+        }
+      }
+    },
+    "/projectbase/sessions/trajectories": {
+      "post": {
+        "tags": ["Agent Step Trajectories & Telemetry"],
+        "summary": "Ingest a discrete execution trajectory step with session_id in payload",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "session_id": { "type": "string" },
+                  "step_type": { "type": "string" },
+                  "tool_name": { "type": "string" }
+                },
+                "required": ["session_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Trajectory step recorded" },
+          "400": { "description": "session_id is required" }
+        }
+      }
+    },
+    "/projectbase/sessions/trajectories/bulk": {
+      "post": {
+        "tags": ["Agent Step Trajectories & Telemetry"],
+        "summary": "Batch ingest multiple trajectory steps across agent sessions",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "steps": { "type": "array" }
+                },
+                "required": ["steps"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Trajectory steps bulk ingested" },
+          "400": { "description": "steps array is required" }
+        }
+      }
+    },
+    "/projectbase/sessions/{id}/trajectories/summary": {
+      "get": {
+        "tags": ["Agent Step Trajectories & Telemetry"],
+        "summary": "Retrieve trajectory summary and tool profiling metrics for a session",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Trajectory summary metrics" },
+          "500": { "description": "Failed to compute summary" }
+        }
+      }
+    },
+    "/projectbase/swarm/clusters": {
+      "post": {
+        "tags": ["Agent Swarm Clusters & Choreography"],
+        "summary": "Initialize a multi-agent swarm cluster with designated topology and workers",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cluster_id": { "type": "string" },
+                  "name": { "type": "string" },
+                  "objective": { "type": "string" },
+                  "topology": { "type": "string" },
+                  "workers": { "type": "array" }
+                },
+                "required": ["objective"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Swarm cluster created" },
+          "500": { "description": "Failed to create cluster" }
+        }
+      },
+      "get": {
+        "tags": ["Agent Swarm Clusters & Choreography"],
+        "summary": "List multi-agent swarm clusters with statuses and metrics",
+        "parameters": [
+          { "name": "status", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "project", "in": "query", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "List of swarm clusters" }
+        }
+      }
+    },
+    "/projectbase/swarm/clusters/{id}": {
+      "get": {
+        "tags": ["Agent Swarm Clusters & Choreography"],
+        "summary": "Get single swarm cluster with all member worker agent sessions",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Swarm cluster details" },
+          "404": { "description": "Cluster not found" }
+        }
+      }
+    },
+    "/projectbase/swarm/clusters/{id}/workers": {
+      "post": {
+        "tags": ["Agent Swarm Clusters & Choreography"],
+        "summary": "Add worker agent sessions to an existing swarm cluster",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workers": { "type": "array" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Workers added to cluster" },
+          "404": { "description": "Cluster not found" }
+        }
+      }
+    },
+    "/projectbase/swarm/clusters/{id}/status": {
+      "post": {
+        "tags": ["Agent Swarm Clusters & Choreography"],
+        "summary": "Update swarm cluster lifecycle status with cascading worker control",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": { "type": "string", "enum": ["running", "paused", "completed", "failed", "aborted"] },
+                  "cascade": { "type": "boolean" }
+                },
+                "required": ["status"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Cluster status updated" },
+          "400": { "description": "Invalid status" },
+          "404": { "description": "Cluster not found" }
+        }
+      }
+    },
+    "/projectbase/swarm/clusters/{id}/metrics": {
+      "get": {
+        "tags": ["Agent Swarm Clusters & Choreography"],
+        "summary": "Aggregate cluster execution metrics across all member workers",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Swarm cluster metrics" },
+          "404": { "description": "Cluster not found" }
+        }
+      }
     }
   }
 }

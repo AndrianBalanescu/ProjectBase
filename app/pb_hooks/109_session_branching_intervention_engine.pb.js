@@ -159,13 +159,17 @@ routerAdd("GET", "/api/projectbase/sessions/{id}/dag", (e) => {
             filter = "project = {:p}";
             params = { p: projectId };
         }
-        const allSessions = e.app.findRecordsByFilter("agent_sessions", filter, "created", 500, 0, params);
+        const allSessions = e.app.findRecordsByFilter("agent_sessions", filter, "-created", 5000, 0, params);
 
         let sessionMap = {};
         allSessions.forEach(s => {
             const sid = s.getString("session_id") || s.getString("id");
             sessionMap[sid] = s;
+            sessionMap[s.getString("id")] = s;
+            if (s.getString("session_id")) sessionMap[s.getString("session_id")] = s;
         });
+        sessionMap[target.getString("id")] = target;
+        if (target.getString("session_id")) sessionMap[target.getString("session_id")] = target;
 
         let current = target;
         let root = target;
@@ -176,8 +180,19 @@ routerAdd("GET", "/api/projectbase/sessions/{id}/dag", (e) => {
             visited.add(sid);
             root = current;
             const parentSid = current.getString("parent_session_id");
-            if (!parentSid || !sessionMap[parentSid]) break;
-            current = sessionMap[parentSid];
+            if (!parentSid) break;
+            let pRec = sessionMap[parentSid];
+            if (!pRec) {
+                try {
+                    pRec = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: parentSid });
+                    if (pRec) {
+                        sessionMap[pRec.getString("id")] = pRec;
+                        if (pRec.getString("session_id")) sessionMap[pRec.getString("session_id")] = pRec;
+                    }
+                } catch (x) {}
+            }
+            if (!pRec) break;
+            current = pRec;
         }
 
         const rootSid = root.getString("session_id") || root.getString("id");

@@ -1943,83 +1943,49 @@ const AgentsViewComponent = {
                   Streaming
                 </span>
               </div>
-              <!-- Tab Switcher -->
-              <div class="flex items-center gap-1 mt-1">
+              <!-- Clean 3-Pillar Tab Switcher -->
+              <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
                 <button
                   @click="activeTab = 'chat'"
-                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors"
-                  :class="activeTab === 'chat' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                  class="px-2.5 py-1 text-xs font-semibold rounded-md transition-colors flex items-center gap-1"
+                  :class="activeTab === 'chat' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'"
                 >💬 Chat Stream</button>
-                <button
-                  @click="activeTab = 'workload'; loadWorkload(); loadLiveBenchmarks();"
-                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
-                  :class="activeTab === 'workload' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
-                >⚡ Workload & Autoscaler</button>
-                <button
-                  @click="activeTab = 'anomalies'; loadAnomalies();"
-                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
-                  :class="activeTab === 'anomalies' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
-                >
-                  <span>🩺 Diagnostics</span>
-                  <span v-if="anomaliesReport && anomaliesReport.total_anomalies > 0" class="px-1 py-0.5 rounded-full bg-rose-500 text-white text-[9px] font-bold">
-                    {{ anomaliesReport.total_anomalies }}
-                  </span>
-                </button>
-                <button
-                  @click="activeTab = 'throughput'; loadThroughput();"
-                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors"
-                  :class="activeTab === 'throughput' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
-                >📊 MTTC Analytics</button>
-                <button
-                  @click="activeTab = 'federation'"
-                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors"
-                  :class="activeTab === 'federation' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
-                >🌐 Federation</button>
-                <button
-                  @click="activeTab = 'cluster'; loadClusterState();"
-                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors"
-                  :class="activeTab === 'cluster' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
-                >🌐 Cluster & Edge</button>
-                <button
-                  @click="activeTab = 'webhooks'; loadWebhookState();"
-                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors"
-                  :class="activeTab === 'webhooks' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
-                >📡 Webhooks & DLQ</button>
-                <button
-                  @click="activeTab = 'observability'; loadObservabilityState();"
-                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
-                  :class="activeTab === 'observability' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
-                >📚 SDK & Observability</button>
-                <button
-                  @click="activeTab = 'consensus'; loadConsensusState();"
-                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
-                  :class="activeTab === 'consensus' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
-                >⚖️ Consensus & Gates</button>
-                <button
-                  @click="activeTab = 'sso_rbac'; loadSsoRbacState();"
-                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
-                  :class="activeTab === 'sso_rbac' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
-                >🛡️ Identity & RBAC</button>
-                <button
-                  @click="activeTab = 'automations'; loadAutomationsState();"
-                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
-                  :class="activeTab === 'automations' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
-                >⚡ Automations</button>
-                <button
-                  @click="activeTab = 'tenants'; loadTenantsState();"
-                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
-                  :class="activeTab === 'tenants' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
-                >🏢 Multi-Tenant</button>
-                <button
-                  @click="activeTab = 'auto_heal'; loadAutoHealState();"
-                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
-                  :class="activeTab === 'auto_heal' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
-                >🩺 Auto-Heal & Remediation</button>
+
                 <button
                   @click="activeTab = 'runs'; loadAgentSessions(); loadSessionMetrics();"
-                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
-                  :class="activeTab === 'runs' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
-                >🚀 Live Runs & Telemetry</button>
+                  class="px-2.5 py-1 text-xs font-semibold rounded-md transition-colors flex items-center gap-1"
+                  :class="activeTab === 'runs' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'"
+                >
+                  <span>🚀 Live Runs & Telemetry</span>
+                  <span v-if="sessions && sessions.length" class="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">
+                    {{ sessions.filter(s => s.status === 'running' || s.is_active).length || sessions.length }}
+                  </span>
+                </button>
+
+                <!-- Engines & Governance Dropdown Selector -->
+                <div class="relative inline-flex items-center">
+                  <select
+                    :value="isGovernanceTab(activeTab) ? activeTab : ''"
+                    @change="onGovernanceTabSelect($event.target.value)"
+                    class="px-2.5 py-1 text-xs font-semibold rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700/60 focus:outline-none cursor-pointer"
+                    :class="isGovernanceTab(activeTab) ? 'ring-1 ring-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300' : ''"
+                  >
+                    <option value="" disabled selected>⚙️ Advanced Engines & Settings ▾</option>
+                    <option value="workload">⚡ Workload & Autoscaler</option>
+                    <option value="anomalies">🩺 Diagnostics & Health</option>
+                    <option value="semantic">🧠 Semantic Admission Brain</option>
+                    <option value="auto_heal">🛡️ Autonomous Auto-Healing</option>
+                    <option value="sso_rbac">🛡️ RBAC & SSO Identity</option>
+                    <option value="automations">⚡ Workflow Automations</option>
+                    <option value="tenants">🏢 Multi-Tenant Quotas</option>
+                    <option value="webhooks">📡 Webhooks & DLQ</option>
+                    <option value="consensus">⚖️ Consensus & Gates</option>
+                    <option value="cluster">🌐 Cluster & Edge Sync</option>
+                    <option value="throughput">📊 MTTC Analytics</option>
+                    <option value="observability">📚 SDK & Observability</option>
+                    <option value="federation">🌐 Multi-Cluster Federation</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>

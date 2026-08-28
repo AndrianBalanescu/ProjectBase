@@ -140,7 +140,7 @@ routerAdd("POST", "/api/projectbase/semantic/review", (e) => {
                     query: queryText,
                     documents: docs
                 }),
-                timeout: 5
+                timeout: 2
             })
             if (resp.statusCode === 200 && resp.json && resp.json.results) {
                 return resp.json.results
@@ -508,7 +508,7 @@ routerAdd("POST", "/api/projectbase/semantic/rerank", (e) => {
                         query: query,
                         documents: docs
                     }),
-                    timeout: 5
+                    timeout: 2
                 })
                 if (resp.statusCode === 200 && resp.json && resp.json.results) {
                     neuralResults = resp.json.results
