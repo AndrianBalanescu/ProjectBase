@@ -79,11 +79,15 @@ ProjectBase operates on the **Session-as-a-Card** principle:
 
 1. **Pick Objective:** Identify the target milestone or epic from `docs/ROADMAP.md` or high-level project Intent.
 2. **Execute Cleanly:** Write clean code, migrations, or frontend templates.
-3. **Verify Mechanically:**
-   - Backend: `uv run --with pytest pytest tests/` — all tests must pass.
-   - Frontend/UI: `scripts/qa/qa-render.sh` (or `flow-ibrowse.sh`) with 0 console errors and 0 DOM overflow.
+3. **Verify Mechanically (Mandatory Dual-Gate):**
+   - **Backend API:** `uv run --with pytest pytest tests/` (or `/home/ubuntu/.local/bin/pytest`) — all tests must pass 100%.
+   - **Frontend UI/UX Sceptic Audit:** Execute `/ibrowse-test` via `scripts/qa/qa-render.sh 8120` or homelab iBrowse.
+     - **0 Console Errors** & **0 Page Exceptions**.
+     - **0 px Horizontal Overflow** across Desktop (1440px), Tablet (768px), and Mobile (375px).
+     - Full interactive verification: drag-and-drop Kanban, resizable drawers, fullscreen editors, command palette (`Cmd+K`), dark/light themes, and real-time live run updates.
+     - Capture concrete numerical evidence and visual proof.
 4. **Commit & Push:** Make ONE consolidated, descriptive commit per functional unit and push to `origin main`.
-5. **Session Ingestion:** The daemon and hooks automatically attach the git commit and test verdict to the ProjectBase board.
+5. **Session Ingestion:** The daemon and hooks automatically attach the git commit, test verdict, and iBrowse audit report to the ProjectBase board.
 
 ## 7. Working rules
 

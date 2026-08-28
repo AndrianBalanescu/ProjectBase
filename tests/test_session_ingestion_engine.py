@@ -164,38 +164,41 @@ def test_session_complete_and_auto_docking():
     assert i_status in (200, 201)
     issue_id = i_body["id"]
 
-    # Ingest session linked to issue
-    sid = _uid()
-    _request("POST", "/api/projectbase/sessions/ingest", {
-        "session_id": sid,
-        "issue_id": issue_id,
-        "project_id": project_id,
-        "agent_name": "flomaster",
-        "runtime": "flomaster",
-        "status": "running"
-    })
+    try:
+        # Ingest session linked to issue
+        sid = _uid()
+        _request("POST", "/api/projectbase/sessions/ingest", {
+            "session_id": sid,
+            "issue_id": issue_id,
+            "project_id": project_id,
+            "agent_name": "flomaster",
+            "runtime": "flomaster",
+            "status": "running"
+        })
 
-    # Complete session with passing test verdict
-    c_status, c_body = _request("POST", "/api/projectbase/sessions/complete", {
-        "session_id": sid,
-        "exit_code": 0,
-        "git_commit_after": "feat123456",
-        "test_verdict": {
-            "passed": 390,
-            "failed": 0,
-            "total": 390,
-            "status": "passed",
-            "duration_s": 52.4
-        }
-    })
-    assert c_status == 200
-    assert c_body["status"] == "completed"
-    assert c_body["auto_docked"] is True
+        # Complete session with passing test verdict
+        c_status, c_body = _request("POST", "/api/projectbase/sessions/complete", {
+            "session_id": sid,
+            "exit_code": 0,
+            "git_commit_after": "feat123456",
+            "test_verdict": {
+                "passed": 390,
+                "failed": 0,
+                "total": 390,
+                "status": "passed",
+                "duration_s": 52.4
+            }
+        })
+        assert c_status == 200
+        assert c_body["status"] == "completed"
+        assert c_body["auto_docked"] is True
 
-    # Check issue status was updated to done
-    chk_status, chk_body = _request("GET", f"/api/collections/issues/records/{issue_id}", headers=headers)
-    assert chk_status == 200
-    assert chk_body["status"] == "done"
+        # Check issue status was updated to done
+        chk_status, chk_body = _request("GET", f"/api/collections/issues/records/{issue_id}", headers=headers)
+        assert chk_status == 200
+        assert chk_body["status"] == "done"
+    finally:
+        _request("DELETE", f"/api/collections/issues/records/{issue_id}", headers=headers)
 
 
 # 6. Test Session Forking for Re-Tasking
@@ -253,28 +256,31 @@ def test_dock_and_undock_session():
     assert i_status in (200, 201)
     real_issue_id = i_body["id"]
 
-    sid = _uid()
-    _request("POST", "/api/projectbase/sessions/ingest", {
-        "session_id": sid,
-        "agent_name": "flomaster",
-        "status": "running"
-    })
+    try:
+        sid = _uid()
+        _request("POST", "/api/projectbase/sessions/ingest", {
+            "session_id": sid,
+            "agent_name": "flomaster",
+            "status": "running"
+        })
 
-    # Dock
-    status, body = _request("POST", f"/api/projectbase/sessions/{sid}/dock", {
-        "issue_id": real_issue_id
-    })
-    assert status == 200
-    assert body["auto_docked"] is True
-    assert body["issue_id"] == real_issue_id
+        # Dock
+        status, body = _request("POST", f"/api/projectbase/sessions/{sid}/dock", {
+            "issue_id": real_issue_id
+        })
+        assert status == 200
+        assert body["auto_docked"] is True
+        assert body["issue_id"] == real_issue_id
 
-    # Undock
-    u_status, u_body = _request("POST", f"/api/projectbase/sessions/{sid}/dock", {
-        "issue_id": ""
-    })
-    assert u_status == 200
-    assert u_body["auto_docked"] is False
-    assert u_body["issue_id"] == ""
+        # Undock
+        u_status, u_body = _request("POST", f"/api/projectbase/sessions/{sid}/dock", {
+            "issue_id": ""
+        })
+        assert u_status == 200
+        assert u_body["auto_docked"] is False
+        assert u_body["issue_id"] == ""
+    finally:
+        _request("DELETE", f"/api/collections/issues/records/{real_issue_id}", headers=headers)
 
 
 # 9. Test Execution Metrics
