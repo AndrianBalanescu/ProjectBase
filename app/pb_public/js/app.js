@@ -1166,7 +1166,7 @@ const App = {
       }
     },
 
-    async handleSyncAgents() {
+    async handleSyncAgents(isManual = false) {
       this.agentSyncing = true;
       try {
         const res = await API.syncAgents();
@@ -1176,10 +1176,14 @@ const App = {
         this.agentSessions = (live && live.sessions) || [];
         this.agentSource = (live && live.source) || 'bridge';
         const n = (res && res.synced) || 0;
-        this.showToast(`${n} agent${n === 1 ? '' : 's'} synced to the board`, 'success');
+        if (isManual && n > 0) {
+          this.showToast(`${n} agent${n === 1 ? '' : 's'} synced to the board`, 'success');
+        }
       } catch (err) {
         console.warn('Agent sync failed:', err);
-        this.showToast('Agent sync failed', 'error');
+        if (isManual) {
+          this.showToast('Agent sync failed', 'error');
+        }
       } finally {
         this.agentSyncing = false;
       }

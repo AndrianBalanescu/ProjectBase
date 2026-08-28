@@ -6569,15 +6569,12 @@ const AgentsViewComponent = {
                   v-model="quotaSimulator.model"
                   class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs focus:outline-none"
                 >
-                  <option value="claude-3-5-sonnet">Claude 3.5 Sonnet ($3 / $15)</option>
-                  <option value="claude-3-opus">Claude 3 Opus ($15 / $75)</option>
-                  <option value="claude-3-5-haiku">Claude 3.5 Haiku ($0.80 / $4)</option>
-                  <option value="gpt-4o">GPT-4o ($2.50 / $10)</option>
-                  <option value="gpt-4o-mini">GPT-4o Mini ($0.15 / $0.60)</option>
-                  <option value="deepseek-v3">DeepSeek V3 ($0.14 / $0.28)</option>
-                  <option value="deepseek-r1">DeepSeek R1 ($0.55 / $2.19)</option>
-                  <option value="gemini-2.0-flash">Gemini 2.0 Flash ($0.10 / $0.40)</option>
-                  <option value="omniroute/premium">OmniRoute Local (Free Tier)</option>
+                  <option value="omniroute/premium">OmniRoute Premium (Default Homelab Combo)</option>
+                  <option value="omniroute/fast">OmniRoute Fast (Low Latency)</option>
+                  <option value="vram/BAAI/bge-m3">OmniRoute Neural BGE-M3 (Local VRAM)</option>
+                  <option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
+                  <option value="gpt-4o">GPT-4o</option>
+                  <option value="deepseek-v3">DeepSeek V3</option>
                 </select>
               </div>
 
