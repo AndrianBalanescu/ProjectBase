@@ -202,7 +202,23 @@ const AgentsViewComponent = {
       isSweepingCrash: false,
       autoHealSuccessMsg: null,
       autoHealErrorMsg: null,
-      isLoadingAutoHeal: false
+      isLoadingAutoHeal: false,
+      // Execution Plane & Live Runs State (Milestone 1 & 2)
+      agentSessionRuns: [],
+      liveSessionRuns: [],
+      sessionMetrics: null,
+      selectedSessionRun: null,
+      sessionFilterStatus: 'all',
+      sessionFilterAgent: '',
+      newIngestAgentName: 'flomaster',
+      newIngestRuntime: 'flomaster',
+      newIngestModel: 'gpt-5.5',
+      newIngestCommand: '',
+      newIngestWorkdir: '/data/projects/projectbase',
+      isIngestingSession: false,
+      sessionSuccessMsg: null,
+      sessionErrorMsg: null,
+      isLoadingSessions: false
     };
   },
   computed: {
@@ -1474,6 +1490,97 @@ const AgentsViewComponent = {
       } finally {
         this.isSweepingCrash = false;
       }
+    },
+    // Execution Plane & Live Runs Methods (Milestone 1 & 2)
+    async loadAgentSessions() {
+      this.isLoadingSessions = true;
+      try {
+        const params = {};
+        if (this.sessionFilterStatus && this.sessionFilterStatus !== 'all') params.status = this.sessionFilterStatus;
+        if (this.sessionFilterAgent) params.agent = this.sessionFilterAgent;
+        const res = await API.getAgentSessions(params);
+        this.agentSessionRuns = res.sessions || [];
+        if (this.agentSessionRuns.length > 0 && !this.selectedSessionRun) {
+          this.selectedSessionRun = this.agentSessionRuns[0];
+        }
+      } catch (e) {
+        console.error('Failed to load agent sessions', e);
+      } finally {
+        this.isLoadingSessions = false;
+      }
+    },
+    async loadSessionMetrics() {
+      try {
+        this.sessionMetrics = await API.getAgentSessionMetrics();
+      } catch (e) {
+        console.error('Failed to load session metrics', e);
+      }
+    },
+    async handleIngestSession() {
+      if (!this.newIngestCommand) {
+        this.sessionErrorMsg = 'Command or task intent is required';
+        return;
+      }
+      this.isIngestingSession = true;
+      this.sessionSuccessMsg = null;
+      this.sessionErrorMsg = null;
+      try {
+        const res = await API.ingestAgentSession({
+          agent_name: this.newIngestAgentName,
+          runtime: this.newIngestRuntime,
+          model: this.newIngestModel,
+          command: this.newIngestCommand,
+          workdir: this.newIngestWorkdir,
+          status: 'running',
+          pid: Math.floor(10000 + Math.random() * 90000)
+        });
+        this.sessionSuccessMsg = `Execution run "${res.session_id}" ingested successfully into Execution Plane!`;
+        this.newIngestCommand = '';
+        await this.loadAgentSessions();
+        await this.loadSessionMetrics();
+      } catch (e) {
+        this.sessionErrorMsg = 'Failed to ingest session: ' + (e.message || String(e));
+      } finally {
+        this.isIngestingSession = false;
+      }
+    },
+    async handleTerminateSession(id) {
+      this.sessionSuccessMsg = null;
+      this.sessionErrorMsg = null;
+      try {
+        await API.terminateAgentSession(id);
+        this.sessionSuccessMsg = 'Session termination signal dispatched';
+        await this.loadAgentSessions();
+        await this.loadSessionMetrics();
+      } catch (e) {
+        this.sessionErrorMsg = 'Failed to terminate session: ' + (e.message || String(e));
+      }
+    },
+    async handleForkSession(id) {
+      this.sessionSuccessMsg = null;
+      this.sessionErrorMsg = null;
+      try {
+        const res = await API.forkAgentSession(id);
+        this.sessionSuccessMsg = `Session forked successfully! New session: ${res.new_session_id}`;
+        await this.loadAgentSessions();
+        await this.loadSessionMetrics();
+      } catch (e) {
+        this.sessionErrorMsg = 'Failed to fork session: ' + (e.message || String(e));
+      }
+    },
+    async handleDockSession(id, issueId) {
+      this.sessionSuccessMsg = null;
+      this.sessionErrorMsg = null;
+      try {
+        await API.dockAgentSession(id, issueId);
+        this.sessionSuccessMsg = 'Session docking updated successfully';
+        await this.loadAgentSessions();
+      } catch (e) {
+        this.sessionErrorMsg = 'Failed to dock session: ' + (e.message || String(e));
+      }
+    },
+    selectSessionRun(run) {
+      this.selectedSessionRun = run;
     }
   },
   template: `
@@ -1669,6 +1776,11 @@ const AgentsViewComponent = {
                   class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
                   :class="activeTab === 'auto_heal' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
                 >🩺 Auto-Heal & Remediation</button>
+                <button
+                  @click="activeTab = 'runs'; loadAgentSessions(); loadSessionMetrics();"
+                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
+                  :class="activeTab === 'runs' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                >🚀 Live Runs & Telemetry</button>
               </div>
             </div>
           </div>
@@ -4732,6 +4844,297 @@ const AgentsViewComponent = {
                 </tbody>
               </table>
             </div>
+          </div>
+
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- PANE 2J: EXECUTION PLANE & LIVE RUNS STREAM (EPIC 24)     -->
+        <!-- ========================================================= -->
+        <div
+          v-if="activeTab === 'runs'"
+          class="flex-1 flex flex-col p-4 space-y-4 overflow-y-auto"
+        >
+          <!-- Header Banner -->
+          <div class="p-4 rounded-xl bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-zinc-900 border border-blue-700/40 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-lg">🚀</span>
+                <h3 class="text-sm font-bold text-white tracking-wide">Execution Plane: Session-as-a-Card Live Runs</h3>
+                <span class="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-mono font-bold animate-pulse">LIVE STREAM</span>
+              </div>
+              <p class="text-xs text-zinc-300 mt-1">
+                Real-time agent execution stream. PIDs, file touched telemetry, git diffs, and test verdicts are ingested directly without agent bookkeeping tax.
+              </p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button
+                @click="loadAgentSessions(); loadSessionMetrics();"
+                class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-bold transition-colors flex items-center gap-1.5"
+              >
+                <span>🔄</span>
+                <span>Refresh Stream</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Notification / Alerts -->
+          <div v-if="sessionSuccessMsg" class="p-3 rounded-lg bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <span>✅</span>
+              <span>{{ sessionSuccessMsg }}</span>
+            </span>
+            <button @click="sessionSuccessMsg = null" class="text-emerald-400 hover:text-emerald-200">✕</button>
+          </div>
+          <div v-if="sessionErrorMsg" class="p-3 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-xs flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <span>⚠️</span>
+              <span>{{ sessionErrorMsg }}</span>
+            </span>
+            <button @click="sessionErrorMsg = null" class="text-rose-400 hover:text-rose-200">✕</button>
+          </div>
+
+          <!-- Top Metrics Cards -->
+          <div v-if="sessionMetrics" class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-medium text-zinc-500 uppercase">Total Sessions</div>
+              <div class="text-lg font-bold text-zinc-900 dark:text-zinc-100 mt-0.5">{{ sessionMetrics.total_sessions }}</div>
+            </div>
+            <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-medium text-zinc-500 uppercase">Active Runs</div>
+              <div class="text-lg font-bold text-blue-600 dark:text-blue-400 mt-0.5 flex items-center gap-1.5">
+                <span>{{ sessionMetrics.active_count }}</span>
+                <span v-if="sessionMetrics.active_count > 0" class="w-2 h-2 rounded-full bg-blue-500 animate-ping"></span>
+              </div>
+            </div>
+            <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-medium text-zinc-500 uppercase">Pass Rate</div>
+              <div class="text-lg font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">{{ sessionMetrics.pass_rate_percent }}%</div>
+            </div>
+            <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-medium text-zinc-500 uppercase">Tokens Streamed</div>
+              <div class="text-lg font-bold text-purple-600 dark:text-purple-400 mt-0.5 font-mono">{{ (sessionMetrics.total_tokens || 0).toLocaleString() }}</div>
+            </div>
+            <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-medium text-zinc-500 uppercase">Auto-Docked Issues</div>
+              <div class="text-lg font-bold text-amber-600 dark:text-amber-400 mt-0.5">{{ sessionMetrics.auto_docked_count }}</div>
+            </div>
+          </div>
+
+          <!-- Fast Ingestion Trigger Bar -->
+          <div class="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 space-y-3">
+            <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+              <span>⚡</span>
+              <span>Fast Agent Ingestion & Execution Trigger</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
+              <div>
+                <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Agent</label>
+                <select
+                  v-model="newIngestAgentName"
+                  class="w-full px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs"
+                >
+                  <option value="flomaster">Flomaster (Autonomous Engine)</option>
+                  <option value="hermes">Hermes Agent</option>
+                  <option value="cursor">Cursor Agent</option>
+                  <option value="flow-builder">Flow Builder</option>
+                  <option value="flow-inspect">Flow Inspect Auditor</option>
+                </select>
+              </div>
+              <div class="sm:col-span-2">
+                <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Task / Prompt Intent</label>
+                <input
+                  v-model="newIngestCommand"
+                  type="text"
+                  placeholder="e.g. Implement live execution plane and verify test suite"
+                  class="w-full px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs"
+                  @keyup.enter="handleIngestSession"
+                />
+              </div>
+              <div class="flex items-end">
+                <button
+                  @click="handleIngestSession"
+                  :disabled="isIngestingSession"
+                  class="w-full py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-colors disabled:opacity-50"
+                >
+                  {{ isIngestingSession ? 'Ingesting...' : 'Ingest Session Run' }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Main Live Stream Grid -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            
+            <!-- Left 2 Cols: Sessions Table -->
+            <div class="lg:col-span-2 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                  <span>📋</span>
+                  <span>Execution Runs ({{ agentSessionRuns.length }})</span>
+                </span>
+                <div class="flex items-center gap-2">
+                  <select
+                    v-model="sessionFilterStatus"
+                    @change="loadAgentSessions"
+                    class="px-2 py-0.5 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-[10px]"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="running">Running</option>
+                    <option value="verifying">Verifying</option>
+                    <option value="completed">Completed</option>
+                    <option value="failed">Failed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+              </div>
+
+              <div v-if="agentSessionRuns.length === 0" class="text-xs text-zinc-400 py-6 text-center">
+                No session runs recorded yet. Ingest a run above or start an agent.
+              </div>
+
+              <div v-else class="overflow-x-auto">
+                <table class="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr class="border-b border-zinc-200 dark:border-zinc-800 text-[10px] font-mono text-zinc-500 uppercase">
+                      <th class="py-2 px-2.5">Agent / Session</th>
+                      <th class="py-2 px-2.5">Status / PID</th>
+                      <th class="py-2 px-2.5">Files Touched</th>
+                      <th class="py-2 px-2.5">Test Verdict</th>
+                      <th class="py-2 px-2.5">Parent Card</th>
+                      <th class="py-2 px-2.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800">
+                    <tr
+                      v-for="s in agentSessionRuns"
+                      :key="s.id"
+                      class="hover:bg-zinc-100/50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer"
+                      :class="selectedSessionRun && selectedSessionRun.id === s.id ? 'bg-blue-50/50 dark:bg-blue-950/30' : ''"
+                      @click="selectSessionRun(s)"
+                    >
+                      <td class="py-2 px-2.5">
+                        <div class="font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1">
+                          <span>🤖 {{ s.agent_name }}</span>
+                          <span class="text-[9px] font-mono text-zinc-400">({{ s.runtime }})</span>
+                        </div>
+                        <div class="text-[10px] text-zinc-500 truncate max-w-[180px] font-mono">{{ s.session_id }}</div>
+                      </td>
+                      <td class="py-2 px-2.5">
+                        <span
+                          class="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase flex items-center gap-1 w-fit"
+                          :class="{
+                            'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300': s.status === 'completed',
+                            'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 animate-pulse': s.status === 'running',
+                            'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300': s.status === 'verifying',
+                            'bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300': s.status === 'failed',
+                            'bg-zinc-100 dark:bg-zinc-800 text-zinc-500': s.status === 'cancelled' || s.status === 'idle'
+                          }"
+                        >
+                          <span>{{ s.status }}</span>
+                        </span>
+                        <span v-if="s.pid" class="text-[10px] font-mono text-zinc-400 block mt-0.5">PID: {{ s.pid }}</span>
+                      </td>
+                      <td class="py-2 px-2.5 font-mono text-[10px] text-zinc-400">
+                        {{ (s.files_touched || []).length }} files
+                      </td>
+                      <td class="py-2 px-2.5">
+                        <span
+                          v-if="s.test_verdict"
+                          class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold"
+                          :class="s.test_verdict.status === 'passed' ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' : 'bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300'"
+                        >
+                          {{ s.test_verdict.passed || 0 }}/{{ s.test_verdict.total || s.test_verdict.passed || 0 }} ✓
+                        </span>
+                        <span v-else class="text-[10px] text-zinc-500 font-mono">-</span>
+                      </td>
+                      <td class="py-2 px-2.5">
+                        <span v-if="s.auto_docked" class="px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-[9px] font-semibold">
+                          🔗 Docked
+                        </span>
+                        <span v-else class="text-[10px] text-zinc-500">-</span>
+                      </td>
+                      <td class="py-2 px-2.5 text-right space-x-1" @click.stop>
+                        <button
+                          @click="handleForkSession(s.id)"
+                          title="Fork / Continue session"
+                          class="px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-[10px] font-semibold hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
+                        >
+                          Fork
+                        </button>
+                        <button
+                          v-if="s.status === 'running' || s.status === 'verifying'"
+                          @click="handleTerminateSession(s.id)"
+                          title="Terminate session process"
+                          class="px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 text-[10px] font-semibold hover:bg-red-200 dark:hover:bg-red-900 transition-colors"
+                        >
+                          Stop
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Right Col: Selected Session Telemetry Inspector -->
+            <div class="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 space-y-3 flex flex-col min-h-0">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                  <span>🔍</span>
+                  <span>Session Telemetry Inspector</span>
+                </span>
+                <span v-if="selectedSessionRun" class="text-[10px] font-mono text-zinc-400">{{ selectedSessionRun.session_id }}</span>
+              </div>
+
+              <div v-if="!selectedSessionRun" class="text-xs text-zinc-400 py-8 text-center">
+                Click any session row on the left to inspect its live logs, git diffs, and test verdicts.
+              </div>
+
+              <div v-else class="space-y-3 flex-1 flex flex-col overflow-y-auto">
+                <div class="p-2.5 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs">
+                  <div class="text-[10px] font-semibold text-zinc-400 uppercase">Command / Intent</div>
+                  <div class="text-zinc-800 dark:text-zinc-200 font-mono mt-0.5 break-words">{{ selectedSessionRun.command || 'Direct autonomous cycle' }}</div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                  <div class="p-2 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                    <div class="text-[10px] text-zinc-400 font-mono">Branch</div>
+                    <div class="font-bold text-zinc-800 dark:text-zinc-200 font-mono text-[11px]">{{ selectedSessionRun.git_branch || 'main' }}</div>
+                  </div>
+                  <div class="p-2 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                    <div class="text-[10px] text-zinc-400 font-mono">PID</div>
+                    <div class="font-bold text-zinc-800 dark:text-zinc-200 font-mono text-[11px]">{{ selectedSessionRun.pid || 'N/A' }}</div>
+                  </div>
+                </div>
+
+                <div v-if="selectedSessionRun.test_verdict" class="p-2.5 rounded bg-emerald-950/20 border border-emerald-800/40 text-xs">
+                  <div class="text-[10px] font-semibold text-emerald-400 uppercase">Test Verification Proof</div>
+                  <div class="text-emerald-300 font-bold mt-0.5">
+                    ✓ {{ selectedSessionRun.test_verdict.passed }} passed, {{ selectedSessionRun.test_verdict.failed || 0 }} failed ({{ selectedSessionRun.test_verdict.duration_s || 0 }}s)
+                  </div>
+                </div>
+
+                <div class="flex-1 flex flex-col min-h-0">
+                  <div class="text-[10px] font-semibold text-zinc-400 uppercase mb-1">Live Log Tail</div>
+                  <pre class="flex-1 p-2 rounded bg-zinc-950 border border-zinc-800 text-[10px] font-mono text-zinc-300 overflow-y-auto max-h-48 whitespace-pre-wrap select-text">{{ selectedSessionRun.log_tail || 'Running execution loop in background...' }}</pre>
+                </div>
+
+                <div v-if="(selectedSessionRun.files_touched || []).length > 0">
+                  <div class="text-[10px] font-semibold text-zinc-400 uppercase mb-1">Files Modified</div>
+                  <div class="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                    <span
+                      v-for="f in selectedSessionRun.files_touched"
+                      :key="f"
+                      class="px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 text-[9px] font-mono"
+                    >
+                      {{ f }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
 
         </div>

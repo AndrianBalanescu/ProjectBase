@@ -1563,5 +1563,141 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to fetch auto-heal metrics');
     return data;
+  },
+
+  // Execution-Native Agent Sessions & Process Lifecycle Engine (Milestone 1 & 2)
+  async getAgentSessions(params = {}) {
+    const q = new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/sessions${q ? '?' + q : ''}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch agent sessions');
+    return data;
+  },
+
+  async ingestAgentSession(payload) {
+    const res = await fetch('/api/projectbase/sessions/ingest', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to ingest agent session');
+    return data;
+  },
+
+  async sendAgentSessionHeartbeat(payload) {
+    const res = await fetch('/api/projectbase/sessions/heartbeat', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to send session heartbeat');
+    return data;
+  },
+
+  async completeAgentSession(payload) {
+    const res = await fetch('/api/projectbase/sessions/complete', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to complete agent session');
+    return data;
+  },
+
+  async getLiveAgentSessions() {
+    const res = await fetch('/api/projectbase/sessions/live', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch live agent sessions');
+    return data;
+  },
+
+  async getAgentSessionMetrics() {
+    const res = await fetch('/api/projectbase/sessions/metrics', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch session metrics');
+    return data;
+  },
+
+  async getAgentSessionDetails(id) {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch session details');
+    return data;
+  },
+
+  async updateAgentSession(id, payload) {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to update agent session');
+    return data;
+  },
+
+  async deleteAgentSession(id) {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete agent session');
+    return data;
+  },
+
+  async terminateAgentSession(id) {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/terminate`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to terminate agent session');
+    return data;
+  },
+
+  async forkAgentSession(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/fork`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fork agent session');
+    return data;
+  },
+
+  async dockAgentSession(id, issueId) {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/dock`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ issue_id: issueId })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to dock agent session');
+    return data;
+  },
+
+  async cleanAgentSessions(olderThanDays = 30) {
+    const res = await fetch('/api/projectbase/sessions/clean', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ older_than_days: olderThanDays })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to clean agent sessions');
+    return data;
   }
 };

@@ -16,7 +16,7 @@
 **Success Criteria:**
 - [x] Dual-engine BM25 + Dense RRF & Neural BGE-M3 Cross-Encoder Admission Brain
 - [x] FastMCP Server & Automated Workflow Engine
-- [ ] Session-native ingestion daemon & `agent_sessions` collection (Milestone 1)
-- [ ] Dual-plane workspace UI: Intent View vs Live Runs Stream (Milestone 2)
+- [x] Session-native ingestion daemon & `agent_sessions` collection (Milestone 1)
+- [x] Dual-plane workspace UI: Intent View vs Live Runs Stream (Milestone 2)
 - [ ] Visual in-browser Git Diff & Sceptic Audit Inspector (Milestone 3)
 - [ ] One-click session forking & re-tasking (Milestone 4)

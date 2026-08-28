@@ -5,12 +5,12 @@ Transform ProjectBase into an Execution-Native AI Agent Workspace ("Session-as-a
 
 ## 🎯 Active Milestone Backlog
 
-- [ ] #P0 todo **Milestone 1: Session-Native Ingestion & Process Lifecycle**
+- [x] #P0 todo **Milestone 1: Session-Native Ingestion & Process Lifecycle**
   - Implement PocketBase collection `agent_sessions` and hook/daemon to ingest Flomaster/Hermes/Flow runs.
-  - Track live PID state (spawning, running, completed, failed) and map deterministically via git root / remote origin / session meta.
+  - Track live PID state (spawning, running, verifying, completed, failed) and map deterministically via git root / remote origin / session meta.
   - Zero-tax execution: agents write code and run tests without manual Kanban MCP tool calls.
 
-- [ ] #P0 todo **Milestone 2: Dual-Plane Workspace UI (Intent Board vs. Live Execution Runs)**
+- [x] #P0 todo **Milestone 2: Dual-Plane Workspace UI (Intent Board vs. Live Execution Runs)**
   - Fast Vue 3 zero-build UI view: Intent View (Milestones/Epics) vs. Live Runs Stream (Live PID, files touched, logs).
   - Auto-docking: Completed sessions automatically resolve parent Intent tickets upon passing test verification.
 

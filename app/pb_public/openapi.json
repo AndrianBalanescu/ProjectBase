@@ -6019,6 +6019,253 @@
           }
         }
       }
+    },
+    "/projectbase/sessions": {
+      "get": {
+        "tags": [
+          "Agent Sessions & Execution Plane"
+        ],
+        "summary": "List agent sessions with filtering across projects, agents, and runtimes",
+        "parameters": [
+          { "name": "project", "in": "query", "schema": { "type": "string" } },
+          { "name": "agent", "in": "query", "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "schema": { "type": "string" } },
+          { "name": "runtime", "in": "query", "schema": { "type": "string" } },
+          { "name": "issue", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Array of agent session records and pagination total"
+          }
+        }
+      }
+    },
+    "/projectbase/sessions/ingest": {
+      "post": {
+        "tags": [
+          "Agent Sessions & Execution Plane"
+        ],
+        "summary": "Ingest and register a new or active AI agent execution run",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "session_id": { "type": "string" },
+                  "agent_name": { "type": "string" },
+                  "runtime": { "type": "string" },
+                  "model": { "type": "string" },
+                  "workdir": { "type": "string" },
+                  "command": { "type": "string" },
+                  "pid": { "type": "integer" },
+                  "project_id": { "type": "string" },
+                  "issue_id": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Session ingested successfully"
+          }
+        }
+      }
+    },
+    "/projectbase/sessions/heartbeat": {
+      "post": {
+        "tags": [
+          "Agent Sessions & Execution Plane"
+        ],
+        "summary": "Send live process heartbeat, active PID state, files touched, and log tail",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["session_id"],
+                "properties": {
+                  "session_id": { "type": "string" },
+                  "status": { "type": "string" },
+                  "pid": { "type": "integer" },
+                  "files_touched": { "type": "array", "items": { "type": "string" } },
+                  "log_tail": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Heartbeat updated successfully"
+          }
+        }
+      }
+    },
+    "/projectbase/sessions/complete": {
+      "post": {
+        "tags": [
+          "Agent Sessions & Execution Plane"
+        ],
+        "summary": "Finalize an agent session with exit code, git commits, test verdicts, and auto-docking",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["session_id"],
+                "properties": {
+                  "session_id": { "type": "string" },
+                  "exit_code": { "type": "integer" },
+                  "git_commit_after": { "type": "string" },
+                  "git_diff_summary": { "type": "object" },
+                  "test_verdict": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session finalized and parent issue docked"
+          }
+        }
+      }
+    },
+    "/projectbase/sessions/live": {
+      "get": {
+        "tags": [
+          "Agent Sessions & Execution Plane"
+        ],
+        "summary": "List active execution runs (spawning, running, verifying)",
+        "responses": {
+          "200": {
+            "description": "Active sessions array and health status"
+          }
+        }
+      }
+    },
+    "/projectbase/sessions/metrics": {
+      "get": {
+        "tags": [
+          "Agent Sessions & Execution Plane"
+        ],
+        "summary": "Aggregated execution metrics, token tallies, cost estimates, and pass rates",
+        "responses": {
+          "200": {
+            "description": "Telemetry metrics payload"
+          }
+        }
+      }
+    },
+    "/projectbase/sessions/{id}": {
+      "get": {
+        "tags": [
+          "Agent Sessions & Execution Plane"
+        ],
+        "summary": "Get full details of a specific agent session including diffs, logs, and docked issue",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detailed session record"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Agent Sessions & Execution Plane"
+        ],
+        "summary": "Update properties or metadata of an existing session record",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated session record"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Agent Sessions & Execution Plane"
+        ],
+        "summary": "Purge or delete a session run from the database",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session purged confirmation"
+          }
+        }
+      }
+    },
+    "/projectbase/sessions/{id}/terminate": {
+      "post": {
+        "tags": [
+          "Agent Sessions & Execution Plane"
+        ],
+        "summary": "Signal cancellation / termination of an active agent session",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Termination status"
+          }
+        }
+      }
+    },
+    "/projectbase/sessions/{id}/fork": {
+      "post": {
+        "tags": [
+          "Agent Sessions & Execution Plane"
+        ],
+        "summary": "Fork an existing session with preserved diff and context for re-tasking",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "201": {
+            "description": "Forked child session ID"
+          }
+        }
+      }
+    },
+    "/projectbase/sessions/{id}/dock": {
+      "post": {
+        "tags": [
+          "Agent Sessions & Execution Plane"
+        ],
+        "summary": "Dock or unlink an agent session to/from a parent issue card",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Docked status"
+          }
+        }
+      }
+    },
+    "/projectbase/sessions/clean": {
+      "post": {
+        "tags": [
+          "Agent Sessions & Execution Plane"
+        ],
+        "summary": "Prune stale or completed sessions older than specified retention window",
+        "responses": {
+          "200": {
+            "description": "Pruned sessions count"
+          }
+        }
+      }
     }
   }
 }
