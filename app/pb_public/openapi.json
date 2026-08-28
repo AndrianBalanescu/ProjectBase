@@ -3299,6 +3299,150 @@
           "200": { "description": "Formatted platform payload and preview signature" }
         }
       }
+    },
+    "/projectbase/sdk/generate": {
+      "post": {
+        "tags": ["Agent SDK & Observability"],
+        "summary": "Generate Typed Client SDK Code",
+        "description": "Generate production-ready typed client SDK snippets (Python, TypeScript, JavaScript, cURL, Agent Tool Schema) for any REST endpoint or FastMCP tool.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "language": { "type": "string", "example": "python" },
+                  "target_endpoint": { "type": "string", "example": "/api/collections/issues/records" },
+                  "target_tool": { "type": "string", "example": "decompose_task_graph" },
+                  "auth_token": { "type": "string" },
+                  "base_url": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Generated SDK code snippet and metadata" },
+          "400": { "description": "Invalid generation parameters" }
+        }
+      }
+    },
+    "/projectbase/sdk/languages": {
+      "get": {
+        "tags": ["Agent SDK & Observability"],
+        "summary": "List Supported SDK Languages",
+        "description": "List supported client SDK generator languages, runtimes, and typing capabilities.",
+        "responses": {
+          "200": { "description": "Supported languages catalog" }
+        }
+      }
+    },
+    "/projectbase/sdk/templates/{lang}": {
+      "get": {
+        "tags": ["Agent SDK & Observability"],
+        "summary": "Get Client SDK Starter Template",
+        "description": "Retrieve complete standalone client SDK code files for Python or TypeScript.",
+        "parameters": [
+          { "name": "lang", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Client SDK source template" },
+          "404": { "description": "Template not found" }
+        }
+      }
+    },
+    "/projectbase/observability/metrics": {
+      "get": {
+        "tags": ["Agent SDK & Observability"],
+        "summary": "Get Real-time Webhook & API Telemetry",
+        "description": "Query live webhook delivery health, p95 latency, throughput, error rates, and health status.",
+        "responses": {
+          "200": { "description": "Observability metrics telemetry" }
+        }
+      }
+    },
+    "/projectbase/observability/alerts": {
+      "get": {
+        "tags": ["Agent SDK & Observability"],
+        "summary": "List Observability Alert Rules & Breaches",
+        "description": "List configured alert threshold rules and recent triggered breach events.",
+        "responses": {
+          "200": { "description": "Alert configurations and events" }
+        }
+      }
+    },
+    "/projectbase/observability/alerts/configure": {
+      "post": {
+        "tags": ["Agent SDK & Observability"],
+        "summary": "Configure Alert Threshold Rule",
+        "description": "Create or update automated observability alert rules for error rate and p95 latency thresholds.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "metric_name": { "type": "string" },
+                  "comparison_operator": { "type": "string" },
+                  "threshold_value": { "type": "number" },
+                  "alert_channel": { "type": "string" },
+                  "channel_type": { "type": "string" }
+                },
+                "required": ["metric_name", "threshold_value"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Alert rule configured" }
+        }
+      }
+    },
+    "/projectbase/observability/alerts/evaluate": {
+      "post": {
+        "tags": ["Agent SDK & Observability"],
+        "summary": "Evaluate Alert Rules Against Live Telemetry",
+        "description": "Trigger real-time evaluation of all alert rules against live metrics and record breaches.",
+        "responses": {
+          "200": { "description": "Evaluation results and triggered breaches" }
+        }
+      }
+    },
+    "/projectbase/observability/alerts/{id}": {
+      "delete": {
+        "tags": ["Agent SDK & Observability"],
+        "summary": "Delete Alert Threshold Rule",
+        "description": "Delete or decommission an alert rule configuration.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Alert rule deleted" }
+        }
+      }
+    },
+    "/projectbase/docs/recipes": {
+      "get": {
+        "tags": ["Agent SDK & Observability"],
+        "summary": "Get Interactive Integration Recipes",
+        "description": "Retrieve interactive agent integration recipes, step-by-step code snippets, and architecture walkthroughs.",
+        "responses": {
+          "200": { "description": "Curated agent integration recipes" }
+        }
+      }
+    },
+    "/projectbase/docs/spec": {
+      "get": {
+        "tags": ["Agent SDK & Observability"],
+        "summary": "Get Unified API & MCP Schema Specification",
+        "description": "Query unified OpenAPI 3.0 REST specification and FastMCP JSON-RPC tools catalog.",
+        "responses": {
+          "200": { "description": "Unified API specification" }
+        }
+      }
     }
   }
 }

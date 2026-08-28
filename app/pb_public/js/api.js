@@ -787,5 +787,102 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to preview webhook transform');
     return data;
+  },
+
+  async generateSdk(payload) {
+    const res = await fetch('/api/projectbase/sdk/generate', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || data.message || 'Failed to generate SDK code');
+    return data;
+  },
+
+  async getSdkLanguages() {
+    const res = await fetch('/api/projectbase/sdk/languages', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch SDK languages');
+    return data;
+  },
+
+  async getSdkTemplate(lang) {
+    const res = await fetch(`/api/projectbase/sdk/templates/${encodeURIComponent(lang)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch SDK template');
+    return data;
+  },
+
+  async getObservabilityMetrics() {
+    const res = await fetch('/api/projectbase/observability/metrics', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch observability metrics');
+    return data;
+  },
+
+  async getObservabilityAlerts() {
+    const res = await fetch('/api/projectbase/observability/alerts', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch observability alerts');
+    return data;
+  },
+
+  async configureObservabilityAlert(payload) {
+    const res = await fetch('/api/projectbase/observability/alerts/configure', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to configure alert rule');
+    return data;
+  },
+
+  async evaluateObservabilityAlerts() {
+    const res = await fetch('/api/projectbase/observability/alerts/evaluate', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to evaluate alert rules');
+    return data;
+  },
+
+  async deleteObservabilityAlert(id) {
+    const res = await fetch(`/api/projectbase/observability/alerts/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete alert rule');
+    return data;
+  },
+
+  async getIntegrationRecipes() {
+    const res = await fetch('/api/projectbase/docs/recipes', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch integration recipes');
+    return data;
+  },
+
+  async getUnifiedSpec() {
+    const res = await fetch('/api/projectbase/docs/spec', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch API spec');
+    return data;
   }
 };

@@ -7,7 +7,7 @@ ProjectBase = ultra-lightweight open-source Plane/Linear alternative. **MIT, 100
 - **Backend:** PocketBase **0.39.11** single binary `./pocketbase` at repo root. Serve with `./pocketbase serve --dir pb_data --hooksDir app/pb_hooks --migrationsDir app/pb_migrations --http 127.0.0.1:8120`. Note: PB data dir is `pb_data/` at root for local run, but Docker mounts `./app/pb_data` — keep both consistent.
 - **Frontend:** Zero-build **Vue 3 UMD** + static Tailwind. All served straight from `app/pb_public/`. No `node_modules`, no bundler.
 - **Styling:** Tailwind is **compiled to static CSS** via `scripts/build_css.sh` → `app/pb_public/css/style.css`. After editing templates/classes, rerun it. Do NOT add a runtime Tailwind CDN.
-- **Tests:** `pytest tests/` (run via `uv run --with pytest pytest tests/` or the pytest binary at `~/.local/bin/pytest`; NOT in repo venv). Tests run against the live instance (default `PROJECTBASE_URL=http://127.0.0.1:8120`, superuser `f@flow.com` / `superdev123`). 321 tests across 20 files.
+- **Tests:** `pytest tests/` (run via `uv run --with pytest pytest tests/` or the pytest binary at `~/.local/bin/pytest`; NOT in repo venv). Tests run against the live instance (default `PROJECTBASE_URL=http://127.0.0.1:8120`, superuser `f@flow.com` / `superdev123`). 334 tests across 21 files.
 - **Docker:** `docker compose up` — builds `Dockerfile`, mounts `app/` subdirs, exposes 8120.
 - **Deploy:** `deploy/projectbase.service` (systemd) + `deploy/Caddyfile`. Helper scripts: `scripts/install-systemd.sh`, `scripts/backup.sh`, `scripts/restore.sh`, `scripts/deploy-demo.sh`, `scripts/reset-demo.sh`.
 
@@ -43,7 +43,7 @@ app/
     50_cron_automation.pb.js   <- scheduled automations
     55_notifications.pb.js / 60_notifications.pb.js  <- Telegram/Discord/webhook + in-app inbox
     70_ai_assist.pb.js / 80_agent_triggers.pb.js      <- AI-assisted actions + agent dispatch
-    90_agents.pb.js / 91_mcp_server.pb.js / 92_agent_collaboration.pb.js / 93_swarm_choreography_dag.pb.js / 94_workspace_synthesis.pb.js / 95_federation_analytics.pb.js / 96_git_workspace_engine.pb.js / 97_autoscale_workload_engine.pb.js / 98_cluster_replication_engine.pb.js / 99_webhook_automation_engine.pb.js <- agent bridge + FastMCP + leases & telemetry + swarm DAG + workspace synthesis + federation & analytics + git workspace engine + workload autoscaler & self-healing + cross-cluster replication & edge sync + webhook automation & DLQ
+    90_agents.pb.js / 91_mcp_server.pb.js / 92_agent_collaboration.pb.js / 93_swarm_choreography_dag.pb.js / 94_workspace_synthesis.pb.js / 95_federation_analytics.pb.js / 96_git_workspace_engine.pb.js / 97_autoscale_workload_engine.pb.js / 98_cluster_replication_engine.pb.js / 99_webhook_automation_engine.pb.js / 100_sdk_observability_engine.pb.js <- agent bridge + FastMCP + leases & telemetry + swarm DAG + workspace synthesis + federation & analytics + git workspace engine + workload autoscaler & self-healing + cross-cluster replication & edge sync + webhook automation & DLQ + openapi sdk generator & webhook observability
   pb_migrations/       <- numbered schema + seed migrations (17100000xx). Add NEW number for changes.
   pb_data/             <- runtime SQLite data. NEVER commit.
 docs/                  <- research, ROADMAP, TODO, architecture, COMPETITORS, FEATURE_MATRIX
@@ -54,7 +54,8 @@ tests/                 <- test_api.py, test_selfhosting.py, test_autonomous_runn
                           test_css_sync.py, test_bulk_actions.py, test_issue_relations.py, test_deploy_consistency.py,
                           test_benchmarks.py, test_openapi_drift.py, test_secret_scan.py, test_agents_drift_guard.py,
                           test_fixture_hygiene.py, test_swarm_dag.py, test_workspace_synthesis.py, test_federation_analytics.py,
-                          test_git_workspace_engine.py, test_autoscale_orchestration.py, test_cluster_replication.py, test_webhook_automation.py (Epic 16 webhook security gateway & DLQ)
+                          test_git_workspace_engine.py, test_autoscale_orchestration.py, test_cluster_replication.py,
+                          test_webhook_automation.py, test_sdk_observability.py (Epic 17 OpenAPI SDK generator & observability)
 deploy/                <- projectbase.service, Caddyfile
 .github/workflows/ci.yml  <- CI (seeds superuser, runs tests)
 ```

@@ -61,7 +61,28 @@ const AgentsViewComponent = {
       isDispatchingWebhook: false,
       dlqRetrying: false,
       transformPreview: null,
-      previewPlatform: 'slack'
+      previewPlatform: 'slack',
+      sdkLanguages: [],
+      selectedSdkLang: 'python',
+      sdkTargetEndpoint: '/api/collections/issues/records',
+      sdkTargetTool: '',
+      generatedSdkCode: '',
+      sdkCopied: false,
+      observabilityMetrics: null,
+      observabilityAlerts: [],
+      observabilityEvents: [],
+      newAlertName: 'High Error Rate Alert',
+      newAlertMetric: 'error_rate_pct',
+      newAlertOperator: 'gt',
+      newAlertThreshold: 5.0,
+      newAlertChannel: 'agent-coordinator',
+      newAlertChannelType: 'agent',
+      alertSuccessMsg: null,
+      alertErrorMsg: null,
+      isEvaluatingAlerts: false,
+      integrationRecipes: [],
+      selectedRecipe: null,
+      isLoadingObservability: false
     };
   },
   computed: {
@@ -546,6 +567,94 @@ const AgentsViewComponent = {
       } catch (e) {
         console.warn('Transform preview failed', e);
       }
+    },
+    async loadObservabilityState() {
+      this.isLoadingObservability = true;
+      try {
+        const [langRes, metricRes, alertRes, recipeRes] = await Promise.all([
+          API.getSdkLanguages(),
+          API.getObservabilityMetrics(),
+          API.getObservabilityAlerts(),
+          API.getIntegrationRecipes()
+        ]);
+        this.sdkLanguages = (langRes && langRes.languages) || [];
+        this.observabilityMetrics = metricRes || null;
+        this.observabilityAlerts = (alertRes && alertRes.configs) || [];
+        this.observabilityEvents = (alertRes && alertRes.recent_events) || [];
+        this.integrationRecipes = (recipeRes && recipeRes.recipes) || [];
+        if (this.integrationRecipes.length > 0 && !this.selectedRecipe) {
+          this.selectedRecipe = this.integrationRecipes[0];
+        }
+        await this.generateSdkSnippet();
+      } catch (e) {
+        console.warn('Failed to load observability state', e);
+      } finally {
+        this.isLoadingObservability = false;
+      }
+    },
+    async generateSdkSnippet() {
+      try {
+        const res = await API.generateSdk({
+          language: this.selectedSdkLang,
+          target_endpoint: this.sdkTargetEndpoint,
+          target_tool: this.sdkTargetTool,
+          base_url: window.location.origin || 'http://127.0.0.1:8120'
+        });
+        this.generatedSdkCode = (res && res.code) || '';
+        this.sdkCopied = false;
+      } catch (e) {
+        this.generatedSdkCode = '// Error generating snippet: ' + (e.message || String(e));
+      }
+    },
+    copySdkSnippet() {
+      if (!this.generatedSdkCode) return;
+      navigator.clipboard.writeText(this.generatedSdkCode).then(() => {
+        this.sdkCopied = true;
+        setTimeout(() => { this.sdkCopied = false; }, 2000);
+      });
+    },
+    async createObservabilityAlert() {
+      this.alertErrorMsg = null;
+      this.alertSuccessMsg = null;
+      try {
+        await API.configureObservabilityAlert({
+          name: this.newAlertName,
+          metric_name: this.newAlertMetric,
+          comparison_operator: this.newAlertOperator,
+          threshold_value: parseFloat(this.newAlertThreshold) || 5.0,
+          alert_channel: this.newAlertChannel,
+          channel_type: this.newAlertChannelType
+        });
+        this.alertSuccessMsg = 'Alert threshold rule created successfully';
+        await this.loadObservabilityState();
+        setTimeout(() => { this.alertSuccessMsg = null; }, 3000);
+      } catch (e) {
+        this.alertErrorMsg = e.message || String(e);
+      }
+    },
+    async triggerAlertEvaluation() {
+      this.isEvaluatingAlerts = true;
+      this.alertSuccessMsg = null;
+      this.alertErrorMsg = null;
+      try {
+        const res = await API.evaluateObservabilityAlerts();
+        this.alertSuccessMsg = `Evaluation complete: ${(res && res.breaches_detected) || 0} breaches detected across ${(res && res.total_rules_evaluated) || 0} rules`;
+        await this.loadObservabilityState();
+        setTimeout(() => { this.alertSuccessMsg = null; }, 3000);
+      } catch (e) {
+        this.alertErrorMsg = e.message || String(e);
+      } finally {
+        this.isEvaluatingAlerts = false;
+      }
+    },
+    async deleteAlertRule(id) {
+      if (!confirm('Are you sure you want to delete this alert rule?')) return;
+      try {
+        await API.deleteObservabilityAlert(id);
+        await this.loadObservabilityState();
+      } catch (e) {
+        console.warn('Failed to delete alert rule', e);
+      }
     }
   },
   template: `
@@ -662,7 +771,7 @@ const AgentsViewComponent = {
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <h2 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 capitalize truncate">
-                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center')))))) }}
+                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center'))))))) }}
                 </h2>
                 <span v-if="selectedSession && selectedSession.is_active && activeTab === 'chat'" class="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-400 text-[10px] font-mono font-semibold flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -711,6 +820,11 @@ const AgentsViewComponent = {
                   class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors"
                   :class="activeTab === 'webhooks' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
                 >📡 Webhooks & DLQ</button>
+                <button
+                  @click="activeTab = 'observability'; loadObservabilityState();"
+                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
+                  :class="activeTab === 'observability' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                >📚 SDK & Observability</button>
               </div>
             </div>
           </div>
@@ -1623,6 +1737,266 @@ const AgentsViewComponent = {
               Register Webhook
             </button>
           </div>
+        </div>
+
+        <!-- TAB 7: SDK GENERATOR, INTERACTIVE DOCS & OBSERVABILITY (EPIC 17) -->
+        <div
+          v-if="activeTab === 'observability'"
+          class="flex-1 flex flex-col min-h-0 overflow-y-auto p-4 space-y-4"
+        >
+          <!-- Top Bar: Overview & Quick Actions -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+            <div>
+              <h2 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                <span>📚</span>
+                <span>OpenAPI SDK Generator & Webhook Observability</span>
+              </h2>
+              <p class="text-xs text-zinc-500 mt-0.5">
+                Generate production-ready typed client SDKs, monitor live p95 latency, configure automated alert thresholds, and explore agent recipes.
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                @click="triggerAlertEvaluation"
+                :disabled="isEvaluatingAlerts"
+                class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              >
+                <span>⚡</span>
+                <span>{{ isEvaluatingAlerts ? 'Evaluating...' : 'Evaluate SLA Rules' }}</span>
+              </button>
+              <button
+                @click="loadObservabilityState"
+                class="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              >
+                <span>🔄</span>
+                <span>Refresh</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Alert Notifications Banner -->
+          <div v-if="alertSuccessMsg" class="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-medium flex items-center justify-between">
+            <span>✅ {{ alertSuccessMsg }}</span>
+            <button @click="alertSuccessMsg = null" class="text-emerald-500 hover:text-emerald-600 font-bold text-xs">✕</button>
+          </div>
+          <div v-if="alertErrorMsg" class="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-medium flex items-center justify-between">
+            <span>❌ {{ alertErrorMsg }}</span>
+            <button @click="alertErrorMsg = null" class="text-rose-500 hover:text-rose-600 font-bold text-xs">✕</button>
+          </div>
+
+          <!-- Live Observability KPI Metrics -->
+          <div v-if="observabilityMetrics" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] uppercase font-bold text-zinc-400">P95 Delivery Latency</div>
+              <div class="text-xl font-bold font-mono text-indigo-500 mt-1">
+                {{ observabilityMetrics.latency ? observabilityMetrics.latency.p95_ms : 0 }} <span class="text-xs font-normal text-zinc-400">ms</span>
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-1">Avg: {{ observabilityMetrics.latency ? observabilityMetrics.latency.avg_ms : 0 }}ms</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] uppercase font-bold text-zinc-400">Delivery Success Rate</div>
+              <div class="text-xl font-bold font-mono text-emerald-500 mt-1">
+                {{ observabilityMetrics.summary ? observabilityMetrics.summary.success_rate_pct : 100 }}%
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-1">{{ observabilityMetrics.summary ? observabilityMetrics.summary.successful_deliveries : 0 }} / {{ observabilityMetrics.summary ? observabilityMetrics.summary.total_requests : 0 }} events</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] uppercase font-bold text-zinc-400">Webhook Throughput</div>
+              <div class="text-xl font-bold font-mono text-zinc-900 dark:text-zinc-100 mt-1">
+                {{ observabilityMetrics.summary ? observabilityMetrics.summary.throughput_per_min : 0 }} <span class="text-xs font-normal text-zinc-400">req/min</span>
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-1">Status: <span class="uppercase font-bold" :class="observabilityMetrics.health_status === 'healthy' ? 'text-emerald-500' : 'text-amber-500'">{{ observabilityMetrics.health_status }}</span></div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] uppercase font-bold text-zinc-400">Active Alert Rules</div>
+              <div class="text-xl font-bold font-mono text-zinc-900 dark:text-zinc-100 mt-1">
+                {{ observabilityAlerts.length }}
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-1">{{ observabilityEvents.length }} breaches recorded</div>
+            </div>
+          </div>
+
+          <!-- Section 1: Interactive Client SDK Generator -->
+          <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+                <span>💻</span>
+                <span>Interactive Client SDK Generator</span>
+              </h3>
+              <div class="flex items-center gap-2">
+                <select
+                  v-model="selectedSdkLang"
+                  @change="generateSdkSnippet"
+                  class="p-1.5 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 font-medium"
+                >
+                  <option value="python">Python 3 (httpx/requests)</option>
+                  <option value="typescript">TypeScript / Node.js</option>
+                  <option value="javascript">JavaScript (ESM)</option>
+                  <option value="curl">cURL CLI</option>
+                  <option value="agent_tool">Agent Tool Schema (FastMCP/OpenAI)</option>
+                </select>
+                <button
+                  @click="copySdkSnippet"
+                  class="px-2.5 py-1 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-xs font-semibold transition-colors flex items-center gap-1"
+                >
+                  <span>{{ sdkCopied ? '✅ Copied!' : '📋 Copy Code' }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Endpoint or Tool Target Configuration -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <label class="text-[10px] font-bold text-zinc-400 uppercase">REST Endpoint Target</label>
+                <input
+                  v-model="sdkTargetEndpoint"
+                  @input="generateSdkSnippet"
+                  type="text"
+                  placeholder="/api/collections/issues/records or /api/projectbase/dag/decompose"
+                  class="w-full mt-1 p-2 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 font-mono"
+                />
+              </div>
+              <div>
+                <label class="text-[10px] font-bold text-zinc-400 uppercase">FastMCP Tool Target (Optional)</label>
+                <input
+                  v-model="sdkTargetTool"
+                  @input="generateSdkSnippet"
+                  type="text"
+                  placeholder="decompose_task_graph, acquire_task_lease, etc."
+                  class="w-full mt-1 p-2 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 font-mono"
+                />
+              </div>
+            </div>
+
+            <!-- Generated Code Display -->
+            <div class="relative">
+              <pre class="p-3 rounded-lg bg-zinc-950 text-zinc-200 font-mono text-xs overflow-x-auto max-h-72 border border-zinc-800">{{ generatedSdkCode }}</pre>
+            </div>
+          </div>
+
+          <!-- Section 2: Observability Alert Rules & Breaches -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <!-- Configured Rules -->
+            <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+                <span>🚨</span>
+                <span>Configured Alert Rules</span>
+              </h3>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs border-collapse font-mono">
+                  <thead>
+                    <tr class="border-b border-zinc-200 dark:border-zinc-800 text-[10px] font-bold uppercase tracking-wider text-zinc-400 font-sans">
+                      <th class="py-1.5 px-2">Rule Name</th>
+                      <th class="py-1.5 px-2">Metric</th>
+                      <th class="py-1.5 px-2">Condition</th>
+                      <th class="py-1.5 px-2 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60 text-xs">
+                    <tr v-if="observabilityAlerts.length === 0">
+                      <td colspan="4" class="py-3 text-center text-zinc-400 font-sans">No alert rules configured.</td>
+                    </tr>
+                    <tr v-for="rule in observabilityAlerts" :key="rule.id" class="hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+                      <td class="py-1.5 px-2 font-bold text-zinc-900 dark:text-zinc-100 font-sans">{{ rule.name }}</td>
+                      <td class="py-1.5 px-2 text-indigo-500 font-semibold">{{ rule.metric_name }}</td>
+                      <td class="py-1.5 px-2 text-zinc-600 dark:text-zinc-400">{{ rule.comparison_operator }} {{ rule.threshold_value }}</td>
+                      <td class="py-1.5 px-2 text-right">
+                        <button @click="deleteAlertRule(rule.id)" class="text-rose-500 hover:text-rose-600 text-xs font-bold">Delete</button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Create Alert Rule Inline Form -->
+              <div class="pt-3 border-t border-zinc-100 dark:border-zinc-800/80 space-y-2 font-sans">
+                <h4 class="text-[10px] font-bold uppercase text-zinc-400">Add SLA Alert Threshold</h4>
+                <div class="grid grid-cols-2 gap-2">
+                  <input v-model="newAlertName" type="text" placeholder="Rule Name" class="p-1.5 text-xs rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800" />
+                  <select v-model="newAlertMetric" class="p-1.5 text-xs rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 font-mono">
+                    <option value="error_rate_pct">error_rate_pct</option>
+                    <option value="p95_latency_ms">p95_latency_ms</option>
+                    <option value="failure_count">failure_count</option>
+                  </select>
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                  <select v-model="newAlertOperator" class="p-1.5 text-xs rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 font-mono">
+                    <option value="gt">&gt; (greater)</option>
+                    <option value="gte">&gt;= (greater/equal)</option>
+                    <option value="lt">&lt; (less)</option>
+                  </select>
+                  <input v-model="newAlertThreshold" type="number" step="0.1" placeholder="Threshold" class="p-1.5 text-xs rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 font-mono" />
+                  <button @click="createObservabilityAlert" class="px-2 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold">Save Rule</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Recent Alert Breaches -->
+            <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+                <span>⚡</span>
+                <span>Recent Alert Breach Events</span>
+              </h3>
+              <div class="overflow-x-auto max-h-64">
+                <table class="w-full text-left text-xs border-collapse font-mono">
+                  <thead>
+                    <tr class="border-b border-zinc-200 dark:border-zinc-800 text-[10px] font-bold uppercase tracking-wider text-zinc-400 font-sans">
+                      <th class="py-1.5 px-2">Metric</th>
+                      <th class="py-1.5 px-2">Value</th>
+                      <th class="py-1.5 px-2">Status</th>
+                      <th class="py-1.5 px-2">Message</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60 text-xs">
+                    <tr v-if="observabilityEvents.length === 0">
+                      <td colspan="4" class="py-3 text-center text-zinc-400 font-sans">No breach events recorded.</td>
+                    </tr>
+                    <tr v-for="ev in observabilityEvents" :key="ev.id" class="hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+                      <td class="py-1.5 px-2 text-rose-500 font-bold">{{ ev.metric_name }}</td>
+                      <td class="py-1.5 px-2 text-zinc-700 dark:text-zinc-300">{{ ev.current_value }}</td>
+                      <td class="py-1.5 px-2">
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-500">{{ ev.status }}</span>
+                      </td>
+                      <td class="py-1.5 px-2 text-zinc-500 truncate max-w-[150px] font-sans" :title="ev.message">{{ ev.message }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 3: Interactive Integration Recipes -->
+          <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+              <span>📖</span>
+              <span>Autonomous Agent Integration Recipes</span>
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div
+                v-for="rec in integrationRecipes"
+                :key="rec.id"
+                @click="selectedRecipe = rec"
+                class="p-3 rounded-lg border cursor-pointer transition-all"
+                :class="selectedRecipe && selectedRecipe.id === rec.id ? 'border-indigo-500 bg-indigo-500/5 dark:bg-indigo-500/10' : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700'"
+              >
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100">{{ rec.title }}</span>
+                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-semibold">{{ rec.category }}</span>
+                </div>
+                <p class="text-xs text-zinc-500 mt-1">{{ rec.description }}</p>
+                <div v-if="selectedRecipe && selectedRecipe.id === rec.id && rec.steps" class="mt-2 space-y-2 pt-2 border-t border-zinc-200 dark:border-zinc-800 font-mono text-xs">
+                  <div v-for="st in rec.steps" :key="st.step" class="bg-zinc-950 text-zinc-300 p-2 rounded text-[11px]">
+                    <div class="font-bold text-indigo-400 font-sans">Step {{ st.step }}: {{ st.title }}</div>
+                    <pre class="mt-1 overflow-x-auto">{{ st.code }}</pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
 
       </section>

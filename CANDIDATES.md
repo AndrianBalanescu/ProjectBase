@@ -132,8 +132,20 @@
 
 ---
 
-## Next Milestone (Cycle 18)
-**Epic 17 – OpenAPI Agent SDK Generation, Interactive Documentation & Webhook Observability**
-- Generate typed SDK examples from the OpenAPI source for Python, JavaScript, and curl
-- Add webhook delivery health analytics, p95 latency charts, and failure-rate alert thresholds
-- Publish interactive agent-facing API documentation and end-to-end integration recipes
+## Milestone (Cycle 18)
+**Epic 17 – OpenAPI Agent SDK Generation, Interactive Documentation & Webhook Observability (✅ Done)**
+- [x] Turnkey client SDK code generator (`POST /api/projectbase/sdk/generate`, `GET /api/projectbase/sdk/languages`, `GET /api/projectbase/sdk/templates/{lang}`) producing production-ready typed client snippets for Python (`ProjectBaseClient`), TypeScript (`ProjectBaseClient`), JavaScript ESM, cURL CLI, and Agent Tool JSON Schemas
+- [x] Real-time webhook & agent API observability telemetry engine (`GET /api/projectbase/observability/metrics`) tracking p50/p90/p95/p99 delivery latencies, throughput (req/min), error rate %, and latency bucket distributions
+- [x] Automated observability alert threshold manager & evaluation engine (`GET/POST/DELETE /api/projectbase/observability/alerts*`) with configurable SLA violation triggers, multi-channel dispatch, and event breach recording
+- [x] Interactive agent integration recipes and unified API specification (`GET /api/projectbase/docs/recipes`, `GET /api/projectbase/docs/spec`)
+- [x] 7 FastMCP JSON-RPC 2.0 tools (`generate_agent_sdk`, `list_sdk_languages`, `get_api_schema_spec`, `get_webhook_observability_metrics`, `configure_alert_thresholds`, `get_observability_alerts`, `get_integration_recipes`)
+- [x] Frontend AgentsView **📚 SDK & Observability** dashboard with interactive code generator, live KPI meters, SLA alert rule manager, and agent recipes explorer
+- [x] 334/334 automated tests passing across 21 test suites with 100% frontend guard verification
+
+---
+
+## Next Milestone (Cycle 19)
+**Epic 18 – Autonomous Multi-Model Consensus & Peer Review Gate Engine**
+- Native multi-model AI consensus verification for critical issue merges and releases
+- FastMCP automated debate & arbitration hooks with verifiable cryptographic ballots
+- Interactive consensus visualization and confidence scoring dashboard in AgentsView

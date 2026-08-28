@@ -11,6 +11,14 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **OpenAPI Agent SDK Generation, Interactive Documentation & Webhook Observability (Epic 17)**:
+  - Turnkey client SDK code generator (`POST /api/projectbase/sdk/generate`, `GET /api/projectbase/sdk/languages`, `GET /api/projectbase/sdk/templates/{lang}`) producing production-ready typed client snippets for Python (`ProjectBaseClient`), TypeScript (`ProjectBaseClient`), JavaScript ESM, cURL CLI, and Agent Tool JSON Schemas.
+  - Real-time webhook & agent API observability telemetry engine (`GET /api/projectbase/observability/metrics`) tracking p50/p90/p95/p99 delivery latencies, throughput (req/min), error rate %, and latency bucket distributions.
+  - Automated observability alert threshold manager & evaluation engine (`GET/POST/DELETE /api/projectbase/observability/alerts*`) with configurable SLA violation triggers, multi-channel dispatch, and event breach recording.
+  - Interactive agent integration recipes and unified API specification (`GET /api/projectbase/docs/recipes`, `GET /api/projectbase/docs/spec`).
+  - Seven FastMCP JSON-RPC 2.0 tools (`generate_agent_sdk`, `list_sdk_languages`, `get_api_schema_spec`, `get_webhook_observability_metrics`, `configure_alert_thresholds`, `get_observability_alerts`, `get_integration_recipes`).
+  - Frontend AgentsView **📚 SDK & Observability** dashboard with interactive code generator, live KPI meters, SLA alert rule manager, and agent recipes explorer.
+  - 13 new integration tests in `tests/test_sdk_observability.py` bringing the test suite to 334 passed tests across 21 files.
 - **Webhook Automation Engine & Outbound Webhook Security Gateway (Epic 16)**:
   - Webhook endpoint fleet management (`POST/GET /api/projectbase/webhooks/endpoints`, `GET/DELETE /api/projectbase/webhooks/endpoints/{id}`) with platform adapters for Slack, Discord, Telegram, Agent, and custom targets.
   - Cryptographic HMAC-SHA256 signing and verification (`POST /api/projectbase/webhooks/dispatch`, `POST /api/projectbase/webhooks/verify`) with constant-time comparison and a configurable timestamp replay window.
