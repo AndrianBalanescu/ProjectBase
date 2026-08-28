@@ -14,7 +14,7 @@ Transform ProjectBase into an Execution-Native AI Agent Workspace ("Session-as-a
   - Fast Vue 3 zero-build UI view: Intent View (Milestones/Epics) vs. Live Runs Stream (Live PID, files touched, logs).
   - Auto-docking: Completed sessions automatically resolve parent Intent tickets upon passing test verification.
 
-- [ ] #P1 todo **Milestone 3: Deep Observability & Ground Truth Verification Hub**
+- [x] #P1 todo **Milestone 3: Deep Observability & Ground Truth Verification Hub**
   - In-browser visual Git Diff viewer, commit telemetry, and test verdict parser (Pytest / Playwright badges).
   - Sceptic audit reports (Flow Inspect) attached directly to the session run.
 

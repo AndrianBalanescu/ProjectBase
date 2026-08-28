@@ -1311,6 +1311,129 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
                 type: "object",
                 properties: {}
             }
+        },
+        {
+            name: "ingest_agent_session",
+            description: "Ingest or register an execution-native agent session (Session-as-a-Card) with live PID, runtime, model, and git branch.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    session_id: { type: "string", description: "Unique session ID" },
+                    project_id: { type: "string", description: "Optional project ID or identifier" },
+                    issue_id: { type: "string", description: "Optional parent issue ID to auto-dock" },
+                    agent_name: { type: "string", description: "Agent name (flomaster, hermes, cursor)" },
+                    runtime: { type: "string", description: "Runtime environment (flomaster, hermes, flow, cursor)" },
+                    model: { type: "string", description: "LLM Model powering session" },
+                    status: { type: "string", description: "spawning|running|verifying|completed|failed" },
+                    pid: { type: "integer", description: "Process ID" },
+                    workdir: { type: "string", description: "Working directory" },
+                    git_branch: { type: "string", description: "Git branch" },
+                    command: { type: "string", description: "Execution intent or prompt" }
+                }
+            }
+        },
+        {
+            name: "record_session_heartbeat",
+            description: "Record a real-time process heartbeat for an active session with live status, log tail, and files touched.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    session_id: { type: "string", description: "Session ID" },
+                    status: { type: "string", description: "running|verifying|completed|failed" },
+                    log_tail: { type: "string", description: "Recent log output" },
+                    files_touched: { type: "array", items: { type: "string" }, description: "List of files modified or touched" },
+                    tokens_in: { type: "integer" },
+                    tokens_out: { type: "integer" }
+                },
+                required: ["session_id"]
+            }
+        },
+        {
+            name: "record_session_diff",
+            description: "Record and parse unified git diffs and file patches for an agent session.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    session_id: { type: "string", description: "Session ID" },
+                    raw_diff: { type: "string", description: "Unified git diff text" },
+                    git_commit_before: { type: "string", description: "Starting commit SHA" },
+                    git_commit_after: { type: "string", description: "Target/current commit SHA" },
+                    git_branch: { type: "string", description: "Git branch" }
+                },
+                required: ["session_id"]
+            }
+        },
+        {
+            name: "record_test_verdict",
+            description: "Record structured test execution results (Pytest / Playwright) and update ground-truth verification badges.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    session_id: { type: "string", description: "Session ID" },
+                    framework: { type: "string", description: "Test framework (pytest, playwright, jest, vitest)" },
+                    passed: { type: "integer", description: "Number of passed assertions" },
+                    failed: { type: "integer", description: "Number of failed assertions" },
+                    skipped: { type: "integer", description: "Number of skipped tests" },
+                    total: { type: "integer", description: "Total tests executed" },
+                    duration_s: { type: "number", description: "Execution time in seconds" },
+                    failures: { type: "array", description: "Array of failure details" },
+                    raw_output: { type: "string", description: "Raw test stdout/stderr output" }
+                },
+                required: ["session_id"]
+            }
+        },
+        {
+            name: "submit_sceptic_audit",
+            description: "Submit an independent Flow Inspect / Sceptic audit report with severity findings and auto P0 veto evaluation.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    session_id: { type: "string", description: "Session ID" },
+                    auditor: { type: "string", description: "Auditor name or model" },
+                    verdict: { type: "string", description: "PASS|FAIL|CONDITIONAL_PASS" },
+                    risk_score: { type: "integer", description: "Risk score (0-100)" },
+                    findings: { type: "array", description: "List of findings [{id, severity: 'P0'|'P1'|'P2', category, title, description, file, line}]" },
+                    summary: { type: "string", description: "Audit summary" }
+                },
+                required: ["session_id", "verdict"]
+            }
+        },
+        {
+            name: "get_session_observability",
+            description: "Retrieve comprehensive ground-truth verification telemetry (git diffs, test verdicts, sceptic audit, verification badge) for a session.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    session_id: { type: "string", description: "Session ID or Record ID" }
+                },
+                required: ["session_id"]
+            }
+        },
+        {
+            name: "list_agent_sessions",
+            description: "List execution-native agent sessions with status, verification badge, and project filters.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    project_id: { type: "string", description: "Optional project ID filter" },
+                    status: { type: "string", description: "spawning|running|verifying|completed|failed" },
+                    verification_badge: { type: "string", description: "unverified|verified|vetoed|failing_tests" },
+                    limit: { type: "integer", description: "Max results (default 50)" }
+                }
+            }
+        },
+        {
+            name: "fork_agent_session",
+            description: "Fork a completed or failed session into a new execution run with preserved context and diffs.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    session_id: { type: "string", description: "Source session ID to fork" },
+                    prompt: { type: "string", description: "New instruction or follow-up prompt" },
+                    agent_name: { type: "string", description: "Optional agent override" }
+                },
+                required: ["session_id"]
+            }
         }
     ]
 
@@ -4962,6 +5085,269 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         }
     }
 
+    const ingestAgentSession = (args) => {
+        const sessionId = (args.session_id || ("sess_" + Math.random().toString(36).substring(2, 10))).trim();
+        let sessionCol = null;
+        try { sessionCol = e.app.findCollectionByNameOrId("agent_sessions"); } catch (x) {}
+        if (!sessionCol) throw new Error("agent_sessions collection not found");
+
+        let record = null;
+        try {
+            record = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid}", { sid: sessionId });
+        } catch (x) {}
+
+        if (!record) {
+            record = new Record(sessionCol);
+            record.set("session_id", sessionId);
+            record.set("started_at", new Date().toISOString());
+        }
+
+        if (args.agent_name) record.set("agent_name", args.agent_name);
+        if (args.runtime) record.set("runtime", args.runtime);
+        if (args.model) record.set("model", args.model);
+        if (args.status) record.set("status", args.status);
+        if (args.pid) record.set("pid", Number(args.pid));
+        if (args.workdir) record.set("workdir", args.workdir);
+        if (args.git_branch) record.set("git_branch", args.git_branch);
+        if (args.command) record.set("command", args.command);
+        if (args.project_id) record.set("project", args.project_id);
+        if (args.issue_id) record.set("issue", args.issue_id);
+
+        e.app.save(record);
+        return { success: true, session_id: sessionId, id: record.id, status: record.getString("status") };
+    }
+
+    const recordSessionHeartbeat = (args) => {
+        if (!args.session_id) throw new Error("session_id is required");
+        let record = null;
+        try {
+            record = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: args.session_id });
+        } catch (x) {}
+        if (!record) throw new Error("Session not found: " + args.session_id);
+
+        if (args.status) record.set("status", args.status);
+        if (args.log_tail) record.set("log_tail", args.log_tail);
+        if (Array.isArray(args.files_touched)) record.set("files_touched", args.files_touched);
+        if (args.tokens_in) record.set("tokens_in", Number(args.tokens_in));
+        if (args.tokens_out) record.set("tokens_out", Number(args.tokens_out));
+
+        e.app.save(record);
+        return { success: true, session_id: record.getString("session_id"), status: record.getString("status") };
+    }
+
+    const recordSessionDiff = (args) => {
+        if (!args.session_id) throw new Error("session_id is required");
+        let record = null;
+        try {
+            record = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: args.session_id });
+        } catch (x) {}
+        if (!record) throw new Error("Session not found: " + args.session_id);
+
+        const rawDiff = args.raw_diff || "";
+        let files = [];
+        let adds = 0;
+        let dels = 0;
+
+        if (rawDiff) {
+            const lines = rawDiff.split("\n");
+            let curFile = null;
+            for (let i = 0; i < lines.length; i++) {
+                const l = lines[i];
+                if (l.startsWith("diff --git ")) {
+                    if (curFile) files.push(curFile);
+                    const parts = l.split(" ");
+                    const fp = parts.length >= 4 ? parts[3].replace(/^b\//, "") : "unknown";
+                    curFile = { file: fp, additions: 0, deletions: 0 };
+                } else if (l.startsWith("+") && !l.startsWith("+++")) {
+                    if (curFile) { curFile.additions++; adds++; }
+                } else if (l.startsWith("-") && !l.startsWith("---")) {
+                    if (curFile) { curFile.deletions++; dels++; }
+                }
+            }
+            if (curFile) files.push(curFile);
+        }
+
+        const summary = { files_changed: files.length, additions: adds, deletions: dels, net_change: adds - dels };
+        record.set("git_diff_raw", rawDiff);
+        record.set("git_diff_files", files);
+        record.set("git_diff_summary", summary);
+        if (args.git_commit_before) record.set("git_commit_before", args.git_commit_before);
+        if (args.git_commit_after) record.set("git_commit_after", args.git_commit_after);
+        if (args.git_branch) record.set("git_branch", args.git_branch);
+
+        e.app.save(record);
+        return { success: true, session_id: record.getString("session_id"), summary: summary, files: files };
+    }
+
+    const recordTestVerdict = (args) => {
+        if (!args.session_id) throw new Error("session_id is required");
+        let record = null;
+        try {
+            record = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: args.session_id });
+        } catch (x) {}
+        if (!record) throw new Error("Session not found: " + args.session_id);
+
+        let passed = Number(args.passed || 0);
+        let failed = Number(args.failed || 0);
+        let skipped = Number(args.skipped || 0);
+        let total = Number(args.total || (passed + failed + skipped));
+        let duration = Number(args.duration_s || 0);
+        let framework = args.framework || "pytest";
+        let failures = Array.isArray(args.failures) ? args.failures : [];
+
+        const verdict = {
+            framework: framework,
+            status: failed > 0 ? "failed" : "passed",
+            passed: passed,
+            failed: failed,
+            skipped: skipped,
+            total: total,
+            duration_s: duration,
+            failures: failures,
+            timestamp: new Date().toISOString()
+        };
+
+        record.set("test_verdict", verdict);
+        const badge = failed > 0 ? "failing_tests" : (passed > 0 ? "verified" : "unverified");
+        const score = total > 0 ? Math.round((passed / total) * 100) : 100;
+        record.set("verification_badge", badge);
+        record.set("verification_score", score);
+
+        e.app.save(record);
+        return { success: true, session_id: record.getString("session_id"), test_verdict: verdict, verification_badge: badge, verification_score: score };
+    }
+
+    const submitScepticAudit = (args) => {
+        if (!args.session_id) throw new Error("session_id is required");
+        let record = null;
+        try {
+            record = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: args.session_id });
+        } catch (x) {}
+        if (!record) throw new Error("Session not found: " + args.session_id);
+
+        const auditor = args.auditor || "Flow Inspect Sceptic";
+        const verdict = (args.verdict || "PASS").toUpperCase();
+        const findings = Array.isArray(args.findings) ? args.findings : [];
+        const hasP0 = findings.some(f => (f.severity || "").toUpperCase() === "P0" || (f.severity || "").toLowerCase() === "critical");
+        const isVetoed = hasP0 || verdict === "FAIL";
+        const riskScore = isVetoed ? Math.max(Number(args.risk_score || 85), 85) : Number(args.risk_score || 10);
+        const signature = "sig_audit_" + Math.random().toString(36).substring(2, 10);
+
+        const auditPayload = {
+            auditor: auditor,
+            verdict: verdict,
+            risk_score: riskScore,
+            findings: findings,
+            vetoed: isVetoed,
+            signature: signature,
+            summary: args.summary || ("Sceptic audit completed by " + auditor),
+            audited_at: new Date().toISOString()
+        };
+
+        record.set("sceptic_audit", auditPayload);
+        const badge = isVetoed ? "vetoed" : "verified";
+        record.set("verification_badge", badge);
+        record.set("verification_score", isVetoed ? 25 : 98);
+
+        if (isVetoed && (record.getString("status") === "running" || record.getString("status") === "verifying")) {
+            record.set("status", "failed");
+        }
+
+        e.app.save(record);
+        return { success: true, session_id: record.getString("session_id"), audit: auditPayload, verification_badge: badge, vetoed: isVetoed };
+    }
+
+    const getSessionObservability = (args) => {
+        if (!args.session_id) throw new Error("session_id is required");
+        let record = null;
+        try {
+            record = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: args.session_id });
+        } catch (x) {}
+        if (!record) throw new Error("Session not found: " + args.session_id);
+
+        return {
+            session_id: record.getString("session_id"),
+            id: record.id,
+            agent_name: record.getString("agent_name"),
+            runtime: record.getString("runtime"),
+            status: record.getString("status"),
+            git_branch: record.getString("git_branch"),
+            git_commit_before: record.getString("git_commit_before"),
+            git_commit_after: record.getString("git_commit_after"),
+            summary: record.get("git_diff_summary") || {},
+            diff_files: record.get("git_diff_files") || [],
+            test_verdict: record.get("test_verdict") || {},
+            sceptic_audit: record.get("sceptic_audit") || {},
+            verification_badge: record.getString("verification_badge") || "unverified",
+            verification_score: record.getInt("verification_score") || 0
+        };
+    }
+
+    const listAgentSessions = (args) => {
+        let conditions = ["id != ''"];
+        if (args.project_id) conditions.push("project = '" + args.project_id + "'");
+        if (args.status) conditions.push("status = '" + args.status + "'");
+        if (args.verification_badge) conditions.push("verification_badge = '" + args.verification_badge + "'");
+
+        const filter = conditions.join(" && ");
+        const limit = Math.min(Number(args.limit) || 50, 200);
+        let records = [];
+        try {
+            records = e.app.findRecordsByFilter("agent_sessions", filter, "-created", limit, 0);
+        } catch (x) {}
+
+        return records.map(r => ({
+            id: r.id,
+            session_id: r.getString("session_id"),
+            agent_name: r.getString("agent_name"),
+            runtime: r.getString("runtime"),
+            status: r.getString("status"),
+            pid: r.getInt("pid"),
+            git_branch: r.getString("git_branch"),
+            verification_badge: r.getString("verification_badge") || "unverified",
+            verification_score: r.getInt("verification_score") || 0,
+            test_verdict: r.get("test_verdict") || {},
+            created: r.getString("created")
+        }));
+    }
+
+    const forkAgentSession = (args) => {
+        if (!args.session_id) throw new Error("session_id is required");
+        let parentRecord = null;
+        try {
+            parentRecord = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: args.session_id });
+        } catch (x) {}
+        if (!parentRecord) throw new Error("Parent session not found: " + args.session_id);
+
+        let sessionCol = null;
+        try { sessionCol = e.app.findCollectionByNameOrId("agent_sessions"); } catch (x) {}
+        if (!sessionCol) throw new Error("agent_sessions collection not found");
+
+        const newSessionId = "sess_fork_" + Math.random().toString(36).substring(2, 10);
+        const newRecord = new Record(sessionCol);
+        newRecord.set("session_id", newSessionId);
+        newRecord.set("project", parentRecord.getString("project"));
+        newRecord.set("issue", parentRecord.getString("issue"));
+        newRecord.set("agent_name", args.agent_name || parentRecord.getString("agent_name"));
+        newRecord.set("runtime", parentRecord.getString("runtime"));
+        newRecord.set("model", parentRecord.getString("model"));
+        newRecord.set("status", "spawning");
+        newRecord.set("workdir", parentRecord.getString("workdir"));
+        newRecord.set("git_branch", parentRecord.getString("git_branch"));
+        newRecord.set("command", args.prompt || parentRecord.getString("command"));
+        newRecord.set("started_at", new Date().toISOString());
+        newRecord.set("metadata", { forked_from: parentRecord.getString("session_id") });
+
+        e.app.save(newRecord);
+        return {
+            success: true,
+            session_id: newSessionId,
+            id: newRecord.id,
+            forked_from: parentRecord.getString("session_id"),
+            status: "spawning"
+        };
+    }
+
     // ---------- 1. Authentication ----------
     let authRecord = e.auth || null
     let bypassEnabled = false
@@ -5118,6 +5504,14 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         else if (toolName === "resolve_auto_heal_incident") { result = resolveAutoHealIncident(args) }
         else if (toolName === "run_crash_recovery_sweep") { result = runCrashRecoverySweep(args) }
         else if (toolName === "get_auto_heal_metrics") { result = getAutoHealMetrics(args) }
+        else if (toolName === "ingest_agent_session") { result = ingestAgentSession(args) }
+        else if (toolName === "record_session_heartbeat") { result = recordSessionHeartbeat(args) }
+        else if (toolName === "record_session_diff") { result = recordSessionDiff(args) }
+        else if (toolName === "record_test_verdict") { result = recordTestVerdict(args) }
+        else if (toolName === "submit_sceptic_audit") { result = submitScepticAudit(args) }
+        else if (toolName === "get_session_observability") { result = getSessionObservability(args) }
+        else if (toolName === "list_agent_sessions") { result = listAgentSessions(args) }
+        else if (toolName === "fork_agent_session") { result = forkAgentSession(args) }
         else { return fail(-32602, "Unknown tool: " + toolName) }
         return ok({ content: [{ type: "text", text: JSON.stringify(result) }] })
     } catch (toolErr) {

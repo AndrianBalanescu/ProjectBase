@@ -7,7 +7,7 @@ ProjectBase = execution-native AI agent orchestration and software engineering w
 - **Backend:** PocketBase **0.39.11** single binary `./pocketbase` at repo root. Serve with `./pocketbase serve --dir pb_data --hooksDir app/pb_hooks --migrationsDir app/pb_migrations --http 127.0.0.1:8120`. Note: PB data dir is `pb_data/` at root for local run, but Docker mounts `./app/pb_data` — keep both consistent.
 - **Frontend:** Zero-build **Vue 3 UMD** + static Tailwind. All served straight from `app/pb_public/`. No `node_modules`, no bundler.
 - **Styling:** Tailwind is **compiled to static CSS** via `scripts/build_css.sh` → `app/pb_public/css/style.css`. After editing templates/classes, rerun it. Do NOT add a runtime Tailwind CDN.
-- **Tests:** `pytest tests/` (run via `uv run --with pytest pytest tests/` or the pytest binary at `/home/ubuntu/.local/bin/pytest`). Tests run against the live instance (default `PROJECTBASE_URL=http://127.0.0.1:8120`, superuser `f@flow.com` / `superdev123`). 401 tests across 28 files.
+- **Tests:** `pytest tests/` (run via `uv run --with pytest pytest tests/` or the pytest binary at `/home/ubuntu/.local/bin/pytest`). Tests run against the live instance (default `PROJECTBASE_URL=http://127.0.0.1:8120`, superuser `f@flow.com` / `superdev123`). 411 tests across 29 files.
 - **Docker:** `docker compose up` — builds `Dockerfile`, mounts `app/` subdirs, exposes 8120.
 - **Deploy:** `deploy/projectbase.service` (systemd) + `deploy/Caddyfile`. Helper scripts: `scripts/install-systemd.sh`, `scripts/backup.sh`, `scripts/restore.sh`, `scripts/deploy-demo.sh`, `scripts/reset-demo.sh`.
 
@@ -49,14 +49,14 @@ docs/                  <- research, ROADMAP, TODO, architecture, COMPETITORS, FE
 scripts/               <- start.sh, build_css.sh, backup.sh, restore.sh, install-systemd.sh, deploy-demo.sh,
                           reset-demo.sh, bump_version.sh, typegen.sh, flow-cli (CLI wrapper), pb-cli,
                           mcp_server.py, pb_autonomous_runner.py, pb-autonomous-daemon.sh, install.sh, qa/, bench/
-tests/                 <- 401 tests across 28 files (test_agents_drift_guard.py, test_api.py, test_auto_heal_pipeline.py, test_autonomous_runner_sync.py, test_autoscale_orchestration.py, test_benchmarks.py, test_bulk_actions.py, test_cluster_replication.py, test_consensus_gates.py, test_css_sync.py, test_deploy_consistency.py, test_federation_analytics.py, test_fixture_hygiene.py, test_foss_schema.py, test_git_workspace_engine.py, test_issue_relations.py, test_multi_tenant_quotas.py, test_openapi_drift.py, test_sdk_observability.py, test_secret_scan.py, test_selfhosting.py, test_semantic_brain.py, test_session_ingestion_engine.py, test_sso_rbac_matrix.py, test_swarm_dag.py, test_webhook_automation.py, test_workflow_automations.py, test_workspace_synthesis.py)
+tests/                 <- 411 tests across 29 files (test_agents_drift_guard.py, test_api.py, test_auto_heal_pipeline.py, test_autonomous_runner_sync.py, test_autoscale_orchestration.py, test_benchmarks.py, test_bulk_actions.py, test_cluster_replication.py, test_consensus_gates.py, test_css_sync.py, test_deploy_consistency.py, test_federation_analytics.py, test_fixture_hygiene.py, test_foss_schema.py, test_git_workspace_engine.py, test_issue_relations.py, test_multi_tenant_quotas.py, test_openapi_drift.py, test_sdk_observability.py, test_secret_scan.py, test_selfhosting.py, test_semantic_brain.py, test_session_ingestion_engine.py, test_session_observability.py, test_sso_rbac_matrix.py, test_swarm_dag.py, test_webhook_automation.py, test_workflow_automations.py, test_workspace_synthesis.py)
 deploy/                <- projectbase.service, Caddyfile
 .github/workflows/ci.yml  <- CI (seeds superuser, runs tests)
 ```
 
 ## 3. Data model (PocketBase collections)
 
-`users` (auth) · `projects` (multi-project, `custom_field_defs`) · `issues` (status, priority, estimate, project rel, assignee, subtasks JSON, milestone) · `cycles` (sprints + burndown) · `milestones` (North Star roadmap) · `labels` · `comments` · `activity` (audit log) · `notifications` (in-app inbox) · `workflow_rules` · `workflow_runs` · `tenants` · `tenant_quotas` · `semantic_embeddings` · `semantic_admission_policies` · `semantic_review_audit`.
+`users` (auth) · `projects` (multi-project, `custom_field_defs`) · `issues` (status, priority, estimate, project rel, assignee, subtasks JSON, milestone) · `cycles` (sprints + burndown) · `milestones` (North Star roadmap) · `labels` · `comments` · `activity` (audit log) · `notifications` (in-app inbox) · `workflow_rules` · `workflow_runs` · `tenants` · `tenant_quotas` · `semantic_embeddings` · `semantic_admission_policies` · `semantic_review_audit` · `agent_sessions` · `session_audits`.
 
 ## 4. Custom API & MCP
 

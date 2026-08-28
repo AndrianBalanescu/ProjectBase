@@ -199,8 +199,18 @@
 
 ---
 
-## Next Milestone (Cycle 24)
-**Epic 23 – Autonomous Fine-Tuned Agent Prompt Synthesizer & Memory Distillation Engine**
-- Agent episodic memory distillation into compressed semantic vectors and durable markdown cards
-- Context-aware automated system prompt generation and continuous persona refinement
-- FastMCP prompt compilation tools and AgentsView memory synthesis dashboard panel
+## Milestone (Cycle 26)
+**Epic 24 – Execution-Native AI Agent Observability & Ground Truth Verification Hub (✅ Done)**
+- [x] Schema migration (`1710000036_add_session_observability.js`) adding git diffs, test verdicts, and `session_audits` collection
+- [x] Observability engine hook (`app/pb_hooks/108_session_observability_engine.pb.js`) with 8 REST API endpoints for unified diffs, test badges, and Sceptic P0 vetoes
+- [x] 8 FastMCP JSON-RPC 2.0 tools for sessions and ground-truth verification
+- [x] In-browser visual Git Diff viewer, file hunk inspector, test verdict pass meter, and 1-click Sceptic auditor in AgentsView
+- [x] 411/411 automated tests passing across 29 test suites with 100% frontend guard and CSS sync verification
+
+---
+
+## Next Milestone (Cycle 27)
+**Epic 25 – One-Click Session Branching, Re-Tasking & Human Intervention Gate**
+- Interactive session forking and continuation DAGs
+- Human-in-the-loop pause/inject instructions into live agent context
+- Multi-engine swarm choreography and worktree conflict arbitration

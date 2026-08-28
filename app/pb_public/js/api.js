@@ -1699,5 +1699,86 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to clean agent sessions');
     return data;
+  },
+
+  // Deep Observability & Ground Truth Verification Hub (Milestone 3)
+  async getSessionDiff(id) {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/diff`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch session git diff');
+    return data;
+  },
+
+  async recordSessionDiff(id, diffPayload) {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/diff`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(diffPayload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to record session git diff');
+    return data;
+  },
+
+  async getSessionVerdict(id) {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/verdict`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch session test verdict');
+    return data;
+  },
+
+  async recordSessionVerdict(id, verdictPayload) {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/verdict`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(verdictPayload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to record session test verdict');
+    return data;
+  },
+
+  async getSessionAudit(id) {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/audit`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch session sceptic audit');
+    return data;
+  },
+
+  async submitSessionAudit(id, auditPayload) {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/audit`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(auditPayload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to submit session sceptic audit');
+    return data;
+  },
+
+  async getObservabilitySummary() {
+    const res = await fetch('/api/projectbase/observability/summary', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch observability summary');
+    return data;
+  },
+
+  async verifySessionSuite(payload) {
+    const res = await fetch('/api/projectbase/observability/verify-suite', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to run verification suite');
+    return data;
   }
 };

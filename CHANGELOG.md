@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.23.0] - 2026-08-28 - Cycle 26
+### Added
+- **Deep Observability & Ground Truth Verification Hub (Milestone 3):**
+  - Schema migration (`1710000036_add_session_observability.js`) extending `agent_sessions` with `git_diff_raw`, `git_diff_files`, `sceptic_audit`, `verification_badge`, and `verification_score` fields, and adding `session_audits` collection for permanent multi-auditor history logs.
+  - Backend engine hook (`app/pb_hooks/108_session_observability_engine.pb.js`) with 8 endpoints (`/api/projectbase/sessions/{id}/diff`, `/api/projectbase/sessions/{id}/verdict`, `/api/projectbase/sessions/{id}/audit`, `/api/projectbase/observability/summary`, `/api/projectbase/observability/verify-suite`) for unified git diff parsing, Pytest/Playwright verdict evaluation, and Sceptic P0 veto enforcement.
+  - 8 FastMCP JSON-RPC 2.0 tools: `ingest_agent_session`, `record_session_heartbeat`, `record_session_diff`, `record_test_verdict`, `submit_sceptic_audit`, `get_session_observability`, `list_agent_sessions`, `fork_agent_session`.
+  - Frontend AgentsView **🔍 Ground Truth Observability Hub** panel with visual unified git diff browser, file hunk selector, test pass breakdown meter, 1-click test suite runner, and Sceptic audit/veto inspector.
+  - 10 automated end-to-end tests in `tests/test_session_observability.py` (411/411 passing across 29 test suites with 100% frontend guard and CSS sync verification).
+
+
 ## [1.22.0] - 2026-08-28 - Cycle 23
 ### Added
 - **Autonomous AI Agent Auto-Healing & Self-Remediation Workflow Pipeline (Epic 22):**

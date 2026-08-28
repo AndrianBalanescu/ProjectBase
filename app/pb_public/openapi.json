@@ -6266,6 +6266,167 @@
           }
         }
       }
+    },
+    "/projectbase/sessions/{id}/diff": {
+      "get": {
+        "tags": ["Agent Ground Truth Observability"],
+        "summary": "Get parsed git diffs, file stats, and raw unified patches for a session",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Git diff details" },
+          "404": { "description": "Session not found" }
+        }
+      },
+      "post": {
+        "tags": ["Agent Ground Truth Observability"],
+        "summary": "Upload and parse unified git diff or file patches for a session",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "raw_diff": { "type": "string" },
+                  "git_commit_before": { "type": "string" },
+                  "git_commit_after": { "type": "string" },
+                  "git_branch": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Diff recorded" },
+          "404": { "description": "Session not found" }
+        }
+      }
+    },
+    "/projectbase/sessions/{id}/verdict": {
+      "get": {
+        "tags": ["Agent Ground Truth Observability"],
+        "summary": "Get structured test verdict breakdown, framework badges, and verification status",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Test verdict and badge" },
+          "404": { "description": "Session not found" }
+        }
+      },
+      "post": {
+        "tags": ["Agent Ground Truth Observability"],
+        "summary": "Ingest test run results (Pytest/Playwright) and evaluate verification badge",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "framework": { "type": "string" },
+                  "passed": { "type": "integer" },
+                  "failed": { "type": "integer" },
+                  "skipped": { "type": "integer" },
+                  "total": { "type": "integer" },
+                  "duration_s": { "type": "number" },
+                  "failures": { "type": "array" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Test verdict recorded" },
+          "404": { "description": "Session not found" }
+        }
+      }
+    },
+    "/projectbase/sessions/{id}/audit": {
+      "get": {
+        "tags": ["Agent Ground Truth Observability"],
+        "summary": "Get Sceptic audit reports, findings, and P0 veto status",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Sceptic audit details" },
+          "404": { "description": "Session not found" }
+        }
+      },
+      "post": {
+        "tags": ["Agent Ground Truth Observability"],
+        "summary": "Submit Flow Inspect / Sceptic audit report with severity findings and veto evaluation",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "auditor": { "type": "string" },
+                  "verdict": { "type": "string" },
+                  "risk_score": { "type": "integer" },
+                  "findings": { "type": "array" },
+                  "summary": { "type": "string" }
+                },
+                "required": ["verdict"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Audit recorded" },
+          "404": { "description": "Session not found" }
+        }
+      }
+    },
+    "/projectbase/observability/summary": {
+      "get": {
+        "tags": ["Agent Ground Truth Observability"],
+        "summary": "Workspace-wide ground-truth verification telemetry & test pass rates",
+        "responses": {
+          "200": { "description": "Observability summary" }
+        }
+      }
+    },
+    "/projectbase/observability/verify-suite": {
+      "post": {
+        "tags": ["Agent Ground Truth Observability"],
+        "summary": "Fast automated test suite runner & verification badge evaluator",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "session_id": { "type": "string" },
+                  "framework": { "type": "string" },
+                  "passed": { "type": "integer" },
+                  "failed": { "type": "integer" },
+                  "raw_diff": { "type": "string" }
+                },
+                "required": ["session_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Suite verified" }
+        }
+      }
     }
   }
 }
