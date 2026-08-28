@@ -3443,6 +3443,167 @@
           "200": { "description": "Unified API specification" }
         }
       }
+    },
+    "/projectbase/consensus/gates": {
+      "post": {
+        "tags": ["Consensus & Peer Review Gates"],
+        "summary": "Create Peer-Review Consensus Gate",
+        "description": "Create a multi-model peer-review consensus gate for an issue, PR, or release with configurable quorum and minimum confidence thresholds.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "issue_id": { "type": "string" },
+                  "target_type": { "type": "string" },
+                  "target_title": { "type": "string" },
+                  "scope": { "type": "string" },
+                  "quorum_size": { "type": "integer" },
+                  "min_confidence": { "type": "number" },
+                  "required_personas": { "type": "array", "items": { "type": "string" } },
+                  "auto_transition": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Consensus gate created" }
+        }
+      },
+      "get": {
+        "tags": ["Consensus & Peer Review Gates"],
+        "summary": "List Consensus Gates",
+        "description": "List all active and resolved consensus gates with filtering and quorum tallies.",
+        "parameters": [
+          { "name": "issue_id", "in": "query", "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "schema": { "type": "string" } },
+          { "name": "target_type", "in": "query", "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "List of consensus gates" }
+        }
+      }
+    },
+    "/projectbase/consensus/gates/{id}": {
+      "get": {
+        "tags": ["Consensus & Peer Review Gates"],
+        "summary": "Get Consensus Gate Details",
+        "description": "Retrieve comprehensive consensus gate details, submitted signed ballots, and cryptographic signature status.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Consensus gate details and ballots" },
+          "404": { "description": "Gate not found" }
+        }
+      },
+      "delete": {
+        "tags": ["Consensus & Peer Review Gates"],
+        "summary": "Delete Consensus Gate",
+        "description": "Delete or archive a consensus gate and its associated review ballots.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Consensus gate deleted" },
+          "404": { "description": "Gate not found" }
+        }
+      }
+    },
+    "/projectbase/consensus/ballots/submit": {
+      "post": {
+        "tags": ["Consensus & Peer Review Gates"],
+        "summary": "Submit Verifiable Peer-Review Ballot",
+        "description": "Submit a cryptographically signed review ballot with vote (approve/reject/abstain), confidence score, and findings.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "gate_id": { "type": "string" },
+                  "model_name": { "type": "string" },
+                  "persona": { "type": "string" },
+                  "vote": { "type": "string", "enum": ["approve", "reject", "abstain"] },
+                  "confidence": { "type": "number" },
+                  "reasoning": { "type": "string" },
+                  "findings": { "type": "array", "items": { "type": "object" } },
+                  "signature": { "type": "string" }
+                },
+                "required": ["gate_id", "model_name", "vote"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Ballot submitted and verified" }
+        }
+      }
+    },
+    "/projectbase/consensus/gates/evaluate": {
+      "post": {
+        "tags": ["Consensus & Peer Review Gates"],
+        "summary": "Evaluate Gate Quorum & Verdict",
+        "description": "Evaluate consensus gate against quorum thresholds, calculate consensus and divergence scores, and trigger issue transition if approved.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "gate_id": { "type": "string" }
+                },
+                "required": ["gate_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Gate evaluation results" }
+        }
+      }
+    },
+    "/projectbase/consensus/debate/start": {
+      "post": {
+        "tags": ["Consensus & Peer Review Gates"],
+        "summary": "Start Multi-Model Consensus Debate",
+        "description": "Orchestrate automated multi-model consensus debate (Claude, GPT, DeepSeek, Llama) generating signed persona ballots and arbitrated verdict.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "gate_id": { "type": "string" },
+                  "issue_id": { "type": "string" },
+                  "topic": { "type": "string" },
+                  "scope": { "type": "string" },
+                  "quorum_size": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Debate completed with evaluation" }
+        }
+      }
+    },
+    "/projectbase/consensus/metrics": {
+      "get": {
+        "tags": ["Consensus & Peer Review Gates"],
+        "summary": "Get Workspace Consensus Metrics",
+        "description": "Query workspace-wide consensus metrics, approval rate %, average confidence, divergence index, and model participation telemetry.",
+        "responses": {
+          "200": { "description": "Consensus analytics metrics" }
+        }
+      }
     }
   }
 }

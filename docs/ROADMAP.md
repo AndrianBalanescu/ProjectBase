@@ -1617,3 +1617,18 @@ sprint or roadmap state.
 - `python3 -m flow.frontend_guard` → ALL VERIFIED (no frontend files touched).
 - Live smoke: `list_cycles("PB")` → 2 cycles; `get_cycle_progress("admzsfez5xsxyeu")`
   → {total 6, done 6, percent 100, done_pts 21/21}; milestones listed correctly.
+
+## Epic 18 Shipped (Cycle 19): Autonomous Multi-Model Consensus & Peer Review Gate Engine
+
+**Goal:** Provide native, zero-trust AI peer-review consensus gates for high-stakes decisions, pull requests, and production releases. When complex architectural or security decisions are made, independent models (Claude, GPT, DeepSeek, Llama) cross-examine changes, cast cryptographically signed ballots with confidence scores, calculate quorum convergence/divergence, and automatically arbitrate issue transitions.
+
+**Shipped this cycle:**
+- `app/pb_migrations/1710000029_add_consensus_gates.js` — migrations for `consensus_gates` and `consensus_ballots` collections.
+- `app/pb_hooks/101_consensus_gate_engine.pb.js` — 8 REST endpoints for gate lifecycle (`/api/projectbase/consensus/gates*`), cryptographically signed ballot submissions (`/api/projectbase/consensus/ballots/submit`), quorum evaluation (`/api/projectbase/consensus/gates/evaluate`), automated 1-click multi-model debate orchestration (`/api/projectbase/consensus/debate/start`), and workspace metrics (`/api/projectbase/consensus/metrics`).
+- `app/pb_hooks/91_mcp_server.pb.js` — 7 FastMCP JSON-RPC 2.0 tools (`create_consensus_gate`, `submit_consensus_ballot`, `evaluate_consensus_gate`, `list_consensus_gates`, `get_consensus_gate_details`, `start_consensus_debate`, `get_consensus_metrics`).
+- `app/pb_public/js/api.js` — frontend client API methods for consensus gates, ballots, and metrics.
+- `app/pb_public/js/components/AgentsView.js` — **⚖️ Consensus & Gates** dashboard with interactive gate creation, live quorum progress meters, cryptographic signature verifier, and 1-click multi-model debate orchestration.
+- `app/pb_public/openapi.json` — complete OpenAPI 3.0 route documentation and schemas for all consensus endpoints.
+- `app/pb_public/css/style.css` — rebuilt static CSS with static Tailwind compiler.
+- `tests/test_consensus_gates.py` — comprehensive 9-test test suite bringing total tests to **343 passed tests across 22 files**.
+

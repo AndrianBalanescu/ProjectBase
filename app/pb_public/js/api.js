@@ -884,5 +884,87 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to fetch API spec');
     return data;
+  },
+
+  async getConsensusGates(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/consensus/gates${query ? '?' + query : ''}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch consensus gates');
+    return data;
+  },
+
+  async getConsensusGate(id) {
+    const res = await fetch(`/api/projectbase/consensus/gates/${encodeURIComponent(id)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch consensus gate details');
+    return data;
+  },
+
+  async createConsensusGate(payload) {
+    const res = await fetch('/api/projectbase/consensus/gates', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create consensus gate');
+    return data;
+  },
+
+  async deleteConsensusGate(id) {
+    const res = await fetch(`/api/projectbase/consensus/gates/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete consensus gate');
+    return data;
+  },
+
+  async submitConsensusBallot(payload) {
+    const res = await fetch('/api/projectbase/consensus/ballots/submit', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to submit consensus ballot');
+    return data;
+  },
+
+  async evaluateConsensusGate(payload) {
+    const res = await fetch('/api/projectbase/consensus/gates/evaluate', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to evaluate consensus gate');
+    return data;
+  },
+
+  async startConsensusDebate(payload) {
+    const res = await fetch('/api/projectbase/consensus/debate/start', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to start consensus debate');
+    return data;
+  },
+
+  async getConsensusMetrics() {
+    const res = await fetch('/api/projectbase/consensus/metrics', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch consensus metrics');
+    return data;
   }
 };

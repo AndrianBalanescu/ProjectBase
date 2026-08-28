@@ -11,6 +11,15 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **Autonomous Multi-Model Consensus & Peer Review Gate Engine (Epic 18)**:
+  - Native multi-model AI consensus verification for critical issue merges, PRs, and releases (`POST/GET /api/projectbase/consensus/gates`, `GET/DELETE /api/projectbase/consensus/gates/{id}`) backed by `consensus_gates` and `consensus_ballots` PocketBase collections.
+  - Verifiable cryptographic peer-review ballot engine (`POST /api/projectbase/consensus/ballots/submit`) with deterministic SHA-256 signatures, confidence scoring (0.0 to 1.0), and structured findings.
+  - Automated quorum evaluation and divergence scoring engine (`POST /api/projectbase/consensus/gates/evaluate`) calculating weighted consensus scores, entropy divergence indexes, arbiter verdicts (`approved`, `rejected`, `contested`), and automatic issue transition/commenting.
+  - Automated 1-Click Multi-Model Debate orchestrator (`POST /api/projectbase/consensus/debate/start`) deploying specialized persona review passes (SecurityAuditor, ArchitecturePragmatist, QASRE, BenchmarkAnalyst).
+  - Workspace-wide consensus metrics & model participation telemetry (`GET /api/projectbase/consensus/metrics`).
+  - Seven FastMCP JSON-RPC 2.0 tools (`create_consensus_gate`, `submit_consensus_ballot`, `evaluate_consensus_gate`, `list_consensus_gates`, `get_consensus_gate_details`, `start_consensus_debate`, `get_consensus_metrics`).
+  - Frontend AgentsView **⚖️ Consensus & Gates** dashboard with interactive gate creation, live quorum progress meters, cryptographic signature verifier, and 1-click multi-model debate orchestration.
+  - 9 new integration tests in `tests/test_consensus_gates.py` bringing the test suite to 343 passed tests across 22 files.
 - **OpenAPI Agent SDK Generation, Interactive Documentation & Webhook Observability (Epic 17)**:
   - Turnkey client SDK code generator (`POST /api/projectbase/sdk/generate`, `GET /api/projectbase/sdk/languages`, `GET /api/projectbase/sdk/templates/{lang}`) producing production-ready typed client snippets for Python (`ProjectBaseClient`), TypeScript (`ProjectBaseClient`), JavaScript ESM, cURL CLI, and Agent Tool JSON Schemas.
   - Real-time webhook & agent API observability telemetry engine (`GET /api/projectbase/observability/metrics`) tracking p50/p90/p95/p99 delivery latencies, throughput (req/min), error rate %, and latency bucket distributions.

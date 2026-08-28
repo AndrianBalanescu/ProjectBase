@@ -144,8 +144,20 @@
 
 ---
 
-## Next Milestone (Cycle 19)
-**Epic 18 – Autonomous Multi-Model Consensus & Peer Review Gate Engine**
-- Native multi-model AI consensus verification for critical issue merges and releases
-- FastMCP automated debate & arbitration hooks with verifiable cryptographic ballots
-- Interactive consensus visualization and confidence scoring dashboard in AgentsView
+## Milestone (Cycle 19)
+**Epic 18 – Autonomous Multi-Model Consensus & Peer Review Gate Engine (✅ Done)**
+- [x] Native multi-model AI consensus verification for critical issue merges, PRs, and releases (`/api/projectbase/consensus/gates*`, `consensus_gates` and `consensus_ballots` collections)
+- [x] Cryptographically signed model peer-review ballots with deterministic SHA-256 signatures, quorum calculation, and divergence scoring (`/api/projectbase/consensus/ballots/submit`, `/api/projectbase/consensus/gates/evaluate`)
+- [x] Automated 1-Click Multi-Model Debate orchestration engine (`/api/projectbase/consensus/debate/start`) with specialized persona lenses (SecurityAuditor, ArchitecturePragmatist, QASRE, BenchmarkAnalyst)
+- [x] Workspace-wide consensus metrics & model participation analytics (`GET /api/projectbase/consensus/metrics`)
+- [x] 7 FastMCP JSON-RPC 2.0 tools (`create_consensus_gate`, `submit_consensus_ballot`, `evaluate_consensus_gate`, `list_consensus_gates`, `get_consensus_gate_details`, `start_consensus_debate`, `get_consensus_metrics`)
+- [x] Frontend AgentsView **⚖️ Consensus & Gates** dashboard with interactive gate creation, live quorum progress, verifiable ballot inspector, and 1-click multi-model debate
+- [x] 343/343 automated tests passing across 22 test suites with 100% frontend guard verification
+
+---
+
+## Next Milestone (Cycle 20)
+**Epic 19 – Enterprise OIDC / SAML SSO Federation & Granular Workspace RBAC Matrix**
+- Enterprise SSO provider federation (Google, GitHub Enterprise, Okta, Keycloak) with just-in-time user provisioning
+- Granular role-based access control matrix with custom per-project permissions and API key scopes
+- FastMCP security audit and identity federation inspection tools

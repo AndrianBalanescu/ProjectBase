@@ -633,6 +633,18 @@ routerAdd("GET", "/api/projectbase/docs/recipes", (e) => {
                     { step: 2, title: "Dispatch and Verify HMAC Signature", code: "POST /api/projectbase/webhooks/verify\n{\n  'payload': '{\"event\":\"issue.created\"}',\n  'signature': 'sha256=...',\n  'secret': '...'\n}" },
                     { step: 3, title: "Inspect DLQ & Trigger Auto-Retry", code: "POST /api/projectbase/webhooks/dlq/retry\n{\n  'endpoint_id': 'endpoint-slack-1',\n  'max_retries': 5\n}" }
                 ]
+            },
+            {
+                id: "consensus-peer-review-gate",
+                title: "Autonomous Multi-Model Consensus & Peer Review Gate",
+                description: "Orchestrate automated multi-model debates (Claude, GPT, DeepSeek, Llama) with cryptographic signed ballots, quorum consensus, and zero-trust verification.",
+                category: "Consensus & QA",
+                tags: ["Consensus", "Multi-Model Debate", "Cryptographic Signatures", "Quorum", "Peer Review"],
+                steps: [
+                    { step: 1, title: "Create Consensus Gate for PR or Issue", code: "POST /api/projectbase/consensus/gates\n{\n  'issue_id': 'PB-12',\n  'target_type': 'pull_request',\n  'quorum_size': 4,\n  'min_confidence': 0.85\n}" },
+                    { step: 2, title: "Submit Signed Model Ballot", code: "POST /api/projectbase/consensus/ballots/submit\n{\n  'gate_id': 'gate-123',\n  'model_name': 'claude-3-7-sonnet',\n  'persona': 'SecurityAuditor',\n  'vote': 'approve',\n  'confidence': 0.95,\n  'reasoning': 'Zero unauthenticated write vulnerabilities.'\n}" },
+                    { step: 3, title: "Orchestrate 1-Click Multi-Model Debate", code: "POST /api/projectbase/consensus/debate/start\n{\n  'gate_id': 'gate-123',\n  'topic': 'Merge PR: Epic 18 Consensus Engine',\n  'quorum_size': 4\n}" }
+                ]
             }
         ];
         return e.json(200, {
