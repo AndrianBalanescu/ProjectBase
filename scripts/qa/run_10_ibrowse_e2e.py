@@ -10,7 +10,9 @@ import time
 import urllib.request
 import urllib.error
 
-HOST = "http://127.0.0.1:3000"
+HOST = os.environ.get("IBROWSE_HOST", "http://127.0.0.1:3007")
+if ":3000" in HOST:
+    HOST = HOST.replace(":3000", ":3007")
 KEY = os.environ.get("IBROWSE_API_KEY", "")
 BASE = "http://127.0.0.1:8120"
 LOGIN = f"Log in to ProjectBase at {BASE} with email f@flow.com and password superdev123 first if the login screen is visible."
