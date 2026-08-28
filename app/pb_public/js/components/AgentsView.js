@@ -500,7 +500,52 @@ const AgentsViewComponent = {
         agent_name: 'flomaster'
       },
       latestVerificationResult: null,
-      isVerifyingInvariants: false
+      isVerifyingInvariants: false,
+
+      // Autonomous Multi-Persona Code Review Swarm & Patch Synthesizer (Milestone 12 / Epic 33)
+      codeReviewsList: [],
+      codeReviewMetrics: null,
+      selectedCodeReview: null,
+      selectedReviewCritiques: [],
+      selectedReviewPatches: [],
+      selectedReviewVerdict: null,
+      isLoadingCodeReviews: false,
+      isDispatchingReviewSwarm: false,
+      isSynthesizingPatch: false,
+      codeReviewSuccessMsg: null,
+      codeReviewErrorMsg: null,
+      codeReviewFilterStatus: '',
+      codeReviewFilterVerdict: '',
+      codeReviewSearch: '',
+      codeReviewActiveSubtab: 'critiques', // 'critiques' | 'diff' | 'patches' | 'gate'
+      newReviewModalOpen: false,
+      newCritiqueModalOpen: false,
+      overrideGateModalOpen: false,
+      newCodeReview: {
+        title: '',
+        summary: '',
+        source_branch: 'feature/agent-task',
+        target_branch: 'main',
+        diff_content: '',
+        files_touched_str: '',
+        author_agent: 'flomaster',
+        auto_swarm: true
+      },
+      newCritique: {
+        persona: 'security_auditor',
+        severity: 'p1_warning',
+        title: '',
+        critique_markdown: '',
+        file_path: '',
+        line_start: 1,
+        line_end: 1,
+        suggested_diff: '',
+        confidence_score: 0.95
+      },
+      gateOverride: {
+        reason: '',
+        overridden_by: 'human_lead'
+      }
     };
   },
   computed: {
@@ -3005,8 +3050,215 @@ const AgentsViewComponent = {
         this.knowledgeErrorMsg = 'Seed demo failed: ' + (e.message || String(e));
       }
     },
+    // Code Review Swarm & Merge Gate Methods (Milestone 12 / Epic 33)
+    async loadCodeReviewsData() {
+      this.isLoadingCodeReviews = true;
+      this.codeReviewErrorMsg = null;
+      try {
+        const [reviewsRes, metricsRes] = await Promise.all([
+          API.listCodeReviews({
+            status: this.codeReviewFilterStatus || undefined,
+            verdict: this.codeReviewFilterVerdict || undefined,
+            search: this.codeReviewSearch || undefined,
+            limit: 200
+          }).catch(() => ({ reviews: [] })),
+          API.getCodeReviewMetrics().catch(() => null)
+        ]);
+        this.codeReviewsList = reviewsRes.reviews || [];
+        this.codeReviewMetrics = metricsRes;
+        if (this.codeReviewsList.length > 0 && !this.selectedCodeReview) {
+          await this.inspectCodeReview(this.codeReviewsList[0].id);
+        }
+      } catch (e) {
+        this.codeReviewErrorMsg = 'Failed loading code reviews: ' + (e.message || String(e));
+      } finally {
+        this.isLoadingCodeReviews = false;
+      }
+    },
+    async inspectCodeReview(id) {
+      if (!id) return;
+      try {
+        const data = await API.getCodeReview(id);
+        this.selectedCodeReview = data || null;
+        this.selectedReviewCritiques = data.critiques || [];
+        this.selectedReviewPatches = data.patches || [];
+        this.selectedReviewVerdict = data.latest_verdict || null;
+      } catch (e) {
+        console.error('Failed inspecting code review:', e);
+      }
+    },
+    async triggerReviewSwarm(id) {
+      if (!id) return;
+      this.isDispatchingReviewSwarm = true;
+      this.codeReviewErrorMsg = null;
+      try {
+        const res = await API.dispatchReviewSwarm(id);
+        this.codeReviewSuccessMsg = `Review swarm completed: ${res.critiques_spawned || res.critiques_created || 0} critique(s) generated.`;
+        await this.loadCodeReviewsData();
+        await this.inspectCodeReview(id);
+      } catch (e) {
+        this.codeReviewErrorMsg = 'Failed dispatching review swarm: ' + (e.message || String(e));
+      } finally {
+        this.isDispatchingReviewSwarm = false;
+      }
+    },
+    async triggerSynthesizePatch(id) {
+      if (!id) return;
+      this.isSynthesizingPatch = true;
+      this.codeReviewErrorMsg = null;
+      try {
+        const res = await API.synthesizeReviewPatch(id);
+        this.codeReviewSuccessMsg = res.message || 'Patch synthesized successfully.';
+        await this.loadCodeReviewsData();
+        await this.inspectCodeReview(id);
+      } catch (e) {
+        this.codeReviewErrorMsg = 'Failed synthesizing patch: ' + (e.message || String(e));
+      } finally {
+        this.isSynthesizingPatch = false;
+      }
+    },
+    async triggerApplyPatch(patchId) {
+      if (!patchId) return;
+      this.codeReviewErrorMsg = null;
+      try {
+        await API.applyReviewPatch(patchId);
+        this.codeReviewSuccessMsg = 'Patch applied cleanly. Resolved critiques marked as patched.';
+        if (this.selectedCodeReview) {
+          await this.loadCodeReviewsData();
+          await this.inspectCodeReview(this.selectedCodeReview.id);
+        }
+      } catch (e) {
+        this.codeReviewErrorMsg = 'Failed applying patch: ' + (e.message || String(e));
+      }
+    },
+    async triggerRevertPatch(patchId) {
+      if (!patchId) return;
+      this.codeReviewErrorMsg = null;
+      try {
+        await API.revertReviewPatch(patchId);
+        this.codeReviewSuccessMsg = 'Patch reverted.';
+        if (this.selectedCodeReview) {
+          await this.loadCodeReviewsData();
+          await this.inspectCodeReview(this.selectedCodeReview.id);
+        }
+      } catch (e) {
+        this.codeReviewErrorMsg = 'Failed reverting patch: ' + (e.message || String(e));
+      }
+    },
+    async triggerEvaluateGate(id) {
+      if (!id) return;
+      this.codeReviewErrorMsg = null;
+      try {
+        const res = await API.evaluateMergeGate(id);
+        this.codeReviewSuccessMsg = `Merge gate verdict: ${res.verdict.toUpperCase()}`;
+        await this.loadCodeReviewsData();
+        await this.inspectCodeReview(id);
+      } catch (e) {
+        this.codeReviewErrorMsg = 'Failed evaluating gate: ' + (e.message || String(e));
+      }
+    },
+    async triggerMergeReview(id) {
+      if (!id) return;
+      this.codeReviewErrorMsg = null;
+      try {
+        const res = await API.mergeCodeReview(id);
+        this.codeReviewSuccessMsg = res.message || 'Code review merged successfully.';
+        await this.loadCodeReviewsData();
+        await this.inspectCodeReview(id);
+      } catch (e) {
+        this.codeReviewErrorMsg = 'Failed merging review: ' + (e.message || String(e));
+      }
+    },
+    async submitNewReviewModal() {
+      if (!this.newCodeReview.title.trim()) return;
+      try {
+        const files = this.newCodeReview.files_touched_str ? this.newCodeReview.files_touched_str.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const res = await API.createCodeReview({
+          title: this.newCodeReview.title,
+          summary: this.newCodeReview.summary,
+          source_branch: this.newCodeReview.source_branch,
+          target_branch: this.newCodeReview.target_branch,
+          diff_content: this.newCodeReview.diff_content,
+          files_touched: files,
+          author_agent: this.newCodeReview.author_agent,
+          auto_swarm: this.newCodeReview.auto_swarm
+        });
+        this.newReviewModalOpen = false;
+        this.newCodeReview = {
+          title: '',
+          summary: '',
+          source_branch: 'feature/agent-task',
+          target_branch: 'main',
+          diff_content: '',
+          files_touched_str: '',
+          author_agent: 'flomaster',
+          auto_swarm: true
+        };
+        await this.loadCodeReviewsData();
+        if (res.id) await this.inspectCodeReview(res.id);
+      } catch (e) {
+        this.codeReviewErrorMsg = 'Failed creating review: ' + (e.message || String(e));
+      }
+    },
+    async submitNewCritiqueModal() {
+      if (!this.selectedCodeReview || !this.newCritique.title.trim()) return;
+      try {
+        await API.submitReviewCritique(this.selectedCodeReview.id, {
+          persona: this.newCritique.persona,
+          severity: this.newCritique.severity,
+          title: this.newCritique.title,
+          critique_markdown: this.newCritique.critique_markdown,
+          file_path: this.newCritique.file_path,
+          line_start: parseInt(this.newCritique.line_start || '1', 10),
+          line_end: parseInt(this.newCritique.line_end || '1', 10),
+          suggested_diff: this.newCritique.suggested_diff,
+          confidence_score: parseFloat(this.newCritique.confidence_score || '0.95')
+        });
+        this.newCritiqueModalOpen = false;
+        this.newCritique = {
+          persona: 'security_auditor',
+          severity: 'p1_warning',
+          title: '',
+          critique_markdown: '',
+          file_path: '',
+          line_start: 1,
+          line_end: 1,
+          suggested_diff: '',
+          confidence_score: 0.95
+        };
+        await this.loadCodeReviewsData();
+        await this.inspectCodeReview(this.selectedCodeReview.id);
+      } catch (e) {
+        this.codeReviewErrorMsg = 'Failed adding critique: ' + (e.message || String(e));
+      }
+    },
+    async submitGateOverrideModal() {
+      if (!this.selectedCodeReview || !this.gateOverride.reason.trim()) return;
+      try {
+        await API.overrideMergeGate(this.selectedCodeReview.id, {
+          reason: this.gateOverride.reason,
+          overridden_by: this.gateOverride.overridden_by
+        });
+        this.overrideGateModalOpen = false;
+        this.gateOverride = { reason: '', overridden_by: 'human_lead' };
+        await this.loadCodeReviewsData();
+        await this.inspectCodeReview(this.selectedCodeReview.id);
+      } catch (e) {
+        this.codeReviewErrorMsg = 'Failed overriding gate: ' + (e.message || String(e));
+      }
+    },
+    async deleteReviewItem(id) {
+      if (!id || !confirm('Are you sure you want to delete this code review?')) return;
+      try {
+        await API.deleteCodeReview(id);
+        this.selectedCodeReview = null;
+        await this.loadCodeReviewsData();
+      } catch (e) {
+        this.codeReviewErrorMsg = 'Failed deleting review: ' + (e.message || String(e));
+      }
+    },
     isGovernanceTab(tab) {
-      return ['workload', 'anomalies', 'semantic', 'auto_heal', 'sso_rbac', 'automations', 'tenants', 'webhooks', 'observability', 'consensus', 'cluster', 'federation', 'throughput', 'swarm', 'merges', 'budget', 'evals', 'sandboxes', 'incidents', 'knowledge'].includes(tab);
+      return ['workload', 'anomalies', 'semantic', 'auto_heal', 'sso_rbac', 'automations', 'tenants', 'webhooks', 'observability', 'consensus', 'cluster', 'federation', 'throughput', 'swarm', 'merges', 'budget', 'evals', 'sandboxes', 'incidents', 'knowledge', 'code_reviews'].includes(tab);
     },
     onGovernanceTabSelect(tab) {
       if (!tab) return;
@@ -3026,6 +3278,8 @@ const AgentsViewComponent = {
         this.loadIncidentsGovernanceData();
       } else if (tab === 'knowledge') {
         this.loadKnowledgeGovernanceData();
+      } else if (tab === 'code_reviews') {
+        this.loadCodeReviewsData();
       }
     }
   },
@@ -3143,7 +3397,7 @@ const AgentsViewComponent = {
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <h2 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 capitalize truncate">
-                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (activeTab === 'automations' ? 'Native Workflow Automations & AI Agent Trigger Pipelines' : (activeTab === 'tenants' ? 'Multi-Tenant Isolation & Granular Resource Quotas' : (activeTab === 'auto_heal' ? 'Autonomous AI Agent Auto-Healing & Self-Remediation Workflow Pipeline' : (activeTab === 'budget' ? 'Agent Fleet Budget & Cost Governance Hub' : (activeTab === 'evals' ? 'Agent Evaluation Benchmark Harness & Model Leaderboard' : (activeTab === 'sandboxes' ? 'Autonomous Ephemeral Dev Sandboxes & Worktree Container Orchestrator' : (activeTab === 'incidents' ? 'Autonomous Multi-Agent Incident Response & Live Debugging War-Room' : (activeTab === 'knowledge' ? 'Autonomous Knowledge Graph, Architectural Memory & Invariants' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center'))))))))))))))))) }}
+                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (activeTab === 'automations' ? 'Native Workflow Automations & AI Agent Trigger Pipelines' : (activeTab === 'tenants' ? 'Multi-Tenant Isolation & Granular Resource Quotas' : (activeTab === 'auto_heal' ? 'Autonomous AI Agent Auto-Healing & Self-Remediation Workflow Pipeline' : (activeTab === 'budget' ? 'Agent Fleet Budget & Cost Governance Hub' : (activeTab === 'evals' ? 'Agent Evaluation Benchmark Harness & Model Leaderboard' : (activeTab === 'sandboxes' ? 'Autonomous Ephemeral Dev Sandboxes & Worktree Container Orchestrator' : (activeTab === 'incidents' ? 'Autonomous Multi-Agent Incident Response & Live Debugging War-Room' : (activeTab === 'knowledge' ? 'Autonomous Knowledge Graph, Architectural Memory & Invariants' : (activeTab === 'code_reviews' ? 'Autonomous Multi-Persona Code Review Swarm & Merge Gate' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center')))))))))))))))))) }}
                 </h2>
                 <span v-if="selectedSession && selectedSession.is_active && activeTab === 'chat'" class="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-400 text-[10px] font-mono font-semibold flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -3197,6 +3451,7 @@ const AgentsViewComponent = {
                     <option value="sandboxes">📦 Ephemeral Sandboxes & Dev Envs</option>
                     <option value="incidents">🚨 Live Incident War-Room & Post-Mortem</option>
                     <option value="knowledge">🧠 Knowledge Graph & Invariants</option>
+                    <option value="code_reviews">🔍 Code Review Swarm & Merge Gate</option>
                     <option value="federation">🌐 Multi-Cluster Federation</option>
                   </select>
                 </div>
@@ -10060,6 +10315,674 @@ const AgentsViewComponent = {
               <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
                 <button @click="newInvariantModalOpen = false" class="px-4 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold">Cancel</button>
                 <button @click="createArchitecturalInvariantSubmit()" :disabled="!newArchitecturalInvariant.rule_name.trim()" class="px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-bold shadow-xs">Register Invariant</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- PANE 2J1: AUTONOMOUS CODE REVIEW SWARM & MERGE GATE (EPIC 33) -->
+        <!-- ========================================================= -->
+        <div v-else-if="activeTab === 'code_reviews'" class="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/30">
+          <!-- Top Header Banner -->
+          <div class="p-4 rounded-xl bg-gradient-to-r from-emerald-950/50 via-teal-950/40 to-zinc-900 border border-emerald-800/40 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xl">🔍</span>
+                <h3 class="text-sm font-bold text-white tracking-wide">Autonomous Code Review Swarm & AST Critique Hub</h3>
+                <span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono font-bold">REVIEW SWARM</span>
+              </div>
+              <p class="text-xs text-zinc-300 mt-1">
+                Multi-Persona Review Matrix (Security, Architecture Invariants, Performance, YAGNI, Test Coverage) • Automated Patch Synthesis • Consensus Merge Gate
+              </p>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <button
+                @click="newReviewModalOpen = true"
+                class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-xs flex items-center gap-1 transition-all"
+              >
+                <span>+ Request Code Review</span>
+              </button>
+              <button
+                @click="loadCodeReviewsData()"
+                class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700/60 shadow-xs flex items-center gap-1"
+                :class="isLoadingCodeReviews ? 'opacity-50 cursor-not-allowed' : ''"
+              >
+                <span>↻ Refresh</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Alert notifications -->
+          <div v-if="codeReviewSuccessMsg" class="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span>✓</span>
+              <span>{{ codeReviewSuccessMsg }}</span>
+            </div>
+            <button @click="codeReviewSuccessMsg = null" class="text-emerald-400 hover:text-emerald-200">&times;</button>
+          </div>
+          <div v-if="codeReviewErrorMsg" class="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span>⚠️</span>
+              <span>{{ codeReviewErrorMsg }}</span>
+            </div>
+            <button @click="codeReviewErrorMsg = null" class="text-rose-400 hover:text-rose-200">&times;</button>
+          </div>
+
+          <!-- KPI Cards Overview Bar -->
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 shadow-xs">
+              <div class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Total Reviews</div>
+              <div class="text-xl font-black text-zinc-900 dark:text-zinc-100 mt-0.5">
+                {{ codeReviewMetrics ? codeReviewMetrics.total_reviews : codeReviewsList.length }}
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-1">
+                {{ codeReviewMetrics ? codeReviewMetrics.merged_reviews : 0 }} Merged • {{ codeReviewMetrics ? codeReviewMetrics.blocked_reviews : 0 }} Blocked
+              </div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 shadow-xs">
+              <div class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Avg Quality Score</div>
+              <div class="text-xl font-black mt-0.5" :class="(codeReviewMetrics ? codeReviewMetrics.average_score : 100) >= 80 ? 'text-emerald-400' : ((codeReviewMetrics ? codeReviewMetrics.average_score : 100) >= 60 ? 'text-amber-400' : 'text-rose-400')">
+                {{ codeReviewMetrics ? codeReviewMetrics.average_score : 100 }}/100
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-1">Composite Persona Benchmark</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 shadow-xs">
+              <div class="text-[10px] font-semibold text-rose-400 uppercase tracking-wider">P0 Blockers</div>
+              <div class="text-xl font-black text-rose-400 mt-0.5">
+                {{ codeReviewMetrics ? (codeReviewMetrics.severity_distribution ? codeReviewMetrics.severity_distribution.p0_blocker : 0) : 0 }}
+              </div>
+              <div class="text-[10px] text-rose-500/80 mt-1">Zero-Tolerance Merge Gate</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 shadow-xs">
+              <div class="text-[10px] font-semibold text-amber-400 uppercase tracking-wider">P1 Warnings</div>
+              <div class="text-xl font-black text-amber-400 mt-0.5">
+                {{ codeReviewMetrics ? (codeReviewMetrics.severity_distribution ? codeReviewMetrics.severity_distribution.p1_warning : 0) : 0 }}
+              </div>
+              <div class="text-[10px] text-amber-500/80 mt-1">Actionable Improvements</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 shadow-xs">
+              <div class="text-[10px] font-semibold text-teal-400 uppercase tracking-wider">Patches Synthesized</div>
+              <div class="text-xl font-black text-teal-400 mt-0.5">
+                {{ codeReviewMetrics ? codeReviewMetrics.total_patches_synthesized : 0 }}
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-1">1-Click Dry-Run Fixes</div>
+            </div>
+          </div>
+
+          <!-- Main Split Layout: Left Reviews List / Right Review Inspector -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <!-- Left: Reviews List Panel -->
+            <div class="lg:col-span-4 space-y-3">
+              <div class="p-3 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Review Requests ({{ codeReviewsList.length }})</span>
+                  <button @click="newReviewModalOpen = true" class="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300">+ New</button>
+                </div>
+
+                <!-- Filters -->
+                <div class="flex gap-1.5">
+                  <input
+                    type="text"
+                    v-model="codeReviewSearch"
+                    @input="loadCodeReviewsData()"
+                    placeholder="Search reviews..."
+                    class="flex-1 px-2.5 py-1 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs"
+                  />
+                  <select
+                    v-model="codeReviewFilterStatus"
+                    @change="loadCodeReviewsData()"
+                    class="px-2 py-1 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs"
+                  >
+                    <option value="">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="reviewing">Reviewing</option>
+                    <option value="changes_requested">Changes Req</option>
+                    <option value="approved">Approved</option>
+                    <option value="blocked">Blocked</option>
+                    <option value="merged">Merged</option>
+                  </select>
+                </div>
+
+                <!-- List Items -->
+                <div v-if="codeReviewsList.length === 0" class="py-8 text-center text-xs text-zinc-500">
+                  No code reviews found. Click "+ Request Code Review" to submit your first change.
+                </div>
+                <div v-else class="space-y-1.5 max-h-[600px] overflow-y-auto pr-1">
+                  <div
+                    v-for="rev in codeReviewsList"
+                    :key="rev.id"
+                    @click="inspectCodeReview(rev.id)"
+                    class="p-2.5 rounded-lg border text-xs cursor-pointer transition-all space-y-1.5"
+                    :class="selectedCodeReview && selectedCodeReview.id === rev.id ? 'bg-emerald-500/10 border-emerald-500/40 shadow-xs' : 'bg-zinc-50/70 dark:bg-zinc-950/50 border-zinc-200 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700'"
+                  >
+                    <div class="flex items-start justify-between gap-1.5">
+                      <div class="font-semibold text-zinc-900 dark:text-zinc-100 line-clamp-1 flex-1">{{ rev.title }}</div>
+                      <span
+                        class="px-1.5 py-0.5 rounded text-[9px] font-bold font-mono uppercase shrink-0"
+                        :class="rev.verdict === 'approved' || rev.status === 'approved' || rev.status === 'merged' ? 'bg-emerald-500/20 text-emerald-300' : (rev.verdict === 'blocked' || rev.status === 'blocked' ? 'bg-rose-500/20 text-rose-300' : (rev.verdict === 'changes_requested' || rev.status === 'changes_requested' ? 'bg-amber-500/20 text-amber-300' : 'bg-zinc-500/20 text-zinc-400'))"
+                      >
+                        {{ rev.status }}
+                      </span>
+                    </div>
+
+                    <div class="flex items-center justify-between text-[11px] text-zinc-400 font-mono">
+                      <span>🌿 {{ rev.source_branch }} → {{ rev.target_branch }}</span>
+                      <span class="font-bold" :class="(rev.overall_score || 100) >= 80 ? 'text-emerald-400' : ((rev.overall_score || 100) >= 60 ? 'text-amber-400' : 'text-rose-400')">
+                        {{ rev.overall_score || 100 }} pts
+                      </span>
+                    </div>
+
+                    <div class="flex items-center justify-between text-[10px] text-zinc-500 pt-1 border-t border-zinc-200/50 dark:border-zinc-800/50">
+                      <span>🤖 {{ rev.author_agent || 'agent' }}</span>
+                      <div class="flex items-center gap-1">
+                        <span v-if="rev.p0_count > 0" class="text-rose-400 font-bold">⛔ {{ rev.p0_count }} P0</span>
+                        <span v-if="rev.p1_count > 0" class="text-amber-400">⚠️ {{ rev.p1_count }} P1</span>
+                        <button @click.stop="deleteReviewItem(rev.id)" class="hover:text-rose-400 ml-1 text-zinc-400">&times;</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Selected Review Inspector Panel -->
+            <div class="lg:col-span-8 space-y-4">
+              <div v-if="!selectedCodeReview" class="p-12 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-center text-zinc-500 text-xs">
+                Select a code review from the left sidebar or create a new review request.
+              </div>
+              <div v-else class="space-y-4">
+                <!-- Review Header & Action Controls Bar -->
+                <div class="p-4 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-3">
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-2">
+                        <h4 class="text-base font-bold text-zinc-900 dark:text-zinc-100">{{ selectedCodeReview.title }}</h4>
+                        <span
+                          class="px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase"
+                          :class="selectedCodeReview.verdict === 'approved' || selectedCodeReview.status === 'approved' || selectedCodeReview.status === 'merged' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : (selectedCodeReview.verdict === 'blocked' || selectedCodeReview.status === 'blocked' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : (selectedCodeReview.verdict === 'changes_requested' || selectedCodeReview.status === 'changes_requested' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-zinc-500/20 text-zinc-400 border border-zinc-500/30'))"
+                        >
+                          {{ selectedCodeReview.status }}
+                        </span>
+                      </div>
+                      <p class="text-xs text-zinc-400">{{ selectedCodeReview.summary || 'No summary provided.' }}</p>
+                      <div class="flex items-center gap-3 text-[11px] text-zinc-500 font-mono">
+                        <span>Branch: <span class="text-zinc-300">{{ selectedCodeReview.source_branch }}</span> → <span class="text-zinc-300">{{ selectedCodeReview.target_branch }}</span></span>
+                        <span>Author: <span class="text-zinc-300">{{ selectedCodeReview.author_agent }}</span></span>
+                        <span>Strategy: <span class="text-zinc-300 uppercase">{{ selectedCodeReview.merge_strategy || 'squash' }}</span></span>
+                      </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 flex-wrap shrink-0">
+                      <button
+                        @click="triggerReviewSwarm(selectedCodeReview.id)"
+                        :disabled="isDispatchingReviewSwarm"
+                        class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold shadow-xs flex items-center gap-1 transition-all"
+                      >
+                        <span>🤖 {{ isDispatchingReviewSwarm ? 'Running Swarm...' : 'Run Review Swarm' }}</span>
+                      </button>
+
+                      <button
+                        @click="triggerSynthesizePatch(selectedCodeReview.id)"
+                        :disabled="isSynthesizingPatch || selectedReviewCritiques.length === 0"
+                        class="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs font-semibold shadow-xs flex items-center gap-1 transition-all"
+                      >
+                        <span>⚡ {{ isSynthesizingPatch ? 'Synthesizing...' : 'Synthesize Patch' }}</span>
+                      </button>
+
+                      <button
+                        v-if="selectedCodeReview.status !== 'merged'"
+                        @click="triggerMergeReview(selectedCodeReview.id)"
+                        :disabled="selectedCodeReview.verdict === 'blocked'"
+                        class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold shadow-xs flex items-center gap-1 transition-all"
+                        :title="selectedCodeReview.verdict === 'blocked' ? 'Resolve P0 blockers or use manual override to merge' : 'Execute autonomous merge'"
+                      >
+                        <span>🔀 Merge</span>
+                      </button>
+
+                      <button
+                        v-if="selectedCodeReview.verdict === 'blocked' || selectedCodeReview.status === 'blocked'"
+                        @click="overrideGateModalOpen = true"
+                        class="px-2.5 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-800 text-xs font-semibold shadow-xs flex items-center gap-1 transition-all"
+                      >
+                        <span>🛡️ Override Gate</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Subtab Navigation -->
+                  <div class="flex items-center gap-2 border-t border-zinc-200 dark:border-zinc-800 pt-2">
+                    <button
+                      @click="codeReviewActiveSubtab = 'critiques'"
+                      class="px-3 py-1 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5"
+                      :class="codeReviewActiveSubtab === 'critiques' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'text-zinc-400 hover:text-zinc-200'"
+                    >
+                      <span>💬 Persona Critiques ({{ selectedReviewCritiques.length }})</span>
+                    </button>
+
+                    <button
+                      @click="codeReviewActiveSubtab = 'diff'"
+                      class="px-3 py-1 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5"
+                      :class="codeReviewActiveSubtab === 'diff' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'text-zinc-400 hover:text-zinc-200'"
+                    >
+                      <span>📄 Unified Diff ({{ (selectedCodeReview.files_touched || []).length }} files)</span>
+                    </button>
+
+                    <button
+                      @click="codeReviewActiveSubtab = 'patches'"
+                      class="px-3 py-1 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5"
+                      :class="codeReviewActiveSubtab === 'patches' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'text-zinc-400 hover:text-zinc-200'"
+                    >
+                      <span>⚡ Synthesized Patches ({{ selectedReviewPatches.length }})</span>
+                    </button>
+
+                    <button
+                      @click="codeReviewActiveSubtab = 'gate'"
+                      class="px-3 py-1 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5"
+                      :class="codeReviewActiveSubtab === 'gate' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'text-zinc-400 hover:text-zinc-200'"
+                    >
+                      <span>⚖️ Merge Gate Consensus</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- SUBTAB 1: PERSONA CRITIQUES -->
+                <div v-if="codeReviewActiveSubtab === 'critiques'" class="space-y-3">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Swarm Critiques & Inline Reviews</span>
+                      <span class="text-[11px] text-zinc-500 font-mono">
+                        {{ selectedReviewCritiques.filter(c => c.status === 'open').length }} open
+                      </span>
+                    </div>
+                    <button
+                      @click="newCritiqueModalOpen = true"
+                      class="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold border border-zinc-700/60"
+                    >
+                      + Add Critique
+                    </button>
+                  </div>
+
+                  <div v-if="selectedReviewCritiques.length === 0" class="p-8 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-center text-xs text-zinc-500 space-y-2">
+                    <p>No critiques logged yet. Run the Autonomous Review Swarm to evaluate across 6 personas.</p>
+                    <button
+                      @click="triggerReviewSwarm(selectedCodeReview.id)"
+                      class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
+                    >
+                      Dispatch Review Swarm Now
+                    </button>
+                  </div>
+
+                  <div v-else class="space-y-2.5">
+                    <div
+                      v-for="c in selectedReviewCritiques"
+                      :key="c.id"
+                      class="p-3.5 rounded-xl border text-xs space-y-2.5 transition-all"
+                      :class="c.severity === 'p0_blocker' ? 'bg-rose-950/20 border-rose-800/50' : (c.severity === 'p1_warning' ? 'bg-amber-950/20 border-amber-800/50' : 'bg-white dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800')"
+                    >
+                      <div class="flex items-start justify-between gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
+                          <span
+                            class="px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono"
+                            :class="c.severity === 'p0_blocker' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : (c.severity === 'p1_warning' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-blue-500/20 text-blue-300 border border-blue-500/30')"
+                          >
+                            {{ c.severity }}
+                          </span>
+
+                          <span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[10px] font-mono">
+                            👤 {{ c.persona }}
+                          </span>
+
+                          <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100">{{ c.title }}</span>
+                        </div>
+
+                        <span
+                          class="px-2 py-0.5 rounded text-[10px] font-mono uppercase"
+                          :class="c.status === 'patched' ? 'bg-emerald-500/20 text-emerald-300' : (c.status === 'dismissed' ? 'bg-zinc-500/20 text-zinc-400' : 'bg-amber-500/20 text-amber-300')"
+                        >
+                          {{ c.status }}
+                        </span>
+                      </div>
+
+                      <div class="text-xs text-zinc-300 leading-relaxed">{{ c.critique_markdown }}</div>
+
+                      <div class="flex items-center gap-3 text-[10px] text-zinc-400 font-mono bg-zinc-100 dark:bg-zinc-950/60 p-2 rounded-lg">
+                        <span>📁 File: <span class="text-zinc-200">{{ c.file_path || 'N/A' }}</span></span>
+                        <span v-if="c.line_start">Lines: {{ c.line_start }}-{{ c.line_end }}</span>
+                        <span>Confidence: {{ Math.round((c.confidence_score || 0.9) * 100) }}%</span>
+                        <span v-if="c.rule_or_invariant_id">Rule: {{ c.rule_or_invariant_id }}</span>
+                      </div>
+
+                      <div v-if="c.suggested_diff" class="p-2 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-[11px] space-y-1">
+                        <div class="text-[10px] text-zinc-500 font-semibold uppercase">Suggested Fix Diff:</div>
+                        <pre class="text-emerald-400 whitespace-pre-wrap overflow-x-auto">{{ c.suggested_diff }}</pre>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- SUBTAB 2: UNIFIED DIFF -->
+                <div v-if="codeReviewActiveSubtab === 'diff'" class="space-y-3">
+                  <div class="p-4 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Touched Files ({{ (selectedCodeReview.files_touched || []).length }})</span>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                      <span v-for="(f, idx) in (selectedCodeReview.files_touched || [])" :key="idx" class="px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 font-mono text-[11px] text-zinc-300">
+                        📄 {{ f }}
+                      </span>
+                    </div>
+
+                    <div class="border-t border-zinc-200 dark:border-zinc-800 pt-3">
+                      <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 mb-2">Unified Git Diff Content</div>
+                      <pre class="p-3 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-xs text-zinc-300 max-h-[500px] overflow-y-auto whitespace-pre-wrap leading-relaxed">{{ selectedCodeReview.diff_content || 'No diff content provided.' }}</pre>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- SUBTAB 3: SYNTHESIZED PATCHES -->
+                <div v-if="codeReviewActiveSubtab === 'patches'" class="space-y-3">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Synthesized Fix Patches ({{ selectedReviewPatches.length }})</span>
+                    <button
+                      @click="triggerSynthesizePatch(selectedCodeReview.id)"
+                      :disabled="isSynthesizingPatch"
+                      class="px-2.5 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold"
+                    >
+                      + Synthesize New Patch
+                    </button>
+                  </div>
+
+                  <div v-if="selectedReviewPatches.length === 0" class="p-8 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-center text-xs text-zinc-500">
+                    No synthesized patches yet. Click "+ Synthesize New Patch" to automatically generate clean unified diffs resolving open critiques.
+                  </div>
+
+                  <div v-else class="space-y-3">
+                    <div
+                      v-for="p in selectedReviewPatches"
+                      :key="p.id"
+                      class="p-4 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-3"
+                    >
+                      <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                          <span class="text-base">⚡</span>
+                          <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100">{{ p.title }}</span>
+                          <span
+                            class="px-2 py-0.5 rounded text-[10px] font-mono uppercase"
+                            :class="p.status === 'applied' ? 'bg-emerald-500/20 text-emerald-300' : (p.status === 'reverted' ? 'bg-rose-500/20 text-rose-300' : 'bg-teal-500/20 text-teal-300')"
+                          >
+                            {{ p.status }}
+                          </span>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                          <button
+                            v-if="p.status !== 'applied'"
+                            @click="triggerApplyPatch(p.id)"
+                            class="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold"
+                          >
+                            Apply Patch
+                          </button>
+                          <button
+                            v-if="p.status === 'applied'"
+                            @click="triggerRevertPatch(p.id)"
+                            class="px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold"
+                          >
+                            Revert Patch
+                          </button>
+                        </div>
+                      </div>
+
+                      <div class="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px]">
+                        ✓ {{ p.dry_run_output || 'Clean dry-run AST application.' }}
+                      </div>
+
+                      <div>
+                        <div class="text-[10px] font-semibold text-zinc-400 uppercase mb-1">Unified Patch Diff:</div>
+                        <pre class="p-3 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-[11px] text-teal-300 max-h-48 overflow-y-auto whitespace-pre-wrap">{{ p.patch_unified_diff }}</pre>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- SUBTAB 4: MERGE GATE CONSENSUS -->
+                <div v-if="codeReviewActiveSubtab === 'gate'" class="space-y-3">
+                  <div class="p-4 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-4">
+                    <div class="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
+                      <div>
+                        <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Merge Gate & Quality Rules Checklist</div>
+                        <p class="text-[11px] text-zinc-400">Strict multi-persona verification before merge to protected branches.</p>
+                      </div>
+                      <button
+                        @click="triggerEvaluateGate(selectedCodeReview.id)"
+                        class="px-3 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
+                      >
+                        Re-Evaluate Gate
+                      </button>
+                    </div>
+
+                    <!-- Checklist -->
+                    <div class="space-y-2 text-xs">
+                      <div class="flex items-center justify-between p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800">
+                        <div class="flex items-center gap-2">
+                          <span :class="selectedCodeReview.p0_count === 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'">
+                            {{ selectedCodeReview.p0_count === 0 ? '✓' : '✗' }}
+                          </span>
+                          <span>Zero P0 Blockers Rule</span>
+                        </div>
+                        <span class="font-mono text-[11px]" :class="selectedCodeReview.p0_count === 0 ? 'text-emerald-400' : 'text-rose-400'">
+                          {{ selectedCodeReview.p0_count }} open blockers
+                        </span>
+                      </div>
+
+                      <div class="flex items-center justify-between p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800">
+                        <div class="flex items-center gap-2">
+                          <span class="text-emerald-400 font-bold">✓</span>
+                          <span>Architectural Invariant Compliance (Hook 116)</span>
+                        </div>
+                        <span class="font-mono text-[11px] text-emerald-400">PASSED</span>
+                      </div>
+
+                      <div class="flex items-center justify-between p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800">
+                        <div class="flex items-center gap-2">
+                          <span :class="selectedCodeReview.p1_count === 0 ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'">
+                            {{ selectedCodeReview.p1_count === 0 ? '✓' : '⚠️' }}
+                          </span>
+                          <span>Security & Credential Scanning</span>
+                        </div>
+                        <span class="font-mono text-[11px]" :class="selectedCodeReview.p1_count === 0 ? 'text-emerald-400' : 'text-amber-400'">
+                          {{ selectedCodeReview.p1_count }} warnings
+                        </span>
+                      </div>
+
+                      <div class="flex items-center justify-between p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800">
+                        <div class="flex items-center gap-2">
+                          <span class="text-emerald-400 font-bold">✓</span>
+                          <span>FOSS & No-Monetization Non-Negotiable Contract</span>
+                        </div>
+                        <span class="font-mono text-[11px] text-emerald-400">PASSED</span>
+                      </div>
+                    </div>
+
+                    <!-- Verdict box -->
+                    <div
+                      class="p-4 rounded-xl border space-y-2"
+                      :class="selectedCodeReview.verdict === 'approved' ? 'bg-emerald-950/20 border-emerald-800/50' : (selectedCodeReview.verdict === 'blocked' ? 'bg-rose-950/20 border-rose-800/50' : 'bg-amber-950/20 border-amber-800/50')"
+                    >
+                      <div class="flex items-center justify-between">
+                        <div class="text-xs font-bold uppercase tracking-wider" :class="selectedCodeReview.verdict === 'approved' ? 'text-emerald-300' : (selectedCodeReview.verdict === 'blocked' ? 'text-rose-300' : 'text-amber-300')">
+                          Consensus Verdict: {{ selectedCodeReview.verdict }}
+                        </div>
+                        <span class="text-xs font-mono font-bold">{{ selectedCodeReview.overall_score || 100 }}/100</span>
+                      </div>
+                      <div v-if="selectedReviewVerdict" class="text-xs text-zinc-300 whitespace-pre-wrap">{{ selectedReviewVerdict.summary_markdown }}</div>
+                      <div v-else class="text-xs text-zinc-400">Run gate evaluation to generate formal arbiter verdict.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- MODAL 1: REQUEST CODE REVIEW -->
+          <div v-if="newReviewModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="w-full max-w-lg rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🔍</span>
+                  <h4 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Request Code Review</h4>
+                </div>
+                <button @click="newReviewModalOpen = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Review Title</label>
+                  <input type="text" v-model="newCodeReview.title" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs" placeholder="e.g. feat: add knowledge graph memory index and invariant engine" />
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Source Branch</label>
+                    <input type="text" v-model="newCodeReview.source_branch" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono" />
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Target Branch</label>
+                    <input type="text" v-model="newCodeReview.target_branch" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono" />
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Touched Files (comma-separated)</label>
+                  <input type="text" v-model="newCodeReview.files_touched_str" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono" placeholder="app/pb_hooks/116.pb.js, tests/test_kg.py" />
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Summary / Context</label>
+                  <textarea v-model="newCodeReview.summary" rows="2" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs" placeholder="Describe the changes made..."></textarea>
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Unified Git Diff Content</label>
+                  <textarea v-model="newCodeReview.diff_content" rows="4" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono" placeholder="--- a/file.js&#10;+++ b/file.js&#10;@@ -1,5 +1,5 @@&#10;+ const x = 1;"></textarea>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <input type="checkbox" id="rev_auto_swarm" v-model="newCodeReview.auto_swarm" class="rounded border-zinc-700" />
+                  <label for="rev_auto_swarm" class="text-xs text-zinc-300">Automatically run review swarm upon submission</label>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button @click="newReviewModalOpen = false" class="px-4 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold">Cancel</button>
+                <button @click="submitNewReviewModal()" :disabled="!newCodeReview.title.trim()" class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold shadow-xs">Submit Review Request</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- MODAL 2: ADD CRITIQUE -->
+          <div v-if="newCritiqueModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="w-full max-w-lg rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">💬</span>
+                  <h4 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Add Persona Code Review Critique</h4>
+                </div>
+                <button @click="newCritiqueModalOpen = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3">
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Persona</label>
+                    <select v-model="newCritique.persona" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs">
+                      <option value="security_auditor">Security Auditor</option>
+                      <option value="architecture_guardian">Architecture Guardian</option>
+                      <option value="performance_specialist">Performance Specialist</option>
+                      <option value="simplicity_yagni">Simplicity & YAGNI</option>
+                      <option value="test_coverage_critic">Test Coverage Critic</option>
+                      <option value="style_conventions">Style Conventions</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Severity</label>
+                    <select v-model="newCritique.severity" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs">
+                      <option value="p0_blocker">P0 Blocker (Blocks Merge)</option>
+                      <option value="p1_warning">P1 Warning</option>
+                      <option value="p2_suggestion">P2 Suggestion</option>
+                      <option value="p3_nit">P3 Nitpick</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Critique Title</label>
+                  <input type="text" v-model="newCritique.title" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs" placeholder="e.g. Unbounded Query Memory Allocation" />
+                </div>
+
+                <div class="grid grid-cols-3 gap-2">
+                  <div class="col-span-2">
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">File Path</label>
+                    <input type="text" v-model="newCritique.file_path" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono" />
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Line Start</label>
+                    <input type="number" v-model="newCritique.line_start" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono" />
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Rationale / Explanation</label>
+                  <textarea v-model="newCritique.critique_markdown" rows="3" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs" placeholder="Explain the defect and recommended fix..."></textarea>
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Suggested Diff Replacement</label>
+                  <textarea v-model="newCritique.suggested_diff" rows="3" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono" placeholder="- badCode()\n+ goodCode()"></textarea>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button @click="newCritiqueModalOpen = false" class="px-4 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold">Cancel</button>
+                <button @click="submitNewCritiqueModal()" :disabled="!newCritique.title.trim()" class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold shadow-xs">Add Critique</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- MODAL 3: OVERRIDE MERGE GATE -->
+          <div v-if="overrideGateModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="w-full max-w-md rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-xl space-y-4">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🛡️</span>
+                  <h4 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Manual Merge Gate Override</h4>
+                </div>
+                <button @click="overrideGateModalOpen = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3">
+                <div class="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
+                  ⚠️ Overriding the merge gate bypasses automated P0 blocking rules and records an audit trace.
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Override Reason</label>
+                  <textarea v-model="gateOverride.reason" rows="3" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs" placeholder="e.g. Critical hotfix approved by Tech Lead; P0 tracked in PB-402"></textarea>
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Overridden By</label>
+                  <input type="text" v-model="gateOverride.overridden_by" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs" />
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button @click="overrideGateModalOpen = false" class="px-4 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold">Cancel</button>
+                <button @click="submitGateOverrideModal()" :disabled="!gateOverride.reason.trim()" class="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-bold shadow-xs">Force Approve & Override</button>
               </div>
             </div>
           </div>

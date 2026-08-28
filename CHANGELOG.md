@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.32.0] - 2026-08-28 - Cycle 36
+### Added
+- **Autonomous Agent Multi-Persona Code Review Swarm, AST-Aware Critique & Patch Synthesis Engine (Milestone 12 / Epic 33):**
+  - Schema migration (`1710000045_add_code_review_swarm_engine.js`) introducing 4 dedicated collections: `code_reviews`, `review_critiques`, `review_patches`, and `merge_verdicts`.
+  - Backend engine hook (`app/pb_hooks/117_code_review_swarm_engine.pb.js`) with 18 high-performance REST API endpoints:
+    - `GET /api/projectbase/reviews` and `POST /api/projectbase/reviews` for listing and creating code review requests with auto-diff file extraction, quality scoring, and baseline analysis.
+    - `GET /api/projectbase/reviews/{id}`, `PATCH /api/projectbase/reviews/{id}`, and `DELETE /api/projectbase/reviews/{id}` for querying complete review specifications, critiques list, synthesized patches, and cascading deletion.
+    - `POST /api/projectbase/reviews/{id}/critiques`, `GET /api/projectbase/reviews/{id}/critiques`, `PATCH /api/projectbase/reviews/critiques/{id}`, and `DELETE /api/projectbase/reviews/critiques/{id}` for line-level persona critiques with real-time severity scoring (P0/P1/P2/P3) and composite score recalculation.
+    - `POST /api/projectbase/reviews/{id}/swarm` for dispatching full 6-persona review swarms (`SecurityAuditor`, `ArchitectureGuardian`, `PerformanceSpecialist`, `SimplicityYAGNI`, `TestCoverageCritic`, `StyleConventions`) that automatically detect hardcoded secrets, invariant violations, unbounded queries, missing tests, and command injection risks.
+    - `POST /api/projectbase/reviews/{id}/synthesize-patch` and `GET /api/projectbase/reviews/{id}/patches` for generating clean unified diff patches that resolve open critiques with zero AST conflicts.
+    - `POST /api/projectbase/reviews/patches/{id}/apply` and `POST /api/projectbase/reviews/patches/{id}/revert` for 1-click dry-run patch application and critique lifecycle state synchronization.
+    - `POST /api/projectbase/reviews/{id}/evaluate-gate` for multi-persona consensus merge gate evaluation and arbiter verdict generation.
+    - `POST /api/projectbase/reviews/{id}/override-gate` for authorized manual gate override with audit rationale logging.
+    - `POST /api/projectbase/reviews/{id}/merge` for autonomous merge execution with strict P0 blocker prevention.
+    - `GET /api/projectbase/reviews/metrics` for workspace-wide code review KPIs, approval rates, and persona severity distributions.
+  - 8 FastMCP JSON-RPC 2.0 tools: `request_code_review`, `submit_persona_critique`, `dispatch_review_swarm`, `synthesize_review_patch`, `apply_review_patch`, `evaluate_merge_gate`, `list_code_reviews`, and `get_code_review_details`.
+  - Frontend AgentsView **🔍 Autonomous Code Review Swarm & AST Critique Hub** dashboard (`activeTab === 'code_reviews'`) with 5 KPI overview cards, split-pane layout, 4 interactive subtabs (Persona Critiques & Inline Reviews, Unified Diff & Touched Files, Synthesized Patches & Dry-Run Logs, and Merge Gate Consensus & Invariant Shield), "+ Request Code Review" modal, "+ Add Critique" modal, and "Manual Merge Gate Override" modal.
+  - Complete OpenAPI 3.0 specification coverage in `app/pb_public/openapi.json` and client SDK in `app/pb_public/js/api.js`.
+  - Comprehensive automated pytest suite `tests/test_code_review_swarm_engine.py` with 10/10 passing assertions, 492 total passing tests across 38 files, and 100% headless Playwright browser E2E verification (`scripts/qa/run_code_review_swarm_e2e.py`).
+
 ## [1.31.0] - 2026-08-28 - Cycle 35
 ### Added
 - **Autonomous Agent Knowledge Graph, Architectural Memory Index & Invariant Compliance Engine (Milestone 11 / Epic 32):**

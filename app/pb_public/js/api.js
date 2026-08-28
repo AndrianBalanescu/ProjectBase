@@ -2920,5 +2920,194 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to seed demo knowledge graph');
     return data;
+  },
+
+  // Milestone 12 / Epic 33 — Autonomous Code Review Swarm & Patch Synthesizer
+  async listCodeReviews(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/reviews${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list code reviews');
+    return data;
+  },
+
+  async createCodeReview(payload = {}) {
+    const res = await fetch('/api/projectbase/reviews', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create code review');
+    return data;
+  },
+
+  async getCodeReview(id) {
+    const res = await fetch(`/api/projectbase/reviews/${encodeURIComponent(id)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get code review');
+    return data;
+  },
+
+  async updateCodeReview(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/reviews/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to update code review');
+    return data;
+  },
+
+  async deleteCodeReview(id) {
+    const res = await fetch(`/api/projectbase/reviews/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete code review');
+    return data;
+  },
+
+  async submitReviewCritique(reviewId, payload = {}) {
+    const res = await fetch(`/api/projectbase/reviews/${encodeURIComponent(reviewId)}/critiques`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to submit review critique');
+    return data;
+  },
+
+  async listReviewCritiques(reviewId, params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/reviews/${encodeURIComponent(reviewId)}/critiques${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list review critiques');
+    return data;
+  },
+
+  async updateReviewCritique(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/reviews/critiques/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to update review critique');
+    return data;
+  },
+
+  async deleteReviewCritique(id) {
+    const res = await fetch(`/api/projectbase/reviews/critiques/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete review critique');
+    return data;
+  },
+
+  async dispatchReviewSwarm(reviewId) {
+    const res = await fetch(`/api/projectbase/reviews/${encodeURIComponent(reviewId)}/swarm`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to dispatch review swarm');
+    return data;
+  },
+
+  async synthesizeReviewPatch(reviewId, payload = {}) {
+    const res = await fetch(`/api/projectbase/reviews/${encodeURIComponent(reviewId)}/synthesize-patch`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to synthesize review patch');
+    return data;
+  },
+
+  async listReviewPatches(reviewId) {
+    const res = await fetch(`/api/projectbase/reviews/${encodeURIComponent(reviewId)}/patches`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list review patches');
+    return data;
+  },
+
+  async applyReviewPatch(patchId) {
+    const res = await fetch(`/api/projectbase/reviews/patches/${encodeURIComponent(patchId)}/apply`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to apply review patch');
+    return data;
+  },
+
+  async revertReviewPatch(patchId) {
+    const res = await fetch(`/api/projectbase/reviews/patches/${encodeURIComponent(patchId)}/revert`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to revert review patch');
+    return data;
+  },
+
+  async evaluateMergeGate(reviewId) {
+    const res = await fetch(`/api/projectbase/reviews/${encodeURIComponent(reviewId)}/evaluate-gate`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to evaluate merge gate');
+    return data;
+  },
+
+  async overrideMergeGate(reviewId, payload = {}) {
+    const res = await fetch(`/api/projectbase/reviews/${encodeURIComponent(reviewId)}/override-gate`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to override merge gate');
+    return data;
+  },
+
+  async mergeCodeReview(reviewId) {
+    const res = await fetch(`/api/projectbase/reviews/${encodeURIComponent(reviewId)}/merge`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to merge code review');
+    return data;
+  },
+
+  async getCodeReviewMetrics() {
+    const res = await fetch('/api/projectbase/reviews/metrics', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get code review metrics');
+    return data;
   }
 };

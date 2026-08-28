@@ -8556,6 +8556,259 @@
           "200": { "description": "Seeded successfully" }
         }
       }
+    },
+    "/projectbase/reviews": {
+      "get": {
+        "tags": ["Autonomous Code Review Swarm & Merge Gate"],
+        "summary": "List code reviews with optional status/verdict filters",
+        "parameters": [
+          { "name": "project_id", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "verdict", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "author_agent", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "search", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer" } },
+          { "name": "offset", "in": "query", "required": false, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "List of code review records" }
+        }
+      },
+      "post": {
+        "tags": ["Autonomous Code Review Swarm & Merge Gate"],
+        "summary": "Request an automated code review on a diff or branch",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "summary": { "type": "string" },
+                  "project_id": { "type": "string" },
+                  "source_branch": { "type": "string" },
+                  "target_branch": { "type": "string" },
+                  "diff_content": { "type": "string" },
+                  "files_touched": { "type": "array", "items": { "type": "string" } },
+                  "author_agent": { "type": "string" },
+                  "auto_swarm": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Code review request created" }
+        }
+      }
+    },
+    "/projectbase/reviews/{id}": {
+      "get": {
+        "tags": ["Autonomous Code Review Swarm & Merge Gate"],
+        "summary": "Get full details of a code review including critiques and patches",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Code review details" }
+        }
+      },
+      "patch": {
+        "tags": ["Autonomous Code Review Swarm & Merge Gate"],
+        "summary": "Update code review metadata or status",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Code review updated" }
+        }
+      },
+      "delete": {
+        "tags": ["Autonomous Code Review Swarm & Merge Gate"],
+        "summary": "Delete code review and cascading artifacts",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Code review deleted" }
+        }
+      }
+    },
+    "/projectbase/reviews/{id}/critiques": {
+      "get": {
+        "tags": ["Autonomous Code Review Swarm & Merge Gate"],
+        "summary": "List persona critiques for a code review",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "persona", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "severity", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "List of critiques" }
+        }
+      },
+      "post": {
+        "tags": ["Autonomous Code Review Swarm & Merge Gate"],
+        "summary": "Submit a specialized persona code review critique",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title"],
+                "properties": {
+                  "persona": { "type": "string" },
+                  "severity": { "type": "string" },
+                  "title": { "type": "string" },
+                  "critique_markdown": { "type": "string" },
+                  "file_path": { "type": "string" },
+                  "line_start": { "type": "integer" },
+                  "line_end": { "type": "integer" },
+                  "suggested_diff": { "type": "string" },
+                  "confidence_score": { "type": "number" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Critique submitted" }
+        }
+      }
+    },
+    "/projectbase/reviews/critiques/{id}": {
+      "patch": {
+        "tags": ["Autonomous Code Review Swarm & Merge Gate"],
+        "summary": "Update critique status or metadata",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Critique updated" }
+        }
+      },
+      "delete": {
+        "tags": ["Autonomous Code Review Swarm & Merge Gate"],
+        "summary": "Delete critique and recalculate metrics",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Critique deleted" }
+        }
+      }
+    },
+    "/projectbase/reviews/{id}/swarm": {
+      "post": {
+        "tags": ["Autonomous Code Review Swarm & Merge Gate"],
+        "summary": "Dispatch multi-persona review swarm against code review diff",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Swarm review completed" }
+        }
+      }
+    },
+    "/projectbase/reviews/{id}/synthesize-patch": {
+      "post": {
+        "tags": ["Autonomous Code Review Swarm & Merge Gate"],
+        "summary": "Synthesize automated fix patch resolving open critiques",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "201": { "description": "Patch synthesized" }
+        }
+      }
+    },
+    "/projectbase/reviews/{id}/patches": {
+      "get": {
+        "tags": ["Autonomous Code Review Swarm & Merge Gate"],
+        "summary": "List synthesized patches for a code review",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "List of patches" }
+        }
+      }
+    },
+    "/projectbase/reviews/patches/{id}/apply": {
+      "post": {
+        "tags": ["Autonomous Code Review Swarm & Merge Gate"],
+        "summary": "Apply synthesized patch and mark critiques patched",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Patch applied" }
+        }
+      }
+    },
+    "/projectbase/reviews/patches/{id}/revert": {
+      "post": {
+        "tags": ["Autonomous Code Review Swarm & Merge Gate"],
+        "summary": "Revert applied patch and reopen critiques",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Patch reverted" }
+        }
+      }
+    },
+    "/projectbase/reviews/{id}/evaluate-gate": {
+      "post": {
+        "tags": ["Autonomous Code Review Swarm & Merge Gate"],
+        "summary": "Evaluate consensus merge gate across personas and invariants",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Merge gate evaluated" }
+        }
+      }
+    },
+    "/projectbase/reviews/{id}/override-gate": {
+      "post": {
+        "tags": ["Autonomous Code Review Swarm & Merge Gate"],
+        "summary": "Manually override merge gate with recorded rationale",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Merge gate overridden" }
+        }
+      }
+    },
+    "/projectbase/reviews/{id}/merge": {
+      "post": {
+        "tags": ["Autonomous Code Review Swarm & Merge Gate"],
+        "summary": "Execute merge of approved code review branch",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Review merged" }
+        }
+      }
+    },
+    "/projectbase/reviews/metrics": {
+      "get": {
+        "tags": ["Autonomous Code Review Swarm & Merge Gate"],
+        "summary": "Get aggregate code review metrics and score distributions",
+        "responses": {
+          "200": { "description": "Metrics summary" }
+        }
+      }
     }
   }
 }

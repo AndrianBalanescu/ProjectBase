@@ -286,3 +286,13 @@
 - [x] 8 FastMCP JSON-RPC 2.0 tools (`store_architectural_fact`, `query_knowledge_graph`, `create_codebase_symbol_node`, `link_knowledge_nodes`, `verify_change_against_invariants`, `list_architectural_decisions`, `invalidate_knowledge_node`, `get_knowledge_graph_metrics`)
 - [x] Frontend AgentsView **🧠 Autonomous Knowledge Graph & Architectural Memory** dashboard with 5 KPI overview cards, interactive 4-subtab layout (Knowledge & Symbol Graph Explorer with detail viewer and relations grid, Architectural Decision Records (ADRs) gallery, Invariants & Compliance Rules table with active toggles, and Interactive Invariant Verifier Playground with live violation diagnostic audits), and "+ Record Fact / ADR" / "+ New Invariant" modals
 - [x] Comprehensive automated test suite `tests/test_knowledge_graph_engine.py` with 11/11 passing assertions, 482 total passing tests across 37 files, and 100% frontend guard verification
+
+---
+
+## Milestone (Cycle 36)
+**Epic 33 – Autonomous Agent Multi-Persona Code Review Swarm, AST-Aware Critique & Patch Synthesis Engine (✅ Done)**
+- [x] Schema migration (`1710000045_add_code_review_swarm_engine.js`) introducing `code_reviews`, `review_critiques`, `review_patches`, and `merge_verdicts` collections
+- [x] Backend engine hook (`app/pb_hooks/117_code_review_swarm_engine.pb.js`) with 18 high-performance REST API endpoints for review requests, line-anchored multi-persona critiques, automated review swarms (`SecurityAuditor`, `ArchitectureGuardian`, `PerformanceSpecialist`, `SimplicityYAGNI`, `TestCoverageCritic`, `StyleConventions`), unified diff patch synthesis, 1-click dry-run patch application/reversion, consensus merge gate evaluation, and manual gate override tracking
+- [x] 8 FastMCP JSON-RPC 2.0 tools (`request_code_review`, `submit_persona_critique`, `dispatch_review_swarm`, `synthesize_review_patch`, `apply_review_patch`, `evaluate_merge_gate`, `list_code_reviews`, `get_code_review_details`)
+- [x] Frontend AgentsView **🔍 Autonomous Code Review Swarm & AST Critique Hub** dashboard (`activeTab === 'code_reviews'`) with 5 KPI cards, split-pane review inspector, 4 interactive subtabs (Persona Critiques & Inline Reviews, Unified Diff & Touched Files, Synthesized Patches & Dry-Run Logs, Merge Gate Consensus & Invariant Shield), "+ Request Code Review" modal, "+ Add Critique" modal, and "Manual Merge Gate Override" modal
+- [x] Comprehensive automated test suite `tests/test_code_review_swarm_engine.py` with 10/10 passing assertions, 492 total passing tests across 38 files, and 100% headless Playwright browser E2E verification (`scripts/qa/run_code_review_swarm_e2e.py`)
