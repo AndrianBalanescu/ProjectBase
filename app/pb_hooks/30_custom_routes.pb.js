@@ -13,6 +13,15 @@ routerAdd("GET", "/api/projectbase/health", (e) => {
     })
 })
 
+routerAdd("POST", "/api/projectbase/health", (e) => {
+    return e.json(200, {
+        status: "healthy",
+        service: "ProjectBase",
+        received: true,
+        time: new Date().toISOString()
+    })
+})
+
 routerAdd("GET", "/api/projectbase/version", (e) => {
     return e.json(200, {
         version: "1.0.0",

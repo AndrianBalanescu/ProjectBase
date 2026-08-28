@@ -84,6 +84,17 @@
             "description": "Healthy"
           }
         }
+      },
+      "post": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Service Health Probe Echo",
+        "responses": {
+          "200": {
+            "description": "Healthy"
+          }
+        }
       }
     },
     "/projectbase/stats": {
@@ -2093,6 +2104,155 @@
           },
           "401": {
             "description": "Missing, invalid, or expired Authorization Bearer token"
+          }
+        }
+      }
+    },
+    "/projectbase/leases": {
+      "get": {
+        "tags": [
+          "Agent Collaboration"
+        ],
+        "summary": "List Active Task Leases",
+        "description": "Returns all active task execution leases across the workspace to prevent concurrent agent collisions.",
+        "responses": {
+          "200": {
+            "description": "List of active leases"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        }
+      }
+    },
+    "/projectbase/leases/acquire": {
+      "post": {
+        "tags": [
+          "Agent Collaboration"
+        ],
+        "summary": "Acquire or Renew Task Lease",
+        "description": "Acquires an exclusive task execution lease on an issue. Returns HTTP 409 Conflict if actively leased by another agent.",
+        "responses": {
+          "200": {
+            "description": "Lease renewed or acquired"
+          },
+          "201": {
+            "description": "Lease created"
+          },
+          "409": {
+            "description": "Collision: task leased by another agent"
+          }
+        }
+      }
+    },
+    "/projectbase/leases/renew": {
+      "post": {
+        "tags": [
+          "Agent Collaboration"
+        ],
+        "summary": "Renew Task Lease Heartbeat",
+        "description": "Extends the expiration TTL and heartbeat for an existing active lease.",
+        "responses": {
+          "200": {
+            "description": "Lease renewed"
+          },
+          "403": {
+            "description": "Held by another agent"
+          }
+        }
+      }
+    },
+    "/projectbase/leases/release": {
+      "post": {
+        "tags": [
+          "Agent Collaboration"
+        ],
+        "summary": "Release Task Lease",
+        "description": "Releases an active task execution lease on an issue.",
+        "responses": {
+          "200": {
+            "description": "Lease released"
+          }
+        }
+      }
+    },
+    "/projectbase/telemetry": {
+      "post": {
+        "tags": [
+          "Agent Collaboration"
+        ],
+        "summary": "Ingest Agent Telemetry",
+        "description": "Records agent reasoning traces, tool invocations, and checkpoint events.",
+        "responses": {
+          "201": {
+            "description": "Telemetry recorded"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Agent Collaboration"
+        ],
+        "summary": "Query Agent Telemetry",
+        "description": "Queries historical telemetry events filtered by agent name, issue ID, or event type.",
+        "responses": {
+          "200": {
+            "description": "Telemetry events list"
+          }
+        }
+      }
+    },
+    "/projectbase/webhooks": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Register Outbound Webhook",
+        "description": "Registers an outbound webhook subscription for external orchestrators.",
+        "responses": {
+          "201": {
+            "description": "Webhook registered"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "List Webhooks",
+        "description": "Lists all registered webhook subscriptions.",
+        "responses": {
+          "200": {
+            "description": "Webhooks list"
+          }
+        }
+      }
+    },
+    "/projectbase/webhooks/{id}": {
+      "delete": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Delete Webhook Subscription",
+        "responses": {
+          "200": {
+            "description": "Webhook deleted"
+          },
+          "404": {
+            "description": "Webhook not found"
+          }
+        }
+      }
+    },
+    "/projectbase/webhooks/{id}/test": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Test Webhook Ping",
+        "responses": {
+          "200": {
+            "description": "Test ping response status"
           }
         }
       }

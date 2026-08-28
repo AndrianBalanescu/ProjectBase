@@ -1,7 +1,7 @@
 # ProjectBase – Candidate Roadmap (Epics)
 
-**Current Cycle:** 8
-**Focus:** Production Benchmarking & FastMCP Tool Parity
+**Current Cycle:** 9
+**Focus:** Real-Time Multi-Agent Collaboration, Task Leases, Collision Avoidance, Webhooks & Telemetry
 
 ## Epic 0 – Core CRUD (✅ Done)
 - Projects, issues, cycles, users
@@ -49,10 +49,17 @@
 - [x] Automated agent workflow benchmark harness (`scripts/bench/agent_workflow_bench.py`) & CI test (`tests/test_benchmarks.py`)
 - [x] Verified FastMCP JSON-RPC 2.0 endpoint suite (`tests/test_api.py`)
 
+## Epic 9 – Real-Time Multi-Agent Collaboration & SSE Stream Telemetry (✅ Done)
+- [x] Multi-agent task lease/lock mutual exclusion to prevent collision on concurrent issue execution (`/api/projectbase/leases/acquire`, `renew`, `release`, `task_leases` collection with TTL expiration)
+- [x] FastMCP collaboration tools (`acquire_task_lease`, `release_task_lease`, `renew_task_lease`, `get_task_lease`, `log_agent_telemetry`, `register_webhook`, `list_webhooks`, `delete_webhook`)
+- [x] Real-time agent activity & reasoning trace telemetry ingestion (`/api/projectbase/telemetry`)
+- [x] Outbound event webhooks subscription engine & HTTP event dispatcher for external orchestrators (Hermes, Windmill, Flomaster swarm coordinator)
+- [x] 238/238 automated tests passing across 13 test suites
+
 ---
 
-## Next Milestone (Cycle 9)
-**Epic 9 – Real-Time Multi-Agent Collaboration & SSE Stream Telemetry**
-- Live agent reasoning & tool invocation streaming in Kanban cards
-- Multi-agent collision avoidance on shared tasks
-- Webhook subscriptions for external orchestrator triggers
+## Next Milestone (Cycle 10)
+**Epic 10 – Autonomous Agent Swarm Choreography & Task Graph Decomposition**
+- Multi-step parent/child issue task graph DAG execution
+- Dynamic subtask splitting and assignment across specialized agent personas
+- Automated peer-review and validation checkpoints before issue completion

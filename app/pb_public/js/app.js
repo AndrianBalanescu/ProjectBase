@@ -278,14 +278,12 @@ const App = {
       let email = (this.loginEmail || '').trim();
       let password = this.loginPassword || '';
       if (!email || !password) {
-        if (e && e.target) {
-          try {
-            const emailInput = e.target.querySelector('input[type="email"]') || (e.target.elements && e.target.elements['email']);
-            const passInput = e.target.querySelector('input[type="password"]') || (e.target.elements && e.target.elements['password']);
-            if (emailInput && emailInput.value) email = emailInput.value.trim();
-            if (passInput && passInput.value) password = passInput.value;
-          } catch (domErr) {}
-        }
+        try {
+          const emailInput = (e && e.target && (e.target.querySelector('input[type="email"]') || (e.target.elements && e.target.elements['email']))) || document.querySelector('input[type="email"]');
+          const passInput = (e && e.target && (e.target.querySelector('input[type="password"]') || (e.target.elements && e.target.elements['password']))) || document.querySelector('input[type="password"]');
+          if (emailInput && emailInput.value && !email) email = emailInput.value.trim();
+          if (passInput && passInput.value && !password) password = passInput.value;
+        } catch (domErr) {}
       }
       if (!email || !password) {
         this.authError = 'Please enter your email and password.';

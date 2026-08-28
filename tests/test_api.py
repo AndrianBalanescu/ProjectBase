@@ -286,6 +286,14 @@ DOCUMENTED_CUSTOM_ROUTES = [
     "/projectbase/ai-assist",
     "/projectbase/dispatch-agent",
     "/projectbase/mcp",
+    "/projectbase/leases",
+    "/projectbase/leases/acquire",
+    "/projectbase/leases/renew",
+    "/projectbase/leases/release",
+    "/projectbase/telemetry",
+    "/projectbase/webhooks",
+    "/projectbase/webhooks/{id}",
+    "/projectbase/webhooks/{id}/test",
 ]
 
 
@@ -2981,4 +2989,328 @@ def test_fastmcp_jsonrpc_endpoint_suite():
         assert "completion_rate" in stats
     finally:
         _request("DELETE", f"/api/collections/issues/records/{issue_id}", headers={"Authorization": token})
+
+
+def test_task_leases_rest_api_lifecycle_and_conflict():
+    """Verify task lease acquisition, conflict avoidance (409), renewal, and release."""
+    token = _superuser_token()
+    pid = _first_project_id()
+
+    # 1. Create a test issue
+    st, issue = _authed_json("POST", "/api/collections/issues/records", {
+        "project": pid,
+        "title": f"Lease Collision Test {_uid()}",
+        "status": "todo",
+        "priority": "high"
+    })
+    assert st == 200
+    iid = issue["id"]
+    ident = issue.get("identifier")
+
+    try:
+        # 2. Agent Alpha acquires lease
+        st, res = _authed_json("POST", "/api/projectbase/leases/acquire", {
+            "issue_id": ident,
+            "agent_name": "agent-alpha",
+            "ttl_seconds": 60,
+            "reason": "Fixing core bug"
+        })
+        assert st in (200, 201)
+        assert res.get("success") is True
+        assert res.get("lease", {}).get("agent_name") == "agent-alpha"
+
+        # 3. Agent Beta tries to acquire lease on same issue -> 409 Conflict
+        st, res_beta = _authed_json("POST", "/api/projectbase/leases/acquire", {
+            "issue_id": ident,
+            "agent_name": "agent-beta",
+            "ttl_seconds": 60,
+            "reason": "Attempting concurrent fix"
+        })
+        assert st == 409
+        assert res_beta.get("conflict") is True
+        assert res_beta.get("lease", {}).get("agent_name") == "agent-alpha"
+
+        # 4. Agent Alpha renews lease
+        st, res_renew = _authed_json("POST", "/api/projectbase/leases/renew", {
+            "issue_id": ident,
+            "agent_name": "agent-alpha",
+            "ttl_seconds": 120
+        })
+        assert st == 200
+        assert res_renew.get("success") is True
+
+        # 5. Agent Beta fails to renew Alpha's lease
+        st, res_bad_renew = _authed_json("POST", "/api/projectbase/leases/renew", {
+            "issue_id": ident,
+            "agent_name": "agent-beta",
+            "ttl_seconds": 120
+        })
+        assert st in (403, 400)
+
+        # 6. List active leases
+        st, list_res = _get_authed("/api/projectbase/leases")
+        assert st == 200
+        assert any(l.get("issue_id") == iid for l in list_res.get("leases", []))
+
+        # 7. Agent Alpha releases lease
+        st, res_rel = _authed_json("POST", "/api/projectbase/leases/release", {
+            "issue_id": ident,
+            "agent_name": "agent-alpha"
+        })
+        assert st == 200
+        assert res_rel.get("success") is True
+
+        # 8. Agent Beta can now acquire the lease cleanly
+        st, res_beta_ok = _authed_json("POST", "/api/projectbase/leases/acquire", {
+            "issue_id": ident,
+            "agent_name": "agent-beta",
+            "ttl_seconds": 60,
+            "reason": "Acquired after release"
+        })
+        assert st in (200, 201)
+        assert res_beta_ok.get("lease", {}).get("agent_name") == "agent-beta"
+    finally:
+        _request("DELETE", f"/api/collections/issues/records/{iid}", headers={"Authorization": token})
+
+
+def test_agent_telemetry_rest_api():
+    """Verify agent telemetry ingestion and filtered queries."""
+    token = _superuser_token()
+    pid = _first_project_id()
+
+    agent_tag = f"test-agent-{_uid()}"
+
+    # 1. Ingest telemetry
+    st, res1 = _authed_json("POST", "/api/projectbase/telemetry", {
+        "agent_name": agent_tag,
+        "event_type": "reasoning",
+        "step": 1,
+        "summary": "Analyzing issue dependencies",
+        "payload": {"dependencies": ["PB-1", "PB-2"]}
+    })
+    assert st == 201
+    assert res1.get("success") is True
+
+    st, res2 = _authed_json("POST", "/api/projectbase/telemetry", {
+        "agent_name": agent_tag,
+        "event_type": "tool_call",
+        "step": 2,
+        "summary": "Invoked git commit",
+        "payload": {"cmd": "git commit -m 'fix'"}
+    })
+    assert st == 201
+
+    # 2. Query telemetry by agent_name
+    st, q_res = _get_authed(f"/api/projectbase/telemetry?agent_name={agent_tag}")
+    assert st == 200
+    telemetry = q_res.get("telemetry", [])
+    assert len(telemetry) >= 2
+    types = [t.get("event_type") for t in telemetry]
+    assert "reasoning" in types and "tool_call" in types
+
+
+def test_webhooks_rest_api_lifecycle():
+    """Verify webhook registration, listing, test ping, and deletion."""
+    webhook_url = "http://127.0.0.1:8120/api/projectbase/health"
+    wh_name = f"Test Orchestrator {_uid()}"
+
+    # 1. Register webhook
+    st, res = _authed_json("POST", "/api/projectbase/webhooks", {
+        "name": wh_name,
+        "url": webhook_url,
+        "events": ["issue.created", "issue.moved"],
+        "secret": "test-secret-123"
+    })
+    assert st == 201
+    wh_id = res.get("webhook", {}).get("id")
+    assert wh_id
+
+    try:
+        # 2. List webhooks
+        st, list_res = _get_authed("/api/projectbase/webhooks")
+        assert st == 200
+        wh_items = list_res.get("webhooks", [])
+        assert any(w.get("id") == wh_id for w in wh_items)
+
+        # 3. Test ping webhook
+        st, test_res = _authed_json("POST", f"/api/projectbase/webhooks/{wh_id}/test", {})
+        assert st == 200
+        assert test_res.get("status_code") == 200
+    finally:
+        # 4. Delete webhook
+        st, del_res = _request("DELETE", f"/api/projectbase/webhooks/{wh_id}", headers={"Authorization": _superuser_token()})
+        assert st == 200
+
+
+def test_fastmcp_collaboration_and_lease_tools():
+    """Verify FastMCP JSON-RPC tools for task leases, telemetry, and webhooks."""
+    token = _superuser_token()
+    headers = {"Authorization": token, "Content-Type": "application/json"}
+    pid = _first_project_id()
+
+    # Create test issue
+    st, issue = _authed_json("POST", "/api/collections/issues/records", {
+        "project": pid, "title": f"FastMCP Collab {_uid()}", "status": "todo"
+    })
+    assert st == 200
+    iid = issue["id"]
+    ident = issue["identifier"]
+
+    try:
+        # 1. acquire_task_lease
+        st, res = _request("POST", "/api/projectbase/mcp", {
+            "jsonrpc": "2.0", "method": "tools/call", "params": {
+                "name": "acquire_task_lease",
+                "arguments": {"issue_id": ident, "agent_name": "flomaster-agent", "ttl_seconds": 60, "reason": "FastMCP test"}
+            }, "id": 100
+        }, headers=headers)
+        assert st == 200
+        lease_data = json.loads(res["result"]["content"][0]["text"])
+        assert lease_data.get("acquired") is True
+
+        # 2. get_task_lease
+        st, res = _request("POST", "/api/projectbase/mcp", {
+            "jsonrpc": "2.0", "method": "tools/call", "params": {
+                "name": "get_task_lease",
+                "arguments": {"issue_id": ident}
+            }, "id": 101
+        }, headers=headers)
+        assert st == 200
+        get_lease = json.loads(res["result"]["content"][0]["text"])
+        assert get_lease.get("active") is True
+        assert get_lease.get("lease", {}).get("agent_name") == "flomaster-agent"
+
+        # 3. renew_task_lease
+        st, res = _request("POST", "/api/projectbase/mcp", {
+            "jsonrpc": "2.0", "method": "tools/call", "params": {
+                "name": "renew_task_lease",
+                "arguments": {"issue_id": ident, "agent_name": "flomaster-agent", "ttl_seconds": 120}
+            }, "id": 102
+        }, headers=headers)
+        assert st == 200
+        renew_data = json.loads(res["result"]["content"][0]["text"])
+        assert renew_data.get("renewed") is True
+
+        # 4. log_agent_telemetry
+        st, res = _request("POST", "/api/projectbase/mcp", {
+            "jsonrpc": "2.0", "method": "tools/call", "params": {
+                "name": "log_agent_telemetry",
+                "arguments": {
+                    "agent_name": "flomaster-agent",
+                    "event_type": "checkpoint",
+                    "issue_id": ident,
+                    "summary": "Completed unit tests",
+                    "step": 3
+                }
+            }, "id": 103
+        }, headers=headers)
+        assert st == 200
+        telem_data = json.loads(res["result"]["content"][0]["text"])
+        assert telem_data.get("success") is True
+
+        # 5. register_webhook, list_webhooks, delete_webhook via MCP
+        st, res = _request("POST", "/api/projectbase/mcp", {
+            "jsonrpc": "2.0", "method": "tools/call", "params": {
+                "name": "register_webhook",
+                "arguments": {
+                    "url": "http://127.0.0.1:8120/api/projectbase/health",
+                    "name": "MCP Webhook Test",
+                    "events": ["*"]
+                }
+            }, "id": 104
+        }, headers=headers)
+        assert st == 200
+        wh_reg = json.loads(res["result"]["content"][0]["text"])
+        assert wh_reg.get("success") is True
+        mcp_wh_id = wh_reg.get("webhook_id")
+
+        st, res = _request("POST", "/api/projectbase/mcp", {
+            "jsonrpc": "2.0", "method": "tools/call", "params": {
+                "name": "list_webhooks", "arguments": {}
+            }, "id": 105
+        }, headers=headers)
+        assert st == 200
+        wh_list = json.loads(res["result"]["content"][0]["text"])
+        assert any(w.get("id") == mcp_wh_id for w in wh_list)
+
+        st, res = _request("POST", "/api/projectbase/mcp", {
+            "jsonrpc": "2.0", "method": "tools/call", "params": {
+                "name": "delete_webhook", "arguments": {"webhook_id": mcp_wh_id}
+            }, "id": 106
+        }, headers=headers)
+        assert st == 200
+        del_res = json.loads(res["result"]["content"][0]["text"])
+        assert del_res.get("success") is True
+
+        # 6. release_task_lease
+        st, res = _request("POST", "/api/projectbase/mcp", {
+            "jsonrpc": "2.0", "method": "tools/call", "params": {
+                "name": "release_task_lease",
+                "arguments": {"issue_id": ident, "agent_name": "flomaster-agent"}
+            }, "id": 107
+        }, headers=headers)
+        assert st == 200
+        rel_data = json.loads(res["result"]["content"][0]["text"])
+        assert rel_data.get("released") is True
+    finally:
+        _request("DELETE", f"/api/collections/issues/records/{iid}", headers={"Authorization": token})
+
+
+def test_mcp_server_collaboration_python_wrappers():
+    """Verify python fastmcp wrappers in scripts/mcp_server.py for collaboration tools."""
+    mcp_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts", "mcp_server.py")
+    assert os.path.isfile(mcp_path)
+
+    import types as _types
+    stub = _types.ModuleType("fastmcp")
+    stub.FastMCP = lambda name: _types.SimpleNamespace(tool=lambda *a, **k: (a[0] if a else (lambda f: f)))
+    import sys as _sys
+    _sys.modules["fastmcp"] = stub
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("mcp_server_collab", mcp_path)
+    mcp_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mcp_mod)
+    mcp_mod.BASE_URL = BASE_URL
+    mcp_mod.AUTH_EMAIL = SUPERUSER_EMAIL
+    mcp_mod.AUTH_PASSWORD = SUPERUSER_PASSWORD
+    mcp_mod.AUTH_TOKEN = ""
+
+    pid = _first_project_id()
+    st, issue = _authed_json("POST", "/api/collections/issues/records", {
+        "project": pid, "title": f"PyMCP Collab {_uid()}", "status": "todo"
+    })
+    assert st == 200
+    iid = issue["id"]
+    ident = issue["identifier"]
+
+    try:
+        # acquire
+        res = mcp_mod.acquire_task_lease(ident, agent_name="py-agent", ttl_seconds=60, reason="Python test")
+        assert res.get("success") is True
+
+        # renew
+        res_renew = mcp_mod.renew_task_lease(ident, agent_name="py-agent", ttl_seconds=120)
+        assert res_renew.get("success") is True
+
+        # telemetry
+        telem = mcp_mod.log_agent_telemetry("py-agent", "reasoning", issue=ident, summary="Py test step", step=1)
+        assert telem.get("success") is True
+
+        # release
+        res_rel = mcp_mod.release_task_lease(ident, agent_name="py-agent")
+        assert res_rel.get("success") is True
+
+        # webhooks
+        wh = mcp_mod.register_webhook("http://127.0.0.1:8120/api/projectbase/health", name="Py MCP Wh")
+        assert wh.get("success") is True
+        wh_id = wh.get("webhook", {}).get("id")
+
+        wh_list = mcp_mod.list_webhooks()
+        assert any(w.get("id") == wh_id for w in wh_list)
+
+        del_res = mcp_mod.delete_webhook(wh_id)
+        assert del_res.get("success") is True
+    finally:
+        _request("DELETE", f"/api/collections/issues/records/{iid}", headers={"Authorization": _superuser_token()})
+
 

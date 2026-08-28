@@ -11,10 +11,10 @@
 //            never enabled in production)
 //
 // Methods:   initialize | ping | tools/list | tools/call
-// Tools:     list_projects, list_issues, get_issue, create_issue, update_issue, move_issue, add_comment, list_cycles, list_milestones, get_stats
-//
-// NOTE (PB JSVM scoping): routerAdd callbacks are invoked from Go in a fresh
-// scope, so all helpers and constants are inlined inside the handler.
+// Tools:     list_projects, list_issues, get_issue, create_issue, update_issue, move_issue, add_comment,
+//            list_cycles, list_milestones, search_issues, dispatch_agent, get_stats,
+//            acquire_task_lease, release_task_lease, renew_task_lease, get_task_lease,
+//            log_agent_telemetry, register_webhook, list_webhooks, delete_webhook
 
 routerAdd("POST", "/api/projectbase/mcp", (e) => {
     const TOOLS = [
@@ -159,6 +159,110 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
                 type: "object",
                 properties: {}
             }
+        },
+        {
+            name: "acquire_task_lease",
+            description: "Acquire an exclusive execution lease/lock on an issue to avoid multi-agent collision.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    issue_id: { type: "string", description: "Issue record ID or identifier (e.g. PB-42)" },
+                    agent_name: { type: "string", description: "Name of the agent claiming the task (default: agent)" },
+                    ttl_seconds: { type: "integer", description: "Lease duration in seconds (default: 900)" },
+                    reason: { type: "string", description: "Intended execution work/reason" },
+                    force: { type: "boolean", description: "Force override existing lease" }
+                },
+                required: ["issue_id"]
+            }
+        },
+        {
+            name: "release_task_lease",
+            description: "Release an active execution lease on an issue.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    issue_id: { type: "string", description: "Issue record ID or identifier (e.g. PB-42)" },
+                    agent_name: { type: "string", description: "Agent name (optional if force=true)" },
+                    force: { type: "boolean", description: "Force release regardless of holder" }
+                },
+                required: ["issue_id"]
+            }
+        },
+        {
+            name: "renew_task_lease",
+            description: "Renew heartbeat and expiration TTL for an existing task lease.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    issue_id: { type: "string", description: "Issue record ID or identifier (e.g. PB-42)" },
+                    agent_name: { type: "string", description: "Agent name" },
+                    ttl_seconds: { type: "integer", description: "Lease extension in seconds (default: 900)" }
+                },
+                required: ["issue_id"]
+            }
+        },
+        {
+            name: "get_task_lease",
+            description: "Get active lease information for an issue.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    issue_id: { type: "string", description: "Issue record ID or identifier (e.g. PB-42)" }
+                },
+                required: ["issue_id"]
+            }
+        },
+        {
+            name: "log_agent_telemetry",
+            description: "Log agent reasoning, tool invocations, checkpoints, or collision events.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    agent_name: { type: "string", description: "Agent name" },
+                    event_type: { type: "string", description: "reasoning|tool_call|checkpoint|collision|status" },
+                    issue_id: { type: "string", description: "Issue record ID or identifier (optional)" },
+                    step: { type: "integer", description: "Workflow step number" },
+                    summary: { type: "string", description: "High-level summary of action or reasoning" },
+                    payload: { type: "object", description: "Detailed payload (arguments, output, logs)" }
+                },
+                required: ["agent_name", "event_type"]
+            }
+        },
+        {
+            name: "register_webhook",
+            description: "Register an outbound webhook endpoint for orchestrator notifications.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    name: { type: "string", description: "Webhook subscription name" },
+                    url: { type: "string", description: "HTTP or HTTPS webhook target URL" },
+                    events: { type: "array", items: { type: "string" }, description: "Subscribed events (e.g. ['issue.created', 'issue.moved', '*'])" },
+                    secret: { type: "string", description: "HMAC secret token for signature verification" },
+                    project_id: { type: "string", description: "Optional project scope filter" }
+                },
+                required: ["url"]
+            }
+        },
+        {
+            name: "list_webhooks",
+            description: "List registered webhook subscriptions.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    project_id: { type: "string", description: "Filter by project ID" }
+                }
+            }
+        },
+        {
+            name: "delete_webhook",
+            description: "Delete a registered webhook subscription.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    webhook_id: { type: "string", description: "Webhook record ID" }
+                },
+                required: ["webhook_id"]
+            }
         }
     ]
 
@@ -190,16 +294,19 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
     const listIssues = (args) => {
         let projectId = args.project_id || ""
         if (projectId === "") { throw new Error("project_id is required") }
-        let limit = args.limit || 100
-        if (limit > 200) { limit = 200 }
 
         let conditions = ["project = '" + projectId + "'"]
-        if (args.status) { conditions.push("status = '" + args.status + "'") }
+        if (args.status) {
+            if (VALID_STATUS.indexOf(args.status) === -1) { throw new Error("invalid status: " + args.status) }
+            conditions.push("status = '" + args.status + "'")
+        }
         if (args.cycle_id) { conditions.push("cycle = '" + args.cycle_id + "'") }
+
         let filter = conditions.join(" && ")
+        let limit = Math.min(Number(args.limit) || 100, 500)
+        let records = e.app.findRecordsByFilter("issues", filter, "order", limit, 0)
 
         let out = []
-        let records = e.app.findRecordsByFilter("issues", filter, "created", limit, 0)
         for (let i = 0; i < records.length; i++) {
             let r = records[i]
             out.push({
@@ -208,16 +315,52 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
                 title: r.getString("title"),
                 status: r.getString("status"),
                 priority: r.getString("priority"),
-                order: r.getFloat("order"),
-                cycle: r.getString("cycle")
+                order: r.getInt("order"),
+                cycle_id: r.getString("cycle"),
+                assignee_id: r.getString("assignee"),
+                created: r.getString("created")
             })
         }
         return out
     }
 
     const getIssue = (args) => {
-        let issueId = args.issue_id || ""
-        let record = resolveIssueRecord(issueId)
+        let record = resolveIssueRecord(args.issue_id)
+        let comments = []
+        try {
+            let cRecords = e.app.findRecordsByFilter("comments", "issue = '" + record.id + "'", "created", 100, 0)
+            for (let i = 0; i < cRecords.length; i++) {
+                let c = cRecords[i]
+                comments.push({
+                    id: c.id,
+                    author: c.getString("author"),
+                    author_type: c.getString("author_type"),
+                    content: c.getString("content"),
+                    created: c.getString("created")
+                })
+            }
+        } catch (cErr) {}
+
+        // Check active task lease
+        let leaseInfo = null
+        try {
+            let leases = e.app.findRecordsByFilter("task_leases", "issue = '" + record.id + "'", "-created", 1, 0)
+            if (leases.length > 0) {
+                let l = leases[0]
+                let now = new Date()
+                let exp = l.getString("expires_at")
+                let isExpired = exp && new Date(exp) <= now
+                if (!isExpired) {
+                    leaseInfo = {
+                        agent_name: l.getString("agent_name"),
+                        reason: l.getString("reason"),
+                        expires_at: exp,
+                        seconds_remaining: Math.max(0, Math.floor((new Date(exp).getTime() - now.getTime()) / 1000))
+                    }
+                }
+            }
+        } catch (lErr) {}
+
         return {
             id: record.id,
             identifier: record.getString("identifier"),
@@ -225,12 +368,13 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
             description: record.getString("description"),
             status: record.getString("status"),
             priority: record.getString("priority"),
-            order: record.getFloat("order"),
-            project: record.getString("project"),
+            project_id: record.getString("project"),
+            cycle_id: record.getString("cycle"),
             assignee: record.getString("assignee"),
-            cycle: record.getString("cycle"),
             created: record.getString("created"),
-            updated: record.getString("updated")
+            updated: record.getString("updated"),
+            comments: comments,
+            active_lease: leaseInfo
         }
     }
 
@@ -239,42 +383,47 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         let title = args.title || ""
         if (projectId === "" || title === "") { throw new Error("project_id and title are required") }
 
-        let status = args.status || "backlog"
+        let proj = e.app.findRecordById("projects", projectId)
+        let prefix = proj.getString("identifier") || "ISSUE"
+
+        let maxNum = 0
+        let lastIssues = e.app.findRecordsByFilter("issues", "project = '" + projectId + "'", "-created", 1, 0)
+        if (lastIssues.length > 0) {
+            let lastIdent = lastIssues[0].getString("identifier")
+            let match = lastIdent.match(/-(\d+)$/)
+            if (match) { maxNum = parseInt(match[1], 10) }
+        }
+        let identifier = prefix + "-" + (maxNum + 1)
+
+        let status = args.status || "todo"
         if (VALID_STATUS.indexOf(status) === -1) { throw new Error("invalid status: " + status) }
         let priority = args.priority || "medium"
         if (VALID_PRIORITY.indexOf(priority) === -1) { throw new Error("invalid priority: " + priority) }
 
         let issuesCol = e.app.findCollectionByNameOrId("issues")
-
-        let projectIdentifier = "ISSUE"
-        try {
-            let project = e.app.findRecordById("projects", projectId)
-            projectIdentifier = project.getString("identifier") || "ISSUE"
-        } catch (pErr) { throw new Error("project not found: " + projectId) }
-
-        let issueNumber = 1
-        try {
-            let last = e.app.findRecordsByFilter("issues", "project = '" + projectId + "'", "-issue_number", 1, 0)
-            if (last.length > 0) { issueNumber = last[0].getFloat("issue_number") + 1 }
-        } catch (nErr) {}
-
-        let order = Date.now()
-        if (order > MAX_ORDER) { order = MAX_ORDER }
-
         let record = new Record(issuesCol)
         record.set("project", projectId)
+        record.set("identifier", identifier)
         record.set("title", title)
         record.set("description", args.description || "")
         record.set("status", status)
         record.set("priority", priority)
-        record.set("issue_number", issueNumber)
-        record.set("identifier", projectIdentifier + "-" + issueNumber)
-        record.set("order", order)
         if (args.assignee_id) { record.set("assignee", args.assignee_id) }
         if (args.cycle_id) { record.set("cycle", args.cycle_id) }
 
+        let order = Date.now()
+        if (order > MAX_ORDER) { order = MAX_ORDER }
+        record.set("order", order)
+
         e.app.save(record)
-        return { id: record.id, identifier: record.getString("identifier"), title: record.getString("title"), status: record.getString("status"), order: record.getFloat("order") }
+        return {
+            id: record.id,
+            identifier: record.getString("identifier") || identifier,
+            title: title,
+            status: status,
+            priority: priority,
+            project_id: projectId
+        }
     }
 
     const updateIssue = (args) => {
@@ -312,40 +461,31 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         record.set("order", order)
 
         e.app.save(record)
-        return { id: record.id, identifier: record.getString("identifier"), title: record.getString("title"), status: record.getString("status"), order: record.getFloat("order") }
+        return { id: record.id, identifier: record.getString("identifier"), status: newStatus, order: order }
     }
 
     const addComment = (args) => {
-        let issueId = args.issue_id || ""
+        let issue = resolveIssueRecord(args.issue_id)
         let content = args.content || ""
-        if (issueId === "" || content === "") { throw new Error("issue_id and content are required") }
-
-        let record = resolveIssueRecord(issueId)
-
-        let author = args.author || ""
-        if (!author) {
-            try { author = authRecord.getString("name") || authRecord.getString("email") } catch (aErr) {}
-            if (!author) { author = "Agent" }
-        }
-        let authorType = args.author_type || "agent"
-        if (["user", "agent", "system"].indexOf(authorType) === -1) { authorType = "agent" }
+        if (content === "") { throw new Error("content is required") }
 
         let commentsCol = e.app.findCollectionByNameOrId("comments")
-        let comment = new Record(commentsCol)
-        comment.set("issue", record.id)
-        comment.set("content", content)
-        comment.set("author", author)
-        comment.set("author_type", authorType)
-        e.app.save(comment)
+        let record = new Record(commentsCol)
+        record.set("issue", issue.id)
+        record.set("content", content)
+        record.set("author", args.author || "FastMCP Agent")
+        record.set("author_type", args.author_type || "agent")
 
+        e.app.save(record)
         return {
-            id: comment.id,
-            issue: record.id,
-            identifier: record.getString("identifier"),
-            author: author,
-            author_type: authorType,
+            id: record.id,
+            issue: issue.id,
+            issue_id: issue.id,
+            identifier: issue.getString("identifier"),
+            author: record.getString("author"),
+            author_type: record.getString("author_type"),
             content: content,
-            created: comment.getString("created")
+            created: record.getString("created")
         }
     }
 
@@ -399,19 +539,12 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
     }
 
     const getStats = () => {
-        let projects = e.app.findRecordsByFilter("projects", "1=1", "-created", 100, 0)
-        let issues = e.app.findRecordsByFilter("issues", "1=1", "-created", 1000, 0)
-        let cycles = e.app.findRecordsByFilter("cycles", "1=1", "-created", 100, 0)
-        let milestones = e.app.findRecordsByFilter("milestones", "1=1", "-created", 100, 0)
+        let projects = e.app.findRecordsByFilter("projects", "", "", 500, 0)
+        let issues = e.app.findRecordsByFilter("issues", "", "", 2000, 0)
+        let cycles = e.app.findRecordsByFilter("cycles", "", "", 500, 0)
+        let milestones = e.app.findRecordsByFilter("milestones", "", "", 500, 0)
 
-        let statusCounts = {
-            backlog: 0,
-            todo: 0,
-            in_progress: 0,
-            in_review: 0,
-            done: 0,
-            cancelled: 0
-        }
+        let statusCounts = { backlog: 0, todo: 0, in_progress: 0, in_review: 0, done: 0, cancelled: 0 }
         for (let i = 0; i < issues.length; i++) {
             let st = issues[i].getString("status")
             if (statusCounts[st] !== undefined) {
@@ -472,7 +605,8 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
                 project_id: projectId,
                 project_name: projectName,
                 project_identifier: projectIdentifier,
-                project_color: projectColor
+                project_color: projectColor,
+                created: rec.getString("created")
             })
         }
         return results
@@ -486,8 +620,6 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         if (allowedTargets.indexOf(agentTarget) === -1) { agentTarget = "flomaster" }
 
         let identifier = issue.getString("identifier")
-        let title = issue.getString("title") || ""
-        let desc = issue.getString("description") || ""
 
         issue.set("status", "in_progress")
         let agentName = {
@@ -515,6 +647,255 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
             agent: agentTarget,
             assigned_to: agentName
         }
+    }
+
+    const acquireTaskLease = (args) => {
+        let issue = resolveIssueRecord(args.issue_id)
+        let agentName = (args.agent_name || "agent").trim()
+        let reason = (args.reason || "").trim()
+        let ttlSeconds = Math.max(10, Math.min(Number(args.ttl_seconds) || 900, 86400))
+        let now = new Date()
+        let nowIso = now.toISOString()
+        let expiresAt = new Date(now.getTime() + (ttlSeconds * 1000)).toISOString()
+
+        let existing = e.app.findRecordsByFilter("task_leases", "issue = '" + issue.id + "'", "-created", 1, 0)
+        let leaseCol = e.app.findCollectionByNameOrId("task_leases")
+
+        if (existing.length > 0) {
+            let current = existing[0]
+            let currentExp = current.getString("expires_at")
+            let isExpired = currentExp && new Date(currentExp) <= now
+            let currentHolder = current.getString("agent_name")
+
+            if (!isExpired && currentHolder !== agentName && !args.force) {
+                return {
+                    acquired: false,
+                    conflict: true,
+                    message: "Task is actively leased by another agent",
+                    current_lease: {
+                        id: current.id,
+                        agent_name: currentHolder,
+                        reason: current.getString("reason"),
+                        expires_at: currentExp,
+                        seconds_remaining: Math.max(0, Math.floor((new Date(currentExp).getTime() - now.getTime()) / 1000))
+                    }
+                }
+            }
+
+            current.set("agent_name", agentName)
+            if (reason) { current.set("reason", reason) }
+            current.set("acquired_at", nowIso)
+            current.set("expires_at", expiresAt)
+            current.set("heartbeat", nowIso)
+            e.app.save(current)
+
+            return {
+                acquired: true,
+                status: "renewed",
+                lease: {
+                    id: current.id,
+                    issue_id: issue.id,
+                    identifier: issue.getString("identifier"),
+                    agent_name: agentName,
+                    expires_at: expiresAt,
+                    ttl_seconds: ttlSeconds,
+                    reason: reason
+                }
+            }
+        }
+
+        let record = new Record(leaseCol)
+        record.set("issue", issue.id)
+        record.set("agent_name", agentName)
+        record.set("reason", reason)
+        record.set("acquired_at", nowIso)
+        record.set("expires_at", expiresAt)
+        record.set("heartbeat", nowIso)
+        e.app.save(record)
+
+        return {
+            acquired: true,
+            status: "created",
+            lease: {
+                id: record.id,
+                issue_id: issue.id,
+                identifier: issue.getString("identifier"),
+                agent_name: agentName,
+                expires_at: expiresAt,
+                ttl_seconds: ttlSeconds,
+                reason: reason
+            }
+        }
+    }
+
+    const releaseTaskLease = (args) => {
+        let issue = resolveIssueRecord(args.issue_id)
+        let agentName = (args.agent_name || "").trim()
+        let force = !!args.force
+
+        let existing = e.app.findRecordsByFilter("task_leases", "issue = '" + issue.id + "'", "-created", 10, 0)
+        let deleted = 0
+        for (let i = 0; i < existing.length; i++) {
+            let rec = existing[i]
+            if (force || !agentName || rec.getString("agent_name") === agentName) {
+                e.app.delete(rec)
+                deleted++
+            }
+        }
+        return { released: true, count: deleted, issue_id: issue.id, identifier: issue.getString("identifier") }
+    }
+
+    const renewTaskLease = (args) => {
+        let issue = resolveIssueRecord(args.issue_id)
+        let agentName = (args.agent_name || "").trim()
+        let ttlSeconds = Math.max(10, Math.min(Number(args.ttl_seconds) || 900, 86400))
+
+        let existing = e.app.findRecordsByFilter("task_leases", "issue = '" + issue.id + "'", "-created", 1, 0)
+        if (existing.length === 0) {
+            throw new Error("No active lease found for issue " + issue.getString("identifier"))
+        }
+
+        let current = existing[0]
+        let holder = current.getString("agent_name")
+        if (agentName && holder !== agentName) {
+            throw new Error("Cannot renew lease held by another agent (" + holder + ")")
+        }
+
+        let now = new Date()
+        let expiresAt = new Date(now.getTime() + (ttlSeconds * 1000)).toISOString()
+        current.set("heartbeat", now.toISOString())
+        current.set("expires_at", expiresAt)
+        e.app.save(current)
+
+        return {
+            renewed: true,
+            issue_id: issue.id,
+            identifier: issue.getString("identifier"),
+            agent_name: holder,
+            expires_at: expiresAt,
+            ttl_seconds: ttlSeconds
+        }
+    }
+
+    const getTaskLease = (args) => {
+        let issue = resolveIssueRecord(args.issue_id)
+        let now = new Date()
+        let existing = e.app.findRecordsByFilter("task_leases", "issue = '" + issue.id + "'", "-created", 1, 0)
+        if (existing.length === 0) {
+            return { active: false, lease: null }
+        }
+        let current = existing[0]
+        let exp = current.getString("expires_at")
+        let isExpired = exp && new Date(exp) <= now
+        return {
+            active: !isExpired,
+            is_expired: isExpired,
+            lease: {
+                id: current.id,
+                issue_id: issue.id,
+                identifier: issue.getString("identifier"),
+                agent_name: current.getString("agent_name"),
+                reason: current.getString("reason"),
+                acquired_at: current.getString("acquired_at"),
+                expires_at: exp,
+                seconds_remaining: isExpired ? 0 : Math.max(0, Math.floor((new Date(exp).getTime() - now.getTime()) / 1000))
+            }
+        }
+    }
+
+    const logAgentTelemetry = (args) => {
+        let agentName = (args.agent_name || "agent").trim()
+        let eventType = (args.event_type || "status").trim()
+        let summary = (args.summary || "").trim()
+        let step = Number(args.step) || 0
+
+        let col = e.app.findCollectionByNameOrId("agent_telemetry")
+        let rec = new Record(col)
+        rec.set("agent_name", agentName)
+        rec.set("event_type", eventType)
+        rec.set("summary", summary)
+        rec.set("step", step)
+        rec.set("timestamp", new Date().toISOString())
+
+        if (args.issue_id) {
+            try {
+                let iss = resolveIssueRecord(args.issue_id)
+                rec.set("issue", iss.id)
+            } catch (x) {}
+        }
+        if (args.payload) { rec.set("payload", args.payload) }
+
+        e.app.save(rec)
+        return {
+            success: true,
+            telemetry_id: rec.id,
+            agent_name: agentName,
+            event_type: eventType,
+            summary: summary,
+            timestamp: rec.getString("timestamp")
+        }
+    }
+
+    const registerWebhook = (args) => {
+        let url = (args.url || "").trim()
+        if (!url || !url.startsWith("http")) { throw new Error("Valid HTTP/HTTPS 'url' is required") }
+        let name = (args.name || "External Orchestrator").trim()
+        let events = args.events || ["issue.created", "issue.updated", "issue.moved", "agent.dispatched", "*"]
+        let secret = (args.secret || "").trim()
+        let projectId = (args.project_id || "").trim()
+
+        let col = e.app.findCollectionByNameOrId("webhooks")
+        let rec = new Record(col)
+        rec.set("name", name)
+        rec.set("url", url)
+        rec.set("events", typeof events === "string" ? JSON.parse(events) : events)
+        if (secret) { rec.set("secret", secret) }
+        if (projectId) { rec.set("project", projectId) }
+        rec.set("enabled", true)
+        rec.set("failure_count", 0)
+
+        e.app.save(rec)
+        return {
+            success: true,
+            webhook_id: rec.id,
+            name: name,
+            url: url,
+            events: rec.get("events"),
+            enabled: true,
+            project_id: projectId || null
+        }
+    }
+
+    const listWebhooks = (args) => {
+        let filter = ""
+        if (args && args.project_id) {
+            let pid = (args.project_id + "").replace(/'/g, "\\'")
+            filter = "project = '" + pid + "' || project = ''"
+        }
+        let records = e.app.findRecordsByFilter("webhooks", filter, "-created", 100, 0)
+        let out = []
+        for (let i = 0; i < records.length; i++) {
+            let r = records[i]
+            out.push({
+                id: r.id,
+                name: r.getString("name"),
+                url: r.getString("url"),
+                events: r.get("events"),
+                enabled: r.getBool("enabled"),
+                project_id: r.getString("project") || null,
+                last_triggered_at: r.getString("last_triggered_at") || null,
+                failure_count: r.getInt("failure_count")
+            })
+        }
+        return out
+    }
+
+    const deleteWebhook = (args) => {
+        let id = (args.webhook_id || "").trim()
+        if (!id) { throw new Error("webhook_id is required") }
+        let rec = e.app.findRecordById("webhooks", id)
+        e.app.delete(rec)
+        return { success: true, webhook_id: id }
     }
 
     // ---------- 1. Authentication ----------
@@ -580,6 +961,14 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         else if (toolName === "search_issues") { result = searchIssues(args) }
         else if (toolName === "dispatch_agent") { result = dispatchAgent(args) }
         else if (toolName === "get_stats") { result = getStats() }
+        else if (toolName === "acquire_task_lease") { result = acquireTaskLease(args) }
+        else if (toolName === "release_task_lease") { result = releaseTaskLease(args) }
+        else if (toolName === "renew_task_lease") { result = renewTaskLease(args) }
+        else if (toolName === "get_task_lease") { result = getTaskLease(args) }
+        else if (toolName === "log_agent_telemetry") { result = logAgentTelemetry(args) }
+        else if (toolName === "register_webhook") { result = registerWebhook(args) }
+        else if (toolName === "list_webhooks") { result = listWebhooks(args) }
+        else if (toolName === "delete_webhook") { result = deleteWebhook(args) }
         else { return fail(-32602, "Unknown tool: " + toolName) }
         return ok({ content: [{ type: "text", text: JSON.stringify(result) }] })
     } catch (toolErr) {

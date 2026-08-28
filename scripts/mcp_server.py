@@ -483,5 +483,152 @@ def update_notification_settings(
         "generic_webhook_url": generic_webhook_url,
     })
 
+@mcp.tool()
+def acquire_task_lease(
+    issue: str,
+    agent_name: str = "agent",
+    ttl_seconds: int = 900,
+    reason: str = "",
+    force: bool = False,
+) -> Dict[str, Any]:
+    """Acquire an exclusive execution lease on an issue to prevent multi-agent collision.
+
+    Args:
+        issue: Issue identifier (e.g. "PB-12") or record ID.
+        agent_name: Name of the agent claiming the task.
+        ttl_seconds: Lease duration in seconds (default 900 = 15m).
+        reason: Optional description of the work being performed.
+        force: Override an existing lease if held by another agent.
+    """
+    iss = _find_issue(issue)
+    return _request("/api/projectbase/leases/acquire", method="POST", data={
+        "issue_id": iss["id"],
+        "agent_name": agent_name,
+        "ttl_seconds": ttl_seconds,
+        "reason": reason,
+        "force": force,
+    })
+
+@mcp.tool()
+def release_task_lease(
+    issue: str,
+    agent_name: str = "",
+    force: bool = False,
+) -> Dict[str, Any]:
+    """Release an active task lease on an issue.
+
+    Args:
+        issue: Issue identifier (e.g. "PB-12") or record ID.
+        agent_name: Agent name releasing the lease.
+        force: Force release regardless of holder.
+    """
+    iss = _find_issue(issue)
+    return _request("/api/projectbase/leases/release", method="POST", data={
+        "issue_id": iss["id"],
+        "agent_name": agent_name,
+        "force": force,
+    })
+
+@mcp.tool()
+def renew_task_lease(
+    issue: str,
+    agent_name: str = "",
+    ttl_seconds: int = 900,
+) -> Dict[str, Any]:
+    """Renew the expiration TTL and heartbeat for an active task lease.
+
+    Args:
+        issue: Issue identifier (e.g. "PB-12") or record ID.
+        agent_name: Agent name holding the lease.
+        ttl_seconds: Extension in seconds (default 900).
+    """
+    iss = _find_issue(issue)
+    return _request("/api/projectbase/leases/renew", method="POST", data={
+        "issue_id": iss["id"],
+        "agent_name": agent_name,
+        "ttl_seconds": ttl_seconds,
+    })
+
+@mcp.tool()
+def get_task_lease(issue: str) -> Dict[str, Any]:
+    """Check the active lease status of an issue."""
+    iss = _find_issue(issue)
+    leases = _request(f"/api/collections/task_leases/records?filter=(issue='{iss['id']}')&sort=-created")
+    items = leases.get("items", [])
+    if not items:
+        return {"active": False, "lease": None}
+    return {"active": True, "lease": items[0]}
+
+@mcp.tool()
+def log_agent_telemetry(
+    agent_name: str,
+    event_type: str,
+    issue: Optional[str] = None,
+    step: int = 0,
+    summary: str = "",
+    payload: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Log an agent reasoning trace, tool invocation, checkpoint, or collision alert.
+
+    Args:
+        agent_name: Name of the agent emitting telemetry.
+        event_type: "reasoning" | "tool_call" | "checkpoint" | "collision" | "status"
+        issue: Optional issue identifier (e.g. "PB-12") or ID.
+        step: Workflow step number.
+        summary: Short summary of the event or reasoning step.
+        payload: Optional structured JSON metadata.
+    """
+    data: Dict[str, Any] = {
+        "agent_name": agent_name,
+        "event_type": event_type,
+        "step": step,
+        "summary": summary,
+    }
+    if issue:
+        iss = _find_issue(issue)
+        data["issue_id"] = iss["id"]
+    if payload:
+        data["payload"] = payload
+    return _request("/api/projectbase/telemetry", method="POST", data=data)
+
+@mcp.tool()
+def register_webhook(
+    url: str,
+    name: str = "External Orchestrator",
+    events: Optional[List[str]] = None,
+    secret: str = "",
+    project: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Register an outbound webhook URL for external orchestrators.
+
+    Args:
+        url: Webhook target URL.
+        name: Subscription name.
+        events: List of subscribed events (default: ["*"]).
+        secret: Optional HMAC secret for signature verification.
+        project: Optional project key (e.g. "PB") to limit scope.
+    """
+    proj_id = _find_project_id(project) if project else None
+    return _request("/api/projectbase/webhooks", method="POST", data={
+        "url": url,
+        "name": name,
+        "events": events or ["*"],
+        "secret": secret,
+        "project_id": proj_id,
+    })
+
+@mcp.tool()
+def list_webhooks(project: Optional[str] = None) -> List[Dict[str, Any]]:
+    """List registered outbound webhooks."""
+    proj_id = _find_project_id(project) if project else None
+    params = f"?project_id={proj_id}" if proj_id else ""
+    res = _request(f"/api/projectbase/webhooks{params}")
+    return res.get("webhooks", [])
+
+@mcp.tool()
+def delete_webhook(webhook_id: str) -> Dict[str, Any]:
+    """Delete a registered webhook subscription by ID."""
+    return _request(f"/api/projectbase/webhooks/{webhook_id}", method="DELETE")
+
 if __name__ == "__main__":
     mcp.run()
