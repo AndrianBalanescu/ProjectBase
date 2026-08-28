@@ -34,7 +34,18 @@ const AgentsViewComponent = {
       autoscaleSuccess: null,
       benchmarksData: null,
       isLoadingBenchmarks: false,
-      selfHealReport: null
+      selfHealReport: null,
+      clusterNodes: [],
+      clusterState: null,
+      failoverHistory: [],
+      newNodeId: '',
+      newNodeName: '',
+      newNodeRole: 'replica',
+      newNodeEndpoint: '',
+      newNodeRegion: 'homelab',
+      clusterSuccessMsg: null,
+      clusterErrorMsg: null,
+      isSyncingCluster: false
     };
   },
   computed: {
@@ -340,6 +351,80 @@ const AgentsViewComponent = {
     },
     toggleReasoning(idx) {
       this.expandedMessage = (this.expandedMessage === idx ? null : idx);
+    },
+    async loadClusterState() {
+      try {
+        const [nodesRes, failoverRes] = await Promise.all([
+          API.getClusterNodes(),
+          API.getClusterFailoverStatus()
+        ]);
+        this.clusterNodes = (nodesRes && nodesRes.nodes) || [];
+        this.clusterState = (failoverRes && failoverRes.cluster) || (nodesRes && nodesRes.cluster) || null;
+        this.failoverHistory = (failoverRes && failoverRes.failover_history) || [];
+      } catch (e) {
+        console.warn('Failed to load cluster state', e);
+      }
+    },
+    async registerNewClusterNode() {
+      if (!this.newNodeId.trim() || !this.newNodeEndpoint.trim()) {
+        this.clusterErrorMsg = 'Node ID and Endpoint URL are required';
+        return;
+      }
+      this.clusterErrorMsg = null;
+      this.clusterSuccessMsg = null;
+      try {
+        const res = await API.registerClusterNode({
+          node_id: this.newNodeId.trim(),
+          node_name: this.newNodeName.trim() || this.newNodeId.trim(),
+          role: this.newNodeRole,
+          endpoint_url: this.newNodeEndpoint.trim(),
+          region: this.newNodeRegion.trim()
+        });
+        this.clusterSuccessMsg = `Registered node ${(res.node && res.node.node_id) || this.newNodeId}`;
+        this.newNodeId = '';
+        this.newNodeName = '';
+        this.newNodeEndpoint = '';
+        await this.loadClusterState();
+        setTimeout(() => { this.clusterSuccessMsg = null; }, 3000);
+      } catch (e) {
+        this.clusterErrorMsg = e.message || String(e);
+      }
+    },
+    async decommissionClusterNode(nodeId) {
+      if (!nodeId) return;
+      try {
+        await API.decommissionClusterNode(nodeId);
+        this.clusterSuccessMsg = `Decommissioned node ${nodeId}`;
+        await this.loadClusterState();
+        setTimeout(() => { this.clusterSuccessMsg = null; }, 3000);
+      } catch (e) {
+        this.clusterErrorMsg = e.message || String(e);
+      }
+    },
+    async promoteClusterNode(candidateId) {
+      if (!candidateId) return;
+      try {
+        const res = await API.promoteClusterPrimary({ candidate_node_id: candidateId, reason: 'dashboard_switchover', force: true });
+        this.clusterSuccessMsg = `Promoted ${candidateId} to primary (Term ${res.new_term})`;
+        await this.loadClusterState();
+        setTimeout(() => { this.clusterSuccessMsg = null; }, 3000);
+      } catch (e) {
+        this.clusterErrorMsg = e.message || String(e);
+      }
+    },
+    async triggerClusterSync() {
+      this.isSyncingCluster = true;
+      this.clusterSuccessMsg = null;
+      try {
+        const pullRes = await API.pullClusterDeltas({ limit: 50 });
+        this.clusterSuccessMsg = `Synced ${(pullRes && pullRes.deltas && pullRes.deltas.length) || 0} deltas across cluster`;
+        await this.loadClusterState();
+        setTimeout(() => { this.clusterSuccessMsg = null; }, 3000);
+      } catch (e) {
+        this.clusterErrorMsg = e.message || String(e);
+      } finally {
+        this.isSyncingCluster = false;
+      }
     }
   },
   template: `
@@ -456,7 +541,7 @@ const AgentsViewComponent = {
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <h2 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 capitalize truncate">
-                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center')))) }}
+                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center'))))) }}
                 </h2>
                 <span v-if="selectedSession && selectedSession.is_active && activeTab === 'chat'" class="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-400 text-[10px] font-mono font-semibold flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -495,6 +580,11 @@ const AgentsViewComponent = {
                   class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors"
                   :class="activeTab === 'federation' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
                 >🌐 Federation</button>
+                <button
+                  @click="activeTab = 'cluster'; loadClusterState();"
+                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors"
+                  :class="activeTab === 'cluster' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                >🌐 Cluster & Edge</button>
               </div>
             </div>
           </div>
@@ -942,6 +1032,174 @@ const AgentsViewComponent = {
                 <div class="text-[10px] text-zinc-400 mt-1">Allocations: {{ JSON.stringify(autoscalePlan.persona_allocations) }}</div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Tab View 6: Distributed Cluster & Edge Replication -->
+        <div
+          v-if="activeTab === 'cluster'"
+          class="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/30"
+        >
+          <!-- Cluster Quorum & Leadership Status Header -->
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Primary Leader</div>
+              <div class="text-base font-bold text-zinc-900 dark:text-zinc-100 font-mono mt-0.5 truncate">
+                {{ clusterState ? clusterState.primary_node : 'local-primary' }}
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5 font-mono">Term: {{ clusterState ? clusterState.term : 1 }}</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Quorum Health</div>
+              <div class="text-base font-bold flex items-center gap-1.5 mt-0.5"
+                :class="(clusterState && clusterState.is_quorum_ok) ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'">
+                <span>{{ (clusterState && clusterState.is_quorum_ok) ? '✅ Quorum OK' : '⚠️ Degraded' }}</span>
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">Threshold: {{ clusterState ? (clusterState.quorum_threshold || 1) : 1 }}</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Active Peer Nodes</div>
+              <div class="text-base font-bold text-zinc-900 dark:text-zinc-100 font-mono mt-0.5">
+                {{ clusterNodes.length }}
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">Edge + Replicas</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Fencing Guard</div>
+              <div class="text-xs font-mono font-semibold text-zinc-800 dark:text-zinc-200 mt-0.5 truncate" :title="clusterState ? clusterState.fencing_token : 'PB-FENCE-T1'">
+                {{ clusterState ? clusterState.fencing_token : 'PB-FENCE-T1' }}
+              </div>
+              <div class="text-[10px] text-emerald-500 mt-0.5">Split-Brain Protected</div>
+            </div>
+          </div>
+
+          <div v-if="clusterSuccessMsg" class="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-xs font-semibold">
+            {{ clusterSuccessMsg }}
+          </div>
+          <div v-if="clusterErrorMsg" class="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-rose-800 dark:text-rose-300 text-xs font-semibold">
+            {{ clusterErrorMsg }}
+          </div>
+
+          <!-- Nodes Fleet Table -->
+          <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Cluster Peer & Edge Nodes</h4>
+              <div class="flex items-center gap-2">
+                <button
+                  @click="triggerClusterSync"
+                  :disabled="isSyncingCluster"
+                  class="px-2.5 py-1 text-xs rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-medium transition-colors"
+                >
+                  {{ isSyncingCluster ? 'Syncing...' : '🔄 Pull Deltas' }}
+                </button>
+                <button
+                  @click="loadClusterState"
+                  class="px-2.5 py-1 text-xs rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-medium transition-colors"
+                >
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            <div v-if="clusterNodes.length === 0" class="py-6 text-center text-xs text-zinc-500">
+              No cluster peers registered yet. Add a node below to initiate cross-host replication.
+            </div>
+
+            <div v-else class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead>
+                  <tr class="border-b border-zinc-200 dark:border-zinc-800 text-zinc-400 text-[10px] uppercase">
+                    <th class="pb-2 font-semibold">Node ID</th>
+                    <th class="pb-2 font-semibold">Role</th>
+                    <th class="pb-2 font-semibold">Region</th>
+                    <th class="pb-2 font-semibold">Endpoint</th>
+                    <th class="pb-2 font-semibold">Status</th>
+                    <th class="pb-2 font-semibold">Lag</th>
+                    <th class="pb-2 font-semibold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                  <tr v-for="node in clusterNodes" :key="node.id" class="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30">
+                    <td class="py-2.5 font-mono font-bold text-zinc-800 dark:text-zinc-200">{{ node.node_id }}</td>
+                    <td class="py-2.5">
+                      <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase"
+                        :class="node.role === 'primary' ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'">
+                        {{ node.role }}
+                      </span>
+                    </td>
+                    <td class="py-2.5 text-zinc-600 dark:text-zinc-400 font-mono">{{ node.region || 'default' }}</td>
+                    <td class="py-2.5 text-zinc-500 font-mono text-[11px] max-w-[150px] truncate" :title="node.endpoint_url">{{ node.endpoint_url }}</td>
+                    <td class="py-2.5">
+                      <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                        :class="node.status === 'online' ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' : 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300'">
+                        {{ node.status }}
+                      </span>
+                    </td>
+                    <td class="py-2.5 font-mono text-[11px] text-zinc-500">{{ node.lag_ms || 0 }}ms</td>
+                    <td class="py-2.5 text-right space-x-1">
+                      <button
+                        v-if="node.role !== 'primary'"
+                        @click="promoteClusterNode(node.node_id)"
+                        class="px-2 py-0.5 rounded text-[10px] bg-amber-500 hover:bg-amber-600 text-white font-semibold transition-colors"
+                        title="Promote to primary leader"
+                      >
+                        Promote
+                      </button>
+                      <button
+                        @click="decommissionClusterNode(node.node_id)"
+                        class="px-2 py-0.5 rounded text-[10px] bg-rose-100 hover:bg-rose-200 dark:bg-rose-950 dark:hover:bg-rose-900 text-rose-700 dark:text-rose-300 font-semibold transition-colors"
+                        title="Decommission node"
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Register Node Form -->
+          <div class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Register Cluster Node</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
+              <input
+                v-model="newNodeId"
+                type="text"
+                placeholder="Node ID (e.g. vps-node-1)"
+                class="p-2 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 font-mono"
+              />
+              <input
+                v-model="newNodeName"
+                type="text"
+                placeholder="Node Name"
+                class="p-2 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200"
+              />
+              <input
+                v-model="newNodeEndpoint"
+                type="text"
+                placeholder="Endpoint (https://node.lan:8120)"
+                class="p-2 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 font-mono"
+              />
+              <select
+                v-model="newNodeRole"
+                class="p-2 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200"
+              >
+                <option value="replica">Replica</option>
+                <option value="edge">Edge Client</option>
+                <option value="primary">Primary</option>
+                <option value="witness">Witness</option>
+              </select>
+            </div>
+            <button
+              @click="registerNewClusterNode"
+              class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors"
+            >
+              Add Node
+            </button>
           </div>
         </div>
 

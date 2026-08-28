@@ -2845,6 +2845,255 @@
           "200": { "description": "Benchmark execution results" }
         }
       }
+    },
+    "/projectbase/cluster/nodes/register": {
+      "post": {
+        "tags": ["Cluster Replication"],
+        "summary": "Register Cluster Node",
+        "description": "Register or update a cluster peer/edge node with role, endpoint, and capabilities.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "node_id": { "type": "string" },
+                  "node_name": { "type": "string" },
+                  "role": { "type": "string", "enum": ["primary", "replica", "edge", "witness"] },
+                  "endpoint_url": { "type": "string" },
+                  "region": { "type": "string" }
+                },
+                "required": ["node_id", "endpoint_url"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Node registered successfully" },
+          "400": { "description": "Missing required fields" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/cluster/nodes": {
+      "get": {
+        "tags": ["Cluster Replication"],
+        "summary": "List Cluster Nodes",
+        "description": "List registered cluster nodes with health, role, lag, and quorum status.",
+        "parameters": [
+          { "name": "role", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Filter by node role" },
+          { "name": "status", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Filter by node status" }
+        ],
+        "responses": {
+          "200": { "description": "List of cluster nodes" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/cluster/nodes/heartbeat": {
+      "post": {
+        "tags": ["Cluster Replication"],
+        "summary": "Node Heartbeat",
+        "description": "Heartbeat and sync sequence reporting for peers/replicas.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "node_id": { "type": "string" },
+                  "applied_seq": { "type": "integer" },
+                  "lag_ms": { "type": "integer" },
+                  "status": { "type": "string" }
+                },
+                "required": ["node_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Heartbeat acknowledged" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/cluster/nodes/{id}": {
+      "delete": {
+        "tags": ["Cluster Replication"],
+        "summary": "Decommission Cluster Node",
+        "description": "Deregister and decommission a cluster node.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Node record ID or node_id" }
+        ],
+        "responses": {
+          "200": { "description": "Cluster node decommissioned" },
+          "404": { "description": "Node not found" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/cluster/sync/pull": {
+      "get": {
+        "tags": ["Cluster Replication"],
+        "summary": "Pull Replication Deltas",
+        "description": "Pull replication delta stream since a sequence ID or vector clock checkpoint.",
+        "parameters": [
+          { "name": "since_seq", "in": "query", "required": false, "schema": { "type": "integer" }, "description": "Sequence number checkpoint" },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer" }, "description": "Max deltas to return" },
+          { "name": "collection", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Target collection filter" }
+        ],
+        "responses": {
+          "200": { "description": "Delta stream payload" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/cluster/sync/push": {
+      "post": {
+        "tags": ["Cluster Replication"],
+        "summary": "Push Replication Deltas",
+        "description": "Push delta stream with vector clock conflict resolution & split-brain fencing.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "origin_node_id": { "type": "string" },
+                  "deltas": { "type": "array", "items": { "type": "object" } },
+                  "fencing_token": { "type": "string" }
+                },
+                "required": ["origin_node_id", "deltas"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Deltas applied successfully" },
+          "409": { "description": "Fencing token violation (split-brain guard)" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/cluster/sync/snapshot": {
+      "post": {
+        "tags": ["Cluster Replication"],
+        "summary": "Create Point-in-Time Snapshot",
+        "description": "Export point-in-time state snapshot bundle for cold-start edge initialization.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "target_node_id": { "type": "string" },
+                  "include_collections": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Snapshot bundle created" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/cluster/failover/status": {
+      "get": {
+        "tags": ["Cluster Replication"],
+        "summary": "High-Availability Failover Status",
+        "description": "High-availability cluster health, quorum state, term epoch, and leader info.",
+        "responses": {
+          "200": { "description": "Cluster failover status report" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/cluster/failover/promote": {
+      "post": {
+        "tags": ["Cluster Replication"],
+        "summary": "Promote Primary Node",
+        "description": "Promote replica to primary upon quorum election or manual switchover.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "candidate_node_id": { "type": "string" },
+                  "reason": { "type": "string" },
+                  "force": { "type": "boolean" }
+                },
+                "required": ["candidate_node_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Candidate promoted to primary" },
+          "412": { "description": "Quorum not met" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/cluster/failover/fencing": {
+      "post": {
+        "tags": ["Cluster Replication"],
+        "summary": "Verify Split-Brain Fencing Token",
+        "description": "Split-brain fencing token validation & barrier verification.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "node_id": { "type": "string" },
+                  "fencing_token": { "type": "string" }
+                },
+                "required": ["fencing_token"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Fencing token verification result" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/cluster/edge/reconcile": {
+      "post": {
+        "tags": ["Cluster Replication"],
+        "summary": "Edge SQLite Two-Way Reconciliation",
+        "description": "Two-way offline-first edge SQLite reconciliation & delta merge.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "edge_node_id": { "type": "string" },
+                  "client_vector_clock": { "type": "object" },
+                  "staged_changes": { "type": "array", "items": { "type": "object" } }
+                },
+                "required": ["edge_node_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Reconciliation outcome and updated vector clock" },
+          "401": { "description": "Authentication required" }
+        }
+      }
     }
   }
 }

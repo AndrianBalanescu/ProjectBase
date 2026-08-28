@@ -556,5 +556,126 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to fetch benchmarks');
     return data;
+  },
+
+  async getClusterNodes(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.role) params.set('role', filters.role);
+    if (filters.status) params.set('status', filters.status);
+    const res = await fetch(`/api/projectbase/cluster/nodes?${params.toString()}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch cluster nodes');
+    return data;
+  },
+
+  async registerClusterNode(payload) {
+    const res = await fetch('/api/projectbase/cluster/nodes/register', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to register cluster node');
+    return data;
+  },
+
+  async sendClusterHeartbeat(payload) {
+    const res = await fetch('/api/projectbase/cluster/nodes/heartbeat', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to send heartbeat');
+    return data;
+  },
+
+  async decommissionClusterNode(nodeId) {
+    const res = await fetch(`/api/projectbase/cluster/nodes/${encodeURIComponent(nodeId)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to decommission cluster node');
+    return data;
+  },
+
+  async pullClusterDeltas(params = {}) {
+    const q = new URLSearchParams();
+    if (params.since_seq) q.set('since_seq', params.since_seq);
+    if (params.limit) q.set('limit', params.limit);
+    if (params.collection) q.set('collection', params.collection);
+    const res = await fetch(`/api/projectbase/cluster/sync/pull?${q.toString()}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to pull cluster deltas');
+    return data;
+  },
+
+  async pushClusterDeltas(payload) {
+    const res = await fetch('/api/projectbase/cluster/sync/push', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to push cluster deltas');
+    return data;
+  },
+
+  async createClusterSnapshot(payload = {}) {
+    const res = await fetch('/api/projectbase/cluster/sync/snapshot', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create cluster snapshot');
+    return data;
+  },
+
+  async getClusterFailoverStatus() {
+    const res = await fetch('/api/projectbase/cluster/failover/status', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch cluster failover status');
+    return data;
+  },
+
+  async promoteClusterPrimary(payload) {
+    const res = await fetch('/api/projectbase/cluster/failover/promote', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to promote cluster primary');
+    return data;
+  },
+
+  async verifyClusterFencing(payload) {
+    const res = await fetch('/api/projectbase/cluster/failover/fencing', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to verify cluster fencing');
+    return data;
+  },
+
+  async reconcileEdgeSync(payload) {
+    const res = await fetch('/api/projectbase/cluster/edge/reconcile', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to reconcile edge sync');
+    return data;
   }
 };

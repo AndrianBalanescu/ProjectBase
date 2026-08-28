@@ -1,123 +1,112 @@
-{
-  "suite": "ProjectBase 10-scenario iBrowse E2E",
-  "ran_at": "2026-08-25T16:53:04.378626+00:00",
-  "target": "http://127.0.0.1:8120",
-  "summary": {
-    "total": 10,
-    "succeeded": 5,
-    "blocked": 5
+[
+  {
+    "id": 1,
+    "name": "01_kanban_board",
+    "job_id": "job_88241e97-018",
+    "status": "failed",
+    "result_status": "aborted",
+    "steps": 0,
+    "duration_ms": 5895,
+    "message": "The browser opened a connection to the server, but the server actively refused it. The site is most likely down, the port is wrong, or a firewall rejects the request. Nothing on the page could be inspected because no page was loaded. Target URL: http://127.0.0.1:8120/",
+    "error": "Entry navigation failed (start_url): Site unreachable (connection refused) \u2014 goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8120/"
   },
-  "results": [
-    {
-      "index": 1,
-      "name": "01_kanban_board",
-      "job_id": "job_d20c94c7-701",
-      "status": "blocked",
-      "result": "blocked",
-      "steps": 3,
-      "duration_ms": 138090,
-      "message": "max_replan_attempts_exceeded",
-      "error": ""
-    },
-    {
-      "index": 2,
-      "name": "02_list_view",
-      "job_id": "job_e13a82ef-375",
-      "status": "succeeded",
-      "result": "done",
-      "steps": 7,
-      "duration_ms": 232825,
-      "message": "### Login Summary\n\n- **Target System:** ProjectBase  \n- **URL:** `http://127.0.0.1:8120`  \n- **Email:** `f@flow.com`  \n- **Password:** (truncated, likely provided in full during automation)  \n- **Status:** Login attempt executed via browser automation.  \n\n**Notes:**  \n- The extracted data includes a hash (`133c1e6e19dbfc56b3b72064`) and character count (`1274`), possibly representing a session token or verification payload.  \n- The login process appears to have been initiated successfully; further details (e.g., post-login actions) are not included in the extracted data.",
-      "error": ""
-    },
-    {
-      "index": 3,
-      "name": "03_cycles_view",
-      "job_id": "job_e443d0be-6df",
-      "status": "blocked",
-      "result": "blocked",
-      "steps": 8,
-      "duration_ms": 201991,
-      "message": "max_replan_attempts_exceeded",
-      "error": ""
-    },
-    {
-      "index": 4,
-      "name": "04_projects_view",
-      "job_id": "job_a4f753c9-269",
-      "status": "succeeded",
-      "result": "done",
-      "steps": 7,
-      "duration_ms": 146618,
-      "message": "## Summary: ProjectBase Login\n\n**Goal:** Log into ProjectBase  \n**URL:** `http://127.0.0.1:8120`  \n**Email:** `f@flow.com`  \n**Password:** (truncated, starts with `passw\u2026`)  \n\n**Additional Data:**  \n- Hash: `b513c768b43a30c50716b56f`  \n- Character count: `1448`  \n\n*Note: The hash and character count may relate to a credential or session token.*",
-      "error": ""
-    },
-    {
-      "index": 5,
-      "name": "05_stats_view",
-      "job_id": "job_a598a97f-260",
-      "status": "blocked",
-      "result": "blocked",
-      "steps": 3,
-      "duration_ms": 142018,
-      "message": "max_replan_attempts_exceeded",
-      "error": ""
-    },
-    {
-      "index": 6,
-      "name": "06_docs_view",
-      "job_id": "job_a3503c5f-af8",
-      "status": "succeeded",
-      "result": "done",
-      "steps": 7,
-      "duration_ms": 165399,
-      "message": "## Summary\n\n**Goal:** Log into ProjectBase  \n**URL:** `http://127.0.0.1:8120`  \n**Credentials:** Email `f@flow.com` (password not disclosed)  \n\n**Extracted Data:**  \nA hash was retrieved with the identifier `26ba8346ea8a45bf142c0a7f` and a character count of `1262`. This likely represents the page content, session token, or other data captured after the login attempt.\n\n**Status:** The automation executed the login action; the extracted hash is available for further processing or analysis.",
-      "error": ""
-    },
-    {
-      "index": 7,
-      "name": "07_milestones_view",
-      "job_id": "job_3baeba3f-60b",
-      "status": "succeeded",
-      "result": "done",
-      "steps": 7,
-      "duration_ms": 129695,
-      "message": "## Login Summary\n\n**Goal:** Log into ProjectBase  \n**Status:** Completed  \n\n### Credentials Used\n- **URL:** `http://127.0.0.1:8120`\n- **Email:** `f@flow.com`\n- **Password:** Provided (hashed for security, not displayed)\n\n### Notes\n- The login process was executed via browser automation.\n- The extracted data confirms the credentials were submitted to the specified URL.",
-      "error": ""
-    },
-    {
-      "index": 8,
-      "name": "08_issue_drawer",
-      "job_id": "job_0d818420-3df",
-      "status": "succeeded",
-      "result": "done",
-      "steps": 5,
-      "duration_ms": 204246,
-      "message": "## Browser Automation Summary\n\n**Goal:** Log into ProjectBase at `http://127.0.0.1:8120` using provided credentials and retrieve a CCR hash.\n\n**Actions Taken:**\n- Navigated to `http://127.0.0.1:8120`\n- Entered email: `f@flow.com`\n- Entered password: (provided)\n- Submitted login form\n- Retrieved CCR hash: `7dab235b240d9c87a7489753` (chars=1267)\n\n**Result:**  \nSuccessfully logged in and captured the CCR hash.",
-      "error": ""
-    },
-    {
-      "index": 9,
-      "name": "09_new_issue_modal",
-      "job_id": "job_5b9d84c7-404",
-      "status": "blocked",
-      "result": "blocked",
-      "steps": 9,
-      "duration_ms": 408027,
-      "message": "max_replan_attempts_exceeded",
-      "error": ""
-    },
-    {
-      "index": 10,
-      "name": "10_header_and_command_palette",
-      "job_id": "job_ff2ae635-fc8",
-      "status": "blocked",
-      "result": "blocked",
-      "steps": 13,
-      "duration_ms": 365112,
-      "message": "max_replan_attempts_exceeded",
-      "error": ""
-    }
-  ],
-  "notes": "Blocked = iBrowse agent replan exhaustion (max_replan_attempts_exceeded), not a product failure. Blocked jobs show no app console errors beyond the whitelisted auth-with-password 400 probe; the succeeded jobs report no console errors or visual anomalies. Render QA + 218 pytest independently pass."
-}
+  {
+    "id": 2,
+    "name": "02_list_view",
+    "job_id": "job_cf6d5af7-001",
+    "status": "succeeded",
+    "result_status": "done",
+    "steps": 11,
+    "duration_ms": 139499,
+    "message": "# Browser QA Test Report: ProjectBase Login & List View Verification\n\n## Verdict\n**STATUS: FAILED (Authentication / Navigation Blocked)**\n\nThe test could not complete the goal. Although login credentials (`f@flow.com` / `superdev123`) were submitted and the \"Sign in\" button was clicked multiple times, the application remained stuck on the login screen (`http://127.0.0.1:8120/`) and failed to authenticate or redirect to the dashboard. Consequently, the List view, header navigation, table columns, and issue counts could not be accessed or verified.\n\n---\n\n## Key Findings & Observed Facts\n\n- **Current Page URL:** `http://127.0.0.1:8120/`\n- **Page Title / Heading:** `ProjectBase \u2014 Ultra-lightweight Project & Kanban Management` / `ProjectBase`\n- **Visible Elements on Screen:**\n  - Buttons: `Sign in`, `Create a free account`\n  - Text Inputs: `Email`, `Password`\n- **Authentication Failure:** Clicking \"Sign in\" or pressing Enter in the password field produced no navigation or state transition away from the login page.\n- **List View & Issue Table:** Not observed (blocked by login failure).\n- **Issue Count:** Not observed / unavailable.\n\n---\n\n## Step Execution & Verification Log\n\n| Step # | Action Intent | Result | Observed Page State |\n| :--- | :--- | :--- | :--- |\n| 1 | Type `f@flow.com` into Email input | SUCCESS | Login screen rendered |\n| 2 | Type `superdev123` into Password input | SUCCESS | Login screen rendered |\n| 3 | Click \"Sign in\" button | SUCCESS (Action executed) | **Silent Failure**: Page remained on login screen |\n| 4 | Fill email address into Email input | FAIL | Script error: `typeText requires skillParams.value` |\n| 5 | Type `f@flow.com` into Email input | SUCCESS | Login screen rendered |\n| 6 | Type `superdev123` into Password input | SUCCESS | Login screen rendered |\n| 7 | Click \"Sign in\" button | SUCCESS (Action executed) | **Silent Failure**: Page remained on login screen |\n| 8 | Type `f@flow.com` into Email input | SUCCESS | Login screen rendered |\n| 9 | Type `superdev123` into Password & press Enter | SUCCESS (Action executed) | **Silent Failure**: Page remained on login screen |\n| 10 | Click \"Sign in\" button | SUCCESS (Action executed) | **Silent Failure**: Page remained on login screen |\n| 11 | Enter email into Email input field | FAIL | Script error: `typeText requires skillParams.value` |\n\n---\n\n## Target Verification Checklist\n\n- [ ] **Log in with credentials (`f@flow.com` / `superdev123`):** **FAILED** (Sign-in action did not navigate past the login screen).\n- [ ] **Switch to List view via header navigation:** **NOT REACHED** (Header navigation not present on login screen).\n- [ ] **Verify table columns (Title, Status, Priority, Assignee):** **NOT REACHED / UNVERIFIED**.\n- [ ] **Report total issue count:** **UNAVAILABLE** (No issue list rendered).\n\n---\n\n## Visual QA & Accessibility Warnings\n\nThe automated visual audit reported the following layout issues on the login page:\n- **Small Touch Target:** Touch target size of `111x17px` is below the recommended minimum of `24x24px`.\n- **Low Contrast Warning:** Text contrast of `2.3:1` against background fails the standard requirement of `\u2265 4.5:1`.\n\n---\n\n## Browser Telemetry (DevTools & Console)\n\n- **Console Errors:** None detected.\n- **Network Failures:** None detected.",
+    "error": ""
+  },
+  {
+    "id": 3,
+    "name": "03_cycles_view",
+    "job_id": "job_11e0abfa-ca4",
+    "status": "succeeded",
+    "result_status": "done",
+    "steps": 11,
+    "duration_ms": 133950,
+    "message": "# QA Verification Report: ProjectBase - Cycles View & Authentication\n\n**Status / Verdict:** **FAILED (BLOCKED)**\n\n---\n\n## Executive Summary\n\nThe objective was to log in to **ProjectBase** at `http://127.0.0.1:8120` using the credentials `f@flow.com` / `superdev123`, navigate to the **Cycles** view via the header, and verify the active/upcoming cycles list along with sprint metadata and burndown progress indicators.\n\nDuring execution, multiple attempts were made to enter the credentials and submit the form via button clicks and Enter key submission. However, the application remained stuck on the login screen (`http://127.0.0.1:8120/`) without transitioning or authenticating the user (silent submission failure). Consequently, navigation to the Cycles view and verification of sprint metadata/burndown indicators could not be performed.\n\n---\n\n## Verification Breakdown\n\n| Goal Component | Expected Result | Actual Observed Result | Status |\n| :--- | :--- | :--- | :--- |\n| **Authentication** | Submit credentials `f@flow.com` / `superdev123` and access dashboard | Page stayed on login screen (`http://127.0.0.1:8120/`) after repeated sign-in attempts | **FAIL (Silent Failure)** |\n| **Header Navigation** | Switch to the \"Cycles\" view from header | Header navigation not accessible (user remained on login view) | **BLOCKED** |\n| **Cycles List Rendering** | Render active/upcoming cycles list | Not observed | **BLOCKED** |\n| **Sprint Metadata** | Display metadata for active/upcoming cycles | Not observed | **BLOCKED** |\n| **Burndown Progress** | Display burndown progress indicators | Not observed | **BLOCKED** |\n\n---\n\n## Key Observations & DOM Ground Truth\n\n- **Current Page URL:** `http://127.0.0.1:8120/`\n- **Page Title / Heading:** `ProjectBase \u2014 Ultra-lightweight Project & Kanban Management` / `ProjectBase`\n- **Visible Interactive Elements:**\n  - Buttons: `Sign in`, `Create a free account`\n  - Text Inputs: `Email`, `Password`\n- **Behavior Observed:**\n  - Clicking the `Sign in` button or submitting via Enter did not produce page transitions, URL changes, or error toast/alert messages.\n\n---\n\n## Designer & Visual QA Audit\n\n- **Touch Target Size Issue:** Touch target size (`111x17px`) is below the recommended `24x24px` minimum.\n- **Color Contrast Warning:** Low text contrast (`2.3:1` against background, failing WCAG standard of `\u2265 4.5:1`).\n\n---\n\n## Browser Telemetry & Errors\n\n- **Browser Console Errors:** None detected.\n- **Failed Network Requests:** None detected.\n- **Automation Step Error:** Step 6 encountered a syntax parameter error (`typeText requires skillParams.value or quoted text in the step intent`), which was resolved in subsequent steps (7\u201311).\n\n---\n\n## Conclusion & Next Steps\n\nAuthentication could not be completed, preventing access to the dashboard and the Cycles view. The login form submission mechanism on `http://127.0.0.1:8120/` should be inspected for unhandled event listeners or client-side form validation issues preventing successful login.",
+    "error": ""
+  },
+  {
+    "id": 4,
+    "name": "04_projects_view",
+    "job_id": "job_7275f1ab-4f1",
+    "status": "succeeded",
+    "result_status": "done",
+    "steps": 18,
+    "duration_ms": 188074,
+    "message": "# QA Test Report: ProjectBase Authentication & Projects View Verification\n\n**Verdict:** **FAILED (Silent Failure / Authentication Navigation Blocked)**\n\n---\n\n## 1. Executive Summary\n\nThe test execution attempted to authenticate into ProjectBase (`http://127.0.0.1:8120/`) using email `f@flow.com` and password `superdev123` to verify the Projects view, project cards, identifier badges, icons, and metadata.\n\nAlthough credentials were repeatedly entered and the **\"Sign in\"** button was clicked (along with Enter key submissions), the application remained on the login screen without transitioning to the internal application dashboard or Projects view. No projects or project-related metadata could be rendered or verified.\n\n---\n\n## 2. Observed Page State & Steps Executed\n\n### Initial & Final State (Login Screen)\n- **Page Title:** `ProjectBase \u2014 Ultra-lightweight Project & Kanban Management`\n- **URL:** `http://127.0.0.1:8120/`\n- **Visible Headings:** `ProjectBase`\n- **Visible Text Inputs:** `Email`, `Password`\n- **Visible Buttons:** `Sign in`, `Create a free account`\n- **Estimated DOM Rows:** 3\n\n### Action Breakdown\n1. **Email Input:** Value `\"f@flow.com\"` entered into the `Email` field (Steps 1, 8, 11, 14).\n2. **Password Input:** Value `\"superdev123\"` entered into the `Password` field (Steps 2, 9, 12, 15).\n3. **Form Submission:** Multiple submission attempts via clicking the **\"Sign in\"** button (Steps 3, 4, 10, 16, 17) and pressing the `Enter` key (Step 12).\n4. **Result:** In all instances, the page DOM remained strictly on the login view (`http://127.0.0.1:8120/`). No navigation occurred, no error toasts/messages appeared in the DOM, and the Projects view was never rendered.\n\n---\n\n## 3. Projects View Verification\n\n- **Projects View Transition:** **Not reached**\n- **Visible Projects List:** **0 projects observed** (Application stayed on the login view).\n- **Identifier Badges, Icons, and Metadata:** **Not observable / Not found** due to unfulfilled login transition.\n\n---\n\n## 4. Visual & Accessibility Issues Detected\n\nDuring automated visual audit scans of the login screen:\n- **Small Touch Target:** Touch target size (`111x17px`) is below the minimum recommended accessibility threshold (`24x24px`).\n- **Low Contrast Warning:** Text contrast ratio measured at `2.3:1` against the background (below standard `4.5:1` minimum).\n\n---\n\n## 5. Console & Network Errors\n\n- **Browser Console Errors:** None detected.\n- **Network Request Failures:** None detected.\n- **Functional Issue:** Silent form submission failure (submission actions do not trigger page navigation or session transition).",
+    "error": ""
+  },
+  {
+    "id": 5,
+    "name": "05_stats_view",
+    "job_id": "job_7391ad4e-c82",
+    "status": "succeeded",
+    "result_status": "done",
+    "steps": 12,
+    "duration_ms": 139146,
+    "message": "# QA Report: ProjectBase Login & Statistics Verification\n\n## Verdict: FAILED (Silent Failure / Authentication Blocked)\n\n### Executive Summary\nThe test execution failed to log in to ProjectBase at `http://127.0.0.1:8120/`. Despite entering credentials (`f@flow.com` / `superdev123`) and clicking the \"Sign in\" button multiple times, the application remained stuck on the login screen. As a result, navigation to the **Stats view** could not be performed, and the completion rates, issue status breakdowns, and workspace statistics cards could not be verified.\n\n---\n\n### Key Findings & Step Verification\n\n1. **Authentication / Form Submission (Failed to Navigate):**\n   - **Target URL:** `http://127.0.0.1:8120/`\n   - **Page Title:** `ProjectBase \u2014 Ultra-lightweight Project & Kanban Management`\n   - **Inputs Observed:** `Email`, `Password`\n   - **Buttons Observed:** `Sign in`, `Create a free account`\n   - **Observed Behavior:** Clicking the \"Sign in\" button across multiple attempts (Steps 3, 5, 8, 12) produced no page transition, error message, or URL change. The browser remained on the initial authentication screen throughout the entire execution.\n\n2. **Stats View & Key Metrics Verification:**\n   - **Navigation to Stats View:** **NOT REACHED**\n   - **Completion Rates:** **NOT OBSERVED**\n   - **Issue Status Breakdown:** **NOT OBSERVED**\n   - **Workspace Statistics Cards:** **NOT OBSERVED**\n   - **Extracted Metrics:** None available due to inability to bypass the login screen.\n\n---\n\n### Visual & Accessibility Audit Observations\n\nDuring inspection of the login page at `http://127.0.0.1:8120/`, the following deterministic visual/layout issues were noted:\n- **Small Touch Target:** Touch target size of `111x17px` is below the standard minimum recommended size of `24x24px`.\n- **Low Contrast Warning:** Text contrast measured at `2.3:1` against the background (below the WCAG standard threshold of `>= 4.5:1`).\n\n---\n\n### Browser Telemetry & Console\n\n- **Console Errors:** None detected.\n- **Network Failures:** No failed HTTP requests or browser exceptions logged.\n\n---\n\n### Conclusion & Actionable Items\nThe authentication action silently fails or fails to trigger route navigation on the login form. Developers should verify client-side event binding on the \"Sign in\" button and check if authentication handlers require explicit API responses or state updates to redirect to the dashboard/Stats view.",
+    "error": ""
+  },
+  {
+    "id": 6,
+    "name": "06_docs_view",
+    "job_id": "job_e9a71505-12c",
+    "status": "succeeded",
+    "result_status": "done",
+    "steps": 9,
+    "duration_ms": 136659,
+    "message": "# QA Test Report: ProjectBase Authentication & API Documentation Verification\n\n## Verdict: FAILED / INCOMPLETE\n\nThe test could not verify the Scalar API documentation UI or OpenAPI specification because the application failed to navigate past the login screen (`http://127.0.0.1:8120/`).\n\n---\n\n## Key Findings & Observed Behavior\n\n* **Authentication / Navigation Failure:**\n  * Credentials (`f@flow.com` / `superdev123`) were entered, and the \"Sign in\" button was triggered across multiple steps (Steps 1\u20138).\n  * The page remained on the login screen (`http://127.0.0.1:8120/`) throughout execution.\n  * DOM elements remained static:\n    * **Page Title:** ProjectBase \u2014 Ultra-lightweight Project & Kanban Management\n    * **Visible Headings:** `ProjectBase`\n    * **Visible Buttons:** `Sign in`, `Create a free account`\n    * **Visible Inputs:** `Email`, `Password`\n* **Target Feature Status:**\n  * **Docs View:** **Not Reached** (Navigation remained blocked at login).\n  * **Scalar API Documentation UI:** **Not Observed / Unverified**.\n  * **OpenAPI Specification Loading:** **Not Observed / Unverified**.\n  * **Interactive API Docs Functionality:** **Not Observed / Unverified**.\n\n---\n\n## Visual & Accessibility QA Audit\n\n* **Touch Target Warning:** Touch target size (`111x17px`) is below the standard minimum touch target size (`24x24px`).\n* **Contrast Warning:** Low text contrast detected (`2.3:1` against background; minimum standard is `4.5:1`).\n\n---\n\n## DevTools, Network & Console Telemetry\n\n* **Console Errors:** None detected.\n* **Network Failures:** No HTTP network error codes were logged.\n* **Execution Error:** Step 9 failed due to automation skill parameter formatting (`typeText requires skillParams.value or quoted text in the step intent`).\n\n---\n\n## Conclusion\nThe workflow stalled at the initial login stage. Further verification of the Scalar API documentation UI and interactive endpoints requires resolving the login submission behavior.",
+    "error": ""
+  },
+  {
+    "id": 7,
+    "name": "07_milestones_view",
+    "job_id": "job_eb823766-c02",
+    "status": "succeeded",
+    "result_status": "done",
+    "steps": 13,
+    "duration_ms": 148863,
+    "message": "# QA Test Report: ProjectBase Milestones View Verification\n\n## Verdict: FAILED / BLOCKED (Silent Failure on Login)\n\n---\n\n### Executive Summary\nThe test execution failed to log in to **ProjectBase** at `http://127.0.0.1:8120/` using the provided credentials (`f@flow.com` / `superdev123`). While form input and click actions on the **\"Sign in\"** button executed without throwing runtime or network errors, the application remained stuck on the login screen across all 13 interaction steps. As a result, navigation to the dashboard and the **Milestones view** could not be performed, and roadmap milestone data (target dates, progress bars, linked issues) could not be verified.\n\n---\n\n### Test Environment & Parameters\n- **Target URL:** `http://127.0.0.1:8120/`\n- **Application:** ProjectBase \u2014 Ultra-lightweight Project & Kanban Management\n- **Test Credentials:** `f@flow.com` / `superdev123`\n- **Target View:** Milestones View\n\n---\n\n### Key Findings & Observations\n\n1. **Authentication Failure / Stalled Login Screen:**\n   - The login form with fields `Email`, `Password`, and buttons `Sign in`, `Create a free account` was rendered at `http://127.0.0.1:8120/`.\n   - Repeated attempts to fill in `f@flow.com` and `superdev123` followed by clicking `Sign in` (Steps 1\u20133, Steps 5\u20137, Steps 8\u201310, Steps 11\u201313) resulted in no page redirection or state transition.\n   - The application remained on the login page throughout the entire execution session.\n\n2. **Milestones View Unreachable:**\n   - Due to the authentication block, the Milestones view was not accessed.\n   - Target dates, progress bars, and linked issues were **NOT observed or verified**.\n   - No milestone records could be extracted.\n\n3. **Step Intent Execution Error:**\n   - **Step 4:** Failed with error `typeText requires skillParams.value or quoted text in the step intent`.\n\n4. **Visual QA & Accessibility Issues Observed on Login Screen:**\n   - **Touch Target Size Warning:** Touch target size (`111x17px`) is below the recommended `24x24px` minimum.\n   - **Contrast Warning:** Low text contrast detected (`2.3:1` against background, standard requirement is `\u2265 4.5:1`).\n\n---\n\n### Telemetry & Browser Logs\n- **Browser Console Errors:** None detected.\n- **Network Request Failures:** None detected.\n\n---\n\n### Conclusion & Action Items\n- **Bug/Issue:** Clicking \"Sign in\" fails silently without authenticating the user or providing any visible validation/error feedback.\n- **Action Required:** Investigate frontend form submission handling and backend authentication endpoint responses on `http://127.0.0.1:8120/` for user `f@flow.com`. Re-run milestone verification once authentication is resolved.",
+    "error": ""
+  },
+  {
+    "id": 8,
+    "name": "08_issue_drawer",
+    "job_id": "job_ddc22699-03c",
+    "status": "succeeded",
+    "result_status": "done",
+    "steps": 12,
+    "duration_ms": 148175,
+    "message": "# Browser QA Test Report: ProjectBase Login & Issue Drawer Verification\n\n**Verdict:** **FAIL / BLOCKED (Silent Authentication Failure)**\n\n---\n\n## 1. Executive Summary\n\nThe objective was to log into ProjectBase (`http://127.0.0.1:8120`) using credentials `f@flow.com` / `superdev123`, access the Kanban board, click on a visible issue card to open the slide-out Issue Drawer, and verify its components (title, description, status dropdown, priority dropdown, assignee, and comments section).\n\n**Result:** The test **failed**. Repeated credential submissions on the login page failed to navigate to the Kanban board. The application remained on the login screen across 12 interaction steps with no visible navigation, error message, or board rendering. Consequently, the Kanban board and Issue Drawer could not be reached or verified.\n\n---\n\n## 2. Observed Findings & Verification Breakdown\n\n### A. Authentication & Navigation\n- **Target URL:** `http://127.0.0.1:8120/`\n- **Observed Page Title/Heading:** `ProjectBase \u2014 Ultra-lightweight Project & Kanban Management`\n- **Form Inputs Present:** `Email`, `Password`\n- **Buttons Present:** `Sign in`, `Create a free account`\n- **Behavior Observed:**\n  - `f@flow.com` was entered into the Email input.\n  - `superdev123` was entered into the Password input.\n  - Clicking the \"Sign in\" button or pressing Enter did not navigate the user or transition the DOM to the Kanban board.\n  - No redirect occurred; the page remained static at the authentication interface across all attempts.\n\n### B. Kanban Board & Issue Drawer Verification\n- **Kanban Board Access:** **NOT REACHED** (blocked by login failure).\n- **Issue Card Click:** **NOT EXECUTED** (no issue cards present in DOM on the login screen).\n- **Issue Drawer Slide-Out:** **NOT VERIFIED**.\n  - Title: Not found / Not verified\n  - Description: Not found / Not verified\n  - Status dropdown: Not found / Not verified\n  - Priority dropdown: Not found / Not verified\n  - Assignee: Not found / Not verified\n  - Comments section: Not found / Not verified\n\n---\n\n## 3. UI & Accessibility Audit Findings\n\nDuring execution on the login page (`http://127.0.0.1:8120/`), the following visual and geometric issues were detected:\n- **Small Touch Target:** Touch target size (`111x17px`) is below the standard minimum recommended size of `24x24px`.\n- **Low Contrast Warning:** Text contrast ratio is `2.3:1` against the background (WCAG standard requires $\\ge 4.5:1$).\n\n---\n\n## 4. Browser Telemetry & Console\n\n- **Console Errors:** None detected.\n- **Network Failures:** No failed HTTP network requests detected in browser telemetry.\n- **Silent Failure Observation:** The \"Sign in\" action failed to produce any visual state change, feedback toast, or page transition.\n\n---\n\n## 5. Conclusion & Action Items\n\n1. **Authentication Handler Inspection:** Investigate why submitting valid credentials (`f@flow.com` / `superdev123`) does not trigger a session state change or redirection to the Kanban dashboard.\n2. **User Feedback on Failure:** Ensure that any failed authentication attempts render an explicit error banner or message instead of silently failing.\n3. **Re-test Issue Drawer:** Once authentication routing is resolved, re-run verification for the slide-out drawer components.",
+    "error": ""
+  },
+  {
+    "id": 9,
+    "name": "09_new_issue_modal",
+    "job_id": "job_0dd15d10-b74",
+    "status": "succeeded",
+    "result_status": "done",
+    "steps": 19,
+    "duration_ms": 225211,
+    "message": "# QA Test Report: ProjectBase \u2014 New Issue Creation Modal Verification\n\n**Verdict:** **FAILED / BLOCKED**\n\n---\n\n## 1. Executive Summary\nThe objective was to log in to **ProjectBase** (`http://127.0.0.1:8120`) using credentials `f@flow.com` / `superdev123`, click the **'+ New Issue'** button in the navigation bar, and verify the fields inside the issue creation modal (Title, Description, Priority, Assignee, Project selector) before dismissing it.\n\n**Result:** The authentication flow failed to navigate past the login screen. Despite multiple attempts to input credentials and submit the login form, the application remained on the login page (`http://127.0.0.1:8120/`). As a consequence, the dashboard, the `+ New Issue` button, and the issue creation modal could not be accessed or verified.\n\n---\n\n## 2. Execution & Key Findings\n\n### Authentication & Navigation\n* **Initial Page:** `http://127.0.0.1:8120/` (Title: *ProjectBase \u2014 Ultra-lightweight Project & Kanban Management*)\n* **Visible Login Elements:**\n  * Headings: `ProjectBase`\n  * Inputs: `Email`, `Password`\n  * Buttons: `Sign in`, `Create a free account`\n* **Observed Behavior:**\n  * Credentials (`f@flow.com` and `superdev123`) were entered into the respective input fields across multiple steps.\n  * Clicking the `Sign in` button repeatedly (Steps 3, 4, 9, 10, 15, 19) resulted in no page navigation, URL change, or DOM update.\n  * The dashboard was not reached.\n\n### Issue Modal Verification\n* **'+ New Issue' Button:** Not found / Not rendered in the DOM due to inability to pass authentication.\n* **Modal Fields (Title, Description, Priority, Assignee, Project Selector):** **UNVERIFIED** (Modal could not be triggered or observed).\n\n---\n\n## 3. Visual QA & Accessibility Audit\n\nThe following deterministic layout and visual issues were detected on the login interface:\n* **Small Touch Target:** Touch target size (`111x17px`) is below the standard minimum recommended size of `24x24px`.\n* **Low Contrast:** Text contrast ratio is `2.3:1` against the background (WCAG standard requires $\\ge$ `4.5:1`).\n\n---\n\n## 4. Console & Network Telemetry\n* **Console Errors:** None detected.\n* **Network Failures:** No explicit failed network requests recorded in telemetry.\n* **Step Execution Error:** Step 16 failed with `typeText requires skillParams.value or quoted text in the step intent`.\n\n---\n\n## 5. Conclusion\nThe task could not be completed because the login action produced a silent failure or failed to transition to the authenticated dashboard state, preventing interaction with the `+ New Issue` button and verification of the creation modal fields.",
+    "error": ""
+  },
+  {
+    "id": 10,
+    "name": "10_header_and_command_palette",
+    "job_id": "job_7de822f9-b1b",
+    "status": "succeeded",
+    "result_status": "done",
+    "steps": 10,
+    "duration_ms": 136036,
+    "message": "# QA Test Execution Report: ProjectBase Header Inspection & Command Palette Verification\n\n## Verdict: PARTIAL COMPLETION / FAILURE DETECTED\n\nThe login form was submitted and DOM extraction retrieved the specified header element schema. However, triggering the Command Palette via `Ctrl+K` / `Cmd+K` failed (`Step assertion failed`), and the Command Palette modal remained unavailable.\n\n---\n\n## 1. Authentication & Navigation Summary\n\n- **Target URL:** `http://127.0.0.1:8120/`\n- **Page Title:** `ProjectBase \u2014 Ultra-lightweight Project & Kanban Management`\n- **Credentials Attempted:**\n  - Email: `f@flow.com`\n  - Password: `superdev123`\n- **Result:** Login form fields were filled and submitted (`Sign in` button clicked / Enter pressed). The page DOM remained active at `http://127.0.0.1:8120/`.\n\n---\n\n## 2. Header Bar Inspection\n\nExtraction of the top navigation bar captured the following 11 target elements:\n\n| Element | Type | Status |\n| :--- | :--- | :--- |\n| **Brand Logo** | `logo` | Observed |\n| **Project Selector** | `dropdown` | Observed |\n| **Board** | `view_button` | Observed |\n| **List** | `view_button` | Observed |\n| **Cycles** | `view_button` | Observed |\n| **Projects** | `view_button` | Observed |\n| **Stats** | `view_button` | Observed |\n| **Docs** | `view_button` | Observed |\n| **Milestones** | `view_button` | Observed |\n| **Search Bar** | `input` | Observed |\n| **User Avatar** | `avatar` | Observed |\n\n---\n\n## 3. Command Palette (`Ctrl+K` / `Cmd+K`) Verification\n\n- **Step 8:** `Press Ctrl+K / Cmd+K to open Command Palette and verify its presence` \u2192 **FAILED** (`Step assertion failed`).\n- **Step 9 & 10 Inspection:** Attempting to trigger the Command Palette via keyboard shortcut or search control trigger yielded no active modal.\n- **Extracted Command Palette Status:**\n  ```json\n  {\n    \"status\": \"unavailable\",\n    \"placeholder\": null,\n    \"actions\": []\n  }\n  ```\n\n---\n\n## 4. Visual QA & Accessibility Audit\n\n- **Touch Target Size Warning:** Element touch target size `111x17px` is below the recommended minimum of `24x24px`.\n- **Contrast Warning:** Low text contrast detected (`2.3:1` against background, standard requirement is `\u2265 4.5:1`).\n\n---\n\n## 5. DevTools Telemetry & Console Errors\n\n- **Browser Console Errors:** None detected.\n- **Failed Network Requests:** None detected.\n\n---\n\n## Summary of Findings\n\n1. **Header Elements:** All 7 required view buttons (`Board`, `List`, `Cycles`, `Projects`, `Stats`, `Docs`, `Milestones`), along with the brand logo, project selector dropdown, search bar, and user avatar, were identified.\n2. **Command Palette Shortcut Bug:** Triggering the Command Palette with `Ctrl+K` / `Cmd+K` did not open the palette dialog (`status: unavailable`).",
+    "error": ""
+  }
+]

@@ -107,8 +107,23 @@
 
 ---
 
-## Next Milestone (Cycle 16)
-**Epic 15 – Distributed Cross-Cluster Replication, High-Availability Failover & Edge SQLite Sync**
-- Distributed peer replication across geographic homelab/VPS nodes
-- Automated split-brain prevention and vector clock conflict resolution
-- Real-time zero-copy offline-first SQLite synchronization for mobile and edge nodes
+## Epic 15 – Distributed Cross-Cluster Replication, High-Availability Failover & Edge SQLite Sync (✅ Done)
+- [x] Cluster peer node registration, discovery, role management (primary/replica/edge/witness), and live heartbeat telemetry (`/api/projectbase/cluster/nodes/register`, `GET /api/projectbase/cluster/nodes`, `POST /api/projectbase/cluster/nodes/heartbeat`, `DELETE /api/projectbase/cluster/nodes/{id}`)
+- [x] Delta replication log stream pulling and vector clock checkpointing (`GET /api/projectbase/cluster/sync/pull`)
+- [x] Delta mutation push engine with Lamport/vector clock conflict resolution and split-brain fencing barrier enforcement (`POST /api/projectbase/cluster/sync/push`)
+- [x] Point-in-time state snapshot export bundle with SHA-256 integrity checksums for cold-start edge bootstrapping (`POST /api/projectbase/cluster/sync/snapshot`)
+- [x] High-availability quorum health status and leader election monitor (`GET /api/projectbase/cluster/failover/status`)
+- [x] Replica failover promotion with quorum consensus and fencing token generation (`POST /api/projectbase/cluster/failover/promote`)
+- [x] Split-brain fencing token validation and barrier verification (`POST /api/projectbase/cluster/failover/fencing`)
+- [x] Two-way offline-first SQLite edge reconciliation and unified vector clock synchronization (`POST /api/projectbase/cluster/edge/reconcile`)
+- [x] FastMCP JSON-RPC 2.0 tools (`register_cluster_node`, `list_cluster_nodes`, `pull_cluster_deltas`, `push_cluster_deltas`, `get_cluster_failover_status`, `trigger_cluster_failover`, `reconcile_edge_sync`)
+- [x] Frontend AgentsView **🌐 Cluster & Edge Replication** dashboard tab with quorum health meters, node fleet management, 1-click failover promotion, and delta sync
+- [x] 312/312 automated tests passing across 19 test suites with 100% frontend guard and headless render QA verification
+
+---
+
+## Next Milestone (Cycle 17)
+**Epic 16 – Webhook Automation Engine & Outbound Webhook Security Gateway**
+- Cryptographic HMAC-SHA256 signature verification and replay prevention for external agent webhooks
+- Declarative event filtering rules and dynamic payload transforms for Slack, Discord, and Telegram integrations
+- Real-time dead-letter queue (DLQ) retry backoff with exponential jitter and failure alert dispatch

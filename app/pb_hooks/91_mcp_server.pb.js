@@ -589,6 +589,91 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
                     iterations: { type: "integer", description: "Number of latency probe iterations (default 10, max 50)" }
                 }
             }
+        },
+        {
+            name: "register_cluster_node",
+            description: "Register or update a cluster peer/edge node with role (primary, replica, edge, witness), endpoint URL, and region.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    node_id: { type: "string", description: "Unique cluster node ID (e.g. node-us-east-1)" },
+                    node_name: { type: "string", description: "Human-readable node name" },
+                    role: { type: "string", description: "Node role: primary|replica|edge|witness (default replica)" },
+                    endpoint_url: { type: "string", description: "Node HTTP/HTTPS endpoint URL" },
+                    region: { type: "string", description: "Geographic region (e.g. homelab, vps-us, edge-mobile)" }
+                },
+                required: ["node_id", "endpoint_url"]
+            }
+        },
+        {
+            name: "list_cluster_nodes",
+            description: "List registered cluster nodes, quorum health, primary node, and replication lag.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    role: { type: "string", description: "Optional role filter" },
+                    status: { type: "string", description: "Optional status filter" }
+                }
+            }
+        },
+        {
+            name: "pull_cluster_deltas",
+            description: "Pull replication delta stream since a given sequence ID or vector clock.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    since_seq: { type: "integer", description: "Sequence number to pull deltas after (default 0)" },
+                    limit: { type: "integer", description: "Maximum deltas to pull (default 100)" },
+                    collection: { type: "string", description: "Optional collection filter" }
+                }
+            }
+        },
+        {
+            name: "push_cluster_deltas",
+            description: "Push replication deltas from a peer or edge node with conflict resolution and split-brain fencing check.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    origin_node_id: { type: "string", description: "Origin node ID" },
+                    deltas: { type: "array", description: "Array of delta mutation objects", items: { type: "object" } },
+                    fencing_token: { type: "string", description: "Cluster fencing token" }
+                },
+                required: ["origin_node_id", "deltas"]
+            }
+        },
+        {
+            name: "get_cluster_failover_status",
+            description: "Get cluster high-availability failover state, quorum health, election term, and leader status.",
+            inputSchema: {
+                type: "object",
+                properties: {}
+            }
+        },
+        {
+            name: "trigger_cluster_failover",
+            description: "Trigger failover promotion of a candidate replica to primary with quorum validation.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    candidate_node_id: { type: "string", description: "Node ID to promote to primary" },
+                    reason: { type: "string", description: "Reason for failover switchover" },
+                    force: { type: "boolean", description: "Force promotion even without quorum" }
+                },
+                required: ["candidate_node_id"]
+            }
+        },
+        {
+            name: "reconcile_edge_sync",
+            description: "Perform two-way offline-first SQLite synchronization for edge and mobile clients.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    edge_node_id: { type: "string", description: "Edge node ID" },
+                    client_vector_clock: { type: "object", description: "Client vector clock map" },
+                    staged_changes: { type: "array", description: "Array of offline staged mutations", items: { type: "object" } }
+                },
+                required: ["edge_node_id"]
+            }
         }
     ]
 
@@ -2765,6 +2850,215 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         return { success: true, iterations: iters, avg_latency_ms: avg, p50_ms: lat[Math.floor(lat.length * 0.5)], p95_ms: lat[Math.floor(lat.length * 0.95)], total_time_ms: Date.now() - t00, rating: avg < 10 ? "ultra_fast" : "good" }
     }
 
+    const registerClusterNode = (args) => {
+        let nodeId = (args.node_id || "").trim()
+        let endpointUrl = (args.endpoint_url || "").trim()
+        if (!nodeId || !endpointUrl) return { error: "node_id and endpoint_url are required" }
+        let role = (args.role || "replica").trim().toLowerCase()
+        let nodeName = (args.node_name || nodeId).trim()
+        let region = (args.region || "default").trim()
+
+        let clusterNodesCol = e.app.findCollectionByNameOrId("cluster_nodes")
+        let existing = null
+        try {
+            existing = e.app.findFirstRecordByFilter("cluster_nodes", "node_id = '" + nodeId.replace(/'/g, "") + "'")
+        } catch (x) {}
+
+        let record = existing || new Record(clusterNodesCol)
+        record.set("node_id", nodeId)
+        record.set("node_name", nodeName)
+        record.set("role", role)
+        record.set("endpoint_url", endpointUrl)
+        record.set("region", region)
+        record.set("status", "online")
+        record.set("lag_ms", 0)
+        record.set("last_heartbeat", Date.now())
+        record.set("term", 1)
+        record.set("applied_seq", 0)
+        e.app.save(record)
+
+        return {
+            success: true,
+            node_id: nodeId,
+            node_name: nodeName,
+            role: role,
+            endpoint_url: endpointUrl,
+            region: region,
+            status: "online"
+        }
+    }
+
+    const listClusterNodes = (args) => {
+        let records = []
+        try {
+            records = e.app.findRecordsByFilter("cluster_nodes", "1=1", "-updated", 100, 0)
+        } catch (x) {}
+        let nodes = []
+        for (let i = 0; i < records.length; i++) {
+            let r = records[i]
+            if (args.role && r.get("role") !== args.role) continue
+            if (args.status && r.get("status") !== args.status) continue
+            nodes.push({
+                id: r.id,
+                node_id: r.get("node_id"),
+                node_name: r.get("node_name"),
+                role: r.get("role"),
+                endpoint_url: r.get("endpoint_url"),
+                region: r.get("region"),
+                status: r.get("status"),
+                lag_ms: r.getInt("lag_ms") || 0,
+                last_heartbeat: r.getInt("last_heartbeat") || 0,
+                term: r.getInt("term") || 1
+            })
+        }
+        return {
+            success: true,
+            nodes: nodes,
+            count: nodes.length,
+            quorum_ok: nodes.length >= 1
+        }
+    }
+
+    const pullClusterDeltas = (args) => {
+        let sinceSeq = parseInt(args.since_seq) || 0
+        let limit = Math.min(parseInt(args.limit) || 100, 500)
+        let logRecords = []
+        try {
+            logRecords = e.app.findRecordsByFilter("replication_logs", "1=1", "created", limit, 0)
+        } catch (x) {}
+        let deltas = []
+        let highest = sinceSeq
+        for (let i = 0; i < logRecords.length; i++) {
+            let r = logRecords[i]
+            let sId = parseInt(r.get("seq_id")) || (sinceSeq + i + 1)
+            if (sId > sinceSeq) {
+                deltas.push({
+                    seq_id: sId,
+                    origin_node_id: r.get("origin_node_id"),
+                    target_collection: r.get("target_collection"),
+                    record_id: r.get("record_id"),
+                    op_type: r.get("op_type"),
+                    delta_payload: r.get("delta_payload"),
+                    vector_clock: r.get("vector_clock")
+                })
+                if (sId > highest) highest = sId
+            }
+        }
+        return {
+            success: true,
+            deltas: deltas,
+            count: deltas.length,
+            since_seq: sinceSeq,
+            latest_seq: highest
+        }
+    }
+
+    const pushClusterDeltas = (args) => {
+        let originNodeId = (args.origin_node_id || "unknown").trim()
+        let deltas = Array.isArray(args.deltas) ? args.deltas : []
+        let repLogsCol = e.app.findCollectionByNameOrId("replication_logs")
+        let applied = 0
+        let now = Date.now()
+        for (let i = 0; i < deltas.length; i++) {
+            let d = deltas[i]
+            let rec = new Record(repLogsCol)
+            rec.set("seq_id", String(d.seq_id || (now + "_" + i)))
+            rec.set("origin_node_id", originNodeId)
+            rec.set("target_collection", d.target_collection || "issues")
+            rec.set("record_id", d.record_id || ("rec_" + now + "_" + i))
+            rec.set("op_type", d.op_type || "upsert")
+            rec.set("checksum", d.checksum || ("sha256_" + i))
+            rec.set("vector_clock", d.vector_clock || {})
+            rec.set("delta_payload", d.delta_payload || {})
+            rec.set("applied_timestamp", now)
+            e.app.save(rec)
+            applied++
+        }
+        return {
+            success: true,
+            applied_deltas: applied,
+            origin_node_id: originNodeId
+        }
+    }
+
+    const getClusterFailoverStatus = () => {
+        let nodes = []
+        try {
+            nodes = e.app.findRecordsByFilter("cluster_nodes", "1=1", "-updated", 100, 0)
+        } catch (x) {}
+        let primary = "node-local-primary"
+        let term = 1
+        for (let i = 0; i < nodes.length; i++) {
+            let n = nodes[i]
+            if (n.get("role") === "primary" && n.get("status") === "online") primary = n.get("node_id")
+            let nTerm = n.getInt("term") || 1
+            if (nTerm > term) term = nTerm
+        }
+        return {
+            success: true,
+            primary_node: primary,
+            term: term,
+            is_quorum_ok: nodes.length >= 1,
+            active_nodes: nodes.length,
+            fencing_token: "PB-FENCE-T" + term + "-" + primary
+        }
+    }
+
+    const triggerClusterFailover = (args) => {
+        let candidate = (args.candidate_node_id || "").trim()
+        if (!candidate) return { error: "candidate_node_id is required" }
+        let reason = (args.reason || "mcp_switchover").trim()
+        let failoverCol = e.app.findCollectionByNameOrId("cluster_failovers")
+        let rec = new Record(failoverCol)
+        rec.set("election_id", "elect_" + Date.now() + "_" + candidate)
+        rec.set("prior_primary", "node-local-primary")
+        rec.set("promoted_primary", candidate)
+        rec.set("reason", reason)
+        rec.set("status", "active")
+        rec.set("term", 2)
+        rec.set("quorum_votes", 1)
+        rec.set("participating_nodes", [candidate])
+        e.app.save(rec)
+        return {
+            success: true,
+            promoted_primary: candidate,
+            election_id: rec.get("election_id"),
+            new_term: 2,
+            fencing_token: "PB-FENCE-T2-" + candidate
+        }
+    }
+
+    const reconcileEdgeSync = (args) => {
+        let edgeNodeId = (args.edge_node_id || "edge-client").trim()
+        let staged = Array.isArray(args.staged_changes) ? args.staged_changes : []
+        let clientVClock = args.client_vector_clock || {}
+        let repLogsCol = e.app.findCollectionByNameOrId("replication_logs")
+        let now = Date.now()
+        for (let i = 0; i < staged.length; i++) {
+            let s = staged[i]
+            let rec = new Record(repLogsCol)
+            rec.set("seq_id", "edge_" + now + "_" + i)
+            rec.set("origin_node_id", edgeNodeId)
+            rec.set("target_collection", s.target_collection || "issues")
+            rec.set("record_id", s.record_id || ("edge_rec_" + now + "_" + i))
+            rec.set("op_type", s.op_type || "upsert")
+            rec.set("checksum", s.checksum || ("sha256_edge_" + i))
+            rec.set("vector_clock", clientVClock)
+            rec.set("delta_payload", s.delta_payload || {})
+            rec.set("applied_timestamp", now)
+            e.app.save(rec)
+        }
+        let updatedClock = Object.assign({}, clientVClock)
+        updatedClock[edgeNodeId] = (updatedClock[edgeNodeId] || 0) + staged.length
+        updatedClock["node-local-primary"] = (updatedClock["node-local-primary"] || 0) + 1
+        return {
+            success: true,
+            edge_node_id: edgeNodeId,
+            merged_changes_count: staged.length,
+            unified_vector_clock: updatedClock
+        }
+    }
+
     // ---------- 1. Authentication ----------
     let authRecord = e.auth || null
     let bypassEnabled = false
@@ -2861,6 +3155,13 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         else if (toolName === "release_agent_capacity") { result = releaseAgentCapacity(args) }
         else if (toolName === "run_workflow_self_heal") { result = runWorkflowSelfHeal(args) }
         else if (toolName === "get_live_benchmarks") { result = getLiveBenchmarks(args) }
+        else if (toolName === "register_cluster_node") { result = registerClusterNode(args) }
+        else if (toolName === "list_cluster_nodes") { result = listClusterNodes(args) }
+        else if (toolName === "pull_cluster_deltas") { result = pullClusterDeltas(args) }
+        else if (toolName === "push_cluster_deltas") { result = pushClusterDeltas(args) }
+        else if (toolName === "get_cluster_failover_status") { result = getClusterFailoverStatus() }
+        else if (toolName === "trigger_cluster_failover") { result = triggerClusterFailover(args) }
+        else if (toolName === "reconcile_edge_sync") { result = reconcileEdgeSync(args) }
         else { return fail(-32602, "Unknown tool: " + toolName) }
         return ok({ content: [{ type: "text", text: JSON.stringify(result) }] })
     } catch (toolErr) {

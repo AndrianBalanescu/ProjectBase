@@ -11,6 +11,16 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **Distributed Cross-Cluster Replication, High-Availability Failover & Edge SQLite Sync (Epic 15)**:
+  - Cluster Peer Node Management (`POST /api/projectbase/cluster/nodes/register`, `GET /api/projectbase/cluster/nodes`, `POST /api/projectbase/cluster/nodes/heartbeat`, `DELETE /api/projectbase/cluster/nodes/{id}`): Dynamic discovery, role orchestration (primary, replica, edge, witness), region labeling, and heartbeat telemetry with sequence numbers.
+  - Replication Delta Log Stream (`GET /api/projectbase/cluster/sync/pull`, `POST /api/projectbase/cluster/sync/push`): High-throughput delta change stream pulling and pushing with Lamport/vector clock conflict resolution, Last-Write-Wins (LWW) determinism, and split-brain fencing barriers.
+  - Point-in-Time Snapshot Engine (`POST /api/projectbase/cluster/sync/snapshot`): Lightweight zero-copy state snapshot bundles with SHA-256 integrity checksums for cold-start edge initialization and mobile catch-up.
+  - High-Availability Quorum & Failover Engine (`GET /api/projectbase/cluster/failover/status`, `POST /api/projectbase/cluster/failover/promote`, `POST /api/projectbase/cluster/failover/fencing`): Automatic quorum health evaluation, failover election orchestration, term epoch advancement, and split-brain fencing token validation (`PB-FENCE-T<term>-<node>`).
+  - Offline-First Edge Reconciler (`POST /api/projectbase/cluster/edge/reconcile`): Two-way synchronization protocol merging local offline changes with server replication log and computing unified vector clocks.
+  - FastMCP JSON-RPC 2.0 Tools (`register_cluster_node`, `list_cluster_nodes`, `pull_cluster_deltas`, `push_cluster_deltas`, `get_cluster_failover_status`, `trigger_cluster_failover`, `reconcile_edge_sync`): Exposes full cluster synchronization and edge replication capabilities to autonomous agents.
+  - Frontend AgentsView **🌐 Cluster & Edge Replication** Dashboard: Interactive dashboard with live quorum meters, node fleet status, manual primary promotion, and 1-click delta synchronization.
+  - 13 new automated tests in `tests/test_cluster_replication.py`, bringing total test coverage to 312 tests across 19 suites (100% passing).
+
 - **Autonomous Agent Autoscaling, Dynamic Workload Orchestration & Self-Healing Engine (Epic 14)**:
   - Real-Time Workload Analytics (`GET /api/projectbase/agents/workload`): Evaluates queue saturation %, per-persona queue depth (backend, frontend, qa, review, architect, docs, general), active task leases, reserved worker slots, and SLA clearance forecasts.
   - Dynamic Persona Autoscaler (`POST /api/projectbase/agents/autoscale`): Calculates optimal worker allocations across persona pools and recommends horizontal scaling strategies (`scale_up`, `scale_down`, `maintain`) based on real-time backlog pressure.
