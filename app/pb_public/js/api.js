@@ -318,6 +318,27 @@ const API = {
     return data;
   },
 
+  // Agents & Autonomous Dispatch
+  async getAgents() {
+    const res = await fetch('/api/projectbase/agents', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to load agents');
+    return data;
+  },
+
+  async dispatchAgent(target, payload = {}) {
+    const res = await fetch('/api/projectbase/dispatch-agent', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ target, ...payload })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Agent dispatch failed');
+    return data;
+  },
+
   // Stats
   async getStats() {
     try {
@@ -364,6 +385,57 @@ const API = {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Retrospective generation failed');
+    return data;
+  },
+
+  // Federation & Analytics (Epic 12)
+  async exportFederation(options = {}) {
+    const params = new URLSearchParams();
+    if (options.projectId) params.set('project_id', options.projectId);
+    const res = await fetch(`/api/projectbase/federation/export?${params.toString()}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Federation export failed');
+    return data;
+  },
+
+  async importFederation(bundle, options = {}) {
+    const res = await fetch('/api/projectbase/federation/import', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        bundle: bundle,
+        conflict_strategy: options.conflictStrategy || 'merge',
+        target_project_id: options.targetProjectId || null
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Federation import failed');
+    return data;
+  },
+
+  async getAnomalies(options = {}) {
+    const params = new URLSearchParams();
+    if (options.projectId) params.set('project_id', options.projectId);
+    if (options.autoHeal) params.set('auto_heal', 'true');
+    const res = await fetch(`/api/projectbase/analytics/anomalies?${params.toString()}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Anomaly scan failed');
+    return data;
+  },
+
+  async getThroughputAnalytics(options = {}) {
+    const params = new URLSearchParams();
+    if (options.projectId) params.set('project_id', options.projectId);
+    if (options.windowHours) params.set('time_window_hours', options.windowHours);
+    const res = await fetch(`/api/projectbase/analytics/throughput?${params.toString()}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Throughput analytics failed');
     return data;
   }
 };

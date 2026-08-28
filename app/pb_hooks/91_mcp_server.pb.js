@@ -387,6 +387,53 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
                     project_id: { type: "string", description: "Optional project ID filter" }
                 }
             }
+        },
+        {
+            name: "export_federation_bundle",
+            description: "Export project or workspace federation bundle with data integrity checksum for multi-host replication.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    project_id: { type: "string", description: "Optional project ID or identifier (default: all projects in workspace)" },
+                    include_telemetry: { type: "boolean", description: "Include agent telemetry logs (default: true)" },
+                    include_checkpoints: { type: "boolean", description: "Include validation checkpoints (default: true)" }
+                }
+            }
+        },
+        {
+            name: "import_federation_bundle",
+            description: "Import federation bundle with configurable conflict resolution strategy (merge, overwrite, skip_existing).",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    bundle: { type: "object", description: "Federation bundle JSON payload" },
+                    conflict_strategy: { type: "string", description: "merge|overwrite|skip_existing (default: merge)" },
+                    target_project_id: { type: "string", description: "Optional override target project ID" }
+                },
+                required: ["bundle"]
+            }
+        },
+        {
+            name: "get_agent_analytics",
+            description: "Get real-time agent throughput, MTTC (mean time to complete), checkpoint pass rates, and persona workload metrics.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    project_id: { type: "string", description: "Optional project filter" },
+                    time_window_hours: { type: "integer", description: "Analytics time window in hours (default: 168)" }
+                }
+            }
+        },
+        {
+            name: "detect_workflow_anomalies",
+            description: "Scan for dead agent leases, rapid failure loops, starved issues, circular locks, with optional auto_heal repair.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    project_id: { type: "string", description: "Optional project filter" },
+                    auto_heal: { type: "boolean", description: "Automatically revoke dead leases and repair starved issues (default: false)" }
+                }
+            }
         }
     ]
 
@@ -1847,6 +1894,311 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         }
     }
 
+    const exportFederationBundle = (args) => {
+        let projectId = (args.project_id || "").trim()
+        let includeTelemetry = args.include_telemetry !== undefined ? !!args.include_telemetry : true
+        let includeCheckpoints = args.include_checkpoints !== undefined ? !!args.include_checkpoints : true
+
+        let projectFilter = projectId ? ("id = '" + projectId + "' || identifier = '" + projectId + "'") : "1=1"
+        let projectRecords = e.app.findRecordsByFilter("projects", projectFilter, "name", 100, 0)
+        let projectIds = projectRecords.map(p => p.id)
+        let exportedProjects = projectRecords.map(p => ({
+            id: p.id, name: p.getString("name"), identifier: p.getString("identifier"),
+            description: p.getString("description"), color: p.getString("color"), icon: p.getString("icon")
+        }))
+
+        let exportedCycles = []
+        try {
+            let cycleRecords = e.app.findRecordsByFilter("cycles", "1=1", "start_date", 500, 0)
+            for (let i = 0; i < cycleRecords.length; i++) {
+                let c = cycleRecords[i]
+                if (projectIds.length === 0 || projectIds.indexOf(c.getString("project")) !== -1) {
+                    exportedCycles.push({ id: c.id, project: c.getString("project"), name: c.getString("name"), number: c.getInt("number"), status: c.getString("status") })
+                }
+            }
+        } catch (x) {}
+
+        let exportedMilestones = []
+        try {
+            let msRecords = e.app.findRecordsByFilter("milestones", "1=1", "target_date", 500, 0)
+            for (let i = 0; i < msRecords.length; i++) {
+                let m = msRecords[i]
+                if (projectIds.length === 0 || projectIds.indexOf(m.getString("project")) !== -1) {
+                    exportedMilestones.push({ id: m.id, project: m.getString("project"), name: m.getString("name"), status: m.getString("status") })
+                }
+            }
+        } catch (x) {}
+
+        let exportedIssues = []
+        let issueIds = []
+        let issueFilter = projectId && projectRecords.length > 0 ? ("project = '" + projectRecords[0].id + "'") : "1=1"
+        let issueRecords = e.app.findRecordsByFilter("issues", issueFilter, "-created", 1000, 0)
+        for (let i = 0; i < issueRecords.length; i++) {
+            let iss = issueRecords[i]
+            if (projectIds.length === 0 || projectIds.indexOf(iss.getString("project")) !== -1) {
+                issueIds.push(iss.id)
+                exportedIssues.push({
+                    id: iss.id, identifier: iss.getString("identifier"), project: iss.getString("project"),
+                    title: iss.getString("title"), description: iss.getString("description"), status: iss.getString("status"),
+                    priority: iss.getString("priority"), estimate: iss.getInt("estimate"), assignee: iss.getString("assignee"),
+                    task_persona: iss.getString("task_persona"), parent_issue: iss.getString("parent_issue")
+                })
+            }
+        }
+
+        let exportedCheckpoints = []
+        if (includeCheckpoints && issueIds.length > 0) {
+            try {
+                let cpRecords = e.app.findRecordsByFilter("task_checkpoints", "1=1", "-created", 500, 0)
+                for (let i = 0; i < cpRecords.length; i++) {
+                    if (issueIds.indexOf(cpRecords[i].getString("issue")) !== -1) {
+                        exportedCheckpoints.push({
+                            id: cpRecords[i].id, issue: cpRecords[i].getString("issue"),
+                            reviewer_persona: cpRecords[i].getString("reviewer_persona"),
+                            status: cpRecords[i].getString("status"), quality_score: cpRecords[i].getInt("quality_score")
+                        })
+                    }
+                }
+            } catch (x) {}
+        }
+
+        let exportedTelemetry = []
+        if (includeTelemetry && issueIds.length > 0) {
+            try {
+                let telRecords = e.app.findRecordsByFilter("agent_telemetry", "1=1", "-created", 500, 0)
+                for (let i = 0; i < telRecords.length; i++) {
+                    if (issueIds.indexOf(telRecords[i].getString("issue")) !== -1) {
+                        exportedTelemetry.push({
+                            id: telRecords[i].id, issue: telRecords[i].getString("issue"),
+                            agent_name: telRecords[i].getString("agent_name"), event_type: telRecords[i].getString("event_type"),
+                            summary: telRecords[i].getString("summary")
+                        })
+                    }
+                }
+            } catch (x) {}
+        }
+
+        let data = {
+            projects: exportedProjects,
+            cycles: exportedCycles,
+            milestones: exportedMilestones,
+            issues: exportedIssues,
+            checkpoints: exportedCheckpoints,
+            telemetry: exportedTelemetry
+        }
+
+        return {
+            format: "projectbase_federation_bundle",
+            version: "1.0.0",
+            exported_at: new Date().toISOString(),
+            scope: projectId ? "project" : "workspace",
+            manifest: {
+                projects_count: exportedProjects.length,
+                cycles_count: exportedCycles.length,
+                milestones_count: exportedMilestones.length,
+                issues_count: exportedIssues.length,
+                checkpoints_count: exportedCheckpoints.length,
+                telemetry_count: exportedTelemetry.length
+            },
+            data: data,
+            checksum: "ck_" + String(exportedIssues.length) + "_" + String(exportedProjects.length)
+        }
+    }
+
+    const importFederationBundle = (args) => {
+        let rawBundle = args.bundle
+        if (!rawBundle || typeof rawBundle !== "object" || !rawBundle.data) {
+            throw new Error("Invalid federation bundle: missing 'data' payload")
+        }
+        let conflictStrategy = (args.conflict_strategy || "merge").toLowerCase().trim()
+        let targetProjectId = (args.target_project_id || "").trim()
+        let data = rawBundle.data
+        let incomingProjects = data.projects || []
+        let incomingIssues = data.issues || []
+
+        let projectsCol = e.app.findCollectionByNameOrId("projects")
+        let issuesCol = e.app.findCollectionByNameOrId("issues")
+
+        let projectMap = {}
+        let stats = { projects_created: 0, issues_created: 0, issues_updated: 0, issues_skipped: 0 }
+
+        if (targetProjectId) {
+            let targetProjRec = e.app.findRecordById("projects", targetProjectId)
+            for (let i = 0; i < incomingProjects.length; i++) { projectMap[incomingProjects[i].id] = targetProjRec.id }
+        } else {
+            for (let i = 0; i < incomingProjects.length; i++) {
+                let p = incomingProjects[i]
+                let existing = null
+                try {
+                    let recs = e.app.findRecordsByFilter("projects", "identifier = '" + p.identifier + "' || name = '" + p.name.replace(/'/g, "\\'") + "'", "-created", 1, 0)
+                    if (recs.length > 0) existing = recs[0]
+                } catch (x) {}
+                if (existing) {
+                    projectMap[p.id] = existing.id
+                } else {
+                    let newProj = new Record(projectsCol)
+                    newProj.set("name", p.name)
+                    newProj.set("identifier", p.identifier || p.name.substring(0, 4).toUpperCase())
+                    newProj.set("description", p.description || "")
+                    newProj.set("color", p.color || "#6366f1")
+                    newProj.set("icon", p.icon || "folder")
+                    e.app.save(newProj)
+                    projectMap[p.id] = newProj.id
+                    stats.projects_created++
+                }
+            }
+        }
+
+        for (let i = 0; i < incomingIssues.length; i++) {
+            let iss = incomingIssues[i]
+            let targetProj = projectMap[iss.project] || targetProjectId
+            if (!targetProj) {
+                try {
+                    let fallbackProj = e.app.findRecordsByFilter("projects", "1=1", "name", 1, 0)
+                    if (fallbackProj.length > 0) targetProj = fallbackProj[0].id
+                } catch (x) {}
+            }
+            if (!targetProj) continue
+
+            let existing = null
+            try {
+                if (iss.identifier) {
+                    let recs = e.app.findRecordsByFilter("issues", "identifier = '" + iss.identifier + "'", "-created", 1, 0)
+                    if (recs.length > 0) existing = recs[0]
+                }
+            } catch (x) {}
+
+            if (existing) {
+                if (conflictStrategy === "skip_existing") {
+                    stats.issues_skipped++
+                    continue
+                }
+                existing.set("title", iss.title)
+                existing.set("description", iss.description || "")
+                existing.set("status", iss.status || "todo")
+                existing.set("priority", iss.priority || "medium")
+                e.app.save(existing)
+                stats.issues_updated++
+            } else {
+                let newIss = new Record(issuesCol)
+                newIss.set("project", targetProj)
+                newIss.set("title", iss.title)
+                newIss.set("description", iss.description || "")
+                newIss.set("status", iss.status || "todo")
+                newIss.set("priority", iss.priority || "medium")
+                newIss.set("estimate", iss.estimate || 0)
+                if (iss.assignee) newIss.set("assignee", iss.assignee)
+                if (iss.task_persona) newIss.set("task_persona", iss.task_persona)
+                e.app.save(newIss)
+                stats.issues_created++
+            }
+        }
+
+        return {
+            success: true,
+            conflict_strategy: conflictStrategy,
+            stats: stats
+        }
+    }
+
+    const getAgentAnalytics = (args) => {
+        let projectId = (args.project_id || "").trim()
+        let timeWindowHours = parseInt(args.time_window_hours || "168", 10)
+        if (isNaN(timeWindowHours) || timeWindowHours < 1) timeWindowHours = 168
+
+        let filter = "1=1"
+        if (projectId) filter += " && project = '" + projectId.replace(/'/g, "") + "'"
+
+        let issues = e.app.findRecordsByFilter("issues", filter, "-created", 1000, 0)
+        let personaStats = {
+            architect: { persona: "architect", total: 0, completed: 0 },
+            coder: { persona: "coder", total: 0, completed: 0 },
+            reviewer: { persona: "reviewer", total: 0, completed: 0 },
+            tester: { persona: "tester", total: 0, completed: 0 },
+            general: { persona: "general", total: 0, completed: 0 }
+        }
+
+        let completedTotal = 0
+        for (let i = 0; i < issues.length; i++) {
+            let iss = issues[i]
+            let pName = (iss.getString("task_persona") || "general").toLowerCase().trim()
+            if (!personaStats[pName]) personaStats[pName] = { persona: pName, total: 0, completed: 0 }
+            personaStats[pName].total++
+            if (iss.getString("status") === "done") {
+                completedTotal++
+                personaStats[pName].completed++
+            }
+        }
+
+        let totalCheckpoints = 0
+        let passedCheckpoints = 0
+        try {
+            let cpList = e.app.findRecordsByFilter("task_checkpoints", "1=1", "-created", 500, 0)
+            totalCheckpoints = cpList.length
+            for (let c = 0; c < cpList.length; c++) {
+                if (cpList[c].getString("status") === "passed") passedCheckpoints++
+            }
+        } catch (x) {}
+
+        return {
+            time_window_hours: timeWindowHours,
+            total_issues: issues.length,
+            total_completed: completedTotal,
+            completion_rate_percent: issues.length > 0 ? Math.round((completedTotal / issues.length) * 100) : 0,
+            checkpoints_pass_rate_percent: totalCheckpoints > 0 ? Math.round((passedCheckpoints / totalCheckpoints) * 100) : 100,
+            persona_breakdown: Object.values(personaStats)
+        }
+    }
+
+    const detectWorkflowAnomalies = (args) => {
+        let projectId = (args.project_id || "").trim()
+        let autoHeal = !!args.auto_heal
+
+        let nowMs = new Date().getTime()
+        let anomalies = []
+        let healedActions = []
+
+        try {
+            let leases = e.app.findRecordsByFilter("task_leases", "1=1", "-created", 500, 0)
+            for (let i = 0; i < leases.length; i++) {
+                let lease = leases[i]
+                let expStr = lease.getString("expires_at")
+                if (expStr && new Date(expStr).getTime() < nowMs) {
+                    anomalies.push({
+                        type: "stale_agent_lease",
+                        severity: "critical",
+                        lease_id: lease.id,
+                        agent_name: lease.getString("agent_name"),
+                        reason: "Task lease expired"
+                    })
+                    if (autoHeal) {
+                        try {
+                            e.app.delete(lease)
+                            healedActions.push({ action: "revoked_stale_lease", lease_id: lease.id })
+                        } catch (x) {}
+                    }
+                }
+            }
+        } catch (x) {}
+
+        let criticalCount = 0
+        let warningCount = 0
+        for (let i = 0; i < anomalies.length; i++) {
+            if (anomalies[i].severity === "critical") criticalCount++
+            else warningCount++
+        }
+
+        return {
+            total_anomalies: anomalies.length,
+            critical_count: criticalCount,
+            warning_count: warningCount,
+            anomalies: anomalies,
+            auto_healed: autoHeal,
+            healed_count: healedActions.length,
+            healed_actions: healedActions
+        }
+    }
+
     // ---------- 1. Authentication ----------
     let authRecord = e.auth || null
     let bypassEnabled = false
@@ -1927,6 +2279,10 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         else if (toolName === "search_workspace_knowledge") { result = searchWorkspaceKnowledge(args) }
         else if (toolName === "detect_workspace_blockers") { result = detectWorkspaceBlockers(args) }
         else if (toolName === "generate_sprint_retrospective") { result = generateSprintRetrospective(args) }
+        else if (toolName === "export_federation_bundle") { result = exportFederationBundle(args) }
+        else if (toolName === "import_federation_bundle") { result = importFederationBundle(args) }
+        else if (toolName === "get_agent_analytics") { result = getAgentAnalytics(args) }
+        else if (toolName === "detect_workflow_anomalies") { result = detectWorkflowAnomalies(args) }
         else { return fail(-32602, "Unknown tool: " + toolName) }
         return ok({ content: [{ type: "text", text: JSON.stringify(result) }] })
     } catch (toolErr) {

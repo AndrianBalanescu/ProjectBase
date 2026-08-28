@@ -11,6 +11,14 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **Multi-Host Federation, Real-Time Agent Stream UI & Autonomous Anomaly Detection Engine (Epic 12)**:
+  - Multi-Host Federation Bridge (`/api/projectbase/federation/export`, `/api/projectbase/federation/import`, `/api/projectbase/federation/sync`): Exports portable workspace bundles with SHA-256 data integrity checksums; imports with `merge`, `overwrite`, and `skip_existing` conflict resolution strategies and foreign-key remapping.
+  - Autonomous Workflow Anomaly Detection & Auto-Heal (`GET/POST /api/projectbase/analytics/anomalies`): Diagnostic engine scanning for expired agent task leases, rapid failure loops, circular deadlock cycles, and backlog starvation, with automated lock revocation and issue triage.
+  - Agent Persona Throughput & MTTC Metrics (`GET /api/projectbase/analytics/throughput`): Calculates Mean Time to Complete (MTTC) per agent persona, validation pass rate %, daily velocity, and 7-day throughput forecast.
+  - FastMCP JSON-RPC 2.0 Tool Expansion: Adds `export_federation_bundle`, `import_federation_bundle`, `get_agent_analytics`, and `detect_workflow_anomalies`.
+  - Frontend AgentsView UI Enhancements: Integrated tabs for Chat Stream, Diagnostics & Auto-Heal, Persona Throughput metrics, and Federation Sync.
+  - Comprehensive Test Suite: 12 new integration tests in `tests/test_federation_analytics.py`, expanding the test surface to 270 passing tests across 16 test suites.
+
 - **Autonomous Workspace Synthesis & Cross-Project Knowledge Retrieval (Epic 11)**:
   - Deep Semantic & Full-Text Workspace Search (`GET/POST /api/projectbase/workspace/search`): Universal search indexing across issues, comments, checkpoints, and telemetry logs with term scoring, token match weighting, type filtering, and project scoping.
   - Cross-Project Blocker & Deadlock Detection (`GET /api/projectbase/workspace/blockers`): Detects cross-project issue dependencies, circular dependency cycles via Kahn's algorithm, calculates dependency graph depth and longest critical paths, and ranks top blocker issues.

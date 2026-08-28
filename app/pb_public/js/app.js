@@ -277,18 +277,18 @@ const App = {
       this.authError = '';
       let email = (this.loginEmail || '').trim();
       let password = this.loginPassword || '';
-      if (!email || !password) {
-        try {
-          const emailInput = (e && e.target && (e.target.querySelector('input[type="email"]') || (e.target.elements && e.target.elements['email']))) || document.querySelector('input[type="email"]');
-          const passInput = (e && e.target && (e.target.querySelector('input[type="password"]') || (e.target.elements && e.target.elements['password']))) || document.querySelector('input[type="password"]');
-          if (emailInput && emailInput.value && !email) email = emailInput.value.trim();
-          if (passInput && passInput.value && !password) password = passInput.value;
-        } catch (domErr) {}
-      }
+      try {
+        const emailEl = document.getElementById('login-email') || document.querySelector('input[type="email"]');
+        const passEl = document.getElementById('login-password') || document.querySelector('input[type="password"]');
+        if (emailEl && emailEl.value && !email) email = emailEl.value.trim();
+        if (passEl && passEl.value && !password) password = passEl.value;
+      } catch (domErr) {}
       if (!email || !password) {
         this.authError = 'Please enter your email and password.';
         return;
       }
+      this.loginEmail = email;
+      this.loginPassword = password;
       try {
         try {
           await API.client.collection('users').authWithPassword(email, password);
@@ -300,13 +300,9 @@ const App = {
         this.loginPassword = '';
         await this.loadAllData();
         this.setupRealtime();
-        // Re-apply the URL hash after auth: a deep link opened before login
-        // (e.g. #/pb/portfolio shared with a collaborator) must land on that
-        // view, not fall back to the board. applyRoute() bailed on mount while
-        // unauthenticated, so the hash never got a chance to route.
         await this.applyRoute();
       } catch (err) {
-        this.authError = err?.response?.message || 'Unable to sign in with those credentials.';
+        this.authError = err?.response?.message || err?.message || 'Unable to sign in with those credentials.';
       }
     },
     async signUp() {

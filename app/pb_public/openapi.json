@@ -2486,6 +2486,135 @@
           }
         }
       }
+    },
+    "/projectbase/federation/export": {
+      "get": {
+        "tags": [
+          "Federation"
+        ],
+        "summary": "Export Federation Bundle",
+        "description": "Exports a portable project or workspace federation bundle with SHA-256 data integrity checksum.",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "Optional project filter (exports full workspace if omitted)"
+          }
+        ],
+        "responses": {
+          "200": { "description": "Federation bundle JSON payload" },
+          "401": { "description": "Authentication required" }
+        }
+      },
+      "post": {
+        "tags": [
+          "Federation"
+        ],
+        "summary": "Export Federation Bundle (POST)",
+        "description": "POST endpoint for exporting federation bundle with JSON configuration.",
+        "responses": {
+          "200": { "description": "Federation bundle JSON payload" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/federation/import": {
+      "post": {
+        "tags": [
+          "Federation"
+        ],
+        "summary": "Import Federation Bundle",
+        "description": "Imports a federation bundle with merge, overwrite, or skip_existing conflict strategy.",
+        "responses": {
+          "200": { "description": "Import result statistics" },
+          "400": { "description": "Invalid bundle payload" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/federation/sync": {
+      "post": {
+        "tags": [
+          "Federation"
+        ],
+        "summary": "Delta Federation Sync",
+        "description": "Two-way delta synchronization bridge exchanging modified issues and records since timestamp.",
+        "responses": {
+          "200": { "description": "Sync delta package" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/analytics/anomalies": {
+      "get": {
+        "tags": [
+          "Agent Analytics"
+        ],
+        "summary": "Detect Workflow Anomalies",
+        "description": "Scans workspace for stale agent leases, rapid failure loops, starved issues, circular locks, and auto-heals if requested.",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "Optional project filter"
+          },
+          {
+            "name": "auto_heal",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "boolean", "default": false },
+            "description": "Automatically repair anomalies and revoke dead leases"
+          }
+        ],
+        "responses": {
+          "200": { "description": "Anomaly diagnostic report" },
+          "401": { "description": "Authentication required" }
+        }
+      },
+      "post": {
+        "tags": [
+          "Agent Analytics"
+        ],
+        "summary": "Detect Workflow Anomalies (POST)",
+        "description": "POST endpoint for workflow anomaly detection and auto-healing.",
+        "responses": {
+          "200": { "description": "Anomaly diagnostic report" },
+          "401": { "description": "Authentication required" }
+        }
+      }
+    },
+    "/projectbase/analytics/throughput": {
+      "get": {
+        "tags": [
+          "Agent Analytics"
+        ],
+        "summary": "Agent Persona Throughput & MTTC",
+        "description": "Calculates Mean Time to Complete (MTTC) per agent persona, validation pass rate %, and throughput forecast.",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "Optional project filter"
+          },
+          {
+            "name": "time_window_hours",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 168 },
+            "description": "Time window in hours"
+          }
+        ],
+        "responses": {
+          "200": { "description": "Throughput and persona analytics" },
+          "401": { "description": "Authentication required" }
+        }
+      }
     }
   }
 }
