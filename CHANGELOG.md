@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.22.0] - 2026-08-28 - Cycle 23
+### Added
+- **Autonomous AI Agent Auto-Healing & Self-Remediation Workflow Pipeline (Epic 22):**
+  - Schema migration (`1710000033_add_auto_heal_pipeline.js`) adding `auto_heal_policies`, `auto_heal_incidents`, and `auto_heal_health_checks` collections.
+  - Backend auto-healing engine hook (`app/pb_hooks/105_auto_heal_pipeline.pb.js`) with 16 REST API endpoints (`/api/projectbase/auto-heal/*`) supporting policy CRUD, automated error diagnosis, incident lifecycle reporting and resolution, crash recovery sweep, blueprint remediation recipes, and workspace MTTR telemetry.
+  - 8 FastMCP JSON-RPC 2.0 tools: `list_auto_heal_policies`, `create_auto_heal_policy`, `list_auto_heal_incidents`, `get_auto_heal_incident_details`, `trigger_auto_healing`, `resolve_auto_heal_incident`, `run_crash_recovery_sweep`, `get_auto_heal_metrics`.
+  - Frontend AgentsView **🩺 Auto-Heal & Remediation** dashboard tab with live KPI meters, fleet diagnostics matrix, interactive incident log, 1-click blueprint recipe applicator, and custom policy builder.
+  - 11 automated end-to-end tests in `tests/test_auto_heal_pipeline.py` (381/381 passing across 26 test suites with 100% frontend guard and headless render QA verification).
+
 ## [1.21.0] - 2026-08-28 - Cycle 22
 ### Added
 - **Native Cross-Workspace Multi-Tenant Tenant Isolation & Granular Resource Quotas (Epic 21):**

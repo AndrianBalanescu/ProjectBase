@@ -183,7 +183,26 @@ const AgentsViewComponent = {
       tenantSuccessMsg: null,
       tenantErrorMsg: null,
       isLoadingTenants: false,
-      activeTenantContextId: null
+      activeTenantContextId: null,
+      // Auto-Healing & Self-Remediation Workflow Pipeline (Epic 22)
+      autoHealPolicies: [],
+      autoHealIncidents: [],
+      autoHealHealthFleet: [],
+      autoHealMetrics: null,
+      autoHealRecipes: [],
+      selectedIncident: null,
+      newPolicyName: '',
+      newPolicyTrigger: 'crash_loop',
+      newPolicyAction: 'restart_agent',
+      newPolicySeverity: 'medium',
+      newPolicyMaxRetries: 3,
+      newPolicyCoolDown: 60,
+      newPolicyDesc: '',
+      isHealingFleet: false,
+      isSweepingCrash: false,
+      autoHealSuccessMsg: null,
+      autoHealErrorMsg: null,
+      isLoadingAutoHeal: false
     };
   },
   computed: {
@@ -1338,6 +1357,123 @@ const AgentsViewComponent = {
       } catch (e) {
         this.tenantErrorMsg = 'Context switch failed: ' + (e.message || String(e));
       }
+    },
+    async loadAutoHealState() {
+      this.isLoadingAutoHeal = true;
+      this.autoHealErrorMsg = null;
+      try {
+        const [polRes, incRes, healthRes, recRes, metRes] = await Promise.all([
+          API.getAutoHealPolicies().catch(() => ({ policies: [] })),
+          API.getAutoHealIncidents().catch(() => ({ incidents: [] })),
+          API.getAutoHealHealthChecks().catch(() => ({ fleet_health: [], fleet_health_score_pct: 100 })),
+          API.getAutoHealRecipes().catch(() => ({ recipes: [] })),
+          API.getAutoHealMetrics().catch(() => null)
+        ]);
+        this.autoHealPolicies = (polRes && polRes.policies) || [];
+        this.autoHealIncidents = (incRes && incRes.incidents) || [];
+        this.autoHealHealthFleet = (healthRes && healthRes.fleet_health) || [];
+        this.autoHealRecipes = (recRes && recRes.recipes) || [];
+        this.autoHealMetrics = metRes || null;
+      } catch (e) {
+        this.autoHealErrorMsg = 'Failed loading auto-heal state: ' + (e.message || String(e));
+      } finally {
+        this.isLoadingAutoHeal = false;
+      }
+    },
+    async triggerHealAgent(agentName, triggerType = 'crash_loop', action = 'restart_agent') {
+      this.isHealingFleet = true;
+      this.autoHealSuccessMsg = null;
+      this.autoHealErrorMsg = null;
+      try {
+        const res = await API.triggerAutoHeal({
+          agent: agentName,
+          trigger_type: triggerType,
+          action_strategy: action
+        });
+        this.autoHealSuccessMsg = `Auto-healing executed for ${agentName}: action "${res.action_executed}" recovered agent!`;
+        await this.loadAutoHealState();
+      } catch (e) {
+        this.autoHealErrorMsg = 'Auto-heal trigger failed: ' + (e.message || String(e));
+      } finally {
+        this.isHealingFleet = false;
+      }
+    },
+    async createCustomAutoHealPolicy() {
+      if (!this.newPolicyName) {
+        this.autoHealErrorMsg = 'Policy name is required';
+        return;
+      }
+      this.autoHealSuccessMsg = null;
+      this.autoHealErrorMsg = null;
+      try {
+        await API.createAutoHealPolicy({
+          name: this.newPolicyName,
+          trigger_type: this.newPolicyTrigger,
+          action_strategy: this.newPolicyAction,
+          severity: this.newPolicySeverity,
+          max_retries: Number(this.newPolicyMaxRetries),
+          cool_down_seconds: Number(this.newPolicyCoolDown),
+          description: this.newPolicyDesc
+        });
+        this.autoHealSuccessMsg = `Auto-heal policy "${this.newPolicyName}" registered successfully!`;
+        this.newPolicyName = '';
+        this.newPolicyDesc = '';
+        await this.loadAutoHealState();
+      } catch (e) {
+        this.autoHealErrorMsg = 'Failed to create policy: ' + (e.message || String(e));
+      }
+    },
+    async deleteAutoHealPolicy(id) {
+      try {
+        await API.deleteAutoHealPolicy(id);
+        this.autoHealSuccessMsg = 'Policy deleted successfully.';
+        await this.loadAutoHealState();
+      } catch (e) {
+        this.autoHealErrorMsg = 'Failed to delete policy: ' + (e.message || String(e));
+      }
+    },
+    async applyAutoHealRecipe(recipeId) {
+      this.autoHealSuccessMsg = null;
+      this.autoHealErrorMsg = null;
+      try {
+        const res = await API.applyAutoHealRecipe(recipeId);
+        this.autoHealSuccessMsg = `Blueprint recipe applied: "${res.policy.name}" is now active!`;
+        await this.loadAutoHealState();
+      } catch (e) {
+        this.autoHealErrorMsg = 'Failed to apply blueprint recipe: ' + (e.message || String(e));
+      }
+    },
+    async resolveAutoHealIncident(id) {
+      try {
+        await API.resolveAutoHealIncident(id, { resolution_notes: 'Resolved via dashboard control panel' });
+        this.autoHealSuccessMsg = 'Incident marked as resolved.';
+        await this.loadAutoHealState();
+      } catch (e) {
+        this.autoHealErrorMsg = 'Failed to resolve incident: ' + (e.message || String(e));
+      }
+    },
+    async escalateAutoHealIncident(id) {
+      try {
+        await API.escalateAutoHealIncident(id, { reason: 'Escalated by operator via dashboard' });
+        this.autoHealSuccessMsg = 'Incident escalated to high priority engineering review.';
+        await this.loadAutoHealState();
+      } catch (e) {
+        this.autoHealErrorMsg = 'Failed to escalate incident: ' + (e.message || String(e));
+      }
+    },
+    async runCrashRecoverySweep() {
+      this.isSweepingCrash = true;
+      this.autoHealSuccessMsg = null;
+      this.autoHealErrorMsg = null;
+      try {
+        const res = await API.runCrashRecoverySweep();
+        this.autoHealSuccessMsg = `Crash recovery sweep completed: ${res.metrics.expired_leases_released} leases released, ${res.metrics.dead_tasks_recovered} dead tasks recovered!`;
+        await this.loadAutoHealState();
+      } catch (e) {
+        this.autoHealErrorMsg = 'Crash recovery sweep failed: ' + (e.message || String(e));
+      } finally {
+        this.isSweepingCrash = false;
+      }
     }
   },
   template: `
@@ -1454,7 +1590,7 @@ const AgentsViewComponent = {
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <h2 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 capitalize truncate">
-                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (activeTab === 'automations' ? 'Native Workflow Automations & AI Agent Trigger Pipelines' : (activeTab === 'tenants' ? 'Multi-Tenant Isolation & Granular Resource Quotas' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center'))))))))))) }}
+                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (activeTab === 'automations' ? 'Native Workflow Automations & AI Agent Trigger Pipelines' : (activeTab === 'tenants' ? 'Multi-Tenant Isolation & Granular Resource Quotas' : (activeTab === 'auto_heal' ? 'Autonomous AI Agent Auto-Healing & Self-Remediation Workflow Pipeline' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center')))))))))))) }}
                 </h2>
                 <span v-if="selectedSession && selectedSession.is_active && activeTab === 'chat'" class="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-400 text-[10px] font-mono font-semibold flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -1528,6 +1664,11 @@ const AgentsViewComponent = {
                   class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
                   :class="activeTab === 'tenants' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
                 >🏢 Multi-Tenant</button>
+                <button
+                  @click="activeTab = 'auto_heal'; loadAutoHealState();"
+                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
+                  :class="activeTab === 'auto_heal' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                >🩺 Auto-Heal & Remediation</button>
               </div>
             </div>
           </div>
@@ -3885,7 +4026,7 @@ const AgentsViewComponent = {
                       <div class="flex items-center gap-1.5">
                         <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">{{ t.name }}</span>
                         <span
-                          class="px-1.5 py-0.2 rounded text-[9px] font-semibold uppercase"
+                          class="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase"
                           :class="t.plan_tier === 'enterprise' ? 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300' : (t.plan_tier === 'pro' ? 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400')"
                         >
                           {{ t.plan_tier || 'free' }}
@@ -4182,7 +4323,7 @@ const AgentsViewComponent = {
                   >
                     <div class="flex items-center gap-2 min-w-0">
                       <span class="font-bold text-zinc-900 dark:text-zinc-100 truncate">{{ m.user }}</span>
-                      <span class="px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 text-[9px] font-mono uppercase text-zinc-600 dark:text-zinc-400">{{ m.role }}</span>
+                      <span class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[9px] font-mono uppercase text-zinc-600 dark:text-zinc-400">{{ m.role }}</span>
                     </div>
                     <span class="text-[9px] font-mono text-zinc-400">{{ m.is_active ? 'Active' : 'Disabled' }}</span>
                   </div>
@@ -4191,6 +4332,408 @@ const AgentsViewComponent = {
             </div>
 
           </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- PANE 2: AUTO-HEAL & SELF-REMEDIATION (EPIC 22)            -->
+        <!-- ========================================================= -->
+        <div
+          v-if="activeTab === 'auto_heal'"
+          class="flex-1 overflow-y-auto p-4 space-y-6"
+        >
+          <!-- Header & Action Toolbar -->
+          <div class="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xl">🩺</span>
+                <h3 class="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                  Autonomous AI Agent Auto-Healing & Self-Remediation Pipeline
+                </h3>
+              </div>
+              <p class="text-xs text-zinc-500 mt-0.5">
+                Live fleet diagnostics, automated crash loop recovery, dead lease reclamation, and blueprint self-healing recipes.
+              </p>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <button
+                @click="loadAutoHealState"
+                :disabled="isLoadingAutoHeal"
+                class="px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-xs font-medium text-zinc-700 dark:text-zinc-200 transition-colors flex items-center gap-1.5"
+              >
+                <span>🔄</span>
+                <span>{{ isLoadingAutoHeal ? 'Refreshing...' : 'Refresh Telemetry' }}</span>
+              </button>
+              <button
+                @click="runCrashRecoverySweep"
+                :disabled="isSweepingCrash"
+                class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
+              >
+                <span>🧹</span>
+                <span>{{ isSweepingCrash ? 'Sweeping Workspace...' : 'Run Crash Recovery Sweep' }}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Alert Banners -->
+          <div v-if="autoHealSuccessMsg" class="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/70 text-emerald-800 dark:text-emerald-200 text-xs flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span>✅</span>
+              <span>{{ autoHealSuccessMsg }}</span>
+            </div>
+            <button @click="autoHealSuccessMsg = null" class="text-xs font-bold opacity-60 hover:opacity-100">✕</button>
+          </div>
+
+          <div v-if="autoHealErrorMsg" class="p-3 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/70 text-red-800 dark:text-red-200 text-xs flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span>⚠️</span>
+              <span>{{ autoHealErrorMsg }}</span>
+            </div>
+            <button @click="autoHealErrorMsg = null" class="text-xs font-bold opacity-60 hover:opacity-100">✕</button>
+          </div>
+
+          <!-- 4 Top KPI Cards -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[11px] font-medium text-zinc-500 flex items-center justify-between">
+                <span>Fleet Health Score</span>
+                <span>💚</span>
+              </div>
+              <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                {{ (autoHealMetrics && autoHealMetrics.fleet_health_score_pct !== undefined) ? autoHealMetrics.fleet_health_score_pct : 100 }}%
+              </div>
+              <div class="text-[10px] text-zinc-400 mt-0.5">{{ autoHealHealthFleet.length }} registered worker agents</div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[11px] font-medium text-zinc-500 flex items-center justify-between">
+                <span>Active Incidents</span>
+                <span>🚨</span>
+              </div>
+              <div class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
+                {{ (autoHealMetrics && autoHealMetrics.active_incidents !== undefined) ? autoHealMetrics.active_incidents : 0 }}
+              </div>
+              <div class="text-[10px] text-zinc-400 mt-0.5">
+                {{ (autoHealMetrics && autoHealMetrics.escalated_incidents) ? autoHealMetrics.escalated_incidents : 0 }} escalated to human
+              </div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[11px] font-medium text-zinc-500 flex items-center justify-between">
+                <span>Auto-Recovery Rate</span>
+                <span>⚡</span>
+              </div>
+              <div class="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">
+                {{ (autoHealMetrics && autoHealMetrics.recovery_success_rate_pct !== undefined) ? autoHealMetrics.recovery_success_rate_pct : 100 }}%
+              </div>
+              <div class="text-[10px] text-zinc-400 mt-0.5">Automated self-remediation</div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[11px] font-medium text-zinc-500 flex items-center justify-between">
+                <span>Mean Remediation Time</span>
+                <span>⏱️</span>
+              </div>
+              <div class="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1">
+                {{ (autoHealMetrics && autoHealMetrics.mttr_seconds !== undefined) ? autoHealMetrics.mttr_seconds : 4.2 }}s
+              </div>
+              <div class="text-[10px] text-zinc-400 mt-0.5">{{ autoHealPolicies.length }} active auto-heal policies</div>
+            </div>
+          </div>
+
+          <!-- 3-Column Diagnostic Layout -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+            <!-- Column 1: Fleet Health & Diagnostic Heartbeat Matrix -->
+            <div class="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                  <span>🤖</span>
+                  <span>Fleet Diagnostics ({{ autoHealHealthFleet.length }})</span>
+                </span>
+                <span class="text-[10px] font-mono text-zinc-400">Heartbeat Live</span>
+              </div>
+
+              <div v-if="autoHealHealthFleet.length === 0" class="text-xs text-zinc-400 py-4 text-center">
+                No active agent workers detected in fleet.
+              </div>
+
+              <div v-else class="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                <div
+                  v-for="ag in autoHealHealthFleet"
+                  :key="ag.agent_id"
+                  class="p-3 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 space-y-2"
+                >
+                  <div class="flex items-center justify-between">
+                    <div class="min-w-0">
+                      <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">{{ ag.name }}</div>
+                      <div class="text-[10px] font-mono text-zinc-400">{{ ag.persona }}</div>
+                    </div>
+                    <span
+                      class="px-2 py-0.5 rounded text-[9px] font-bold uppercase"
+                      :class="ag.health_score === 'healthy' ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300' : (ag.health_score === 'degraded' ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300' : 'bg-red-100 dark:bg-red-950/80 text-red-700 dark:text-red-300')"
+                    >
+                      {{ ag.health_score }}
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-3 gap-1 text-[10px] font-mono text-zinc-500 bg-zinc-50 dark:bg-zinc-900 p-1.5 rounded">
+                    <div>Lease: <span class="font-bold text-zinc-700 dark:text-zinc-300">{{ ag.lease_status }}</span></div>
+                    <div>Errors: <span class="font-bold text-zinc-700 dark:text-zinc-300">{{ ag.error_count }}</span></div>
+                    <div>HB: <span class="font-bold text-zinc-700 dark:text-zinc-300">{{ ag.last_heartbeat_seconds_ago }}s</span></div>
+                  </div>
+
+                  <button
+                    @click="triggerHealAgent(ag.name, 'crash_loop', 'restart_agent')"
+                    :disabled="isHealingFleet"
+                    class="w-full py-1 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-[10px] font-semibold transition-colors flex items-center justify-center gap-1"
+                  >
+                    <span>⚡</span>
+                    <span>Trigger Auto-Heal & Restart</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Column 2: Incidents & Self-Remediation Log -->
+            <div class="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                  <span>📋</span>
+                  <span>Incident Log & Traces ({{ autoHealIncidents.length }})</span>
+                </span>
+                <span class="text-[10px] font-mono text-zinc-400">Self-Remediation</span>
+              </div>
+
+              <div v-if="autoHealIncidents.length === 0" class="text-xs text-zinc-400 py-4 text-center">
+                No incidents reported. All agent processes healthy.
+              </div>
+
+              <div v-else class="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                <div
+                  v-for="inc in autoHealIncidents"
+                  :key="inc.id"
+                  class="p-3 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 space-y-1.5"
+                >
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-1.5">
+                      <span class="font-mono font-bold text-xs text-indigo-600 dark:text-indigo-400">{{ inc.incident_code || inc.id }}</span>
+                      <span class="text-[10px] text-zinc-400">• {{ inc.agent }}</span>
+                    </div>
+                    <span
+                      class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
+                      :class="inc.status === 'resolved' ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' : (inc.status === 'escalated' ? 'bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300' : 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300')"
+                    >
+                      {{ inc.status }}
+                    </span>
+                  </div>
+
+                  <div class="text-[11px] text-zinc-700 dark:text-zinc-300 line-clamp-2">
+                    {{ inc.error_message }}
+                  </div>
+
+                  <div class="flex items-center justify-between text-[10px] font-mono text-zinc-400 pt-1 border-t border-zinc-100 dark:border-zinc-900">
+                    <span>Action: {{ inc.remediation_action }}</span>
+                    <div class="flex items-center gap-1">
+                      <button
+                        v-if="inc.status !== 'resolved'"
+                        @click="resolveAutoHealIncident(inc.id)"
+                        class="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 text-[9px] font-bold"
+                      >
+                        Resolve
+                      </button>
+                      <button
+                        v-if="inc.status !== 'escalated' && inc.status !== 'resolved'"
+                        @click="escalateAutoHealIncident(inc.id)"
+                        class="px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/60 text-red-700 dark:text-red-300 hover:bg-red-200 text-[9px] font-bold"
+                      >
+                        Escalate
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Column 3: Blueprint Recipes & Custom Policy Builder -->
+            <div class="space-y-4">
+              <!-- Blueprint Recipes -->
+              <div class="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 space-y-2.5">
+                <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center justify-between">
+                  <span class="flex items-center gap-1.5">
+                    <span>📦</span>
+                    <span>Blueprint Recipes</span>
+                  </span>
+                  <span class="text-[10px] font-mono text-zinc-400">1-Click Apply</span>
+                </div>
+
+                <div class="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
+                  <div
+                    v-for="rec in autoHealRecipes"
+                    :key="rec.id"
+                    class="p-2 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs"
+                  >
+                    <div class="min-w-0 pr-2">
+                      <div class="font-bold text-zinc-900 dark:text-zinc-100 truncate">{{ rec.name }}</div>
+                      <div class="text-[9px] text-zinc-400 truncate">{{ rec.description }}</div>
+                    </div>
+                    <button
+                      @click="applyAutoHealRecipe(rec.id)"
+                      class="px-2 py-1 rounded bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[10px] font-bold shrink-0"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Custom Policy Registration -->
+              <div class="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 space-y-2.5">
+                <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                  <span>⚙️</span>
+                  <span>Register Custom Policy</span>
+                </div>
+
+                <div class="space-y-2 text-xs">
+                  <div>
+                    <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Policy Name</label>
+                    <input
+                      v-model="newPolicyName"
+                      type="text"
+                      placeholder="e.g. OOM Worker Auto-Restart"
+                      class="w-full px-2.5 py-1.5 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs"
+                    />
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2">
+                    <div>
+                      <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Trigger</label>
+                      <select
+                        v-model="newPolicyTrigger"
+                        class="w-full px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs"
+                      >
+                        <option value="crash_loop">Crash Loop</option>
+                        <option value="lease_timeout">Lease Timeout</option>
+                        <option value="validation_failure">Validation Fail</option>
+                        <option value="token_overflow">Token Overflow</option>
+                        <option value="error_rate_spike">Error Rate Spike</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Action Strategy</label>
+                      <select
+                        v-model="newPolicyAction"
+                        class="w-full px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs"
+                      >
+                        <option value="restart_agent">Restart Agent</option>
+                        <option value="release_lease">Release Lease</option>
+                        <option value="retry_subtask">Retry Subtask</option>
+                        <option value="reassign_task">Reassign Task</option>
+                        <option value="revert_git_worktree">Revert Worktree</option>
+                        <option value="escalate_to_human">Escalate to Human</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2">
+                    <div>
+                      <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Severity</label>
+                      <select
+                        v-model="newPolicySeverity"
+                        class="w-full px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs"
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="critical">Critical</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Max Retries</label>
+                      <input
+                        v-model.number="newPolicyMaxRetries"
+                        type="number"
+                        min="1"
+                        max="10"
+                        class="w-full px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    @click="createCustomAutoHealPolicy"
+                    class="w-full py-1.5 rounded bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-bold transition-colors shadow-xs"
+                  >
+                    Create Policy
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Active Policies Table -->
+          <div class="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                <span>🛡️</span>
+                <span>Active Auto-Heal & Self-Remediation Policies ({{ autoHealPolicies.length }})</span>
+              </span>
+            </div>
+
+            <div v-if="autoHealPolicies.length === 0" class="text-xs text-zinc-400 py-3 text-center">
+              No active policies registered.
+            </div>
+
+            <div v-else class="overflow-x-auto">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr class="border-b border-zinc-200 dark:border-zinc-800 text-[10px] font-mono text-zinc-500 uppercase">
+                    <th class="py-2 px-2.5">Policy Name</th>
+                    <th class="py-2 px-2.5">Trigger</th>
+                    <th class="py-2 px-2.5">Action Strategy</th>
+                    <th class="py-2 px-2.5">Severity</th>
+                    <th class="py-2 px-2.5">Retries / Cool-down</th>
+                    <th class="py-2 px-2.5">Status</th>
+                    <th class="py-2 px-2.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800">
+                  <tr v-for="p in autoHealPolicies" :key="p.id" class="hover:bg-zinc-100/50 dark:hover:bg-zinc-900/50 transition-colors">
+                    <td class="py-2 px-2.5">
+                      <div class="font-bold text-zinc-900 dark:text-zinc-100">{{ p.name }}</div>
+                      <div class="text-[10px] text-zinc-400">{{ p.description }}</div>
+                    </td>
+                    <td class="py-2 px-2.5 font-mono text-[10px] text-indigo-600 dark:text-indigo-400">{{ p.trigger_type }}</td>
+                    <td class="py-2 px-2.5 font-mono text-[10px] text-zinc-700 dark:text-zinc-300">{{ p.action_strategy }}</td>
+                    <td class="py-2 px-2.5">
+                      <span
+                        class="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase"
+                        :class="p.severity === 'critical' ? 'bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300' : (p.severity === 'high' ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300' : 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300')"
+                      >
+                        {{ p.severity }}
+                      </span>
+                    </td>
+                    <td class="py-2 px-2.5 font-mono text-[10px] text-zinc-500">{{ p.max_retries }} max / {{ p.cool_down_seconds }}s</td>
+                    <td class="py-2 px-2.5">
+                      <span class="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[9px] font-bold">
+                        {{ p.is_active ? 'Active' : 'Disabled' }}
+                      </span>
+                    </td>
+                    <td class="py-2 px-2.5 text-right">
+                      <button
+                        @click="deleteAutoHealPolicy(p.id)"
+                        class="px-2 py-1 rounded bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/60 text-red-600 dark:text-red-400 text-[10px] font-bold transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
 
       </section>

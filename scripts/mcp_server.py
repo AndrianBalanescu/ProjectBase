@@ -859,5 +859,94 @@ def get_live_benchmarks(iterations: int = 10) -> Dict[str, Any]:
         "iterations": iterations
     })
 
+@mcp.tool()
+def list_auto_heal_policies(trigger_type: Optional[str] = None) -> Dict[str, Any]:
+    """List all autonomous AI agent auto-healing policies, triggers, and action strategies."""
+    params = {}
+    if trigger_type:
+        params["trigger_type"] = trigger_type
+    return _request("/api/projectbase/auto-heal/policies", method="GET", params=params)
+
+@mcp.tool()
+def create_auto_heal_policy(
+    name: str,
+    trigger_type: str,
+    action_strategy: str,
+    severity: str = "medium",
+    max_retries: int = 3,
+    cool_down_seconds: int = 60,
+    description: str = ""
+) -> Dict[str, Any]:
+    """Create or register a new agent auto-healing remediation policy."""
+    return _request("/api/projectbase/auto-heal/policies", method="POST", data={
+        "name": name,
+        "trigger_type": trigger_type,
+        "action_strategy": action_strategy,
+        "severity": severity,
+        "max_retries": max_retries,
+        "cool_down_seconds": cool_down_seconds,
+        "description": description
+    })
+
+@mcp.tool()
+def list_auto_heal_incidents(
+    status: Optional[str] = None,
+    severity: Optional[str] = None,
+    agent: Optional[str] = None
+) -> Dict[str, Any]:
+    """List auto-remediation incidents, failure traces, and resolution status."""
+    params = {}
+    if status:
+        params["status"] = status
+    if severity:
+        params["severity"] = severity
+    if agent:
+        params["agent"] = agent
+    return _request("/api/projectbase/auto-heal/incidents", method="GET", params=params)
+
+@mcp.tool()
+def get_auto_heal_incident_details(incident_id: str) -> Dict[str, Any]:
+    """Get detailed incident diagnostic trace, error log, and execution timeline."""
+    return _request(f"/api/projectbase/auto-heal/incidents/{incident_id}", method="GET")
+
+@mcp.tool()
+def trigger_auto_healing(
+    agent: str,
+    issue: str = "PB-100",
+    trigger_type: str = "crash_loop",
+    action_strategy: Optional[str] = None
+) -> Dict[str, Any]:
+    """Trigger dynamic auto-healing diagnosis and self-remediation for an agent or issue."""
+    data = {
+        "agent": agent,
+        "issue": issue,
+        "trigger_type": trigger_type
+    }
+    if action_strategy:
+        data["action_strategy"] = action_strategy
+    return _request("/api/projectbase/auto-heal/trigger", method="POST", data=data)
+
+@mcp.tool()
+def resolve_auto_heal_incident(
+    incident_id: str,
+    resolution_notes: str = "Manually verified and resolved via MCP",
+    resolved_by: str = "Admin"
+) -> Dict[str, Any]:
+    """Resolve an active auto-healing incident with resolution notes."""
+    return _request(f"/api/projectbase/auto-heal/incidents/{incident_id}/resolve", method="POST", data={
+        "resolution_notes": resolution_notes,
+        "resolved_by": resolved_by
+    })
+
+@mcp.tool()
+def run_crash_recovery_sweep() -> Dict[str, Any]:
+    """Run workspace-wide crash recovery sweep to clear dead leases, reset stuck tasks, and restore agent health."""
+    return _request("/api/projectbase/auto-heal/crash-recovery", method="POST")
+
+@mcp.tool()
+def get_auto_heal_metrics() -> Dict[str, Any]:
+    """Retrieve aggregated auto-healing KPIs, MTTR (Mean Time to Remediation), and recovery success rate."""
+    return _request("/api/projectbase/auto-heal/metrics", method="GET")
+
 if __name__ == "__main__":
     mcp.run()

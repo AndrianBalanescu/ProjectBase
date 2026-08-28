@@ -1409,5 +1409,159 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to delete tenant member');
     return data;
+  },
+
+  async getAutoHealPolicies(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/auto-heal/policies${query ? '?' + query : ''}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch auto-heal policies');
+    return data;
+  },
+
+  async createAutoHealPolicy(payload) {
+    const res = await fetch('/api/projectbase/auto-heal/policies', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create auto-heal policy');
+    return data;
+  },
+
+  async updateAutoHealPolicy(id, payload) {
+    const res = await fetch(`/api/projectbase/auto-heal/policies/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to update auto-heal policy');
+    return data;
+  },
+
+  async deleteAutoHealPolicy(id) {
+    const res = await fetch(`/api/projectbase/auto-heal/policies/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete auto-heal policy');
+    return data;
+  },
+
+  async getAutoHealIncidents(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/auto-heal/incidents${query ? '?' + query : ''}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch auto-heal incidents');
+    return data;
+  },
+
+  async reportAutoHealIncident(payload) {
+    const res = await fetch('/api/projectbase/auto-heal/incidents', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to report auto-heal incident');
+    return data;
+  },
+
+  async getAutoHealIncidentDetails(id) {
+    const res = await fetch(`/api/projectbase/auto-heal/incidents/${encodeURIComponent(id)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch incident details');
+    return data;
+  },
+
+  async resolveAutoHealIncident(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/auto-heal/incidents/${encodeURIComponent(id)}/resolve`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to resolve auto-heal incident');
+    return data;
+  },
+
+  async escalateAutoHealIncident(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/auto-heal/incidents/${encodeURIComponent(id)}/escalate`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to escalate auto-heal incident');
+    return data;
+  },
+
+  async getAutoHealHealthChecks() {
+    const res = await fetch('/api/projectbase/auto-heal/health-checks', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch health checks');
+    return data;
+  },
+
+  async triggerAutoHeal(payload) {
+    const res = await fetch('/api/projectbase/auto-heal/trigger', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to trigger auto-healing');
+    return data;
+  },
+
+  async runCrashRecoverySweep() {
+    const res = await fetch('/api/projectbase/auto-heal/crash-recovery', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to run crash recovery sweep');
+    return data;
+  },
+
+  async getAutoHealRecipes() {
+    const res = await fetch('/api/projectbase/auto-heal/recipes', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch auto-heal recipes');
+    return data;
+  },
+
+  async applyAutoHealRecipe(id) {
+    const res = await fetch(`/api/projectbase/auto-heal/recipes/${encodeURIComponent(id)}/apply`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to apply auto-heal recipe');
+    return data;
+  },
+
+  async getAutoHealMetrics() {
+    const res = await fetch('/api/projectbase/auto-heal/metrics', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch auto-heal metrics');
+    return data;
   }
 };

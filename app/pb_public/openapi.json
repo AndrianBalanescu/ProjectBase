@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "ProjectBase API",
-    "version": "1.0.0",
+    "version": "1.22.0",
     "description": "High-performance, ultra-lightweight Plane & Linear alternative for multi-project Kanban, sprint cycles, and autonomous AI agent orchestration.",
     "contact": {
       "name": "Andrian Balanescu",
@@ -826,7 +826,7 @@
                   "properties": {
                     "version": {
                       "type": "string",
-                      "example": "1.0.0"
+                      "example": "1.22.0"
                     },
                     "service": {
                       "type": "string",
@@ -2356,28 +2356,37 @@
             "name": "q",
             "in": "query",
             "required": true,
-            "schema": { "type": "string" },
+            "schema": {
+              "type": "string"
+            },
             "description": "Search query"
           },
           {
             "name": "project_id",
             "in": "query",
             "required": false,
-            "schema": { "type": "string" },
+            "schema": {
+              "type": "string"
+            },
             "description": "Filter by project"
           },
           {
             "name": "types",
             "in": "query",
             "required": false,
-            "schema": { "type": "string" },
+            "schema": {
+              "type": "string"
+            },
             "description": "Comma-separated list of types (issues, comments, telemetry, checkpoints)"
           },
           {
             "name": "limit",
             "in": "query",
             "required": false,
-            "schema": { "type": "integer", "default": 20 },
+            "schema": {
+              "type": "integer",
+              "default": 20
+            },
             "description": "Max results"
           }
         ],
@@ -2418,14 +2427,19 @@
             "name": "project_id",
             "in": "query",
             "required": false,
-            "schema": { "type": "string" },
+            "schema": {
+              "type": "string"
+            },
             "description": "Optional project filter"
           },
           {
             "name": "include_cross_project",
             "in": "query",
             "required": false,
-            "schema": { "type": "boolean", "default": true },
+            "schema": {
+              "type": "boolean",
+              "default": true
+            },
             "description": "Include cross-project dependencies"
           }
         ],
@@ -2451,14 +2465,18 @@
             "name": "cycle_id",
             "in": "query",
             "required": false,
-            "schema": { "type": "string" },
+            "schema": {
+              "type": "string"
+            },
             "description": "Cycle filter"
           },
           {
             "name": "project_id",
             "in": "query",
             "required": false,
-            "schema": { "type": "string" },
+            "schema": {
+              "type": "string"
+            },
             "description": "Project filter"
           }
         ],
@@ -2499,13 +2517,19 @@
             "name": "project_id",
             "in": "query",
             "required": false,
-            "schema": { "type": "string" },
+            "schema": {
+              "type": "string"
+            },
             "description": "Optional project filter (exports full workspace if omitted)"
           }
         ],
         "responses": {
-          "200": { "description": "Federation bundle JSON payload" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Federation bundle JSON payload"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       },
       "post": {
@@ -2515,8 +2539,12 @@
         "summary": "Export Federation Bundle (POST)",
         "description": "POST endpoint for exporting federation bundle with JSON configuration.",
         "responses": {
-          "200": { "description": "Federation bundle JSON payload" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Federation bundle JSON payload"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
@@ -2528,9 +2556,15 @@
         "summary": "Import Federation Bundle",
         "description": "Imports a federation bundle with merge, overwrite, or skip_existing conflict strategy.",
         "responses": {
-          "200": { "description": "Import result statistics" },
-          "400": { "description": "Invalid bundle payload" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Import result statistics"
+          },
+          "400": {
+            "description": "Invalid bundle payload"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
@@ -2542,8 +2576,12 @@
         "summary": "Delta Federation Sync",
         "description": "Two-way delta synchronization bridge exchanging modified issues and records since timestamp.",
         "responses": {
-          "200": { "description": "Sync delta package" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Sync delta package"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
@@ -2559,20 +2597,29 @@
             "name": "project_id",
             "in": "query",
             "required": false,
-            "schema": { "type": "string" },
+            "schema": {
+              "type": "string"
+            },
             "description": "Optional project filter"
           },
           {
             "name": "auto_heal",
             "in": "query",
             "required": false,
-            "schema": { "type": "boolean", "default": false },
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
             "description": "Automatically repair anomalies and revoke dead leases"
           }
         ],
         "responses": {
-          "200": { "description": "Anomaly diagnostic report" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Anomaly diagnostic report"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       },
       "post": {
@@ -2582,8 +2629,12 @@
         "summary": "Detect Workflow Anomalies (POST)",
         "description": "POST endpoint for workflow anomaly detection and auto-healing.",
         "responses": {
-          "200": { "description": "Anomaly diagnostic report" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Anomaly diagnostic report"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
@@ -2599,114 +2650,213 @@
             "name": "project_id",
             "in": "query",
             "required": false,
-            "schema": { "type": "string" },
+            "schema": {
+              "type": "string"
+            },
             "description": "Optional project filter"
           },
           {
             "name": "time_window_hours",
             "in": "query",
             "required": false,
-            "schema": { "type": "integer", "default": 168 },
+            "schema": {
+              "type": "integer",
+              "default": 168
+            },
             "description": "Time window in hours"
           }
         ],
         "responses": {
-          "200": { "description": "Throughput and persona analytics" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Throughput and persona analytics"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
     "/projectbase/git/artifacts": {
       "get": {
-        "tags": ["Git Workspace"],
+        "tags": [
+          "Git Workspace"
+        ],
         "summary": "Query Git Artifacts",
         "description": "Query linked branches, commits, pull requests, CI runs, and staged patches for an issue or project.",
         "parameters": [
-          { "name": "issue_id", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Issue ID or identifier (e.g. PB-12)" },
-          { "name": "project_id", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Project ID" },
-          { "name": "type", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Artifact type filter" }
+          {
+            "name": "issue_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Issue ID or identifier (e.g. PB-12)"
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Project ID"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Artifact type filter"
+          }
         ],
         "responses": {
-          "200": { "description": "List of git artifacts" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "List of git artifacts"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       },
       "post": {
-        "tags": ["Git Workspace"],
+        "tags": [
+          "Git Workspace"
+        ],
         "summary": "Link Git Artifact",
         "description": "Link a branch, commit, PR, or CI run to an issue and auto-update Kanban status.",
         "responses": {
-          "201": { "description": "Git artifact linked successfully" },
-          "401": { "description": "Authentication required" }
+          "201": {
+            "description": "Git artifact linked successfully"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
     "/projectbase/git/patch": {
       "post": {
-        "tags": ["Git Workspace"],
+        "tags": [
+          "Git Workspace"
+        ],
         "summary": "Stage Code Patch",
         "description": "Stage a unified diff or patch for peer review and automated agent verification.",
         "responses": {
-          "201": { "description": "Patch staged successfully" },
-          "401": { "description": "Authentication required" }
+          "201": {
+            "description": "Patch staged successfully"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
     "/projectbase/git/patch/{id}": {
       "get": {
-        "tags": ["Git Workspace"],
+        "tags": [
+          "Git Workspace"
+        ],
         "summary": "Get Staged Patch",
         "description": "Retrieve full patch content and unified diff statistics.",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Patch artifact ID or identifier" }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Patch artifact ID or identifier"
+          }
         ],
         "responses": {
-          "200": { "description": "Staged patch content" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Staged patch content"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
     "/projectbase/webhooks/git": {
       "post": {
-        "tags": ["Git Workspace"],
+        "tags": [
+          "Git Workspace"
+        ],
         "summary": "Universal Git Webhook Receiver",
         "description": "Handles GitHub/GitLab push, pull_request, and CI webhooks for automated issue triage.",
         "responses": {
-          "200": { "description": "Webhook processed and issues triaged" }
+          "200": {
+            "description": "Webhook processed and issues triaged"
+          }
         }
       }
     },
     "/projectbase/git/status": {
       "get": {
-        "tags": ["Git Workspace"],
+        "tags": [
+          "Git Workspace"
+        ],
         "summary": "Project Git Status & CI Metrics",
         "description": "Aggregated workspace/project git status, active branches, open/merged PRs, and CI pass rate.",
         "parameters": [
-          { "name": "project_id", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Optional project filter" }
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional project filter"
+          }
         ],
         "responses": {
-          "200": { "description": "Git status and CI reliability metrics" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Git status and CI reliability metrics"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
     "/projectbase/agents/workload": {
       "get": {
-        "tags": ["Agent Orchestration"],
+        "tags": [
+          "Agent Orchestration"
+        ],
         "summary": "Agent Workload & Queue Saturation",
         "description": "Get real-time agent queue saturation, persona queue depth, active task leases, capacity, and estimated clearance time.",
         "parameters": [
-          { "name": "project_id", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Optional project filter" }
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional project filter"
+          }
         ],
         "responses": {
-          "200": { "description": "Workload saturation metrics and persona queue depths" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Workload saturation metrics and persona queue depths"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
     "/projectbase/agents/autoscale": {
       "post": {
-        "tags": ["Agent Orchestration"],
+        "tags": [
+          "Agent Orchestration"
+        ],
         "summary": "Dynamic Agent Autoscaler Plan",
         "description": "Calculate optimal autonomous agent worker pool allocations per persona based on backlog pressure and queue depth.",
         "requestBody": {
@@ -2716,25 +2866,41 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "project_id": { "type": "string" },
-                  "min_workers": { "type": "integer" },
-                  "max_workers": { "type": "integer" },
-                  "target_saturation_pct": { "type": "integer" },
-                  "apply": { "type": "boolean" }
+                  "project_id": {
+                    "type": "string"
+                  },
+                  "min_workers": {
+                    "type": "integer"
+                  },
+                  "max_workers": {
+                    "type": "integer"
+                  },
+                  "target_saturation_pct": {
+                    "type": "integer"
+                  },
+                  "apply": {
+                    "type": "boolean"
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Autoscaling plan and persona allocations" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Autoscaling plan and persona allocations"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
     "/projectbase/agents/capacity/reserve": {
       "post": {
-        "tags": ["Agent Orchestration"],
+        "tags": [
+          "Agent Orchestration"
+        ],
         "summary": "Reserve Agent Concurrency Capacity",
         "description": "Reserve worker slot concurrency capacity with TTL expiration.",
         "requestBody": {
@@ -2743,27 +2909,46 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["persona", "worker_id"],
+                "required": [
+                  "persona",
+                  "worker_id"
+                ],
                 "properties": {
-                  "persona": { "type": "string" },
-                  "worker_id": { "type": "string" },
-                  "slots": { "type": "integer" },
-                  "ttl_seconds": { "type": "integer" },
-                  "project_id": { "type": "string" }
+                  "persona": {
+                    "type": "string"
+                  },
+                  "worker_id": {
+                    "type": "string"
+                  },
+                  "slots": {
+                    "type": "integer"
+                  },
+                  "ttl_seconds": {
+                    "type": "integer"
+                  },
+                  "project_id": {
+                    "type": "string"
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Capacity reservation created" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Capacity reservation created"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
     "/projectbase/agents/capacity/release": {
       "post": {
-        "tags": ["Agent Orchestration"],
+        "tags": [
+          "Agent Orchestration"
+        ],
         "summary": "Release Agent Concurrency Capacity",
         "description": "Release an active agent worker capacity reservation.",
         "requestBody": {
@@ -2773,23 +2958,35 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "reservation_id": { "type": "string" },
-                  "worker_id": { "type": "string" },
-                  "persona": { "type": "string" }
+                  "reservation_id": {
+                    "type": "string"
+                  },
+                  "worker_id": {
+                    "type": "string"
+                  },
+                  "persona": {
+                    "type": "string"
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Capacity reservation released" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Capacity reservation released"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
     "/projectbase/workflow/self-heal": {
       "post": {
-        "tags": ["Agent Orchestration"],
+        "tags": [
+          "Agent Orchestration"
+        ],
         "summary": "Autonomous Workflow Self-Healing",
         "description": "Autonomous self-healing scan to detect and auto-repair expired leases, orphaned DAG subtasks, and stalled statuses.",
         "requestBody": {
@@ -2799,33 +2996,49 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "project_id": { "type": "string" },
-                  "auto_fix": { "type": "boolean" },
-                  "trigger": { "type": "string" }
+                  "project_id": {
+                    "type": "string"
+                  },
+                  "auto_fix": {
+                    "type": "boolean"
+                  },
+                  "trigger": {
+                    "type": "string"
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Self-healing scan results and applied repairs" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Self-healing scan results and applied repairs"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
     "/projectbase/benchmarks/live": {
       "get": {
-        "tags": ["Telemetry & Diagnostics"],
+        "tags": [
+          "Telemetry & Diagnostics"
+        ],
         "summary": "Live Database Benchmarks Telemetry",
         "description": "Real-time query latency distribution (p50/p95), SQLite WAL status, and QPS estimation.",
         "responses": {
-          "200": { "description": "Live benchmark telemetry report" }
+          "200": {
+            "description": "Live benchmark telemetry report"
+          }
         }
       }
     },
     "/projectbase/benchmarks/run": {
       "post": {
-        "tags": ["Telemetry & Diagnostics"],
+        "tags": [
+          "Telemetry & Diagnostics"
+        ],
         "summary": "Execute Latency Benchmark Probes",
         "description": "Executes consecutive query latency probes and computes statistical distribution.",
         "requestBody": {
@@ -2835,20 +3048,26 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "iterations": { "type": "integer" }
+                  "iterations": {
+                    "type": "integer"
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Benchmark execution results" }
+          "200": {
+            "description": "Benchmark execution results"
+          }
         }
       }
     },
     "/projectbase/cluster/nodes/register": {
       "post": {
-        "tags": ["Cluster Replication"],
+        "tags": [
+          "Cluster Replication"
+        ],
         "summary": "Register Cluster Node",
         "description": "Register or update a cluster peer/edge node with role, endpoint, and capabilities.",
         "requestBody": {
@@ -2858,42 +3077,91 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "node_id": { "type": "string" },
-                  "node_name": { "type": "string" },
-                  "role": { "type": "string", "enum": ["primary", "replica", "edge", "witness"] },
-                  "endpoint_url": { "type": "string" },
-                  "region": { "type": "string" }
+                  "node_id": {
+                    "type": "string"
+                  },
+                  "node_name": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "primary",
+                      "replica",
+                      "edge",
+                      "witness"
+                    ]
+                  },
+                  "endpoint_url": {
+                    "type": "string"
+                  },
+                  "region": {
+                    "type": "string"
+                  }
                 },
-                "required": ["node_id", "endpoint_url"]
+                "required": [
+                  "node_id",
+                  "endpoint_url"
+                ]
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Node registered successfully" },
-          "400": { "description": "Missing required fields" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Node registered successfully"
+          },
+          "400": {
+            "description": "Missing required fields"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
     "/projectbase/cluster/nodes": {
       "get": {
-        "tags": ["Cluster Replication"],
+        "tags": [
+          "Cluster Replication"
+        ],
         "summary": "List Cluster Nodes",
         "description": "List registered cluster nodes with health, role, lag, and quorum status.",
         "parameters": [
-          { "name": "role", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Filter by node role" },
-          { "name": "status", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Filter by node status" }
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by node role"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by node status"
+          }
         ],
         "responses": {
-          "200": { "description": "List of cluster nodes" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "List of cluster nodes"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
     "/projectbase/cluster/nodes/heartbeat": {
       "post": {
-        "tags": ["Cluster Replication"],
+        "tags": [
+          "Cluster Replication"
+        ],
         "summary": "Node Heartbeat",
         "description": "Heartbeat and sync sequence reporting for peers/replicas.",
         "requestBody": {
@@ -2903,56 +3171,118 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "node_id": { "type": "string" },
-                  "applied_seq": { "type": "integer" },
-                  "lag_ms": { "type": "integer" },
-                  "status": { "type": "string" }
+                  "node_id": {
+                    "type": "string"
+                  },
+                  "applied_seq": {
+                    "type": "integer"
+                  },
+                  "lag_ms": {
+                    "type": "integer"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
                 },
-                "required": ["node_id"]
+                "required": [
+                  "node_id"
+                ]
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Heartbeat acknowledged" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Heartbeat acknowledged"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
     "/projectbase/cluster/nodes/{id}": {
       "delete": {
-        "tags": ["Cluster Replication"],
+        "tags": [
+          "Cluster Replication"
+        ],
         "summary": "Decommission Cluster Node",
         "description": "Deregister and decommission a cluster node.",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Node record ID or node_id" }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Node record ID or node_id"
+          }
         ],
         "responses": {
-          "200": { "description": "Cluster node decommissioned" },
-          "404": { "description": "Node not found" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Cluster node decommissioned"
+          },
+          "404": {
+            "description": "Node not found"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
     "/projectbase/cluster/sync/pull": {
       "get": {
-        "tags": ["Cluster Replication"],
+        "tags": [
+          "Cluster Replication"
+        ],
         "summary": "Pull Replication Deltas",
         "description": "Pull replication delta stream since a sequence ID or vector clock checkpoint.",
         "parameters": [
-          { "name": "since_seq", "in": "query", "required": false, "schema": { "type": "integer" }, "description": "Sequence number checkpoint" },
-          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer" }, "description": "Max deltas to return" },
-          { "name": "collection", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Target collection filter" }
+          {
+            "name": "since_seq",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Sequence number checkpoint"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Max deltas to return"
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Target collection filter"
+          }
         ],
         "responses": {
-          "200": { "description": "Delta stream payload" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Delta stream payload"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
     "/projectbase/cluster/sync/push": {
       "post": {
-        "tags": ["Cluster Replication"],
+        "tags": [
+          "Cluster Replication"
+        ],
         "summary": "Push Replication Deltas",
         "description": "Push delta stream with vector clock conflict resolution & split-brain fencing.",
         "requestBody": {
@@ -2962,25 +3292,45 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "origin_node_id": { "type": "string" },
-                  "deltas": { "type": "array", "items": { "type": "object" } },
-                  "fencing_token": { "type": "string" }
+                  "origin_node_id": {
+                    "type": "string"
+                  },
+                  "deltas": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "fencing_token": {
+                    "type": "string"
+                  }
                 },
-                "required": ["origin_node_id", "deltas"]
+                "required": [
+                  "origin_node_id",
+                  "deltas"
+                ]
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Deltas applied successfully" },
-          "409": { "description": "Fencing token violation (split-brain guard)" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Deltas applied successfully"
+          },
+          "409": {
+            "description": "Fencing token violation (split-brain guard)"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
     "/projectbase/cluster/sync/snapshot": {
       "post": {
-        "tags": ["Cluster Replication"],
+        "tags": [
+          "Cluster Replication"
+        ],
         "summary": "Create Point-in-Time Snapshot",
         "description": "Export point-in-time state snapshot bundle for cold-start edge initialization.",
         "requestBody": {
@@ -2990,33 +3340,52 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "target_node_id": { "type": "string" },
-                  "include_collections": { "type": "array", "items": { "type": "string" } }
+                  "target_node_id": {
+                    "type": "string"
+                  },
+                  "include_collections": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Snapshot bundle created" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Snapshot bundle created"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
     "/projectbase/cluster/failover/status": {
       "get": {
-        "tags": ["Cluster Replication"],
+        "tags": [
+          "Cluster Replication"
+        ],
         "summary": "High-Availability Failover Status",
         "description": "High-availability cluster health, quorum state, term epoch, and leader info.",
         "responses": {
-          "200": { "description": "Cluster failover status report" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Cluster failover status report"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
     "/projectbase/cluster/failover/promote": {
       "post": {
-        "tags": ["Cluster Replication"],
+        "tags": [
+          "Cluster Replication"
+        ],
         "summary": "Promote Primary Node",
         "description": "Promote replica to primary upon quorum election or manual switchover.",
         "requestBody": {
@@ -3026,25 +3395,41 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "candidate_node_id": { "type": "string" },
-                  "reason": { "type": "string" },
-                  "force": { "type": "boolean" }
+                  "candidate_node_id": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "force": {
+                    "type": "boolean"
+                  }
                 },
-                "required": ["candidate_node_id"]
+                "required": [
+                  "candidate_node_id"
+                ]
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Candidate promoted to primary" },
-          "412": { "description": "Quorum not met" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Candidate promoted to primary"
+          },
+          "412": {
+            "description": "Quorum not met"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
     "/projectbase/cluster/failover/fencing": {
       "post": {
-        "tags": ["Cluster Replication"],
+        "tags": [
+          "Cluster Replication"
+        ],
         "summary": "Verify Split-Brain Fencing Token",
         "description": "Split-brain fencing token validation & barrier verification.",
         "requestBody": {
@@ -3054,23 +3439,35 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "node_id": { "type": "string" },
-                  "fencing_token": { "type": "string" }
+                  "node_id": {
+                    "type": "string"
+                  },
+                  "fencing_token": {
+                    "type": "string"
+                  }
                 },
-                "required": ["fencing_token"]
+                "required": [
+                  "fencing_token"
+                ]
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Fencing token verification result" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Fencing token verification result"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
     "/projectbase/cluster/edge/reconcile": {
       "post": {
-        "tags": ["Cluster Replication"],
+        "tags": [
+          "Cluster Replication"
+        ],
         "summary": "Edge SQLite Two-Way Reconciliation",
         "description": "Two-way offline-first edge SQLite reconciliation & delta merge.",
         "requestBody": {
@@ -3080,24 +3477,41 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "edge_node_id": { "type": "string" },
-                  "client_vector_clock": { "type": "object" },
-                  "staged_changes": { "type": "array", "items": { "type": "object" } }
+                  "edge_node_id": {
+                    "type": "string"
+                  },
+                  "client_vector_clock": {
+                    "type": "object"
+                  },
+                  "staged_changes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  }
                 },
-                "required": ["edge_node_id"]
+                "required": [
+                  "edge_node_id"
+                ]
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Reconciliation outcome and updated vector clock" },
-          "401": { "description": "Authentication required" }
+          "200": {
+            "description": "Reconciliation outcome and updated vector clock"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
         }
       }
     },
     "/projectbase/webhooks/endpoints": {
       "post": {
-        "tags": ["Webhook Automation"],
+        "tags": [
+          "Webhook Automation"
+        ],
         "summary": "Register Outbound Webhook Endpoint",
         "description": "Register or update an outbound webhook endpoint with HMAC secret, target platform, and event filters.",
         "requestBody": {
@@ -3107,65 +3521,134 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "name": { "type": "string" },
-                  "url": { "type": "string" },
-                  "platform": { "type": "string", "enum": ["slack", "discord", "telegram", "agent", "custom"] },
-                  "events": { "type": "array", "items": { "type": "string" } },
-                  "secret": { "type": "string" },
-                  "active": { "type": "boolean" },
-                  "retry_policy": { "type": "object" },
-                  "headers": { "type": "object" },
-                  "template": { "type": "string" }
+                  "name": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "platform": {
+                    "type": "string",
+                    "enum": [
+                      "slack",
+                      "discord",
+                      "telegram",
+                      "agent",
+                      "custom"
+                    ]
+                  },
+                  "events": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "secret": {
+                    "type": "string"
+                  },
+                  "active": {
+                    "type": "boolean"
+                  },
+                  "retry_policy": {
+                    "type": "object"
+                  },
+                  "headers": {
+                    "type": "object"
+                  },
+                  "template": {
+                    "type": "string"
+                  }
                 },
-                "required": ["name", "url"]
+                "required": [
+                  "name",
+                  "url"
+                ]
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Webhook endpoint registered successfully" },
-          "400": { "description": "Missing required fields" },
-          "500": { "description": "Registration failed" }
+          "200": {
+            "description": "Webhook endpoint registered successfully"
+          },
+          "400": {
+            "description": "Missing required fields"
+          },
+          "500": {
+            "description": "Registration failed"
+          }
         }
       },
       "get": {
-        "tags": ["Webhook Automation"],
+        "tags": [
+          "Webhook Automation"
+        ],
         "summary": "List Webhook Endpoints",
         "description": "List all configured outbound webhook endpoints with delivery stats.",
         "responses": {
-          "200": { "description": "List of configured webhook endpoints" }
+          "200": {
+            "description": "List of configured webhook endpoints"
+          }
         }
       }
     },
     "/projectbase/webhooks/endpoints/{id}": {
       "get": {
-        "tags": ["Webhook Automation"],
+        "tags": [
+          "Webhook Automation"
+        ],
         "summary": "Get Webhook Endpoint",
         "description": "Retrieve specific webhook endpoint configuration.",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Webhook endpoint configuration" },
-          "404": { "description": "Endpoint not found" }
+          "200": {
+            "description": "Webhook endpoint configuration"
+          },
+          "404": {
+            "description": "Endpoint not found"
+          }
         }
       },
       "delete": {
-        "tags": ["Webhook Automation"],
+        "tags": [
+          "Webhook Automation"
+        ],
         "summary": "Delete Webhook Endpoint",
         "description": "Delete or decommission a webhook endpoint.",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Webhook endpoint deleted successfully" },
-          "404": { "description": "Endpoint not found" }
+          "200": {
+            "description": "Webhook endpoint deleted successfully"
+          },
+          "404": {
+            "description": "Endpoint not found"
+          }
         }
       }
     },
     "/projectbase/webhooks/dispatch": {
       "post": {
-        "tags": ["Webhook Automation"],
+        "tags": [
+          "Webhook Automation"
+        ],
         "summary": "Dispatch Webhook Event",
         "description": "Dispatch webhook event with declarative payload formatting and cryptographic HMAC-SHA256 signing.",
         "requestBody": {
@@ -3175,26 +3658,44 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "event": { "type": "string" },
-                  "payload": { "type": "object" },
-                  "target_endpoint_id": { "type": "string" },
-                  "simulate_network": { "type": "boolean" },
-                  "force_fail": { "type": "boolean" }
+                  "event": {
+                    "type": "string"
+                  },
+                  "payload": {
+                    "type": "object"
+                  },
+                  "target_endpoint_id": {
+                    "type": "string"
+                  },
+                  "simulate_network": {
+                    "type": "boolean"
+                  },
+                  "force_fail": {
+                    "type": "boolean"
+                  }
                 },
-                "required": ["event"]
+                "required": [
+                  "event"
+                ]
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Webhook dispatch outcome" },
-          "400": { "description": "Missing event parameter" }
+          "200": {
+            "description": "Webhook dispatch outcome"
+          },
+          "400": {
+            "description": "Missing event parameter"
+          }
         }
       }
     },
     "/projectbase/webhooks/verify": {
       "post": {
-        "tags": ["Webhook Automation"],
+        "tags": [
+          "Webhook Automation"
+        ],
         "summary": "Verify Webhook Signature & Replay Guard",
         "description": "Cryptographically verify HMAC-SHA256 signature and enforce 300s replay tolerance.",
         "requestBody": {
@@ -3204,52 +3705,108 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "secret": { "type": "string" },
-                  "payload": { "description": "Payload string or object" },
-                  "signature": { "type": "string" },
-                  "timestamp": { "type": "number" },
-                  "tolerance_seconds": { "type": "number" }
+                  "secret": {
+                    "type": "string"
+                  },
+                  "payload": {
+                    "description": "Payload string or object"
+                  },
+                  "signature": {
+                    "type": "string"
+                  },
+                  "timestamp": {
+                    "type": "number"
+                  },
+                  "tolerance_seconds": {
+                    "type": "number"
+                  }
                 },
-                "required": ["secret", "signature", "timestamp"]
+                "required": [
+                  "secret",
+                  "signature",
+                  "timestamp"
+                ]
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Cryptographic signature verified successfully" },
-          "401": { "description": "Signature mismatch or replay window expired" }
+          "200": {
+            "description": "Cryptographic signature verified successfully"
+          },
+          "401": {
+            "description": "Signature mismatch or replay window expired"
+          }
         }
       }
     },
     "/projectbase/webhooks/deliveries": {
       "get": {
-        "tags": ["Webhook Automation"],
+        "tags": [
+          "Webhook Automation"
+        ],
         "summary": "List Webhook Deliveries",
         "description": "Query historical webhook deliveries and audit log.",
         "parameters": [
-          { "name": "status", "in": "query", "required": false, "schema": { "type": "string" } },
-          { "name": "endpoint_id", "in": "query", "required": false, "schema": { "type": "string" } },
-          { "name": "event", "in": "query", "required": false, "schema": { "type": "string" } },
-          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer" } }
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "endpoint_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "event",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "List of delivery audit logs" }
+          "200": {
+            "description": "List of delivery audit logs"
+          }
         }
       }
     },
     "/projectbase/webhooks/dlq": {
       "get": {
-        "tags": ["Webhook Automation"],
+        "tags": [
+          "Webhook Automation"
+        ],
         "summary": "Inspect Dead-Letter Queue",
         "description": "Get failed webhook messages in the Dead-Letter Queue (DLQ) with retry metadata.",
         "responses": {
-          "200": { "description": "Dead-Letter Queue telemetry and item list" }
+          "200": {
+            "description": "Dead-Letter Queue telemetry and item list"
+          }
         }
       }
     },
     "/projectbase/webhooks/dlq/retry": {
       "post": {
-        "tags": ["Webhook Automation"],
+        "tags": [
+          "Webhook Automation"
+        ],
         "summary": "Retry DLQ Messages",
         "description": "Replay failed dead-letter queue messages.",
         "requestBody": {
@@ -3259,50 +3816,101 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "item_id": { "type": "string" }
+                  "item_id": {
+                    "type": "string"
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "DLQ replay results" }
+          "200": {
+            "description": "DLQ replay results"
+          }
         }
       }
     },
     "/projectbase/webhooks/dlq/{id}": {
       "delete": {
-        "tags": ["Webhook Automation"],
+        "tags": [
+          "Webhook Automation"
+        ],
         "summary": "Purge DLQ Message",
         "description": "Purge specific DLQ item or flush entire queue.",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "DLQ item purged" },
-          "404": { "description": "DLQ item not found" }
+          "200": {
+            "description": "DLQ item purged"
+          },
+          "404": {
+            "description": "DLQ item not found"
+          }
         }
       }
     },
     "/projectbase/webhooks/transforms/preview": {
       "get": {
-        "tags": ["Webhook Automation"],
+        "tags": [
+          "Webhook Automation"
+        ],
         "summary": "Preview Payload Transforms",
         "description": "Preview platform-specific payload formatting for Slack, Discord, Telegram, or Agent targets.",
         "parameters": [
-          { "name": "platform", "in": "query", "required": false, "schema": { "type": "string" } },
-          { "name": "event", "in": "query", "required": false, "schema": { "type": "string" } },
-          { "name": "title", "in": "query", "required": false, "schema": { "type": "string" } },
-          { "name": "description", "in": "query", "required": false, "schema": { "type": "string" } }
+          {
+            "name": "platform",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "event",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "title",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "description",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Formatted platform payload and preview signature" }
+          "200": {
+            "description": "Formatted platform payload and preview signature"
+          }
         }
       }
     },
     "/projectbase/sdk/generate": {
       "post": {
-        "tags": ["Agent SDK & Observability"],
+        "tags": [
+          "Agent SDK & Observability"
+        ],
         "summary": "Generate Typed Client SDK Code",
         "description": "Generate production-ready typed client SDK snippets (Python, TypeScript, JavaScript, cURL, Agent Tool Schema) for any REST endpoint or FastMCP tool.",
         "requestBody": {
@@ -3312,69 +3920,113 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "language": { "type": "string", "example": "python" },
-                  "target_endpoint": { "type": "string", "example": "/api/collections/issues/records" },
-                  "target_tool": { "type": "string", "example": "decompose_task_graph" },
-                  "auth_token": { "type": "string" },
-                  "base_url": { "type": "string" }
+                  "language": {
+                    "type": "string",
+                    "example": "python"
+                  },
+                  "target_endpoint": {
+                    "type": "string",
+                    "example": "/api/collections/issues/records"
+                  },
+                  "target_tool": {
+                    "type": "string",
+                    "example": "decompose_task_graph"
+                  },
+                  "auth_token": {
+                    "type": "string"
+                  },
+                  "base_url": {
+                    "type": "string"
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Generated SDK code snippet and metadata" },
-          "400": { "description": "Invalid generation parameters" }
+          "200": {
+            "description": "Generated SDK code snippet and metadata"
+          },
+          "400": {
+            "description": "Invalid generation parameters"
+          }
         }
       }
     },
     "/projectbase/sdk/languages": {
       "get": {
-        "tags": ["Agent SDK & Observability"],
+        "tags": [
+          "Agent SDK & Observability"
+        ],
         "summary": "List Supported SDK Languages",
         "description": "List supported client SDK generator languages, runtimes, and typing capabilities.",
         "responses": {
-          "200": { "description": "Supported languages catalog" }
+          "200": {
+            "description": "Supported languages catalog"
+          }
         }
       }
     },
     "/projectbase/sdk/templates/{lang}": {
       "get": {
-        "tags": ["Agent SDK & Observability"],
+        "tags": [
+          "Agent SDK & Observability"
+        ],
         "summary": "Get Client SDK Starter Template",
         "description": "Retrieve complete standalone client SDK code files for Python or TypeScript.",
         "parameters": [
-          { "name": "lang", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "lang",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Client SDK source template" },
-          "404": { "description": "Template not found" }
+          "200": {
+            "description": "Client SDK source template"
+          },
+          "404": {
+            "description": "Template not found"
+          }
         }
       }
     },
     "/projectbase/observability/metrics": {
       "get": {
-        "tags": ["Agent SDK & Observability"],
+        "tags": [
+          "Agent SDK & Observability"
+        ],
         "summary": "Get Real-time Webhook & API Telemetry",
         "description": "Query live webhook delivery health, p95 latency, throughput, error rates, and health status.",
         "responses": {
-          "200": { "description": "Observability metrics telemetry" }
+          "200": {
+            "description": "Observability metrics telemetry"
+          }
         }
       }
     },
     "/projectbase/observability/alerts": {
       "get": {
-        "tags": ["Agent SDK & Observability"],
+        "tags": [
+          "Agent SDK & Observability"
+        ],
         "summary": "List Observability Alert Rules & Breaches",
         "description": "List configured alert threshold rules and recent triggered breach events.",
         "responses": {
-          "200": { "description": "Alert configurations and events" }
+          "200": {
+            "description": "Alert configurations and events"
+          }
         }
       }
     },
     "/projectbase/observability/alerts/configure": {
       "post": {
-        "tags": ["Agent SDK & Observability"],
+        "tags": [
+          "Agent SDK & Observability"
+        ],
         "summary": "Configure Alert Threshold Rule",
         "description": "Create or update automated observability alert rules for error rate and p95 latency thresholds.",
         "requestBody": {
@@ -3384,69 +4036,111 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "name": { "type": "string" },
-                  "metric_name": { "type": "string" },
-                  "comparison_operator": { "type": "string" },
-                  "threshold_value": { "type": "number" },
-                  "alert_channel": { "type": "string" },
-                  "channel_type": { "type": "string" }
+                  "name": {
+                    "type": "string"
+                  },
+                  "metric_name": {
+                    "type": "string"
+                  },
+                  "comparison_operator": {
+                    "type": "string"
+                  },
+                  "threshold_value": {
+                    "type": "number"
+                  },
+                  "alert_channel": {
+                    "type": "string"
+                  },
+                  "channel_type": {
+                    "type": "string"
+                  }
                 },
-                "required": ["metric_name", "threshold_value"]
+                "required": [
+                  "metric_name",
+                  "threshold_value"
+                ]
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Alert rule configured" }
+          "200": {
+            "description": "Alert rule configured"
+          }
         }
       }
     },
     "/projectbase/observability/alerts/evaluate": {
       "post": {
-        "tags": ["Agent SDK & Observability"],
+        "tags": [
+          "Agent SDK & Observability"
+        ],
         "summary": "Evaluate Alert Rules Against Live Telemetry",
         "description": "Trigger real-time evaluation of all alert rules against live metrics and record breaches.",
         "responses": {
-          "200": { "description": "Evaluation results and triggered breaches" }
+          "200": {
+            "description": "Evaluation results and triggered breaches"
+          }
         }
       }
     },
     "/projectbase/observability/alerts/{id}": {
       "delete": {
-        "tags": ["Agent SDK & Observability"],
+        "tags": [
+          "Agent SDK & Observability"
+        ],
         "summary": "Delete Alert Threshold Rule",
         "description": "Delete or decommission an alert rule configuration.",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Alert rule deleted" }
+          "200": {
+            "description": "Alert rule deleted"
+          }
         }
       }
     },
     "/projectbase/docs/recipes": {
       "get": {
-        "tags": ["Agent SDK & Observability"],
+        "tags": [
+          "Agent SDK & Observability"
+        ],
         "summary": "Get Interactive Integration Recipes",
         "description": "Retrieve interactive agent integration recipes, step-by-step code snippets, and architecture walkthroughs.",
         "responses": {
-          "200": { "description": "Curated agent integration recipes" }
+          "200": {
+            "description": "Curated agent integration recipes"
+          }
         }
       }
     },
     "/projectbase/docs/spec": {
       "get": {
-        "tags": ["Agent SDK & Observability"],
+        "tags": [
+          "Agent SDK & Observability"
+        ],
         "summary": "Get Unified API & MCP Schema Specification",
         "description": "Query unified OpenAPI 3.0 REST specification and FastMCP JSON-RPC tools catalog.",
         "responses": {
-          "200": { "description": "Unified API specification" }
+          "200": {
+            "description": "Unified API specification"
+          }
         }
       }
     },
     "/projectbase/consensus/gates": {
       "post": {
-        "tags": ["Consensus & Peer Review Gates"],
+        "tags": [
+          "Consensus & Peer Review Gates"
+        ],
         "summary": "Create Peer-Review Consensus Gate",
         "description": "Create a multi-model peer-review consensus gate for an issue, PR, or release with configurable quorum and minimum confidence thresholds.",
         "requestBody": {
@@ -3456,67 +4150,144 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "issue_id": { "type": "string" },
-                  "target_type": { "type": "string" },
-                  "target_title": { "type": "string" },
-                  "scope": { "type": "string" },
-                  "quorum_size": { "type": "integer" },
-                  "min_confidence": { "type": "number" },
-                  "required_personas": { "type": "array", "items": { "type": "string" } },
-                  "auto_transition": { "type": "boolean" }
+                  "issue_id": {
+                    "type": "string"
+                  },
+                  "target_type": {
+                    "type": "string"
+                  },
+                  "target_title": {
+                    "type": "string"
+                  },
+                  "scope": {
+                    "type": "string"
+                  },
+                  "quorum_size": {
+                    "type": "integer"
+                  },
+                  "min_confidence": {
+                    "type": "number"
+                  },
+                  "required_personas": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "auto_transition": {
+                    "type": "boolean"
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "201": { "description": "Consensus gate created" }
+          "201": {
+            "description": "Consensus gate created"
+          }
         }
       },
       "get": {
-        "tags": ["Consensus & Peer Review Gates"],
+        "tags": [
+          "Consensus & Peer Review Gates"
+        ],
         "summary": "List Consensus Gates",
         "description": "List all active and resolved consensus gates with filtering and quorum tallies.",
         "parameters": [
-          { "name": "issue_id", "in": "query", "schema": { "type": "string" } },
-          { "name": "status", "in": "query", "schema": { "type": "string" } },
-          { "name": "target_type", "in": "query", "schema": { "type": "string" } },
-          { "name": "limit", "in": "query", "schema": { "type": "integer" } }
+          {
+            "name": "issue_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "target_type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "List of consensus gates" }
+          "200": {
+            "description": "List of consensus gates"
+          }
         }
       }
     },
     "/projectbase/consensus/gates/{id}": {
       "get": {
-        "tags": ["Consensus & Peer Review Gates"],
+        "tags": [
+          "Consensus & Peer Review Gates"
+        ],
         "summary": "Get Consensus Gate Details",
         "description": "Retrieve comprehensive consensus gate details, submitted signed ballots, and cryptographic signature status.",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Consensus gate details and ballots" },
-          "404": { "description": "Gate not found" }
+          "200": {
+            "description": "Consensus gate details and ballots"
+          },
+          "404": {
+            "description": "Gate not found"
+          }
         }
       },
       "delete": {
-        "tags": ["Consensus & Peer Review Gates"],
+        "tags": [
+          "Consensus & Peer Review Gates"
+        ],
         "summary": "Delete Consensus Gate",
         "description": "Delete or archive a consensus gate and its associated review ballots.",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Consensus gate deleted" },
-          "404": { "description": "Gate not found" }
+          "200": {
+            "description": "Consensus gate deleted"
+          },
+          "404": {
+            "description": "Gate not found"
+          }
         }
       }
     },
     "/projectbase/consensus/ballots/submit": {
       "post": {
-        "tags": ["Consensus & Peer Review Gates"],
+        "tags": [
+          "Consensus & Peer Review Gates"
+        ],
         "summary": "Submit Verifiable Peer-Review Ballot",
         "description": "Submit a cryptographically signed review ballot with vote (approve/reject/abstain), confidence score, and findings.",
         "requestBody": {
@@ -3526,28 +4297,60 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "gate_id": { "type": "string" },
-                  "model_name": { "type": "string" },
-                  "persona": { "type": "string" },
-                  "vote": { "type": "string", "enum": ["approve", "reject", "abstain"] },
-                  "confidence": { "type": "number" },
-                  "reasoning": { "type": "string" },
-                  "findings": { "type": "array", "items": { "type": "object" } },
-                  "signature": { "type": "string" }
+                  "gate_id": {
+                    "type": "string"
+                  },
+                  "model_name": {
+                    "type": "string"
+                  },
+                  "persona": {
+                    "type": "string"
+                  },
+                  "vote": {
+                    "type": "string",
+                    "enum": [
+                      "approve",
+                      "reject",
+                      "abstain"
+                    ]
+                  },
+                  "confidence": {
+                    "type": "number"
+                  },
+                  "reasoning": {
+                    "type": "string"
+                  },
+                  "findings": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "signature": {
+                    "type": "string"
+                  }
                 },
-                "required": ["gate_id", "model_name", "vote"]
+                "required": [
+                  "gate_id",
+                  "model_name",
+                  "vote"
+                ]
               }
             }
           }
         },
         "responses": {
-          "201": { "description": "Ballot submitted and verified" }
+          "201": {
+            "description": "Ballot submitted and verified"
+          }
         }
       }
     },
     "/projectbase/consensus/gates/evaluate": {
       "post": {
-        "tags": ["Consensus & Peer Review Gates"],
+        "tags": [
+          "Consensus & Peer Review Gates"
+        ],
         "summary": "Evaluate Gate Quorum & Verdict",
         "description": "Evaluate consensus gate against quorum thresholds, calculate consensus and divergence scores, and trigger issue transition if approved.",
         "requestBody": {
@@ -3557,21 +4360,29 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "gate_id": { "type": "string" }
+                  "gate_id": {
+                    "type": "string"
+                  }
                 },
-                "required": ["gate_id"]
+                "required": [
+                  "gate_id"
+                ]
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Gate evaluation results" }
+          "200": {
+            "description": "Gate evaluation results"
+          }
         }
       }
     },
     "/projectbase/consensus/debate/start": {
       "post": {
-        "tags": ["Consensus & Peer Review Gates"],
+        "tags": [
+          "Consensus & Peer Review Gates"
+        ],
         "summary": "Start Multi-Model Consensus Debate",
         "description": "Orchestrate automated multi-model consensus debate (Claude, GPT, DeepSeek, Llama) generating signed persona ballots and arbitrated verdict.",
         "requestBody": {
@@ -3580,42 +4391,64 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "gate_id": { "type": "string" },
-                  "issue_id": { "type": "string" },
-                  "topic": { "type": "string" },
-                  "scope": { "type": "string" },
-                  "quorum_size": { "type": "integer" }
+                  "gate_id": {
+                    "type": "string"
+                  },
+                  "issue_id": {
+                    "type": "string"
+                  },
+                  "topic": {
+                    "type": "string"
+                  },
+                  "scope": {
+                    "type": "string"
+                  },
+                  "quorum_size": {
+                    "type": "integer"
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Debate completed with evaluation" }
+          "200": {
+            "description": "Debate completed with evaluation"
+          }
         }
       }
     },
     "/projectbase/consensus/metrics": {
       "get": {
-        "tags": ["Consensus & Peer Review Gates"],
+        "tags": [
+          "Consensus & Peer Review Gates"
+        ],
         "summary": "Get Workspace Consensus Metrics",
         "description": "Query workspace-wide consensus metrics, approval rate %, average confidence, divergence index, and model participation telemetry.",
         "responses": {
-          "200": { "description": "Consensus analytics metrics" }
+          "200": {
+            "description": "Consensus analytics metrics"
+          }
         }
       }
     },
     "/projectbase/sso/providers": {
       "get": {
-        "tags": ["SSO & Identity Federation"],
+        "tags": [
+          "SSO & Identity Federation"
+        ],
         "summary": "List SSO Identity Providers",
         "description": "List configured enterprise SSO providers (Google, GitHub Enterprise, Okta, Keycloak).",
         "responses": {
-          "200": { "description": "List of SSO identity providers" }
+          "200": {
+            "description": "List of SSO identity providers"
+          }
         }
       },
       "post": {
-        "tags": ["SSO & Identity Federation"],
+        "tags": [
+          "SSO & Identity Federation"
+        ],
         "summary": "Register or Update SSO Provider",
         "description": "Register or configure enterprise SSO provider metadata, client credentials, and default role.",
         "requestBody": {
@@ -3625,49 +4458,84 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "provider_key": { "type": "string" },
-                  "name": { "type": "string" },
-                  "provider_type": { "type": "string" }
+                  "provider_key": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "provider_type": {
+                    "type": "string"
+                  }
                 },
-                "required": ["provider_key", "name"]
+                "required": [
+                  "provider_key",
+                  "name"
+                ]
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "SSO provider configured" }
+          "200": {
+            "description": "SSO provider configured"
+          }
         }
       }
     },
     "/projectbase/sso/providers/{id}": {
       "delete": {
-        "tags": ["SSO & Identity Federation"],
+        "tags": [
+          "SSO & Identity Federation"
+        ],
         "summary": "Delete SSO Provider",
         "description": "Delete an enterprise SSO provider configuration.",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "SSO provider deleted" }
+          "200": {
+            "description": "SSO provider deleted"
+          }
         }
       }
     },
     "/projectbase/sso/providers/{id}/discovery": {
       "get": {
-        "tags": ["SSO & Identity Federation"],
+        "tags": [
+          "SSO & Identity Federation"
+        ],
         "summary": "Get SSO Provider OIDC Discovery",
         "description": "Retrieve OIDC .well-known/openid-configuration metadata for an identity provider.",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "OIDC discovery document" }
+          "200": {
+            "description": "OIDC discovery document"
+          }
         }
       }
     },
     "/projectbase/sso/auth/exchange": {
       "post": {
-        "tags": ["SSO & Identity Federation"],
+        "tags": [
+          "SSO & Identity Federation"
+        ],
         "summary": "Exchange SSO Auth Token & JIT Provision",
         "description": "Exchange authorization token or code, verify provider identity, and perform Just-In-Time (JIT) user account creation.",
         "requestBody": {
@@ -3677,31 +4545,47 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "provider_key": { "type": "string" },
-                  "code": { "type": "string" },
-                  "email": { "type": "string" },
-                  "name": { "type": "string" }
+                  "provider_key": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Authentication result and session token" }
+          "200": {
+            "description": "Authentication result and session token"
+          }
         }
       }
     },
     "/projectbase/rbac/roles": {
       "get": {
-        "tags": ["Granular Workspace RBAC"],
+        "tags": [
+          "Granular Workspace RBAC"
+        ],
         "summary": "List RBAC Roles",
         "description": "List all workspace system roles (owner, admin, maintainer, member, agent, viewer, auditor) and custom roles.",
         "responses": {
-          "200": { "description": "List of RBAC roles" }
+          "200": {
+            "description": "List of RBAC roles"
+          }
         }
       },
       "post": {
-        "tags": ["Granular Workspace RBAC"],
+        "tags": [
+          "Granular Workspace RBAC"
+        ],
         "summary": "Create or Update Custom RBAC Role",
         "description": "Create a custom RBAC role with fine-grained capabilities mapping.",
         "requestBody": {
@@ -3711,47 +4595,80 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "role_key": { "type": "string" },
-                  "name": { "type": "string" },
-                  "description": { "type": "string" },
-                  "capabilities": { "type": "array", "items": { "type": "string" } }
+                  "role_key": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "capabilities": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
                 },
-                "required": ["role_key", "name"]
+                "required": [
+                  "role_key",
+                  "name"
+                ]
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Custom role created or updated" }
+          "200": {
+            "description": "Custom role created or updated"
+          }
         }
       }
     },
     "/projectbase/rbac/roles/{id}": {
       "delete": {
-        "tags": ["Granular Workspace RBAC"],
+        "tags": [
+          "Granular Workspace RBAC"
+        ],
         "summary": "Delete Custom RBAC Role",
         "description": "Delete a custom RBAC role (protected system roles cannot be deleted).",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Custom role deleted" }
+          "200": {
+            "description": "Custom role deleted"
+          }
         }
       }
     },
     "/projectbase/rbac/matrix": {
       "get": {
-        "tags": ["Granular Workspace RBAC"],
+        "tags": [
+          "Granular Workspace RBAC"
+        ],
         "summary": "Get 2D RBAC Permissions Matrix",
         "description": "Retrieve full 2D matrix of roles vs fine-grained capabilities.",
         "responses": {
-          "200": { "description": "2D permissions matrix" }
+          "200": {
+            "description": "2D permissions matrix"
+          }
         }
       }
     },
     "/projectbase/rbac/check": {
       "post": {
-        "tags": ["Granular Workspace RBAC"],
+        "tags": [
+          "Granular Workspace RBAC"
+        ],
         "summary": "Check Actor RBAC Permission",
         "description": "Evaluate fine-grained capability check for user or agent against requested permission.",
         "requestBody": {
@@ -3761,33 +4678,50 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "actor_id": { "type": "string" },
-                  "capability": { "type": "string" },
-                  "project_id": { "type": "string" }
+                  "actor_id": {
+                    "type": "string"
+                  },
+                  "capability": {
+                    "type": "string"
+                  },
+                  "project_id": {
+                    "type": "string"
+                  }
                 },
-                "required": ["actor_id", "capability"]
+                "required": [
+                  "actor_id",
+                  "capability"
+                ]
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Permission evaluation result (allowed: true/false)" }
+          "200": {
+            "description": "Permission evaluation result (allowed: true/false)"
+          }
         }
       }
     },
     "/projectbase/rbac/assignments": {
       "get": {
-        "tags": ["Granular Workspace RBAC"],
+        "tags": [
+          "Granular Workspace RBAC"
+        ],
         "summary": "List User & Agent Role Assignments",
         "description": "Query workspace and per-project role assignments.",
         "responses": {
-          "200": { "description": "List of role assignments" }
+          "200": {
+            "description": "List of role assignments"
+          }
         }
       }
     },
     "/projectbase/rbac/assign": {
       "post": {
-        "tags": ["Granular Workspace RBAC"],
+        "tags": [
+          "Granular Workspace RBAC"
+        ],
         "summary": "Assign Role to User or Agent",
         "description": "Assign or update RBAC role for user or agent in workspace or project.",
         "requestBody": {
@@ -3797,36 +4731,60 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "user_id": { "type": "string" },
-                  "role_key": { "type": "string" },
-                  "project_id": { "type": "string" }
+                  "user_id": {
+                    "type": "string"
+                  },
+                  "role_key": {
+                    "type": "string"
+                  },
+                  "project_id": {
+                    "type": "string"
+                  }
                 },
-                "required": ["user_id", "role_key"]
+                "required": [
+                  "user_id",
+                  "role_key"
+                ]
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Role assigned" }
+          "200": {
+            "description": "Role assigned"
+          }
         }
       }
     },
     "/projectbase/rbac/assignments/{id}": {
       "delete": {
-        "tags": ["Granular Workspace RBAC"],
+        "tags": [
+          "Granular Workspace RBAC"
+        ],
         "summary": "Revoke Role Assignment",
         "description": "Revoke a user or agent role assignment.",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Role assignment revoked" }
+          "200": {
+            "description": "Role assignment revoked"
+          }
         }
       }
     },
     "/projectbase/rbac/tokens/create": {
       "post": {
-        "tags": ["Granular Workspace RBAC"],
+        "tags": [
+          "Granular Workspace RBAC"
+        ],
         "summary": "Generate Scoped API Token",
         "description": "Generate a scoped API token with specific capability constraints and TTL.",
         "requestBody": {
@@ -3836,32 +4794,49 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "name": { "type": "string" },
-                  "user_or_agent_id": { "type": "string" },
-                  "scopes": { "type": "array", "items": { "type": "string" } }
+                  "name": {
+                    "type": "string"
+                  },
+                  "user_or_agent_id": {
+                    "type": "string"
+                  },
+                  "scopes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Scoped API token generated" }
+          "200": {
+            "description": "Scoped API token generated"
+          }
         }
       }
     },
     "/projectbase/rbac/tokens": {
       "get": {
-        "tags": ["Granular Workspace RBAC"],
+        "tags": [
+          "Granular Workspace RBAC"
+        ],
         "summary": "List Scoped API Tokens",
         "description": "List active scoped API tokens.",
         "responses": {
-          "200": { "description": "List of active tokens" }
+          "200": {
+            "description": "List of active tokens"
+          }
         }
       }
     },
     "/projectbase/rbac/tokens/revoke": {
       "post": {
-        "tags": ["Granular Workspace RBAC"],
+        "tags": [
+          "Granular Workspace RBAC"
+        ],
         "summary": "Revoke Scoped API Token",
         "description": "Revoke an active scoped API token.",
         "requestBody": {
@@ -3871,35 +4846,61 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "token_id": { "type": "string" }
+                  "token_id": {
+                    "type": "string"
+                  }
                 },
-                "required": ["token_id"]
+                "required": [
+                  "token_id"
+                ]
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Token revoked" }
+          "200": {
+            "description": "Token revoked"
+          }
         }
       }
     },
     "/projectbase/rbac/audit-logs": {
       "get": {
-        "tags": ["Granular Workspace RBAC"],
+        "tags": [
+          "Granular Workspace RBAC"
+        ],
         "summary": "Query Security Audit Logs",
         "description": "Query immutable security and access event audit trail.",
         "parameters": [
-          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer" } },
-          { "name": "event_type", "in": "query", "required": false, "schema": { "type": "string" } }
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "event_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Security audit logs" }
+          "200": {
+            "description": "Security audit logs"
+          }
         }
       }
     },
     "/projectbase/rbac/audit-logs/export": {
       "post": {
-        "tags": ["Granular Workspace RBAC"],
+        "tags": [
+          "Granular Workspace RBAC"
+        ],
         "summary": "Export Security Audit Logs",
         "description": "Export security audit log events in JSON or CSV format.",
         "requestBody": {
@@ -3908,33 +4909,68 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "format": { "type": "string", "enum": ["json", "csv"] }
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "json",
+                      "csv"
+                    ]
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Exported audit log data" }
+          "200": {
+            "description": "Exported audit log data"
+          }
         }
       }
     },
     "/projectbase/automations/rules": {
       "get": {
-        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "tags": [
+          "Workflow Automations & Trigger Pipelines"
+        ],
         "summary": "List Automation Rules",
         "description": "List configured event-driven workflow automation rules and active DAG pipelines.",
         "parameters": [
-          { "name": "project", "in": "query", "required": false, "schema": { "type": "string" } },
-          { "name": "event_type", "in": "query", "required": false, "schema": { "type": "string" } },
-          { "name": "is_active", "in": "query", "required": false, "schema": { "type": "boolean" } }
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "event_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "is_active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "List of workflow automation rules" }
+          "200": {
+            "description": "List of workflow automation rules"
+          }
         }
       },
       "post": {
-        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "tags": [
+          "Workflow Automations & Trigger Pipelines"
+        ],
         "summary": "Create or Update Automation Rule",
         "description": "Create or update an event-driven workflow automation rule with conditional DAG execution.",
         "requestBody": {
@@ -3944,125 +4980,235 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "name": { "type": "string" },
-                  "description": { "type": "string" },
-                  "event_type": { "type": "string" },
-                  "trigger_conditions": { "type": "object" },
-                  "action_pipeline": { "type": "array" }
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "event_type": {
+                    "type": "string"
+                  },
+                  "trigger_conditions": {
+                    "type": "object"
+                  },
+                  "action_pipeline": {
+                    "type": "array"
+                  }
                 },
-                "required": ["name", "event_type"]
+                "required": [
+                  "name",
+                  "event_type"
+                ]
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Automation rule created or updated" }
+          "200": {
+            "description": "Automation rule created or updated"
+          }
         }
       }
     },
     "/projectbase/automations/rules/{id}": {
       "delete": {
-        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "tags": [
+          "Workflow Automations & Trigger Pipelines"
+        ],
         "summary": "Delete Automation Rule",
         "description": "Decommission and delete an automation rule by ID.",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Automation rule deleted" }
+          "200": {
+            "description": "Automation rule deleted"
+          }
         }
       }
     },
     "/projectbase/automations/rules/{id}/toggle": {
       "post": {
-        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "tags": [
+          "Workflow Automations & Trigger Pipelines"
+        ],
         "summary": "Toggle Automation Rule Active State",
         "description": "Enable or disable a workflow automation rule.",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Toggled active state" }
+          "200": {
+            "description": "Toggled active state"
+          }
         }
       }
     },
     "/projectbase/automations/rules/{id}/test": {
       "post": {
-        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "tags": [
+          "Workflow Automations & Trigger Pipelines"
+        ],
         "summary": "Test Execute Automation Rule",
         "description": "Simulate and test rule execution against a test payload.",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": { "type": "object" }
+              "schema": {
+                "type": "object"
+              }
             }
           }
         },
         "responses": {
-          "200": { "description": "Test execution result and step breakdown" }
+          "200": {
+            "description": "Test execution result and step breakdown"
+          }
         }
       }
     },
     "/projectbase/automations/runs": {
       "get": {
-        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "tags": [
+          "Workflow Automations & Trigger Pipelines"
+        ],
         "summary": "List Workflow Execution Runs",
         "description": "List execution run history with duration, status, and entity filters.",
         "parameters": [
-          { "name": "rule_id", "in": "query", "required": false, "schema": { "type": "string" } },
-          { "name": "status", "in": "query", "required": false, "schema": { "type": "string" } },
-          { "name": "entity_id", "in": "query", "required": false, "schema": { "type": "string" } }
+          {
+            "name": "rule_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entity_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "List of workflow execution runs" }
+          "200": {
+            "description": "List of workflow execution runs"
+          }
         }
       }
     },
     "/projectbase/automations/runs/{id}": {
       "get": {
-        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "tags": [
+          "Workflow Automations & Trigger Pipelines"
+        ],
         "summary": "Get Workflow Run Details",
         "description": "Retrieve full execution trace and DAG step breakdown for a workflow run.",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Detailed workflow execution trace" }
+          "200": {
+            "description": "Detailed workflow execution trace"
+          }
         }
       }
     },
     "/projectbase/automations/runs/{id}/cancel": {
       "post": {
-        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "tags": [
+          "Workflow Automations & Trigger Pipelines"
+        ],
         "summary": "Cancel Workflow Run",
         "description": "Cancel an in-flight workflow execution run.",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Workflow run cancelled" }
+          "200": {
+            "description": "Workflow run cancelled"
+          }
         }
       }
     },
     "/projectbase/automations/runs/{id}/retry": {
       "post": {
-        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "tags": [
+          "Workflow Automations & Trigger Pipelines"
+        ],
         "summary": "Retry Workflow Run",
         "description": "Re-execute a failed or completed workflow execution run.",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Retried workflow run" }
+          "200": {
+            "description": "Retried workflow run"
+          }
         }
       }
     },
     "/projectbase/automations/trigger": {
       "post": {
-        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "tags": [
+          "Workflow Automations & Trigger Pipelines"
+        ],
         "summary": "Dispatch Event into Automation Engine",
         "description": "Manually fire an event trigger and execute all matching active pipelines.",
         "requestBody": {
@@ -4072,36 +5218,612 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "event_type": { "type": "string" },
-                  "payload": { "type": "object" }
+                  "event_type": {
+                    "type": "string"
+                  },
+                  "payload": {
+                    "type": "object"
+                  }
                 },
-                "required": ["event_type"]
+                "required": [
+                  "event_type"
+                ]
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Fired automation pipelines" }
+          "200": {
+            "description": "Fired automation pipelines"
+          }
         }
       }
     },
     "/projectbase/automations/metrics": {
       "get": {
-        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "tags": [
+          "Workflow Automations & Trigger Pipelines"
+        ],
         "summary": "Get Automation Engine Metrics",
         "description": "Retrieve real-time workflow automation metrics, success rate, and duration telemetry.",
         "responses": {
-          "200": { "description": "Automation engine metrics" }
+          "200": {
+            "description": "Automation engine metrics"
+          }
         }
       }
     },
     "/projectbase/automations/templates": {
       "get": {
-        "tags": ["Workflow Automations & Trigger Pipelines"],
+        "tags": [
+          "Workflow Automations & Trigger Pipelines"
+        ],
         "summary": "List Blueprint Automation Templates",
         "description": "Retrieve standard pre-configured starter workflow blueprints.",
         "responses": {
-          "200": { "description": "List of workflow blueprints" }
+          "200": {
+            "description": "List of workflow blueprints"
+          }
+        }
+      }
+    },
+    "/projectbase/tenants": {
+      "get": {
+        "tags": [
+          "Multi-Tenant Workspaces"
+        ],
+        "summary": "List all multi-tenant workspaces with usage and quota summary",
+        "responses": {
+          "200": {
+            "description": "List of tenants"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Multi-Tenant Workspaces"
+        ],
+        "summary": "Create a new isolated multi-tenant workspace",
+        "responses": {
+          "201": {
+            "description": "Tenant workspace created"
+          }
+        }
+      }
+    },
+    "/projectbase/tenants/metrics": {
+      "get": {
+        "tags": [
+          "Multi-Tenant Workspaces"
+        ],
+        "summary": "System-wide multi-tenant workspace analytics and utilization",
+        "responses": {
+          "200": {
+            "description": "Tenant metrics and health"
+          }
+        }
+      }
+    },
+    "/projectbase/tenants/{id}": {
+      "get": {
+        "tags": [
+          "Multi-Tenant Workspaces"
+        ],
+        "summary": "Get tenant workspace details",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tenant details"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Multi-Tenant Workspaces"
+        ],
+        "summary": "Update tenant workspace metadata and plan tier",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tenant updated"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Multi-Tenant Workspaces"
+        ],
+        "summary": "Delete tenant workspace",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tenant deleted"
+          }
+        }
+      }
+    },
+    "/projectbase/tenants/{id}/quotas": {
+      "get": {
+        "tags": [
+          "Multi-Tenant Workspaces"
+        ],
+        "summary": "Get tenant quota limits and enforcement policy",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tenant quotas"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Multi-Tenant Workspaces"
+        ],
+        "summary": "Update tenant resource quota limits",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tenant quotas updated"
+          }
+        }
+      }
+    },
+    "/projectbase/tenants/{id}/usage": {
+      "get": {
+        "tags": [
+          "Multi-Tenant Workspaces"
+        ],
+        "summary": "Get real-time resource consumption and quota utilization %",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tenant resource usage"
+          }
+        }
+      }
+    },
+    "/projectbase/tenants/{id}/check-quota": {
+      "post": {
+        "tags": [
+          "Multi-Tenant Workspaces"
+        ],
+        "summary": "Evaluate dynamic quota enforcement gate before creating resources",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quota evaluation result"
+          }
+        }
+      }
+    },
+    "/projectbase/tenants/{id}/switch": {
+      "post": {
+        "tags": [
+          "Multi-Tenant Workspaces"
+        ],
+        "summary": "Switch active tenant workspace session context",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tenant context switched"
+          }
+        }
+      }
+    },
+    "/projectbase/tenants/{id}/members": {
+      "get": {
+        "tags": [
+          "Multi-Tenant Workspaces"
+        ],
+        "summary": "List tenant workspace members and assigned agents",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tenant members list"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Multi-Tenant Workspaces"
+        ],
+        "summary": "Add or assign member/agent to tenant workspace",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Member assigned to tenant"
+          }
+        }
+      }
+    },
+    "/projectbase/tenants/{id}/members/{userId}": {
+      "delete": {
+        "tags": [
+          "Multi-Tenant Workspaces"
+        ],
+        "summary": "Remove member or agent from tenant workspace",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Member removed"
+          }
+        }
+      }
+    },
+    "/projectbase/auto-heal/policies": {
+      "get": {
+        "tags": [
+          "Agent Auto-Healing & Self-Remediation"
+        ],
+        "summary": "List all active auto-heal policies, triggers, and action strategies",
+        "responses": {
+          "200": {
+            "description": "List of auto-heal policies"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Agent Auto-Healing & Self-Remediation"
+        ],
+        "summary": "Create a new agent auto-healing remediation policy",
+        "responses": {
+          "201": {
+            "description": "Auto-heal policy created"
+          }
+        }
+      }
+    },
+    "/projectbase/auto-heal/policies/{id}": {
+      "get": {
+        "tags": [
+          "Agent Auto-Healing & Self-Remediation"
+        ],
+        "summary": "Get auto-heal policy configuration details",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Policy details"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Agent Auto-Healing & Self-Remediation"
+        ],
+        "summary": "Update auto-heal policy configuration",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Policy updated"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Agent Auto-Healing & Self-Remediation"
+        ],
+        "summary": "Delete auto-heal policy",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Policy deleted"
+          }
+        }
+      }
+    },
+    "/projectbase/auto-heal/incidents": {
+      "get": {
+        "tags": [
+          "Agent Auto-Healing & Self-Remediation"
+        ],
+        "summary": "List auto-remediation incidents and execution traces",
+        "responses": {
+          "200": {
+            "description": "List of incidents"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Agent Auto-Healing & Self-Remediation"
+        ],
+        "summary": "Report or trigger a new auto-healing incident",
+        "responses": {
+          "201": {
+            "description": "Incident logged and auto-remediated"
+          }
+        }
+      }
+    },
+    "/projectbase/auto-heal/incidents/{id}": {
+      "get": {
+        "tags": [
+          "Agent Auto-Healing & Self-Remediation"
+        ],
+        "summary": "Get incident diagnostic trace, error log, and execution timeline",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Incident details"
+          }
+        }
+      }
+    },
+    "/projectbase/auto-heal/incidents/{id}/resolve": {
+      "post": {
+        "tags": [
+          "Agent Auto-Healing & Self-Remediation"
+        ],
+        "summary": "Resolve active auto-healing incident with outcome notes",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Incident resolved"
+          }
+        }
+      }
+    },
+    "/projectbase/auto-heal/incidents/{id}/escalate": {
+      "post": {
+        "tags": [
+          "Agent Auto-Healing & Self-Remediation"
+        ],
+        "summary": "Escalate incident to human engineering / high priority",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Incident escalated"
+          }
+        }
+      }
+    },
+    "/projectbase/auto-heal/health-checks": {
+      "get": {
+        "tags": [
+          "Agent Auto-Healing & Self-Remediation"
+        ],
+        "summary": "Live agent fleet diagnostics matrix, crash rates, and health scores",
+        "responses": {
+          "200": {
+            "description": "Fleet diagnostics matrix"
+          }
+        }
+      }
+    },
+    "/projectbase/auto-heal/trigger": {
+      "post": {
+        "tags": [
+          "Agent Auto-Healing & Self-Remediation"
+        ],
+        "summary": "Evaluate triggers and execute self-healing remediation pipeline",
+        "responses": {
+          "200": {
+            "description": "Remediation executed"
+          }
+        }
+      }
+    },
+    "/projectbase/auto-heal/crash-recovery": {
+      "post": {
+        "tags": [
+          "Agent Auto-Healing & Self-Remediation"
+        ],
+        "summary": "Workspace-wide crash recovery sweep to clear dead leases and restore health",
+        "responses": {
+          "200": {
+            "description": "Recovery sweep summary"
+          }
+        }
+      }
+    },
+    "/projectbase/auto-heal/recipes": {
+      "get": {
+        "tags": [
+          "Agent Auto-Healing & Self-Remediation"
+        ],
+        "summary": "List blueprint auto-healing remediation recipes",
+        "responses": {
+          "200": {
+            "description": "List of blueprint recipes"
+          }
+        }
+      }
+    },
+    "/projectbase/auto-heal/recipes/{id}/apply": {
+      "post": {
+        "tags": [
+          "Agent Auto-Healing & Self-Remediation"
+        ],
+        "summary": "Apply blueprint recipe as active policy",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Recipe applied as policy"
+          }
+        }
+      }
+    },
+    "/projectbase/auto-heal/metrics": {
+      "get": {
+        "tags": [
+          "Agent Auto-Healing & Self-Remediation"
+        ],
+        "summary": "Aggregated auto-healing KPIs, MTTR, and recovery success rate",
+        "responses": {
+          "200": {
+            "description": "Auto-healing telemetry metrics"
+          }
         }
       }
     }
