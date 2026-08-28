@@ -19,4 +19,4 @@
 - [x] Session-native ingestion daemon & `agent_sessions` collection (Milestone 1)
 - [x] Dual-plane workspace UI: Intent View vs Live Runs Stream (Milestone 2)
 - [x] Visual in-browser Git Diff & Sceptic Audit Inspector (Milestone 3)
-- [ ] One-click session forking & re-tasking (Milestone 4)
+- [x] One-click session branching, DAG continuation & Human Intervention Gate (Milestone 4)

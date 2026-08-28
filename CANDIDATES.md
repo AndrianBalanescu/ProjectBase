@@ -209,8 +209,10 @@
 
 ---
 
-## Next Milestone (Cycle 27)
-**Epic 25 – One-Click Session Branching, Re-Tasking & Human Intervention Gate**
-- Interactive session forking and continuation DAGs
-- Human-in-the-loop pause/inject instructions into live agent context
-- Multi-engine swarm choreography and worktree conflict arbitration
+## Milestone (Cycle 27)
+**Epic 25 – One-Click Session Branching, Re-Tasking & Human Intervention Gate (✅ Done)**
+- [x] Schema migration (`1710000037_add_session_branching_and_intervention.js`) extending `agent_sessions` and introducing `session_interventions` collection
+- [x] Backend session branching and intervention hook (`app/pb_hooks/109_session_branching_intervention_engine.pb.js`) with 11 endpoints for branching, DAG trees, pause/resume, prompt steering injection, gate decisions, conflict arbitration, and swarm fan-out
+- [x] 8 FastMCP JSON-RPC 2.0 tools for session branching, steering injection, gate management, and conflict arbitration
+- [x] Frontend AgentsView **🌿 DAG Lineage** tree visualizer, **💬 Interventions & Control** console with live steering prompt injection, pause/resume controls, 1-click Human Gate approval buttons, and **🔀 1-Click Branch Modal**
+- [x] 418/418 automated tests passing across 30 test suites with 100% frontend guard, CSS sync, and full headless browser E2E verification

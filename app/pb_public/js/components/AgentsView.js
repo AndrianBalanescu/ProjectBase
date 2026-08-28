@@ -233,7 +233,24 @@ const AgentsViewComponent = {
       simulatedTestFramework: 'pytest',
       simulatedTestPassed: 401,
       simulatedTestFailed: 0,
-      simulatedAuditVerdict: 'PASS'
+      simulatedAuditVerdict: 'PASS',
+      // One-Click Session Branching, Re-Tasking & Human Intervention Gate (Milestone 4 / Epic 25)
+      branchModalOpen: false,
+      branchTargetSession: null,
+      branchNameInput: '',
+      branchTypeInput: 'fork',
+      branchPromptInput: '',
+      branchModelInput: '',
+      isBranchingSession: false,
+      interventionInstructionInput: '',
+      interventionPriorityInput: 'high',
+      isInjectingInstruction: false,
+      sessionDagData: null,
+      sessionInterventionsList: [],
+      allSessionConflicts: [],
+      isLoadingDag: false,
+      swarmModalOpen: false,
+      isDispatchingSwarm: false
     };
   },
   computed: {
@@ -1597,7 +1614,140 @@ const AgentsViewComponent = {
     async selectSessionRun(run) {
       this.selectedSessionRun = run;
       if (run) {
-        await this.loadSessionObservability(run.id || run.session_id);
+        const sid = run.id || run.session_id;
+        await Promise.all([
+          this.loadSessionObservability(sid),
+          this.loadSessionDag(sid),
+          this.loadSessionInterventions(sid)
+        ]);
+      }
+    },
+    async loadSessionDag(id) {
+      if (!id) return;
+      this.isLoadingDag = true;
+      try {
+        const res = await API.getSessionDag(id);
+        this.sessionDagData = res;
+      } catch (e) {
+        console.error('Failed to load session DAG:', e);
+      } finally {
+        this.isLoadingDag = false;
+      }
+    },
+    async loadSessionInterventions(id) {
+      if (!id) return;
+      try {
+        const res = await API.getSessionInterventions(id);
+        this.sessionInterventionsList = (res && res.interventions) || [];
+      } catch (e) {
+        console.error('Failed to load session interventions:', e);
+      }
+    },
+    openBranchModal(session) {
+      if (!session) return;
+      this.branchTargetSession = session;
+      this.branchNameInput = 'branch-' + Math.random().toString(36).substring(2, 7);
+      this.branchTypeInput = 'fork';
+      this.branchPromptInput = session.command || '';
+      this.branchModelInput = session.model || 'gpt-5.5';
+      this.branchModalOpen = true;
+    },
+    async handleCreateBranch() {
+      if (!this.branchTargetSession) return;
+      this.isBranchingSession = true;
+      try {
+        const sid = this.branchTargetSession.id || this.branchTargetSession.session_id;
+        const res = await API.branchAgentSession(sid, {
+          branch_name: this.branchNameInput,
+          branch_type: this.branchTypeInput,
+          prompt: this.branchPromptInput,
+          model: this.branchModelInput
+        });
+        this.sessionSuccessMsg = `Branch created: ${res.branch_name} (${res.branch_type})`;
+        this.branchModalOpen = false;
+        await this.loadAgentSessions();
+        if (res.id) {
+          const newRun = (this.sessions || []).find(s => s.id === res.id || s.session_id === res.session_id);
+          if (newRun) await this.selectSessionRun(newRun);
+        }
+      } catch (e) {
+        this.sessionErrorMsg = 'Failed to branch session: ' + (e.message || String(e));
+      } finally {
+        this.isBranchingSession = false;
+      }
+    },
+    async handleTogglePauseSession(session) {
+      if (!session) return;
+      const sid = session.id || session.session_id;
+      try {
+        if (session.is_paused) {
+          await API.resumeAgentSession(sid);
+          session.is_paused = false;
+          this.sessionSuccessMsg = 'Session execution resumed';
+        } else {
+          await API.pauseAgentSession(sid, 'Manual operator pause');
+          session.is_paused = true;
+          this.sessionSuccessMsg = 'Session execution paused';
+        }
+        await this.loadAgentSessions();
+        await this.loadSessionInterventions(sid);
+      } catch (e) {
+        this.sessionErrorMsg = 'Failed to toggle pause: ' + (e.message || String(e));
+      }
+    },
+    async handleInjectInstruction(session) {
+      if (!session || !this.interventionInstructionInput.trim()) return;
+      this.isInjectingInstruction = true;
+      const sid = session.id || session.session_id;
+      try {
+        await API.injectSessionInstruction(sid, {
+          instruction: this.interventionInstructionInput.trim(),
+          priority: this.interventionPriorityInput
+        });
+        this.sessionSuccessMsg = 'Instruction successfully injected into live context';
+        this.interventionInstructionInput = '';
+        await this.loadSessionInterventions(sid);
+        await this.loadAgentSessions();
+      } catch (e) {
+        this.sessionErrorMsg = 'Failed to inject instruction: ' + (e.message || String(e));
+      } finally {
+        this.isInjectingInstruction = false;
+      }
+    },
+    async handleSetGate(session, action, comment = '') {
+      if (!session) return;
+      const sid = session.id || session.session_id;
+      try {
+        const res = await API.setSessionInterventionGate(sid, { action, comment });
+        this.sessionSuccessMsg = `Gate updated: ${res.intervention_gate}`;
+        session.intervention_gate = res.intervention_gate;
+        session.status = res.status;
+        await this.loadAgentSessions();
+        await this.loadSessionInterventions(sid);
+        await this.loadSessionDag(sid);
+      } catch (e) {
+        this.sessionErrorMsg = 'Failed to set gate: ' + (e.message || String(e));
+      }
+    },
+    async handleArbitrateConflicts(session, resolve = false) {
+      if (!session) return;
+      const sid = session.id || session.session_id;
+      try {
+        const res = await API.arbitrateSessionConflicts(sid, { resolve });
+        this.sessionSuccessMsg = res.message;
+        session.conflict_status = res.conflict_status;
+        await this.loadAgentSessions();
+        await this.loadSessionInterventions(sid);
+      } catch (e) {
+        this.sessionErrorMsg = 'Arbitration failed: ' + (e.message || String(e));
+      }
+    },
+    async checkWorkspaceConflicts() {
+      try {
+        const res = await API.getSessionConflicts(this.currentProject ? this.currentProject.id : '');
+        this.allSessionConflicts = (res && res.conflicts) || [];
+      } catch (e) {
+        console.error('Failed checking conflicts:', e);
       }
     },
     async loadSessionObservability(id) {
@@ -5198,10 +5348,28 @@ const AgentsViewComponent = {
 
               <div v-else class="space-y-3 flex-1 flex flex-col overflow-y-auto">
                 <!-- Observability Sub-tabs -->
-                <div class="flex items-center gap-1 border-b border-zinc-200 dark:border-zinc-800 pb-1 text-xs">
+                <div class="flex items-center gap-1 border-b border-zinc-200 dark:border-zinc-800 pb-1 text-xs overflow-x-auto">
+                  <button
+                    @click="sessionObservabilityTab = 'dag'"
+                    class="px-2.5 py-1 rounded font-medium text-[11px] transition-colors flex items-center gap-1 shrink-0"
+                    :class="sessionObservabilityTab === 'dag' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                  >
+                    <span>🌿</span>
+                    <span>DAG Lineage</span>
+                    <span v-if="sessionDagData && sessionDagData.total_nodes" class="px-1 py-0.5 rounded bg-zinc-300 dark:bg-zinc-700 text-[9px] font-mono">{{ sessionDagData.total_nodes }}</span>
+                  </button>
+                  <button
+                    @click="sessionObservabilityTab = 'interventions'"
+                    class="px-2.5 py-1 rounded font-medium text-[11px] transition-colors flex items-center gap-1 shrink-0"
+                    :class="sessionObservabilityTab === 'interventions' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                  >
+                    <span>💬</span>
+                    <span>Interventions</span>
+                    <span v-if="sessionInterventionsList && sessionInterventionsList.length" class="px-1 py-0.5 rounded bg-zinc-300 dark:bg-zinc-700 text-[9px] font-mono">{{ sessionInterventionsList.length }}</span>
+                  </button>
                   <button
                     @click="sessionObservabilityTab = 'diff'"
-                    class="px-2.5 py-1 rounded font-medium text-[11px] transition-colors flex items-center gap-1"
+                    class="px-2.5 py-1 rounded font-medium text-[11px] transition-colors flex items-center gap-1 shrink-0"
                     :class="sessionObservabilityTab === 'diff' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
                   >
                     <span>📝</span>
@@ -5210,7 +5378,7 @@ const AgentsViewComponent = {
                   </button>
                   <button
                     @click="sessionObservabilityTab = 'verdict'"
-                    class="px-2.5 py-1 rounded font-medium text-[11px] transition-colors flex items-center gap-1"
+                    class="px-2.5 py-1 rounded font-medium text-[11px] transition-colors flex items-center gap-1 shrink-0"
                     :class="sessionObservabilityTab === 'verdict' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
                   >
                     <span>🧪</span>
@@ -5218,7 +5386,7 @@ const AgentsViewComponent = {
                   </button>
                   <button
                     @click="sessionObservabilityTab = 'audit'"
-                    class="px-2.5 py-1 rounded font-medium text-[11px] transition-colors flex items-center gap-1"
+                    class="px-2.5 py-1 rounded font-medium text-[11px] transition-colors flex items-center gap-1 shrink-0"
                     :class="sessionObservabilityTab === 'audit' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
                   >
                     <span>⚖️</span>
@@ -5226,7 +5394,7 @@ const AgentsViewComponent = {
                   </button>
                   <button
                     @click="sessionObservabilityTab = 'telemetry'"
-                    class="px-2.5 py-1 rounded font-medium text-[11px] transition-colors flex items-center gap-1"
+                    class="px-2.5 py-1 rounded font-medium text-[11px] transition-colors flex items-center gap-1 shrink-0"
                     :class="sessionObservabilityTab === 'telemetry' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
                   >
                     <span>📊</span>
@@ -5240,6 +5408,177 @@ const AgentsViewComponent = {
                 </div>
                 <div v-if="observabilityErrorMsg" class="p-2 rounded bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800/60 text-rose-800 dark:text-rose-300 text-[11px]">
                   {{ observabilityErrorMsg }}
+                </div>
+
+                <!-- TAB 0: DAG LINEAGE & GRAPH -->
+                <div v-if="sessionObservabilityTab === 'dag'" class="space-y-3 flex-1 flex flex-col">
+                  <div class="flex items-center justify-between p-2.5 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs">
+                    <div class="flex items-center gap-2">
+                      <span class="font-bold text-zinc-800 dark:text-zinc-200">Execution Tree</span>
+                      <span v-if="sessionDagData" class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[10px] font-mono text-zinc-500">Root: {{ sessionDagData.root_session_id }}</span>
+                    </div>
+                    <button
+                      @click="openBranchModal(selectedSessionRun)"
+                      class="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1 transition-colors shadow-xs"
+                    >
+                      <span>🔀</span>
+                      <span>Branch from this Run</span>
+                    </button>
+                  </div>
+
+                  <div v-if="isLoadingDag" class="text-center py-6 text-xs text-zinc-400">Loading session lineage graph...</div>
+                  <div v-else-if="sessionDagData && sessionDagData.nodes && sessionDagData.nodes.length" class="space-y-2 overflow-y-auto max-h-[360px] pr-1">
+                    <div
+                      v-for="node in sessionDagData.nodes"
+                      :key="node.session_id"
+                      class="p-2.5 rounded-lg border transition-all cursor-pointer flex items-center justify-between"
+                      :class="node.is_target ? 'bg-indigo-50/60 dark:bg-indigo-950/30 border-indigo-300 dark:border-indigo-700 shadow-2xs' : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'"
+                      @click="selectSessionRun(sessions.find(s => s.id === node.id || s.session_id === node.session_id) || node)"
+                    >
+                      <div class="flex items-center gap-2">
+                        <span class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-mono text-[9px]">Gen {{ node.generation }}</span>
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                          :class="{
+                            'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300': node.branch_type === 'fork',
+                            'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300': node.branch_type === 'continuation',
+                            'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300': node.branch_type === 'retry',
+                            'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300': node.branch_type === 'swarm_worker',
+                            'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300': !node.branch_type || node.branch_type === 'root'
+                          }"
+                        >{{ node.branch_type || 'root' }}</span>
+                        <span class="font-mono text-xs font-semibold text-zinc-900 dark:text-zinc-100">{{ node.branch_name || node.session_id }}</span>
+                        <span v-if="node.is_target" class="text-[9px] font-bold text-indigo-600 dark:text-indigo-400">(active)</span>
+                      </div>
+                      <div class="flex items-center gap-1.5">
+                        <span class="text-[10px] font-mono text-zinc-400">{{ node.agent_name || 'agent' }}</span>
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
+                          :class="{
+                            'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300': node.status === 'completed',
+                            'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300': node.status === 'failed',
+                            'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300': node.status === 'running' || node.status === 'verifying',
+                            'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400': node.status === 'spawning'
+                          }"
+                        >{{ node.status }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-else class="p-4 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-400 text-center">
+                    No parent or child lineage nodes found for this session.
+                  </div>
+                </div>
+
+                <!-- TAB 0.5: INTERVENTIONS & CONTROL -->
+                <div v-if="sessionObservabilityTab === 'interventions'" class="space-y-3 flex-1 flex flex-col">
+                  <!-- Process State & Pause / Gate Banner -->
+                  <div class="p-3 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 space-y-2">
+                    <div class="flex items-center justify-between text-xs">
+                      <div class="flex items-center gap-2">
+                        <span class="font-bold text-zinc-800 dark:text-zinc-200">Session Controls</span>
+                        <span v-if="selectedSessionRun.is_paused" class="px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 text-[10px] font-bold">⏸️ PAUSED</span>
+                        <span v-else class="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold">▶️ ACTIVE</span>
+                      </div>
+                      <div class="flex items-center gap-1.5">
+                        <button
+                          @click="handleTogglePauseSession(selectedSessionRun)"
+                          class="px-2 py-1 rounded text-xs font-semibold transition-colors"
+                          :class="selectedSessionRun.is_paused ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-amber-600 hover:bg-amber-500 text-white'"
+                        >
+                          {{ selectedSessionRun.is_paused ? '▶️ Resume Process' : '⏸️ Pause Process' }}
+                        </button>
+                        <button
+                          @click="handleArbitrateConflicts(selectedSessionRun, true)"
+                          class="px-2 py-1 rounded bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition-colors"
+                        >
+                          🛡️ Check Conflicts
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Human Gate Review Status -->
+                    <div class="pt-2 border-t border-zinc-100 dark:border-zinc-900 flex items-center justify-between text-xs">
+                      <div class="flex items-center gap-2">
+                        <span class="text-zinc-500">Human Gate:</span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                          :class="{
+                            'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300': selectedSessionRun.intervention_gate === 'human_approved' || selectedSessionRun.intervention_gate === 'auto_passed',
+                            'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300': selectedSessionRun.intervention_gate === 'human_rejected',
+                            'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300': selectedSessionRun.intervention_gate === 'pending_human_review',
+                            'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400': !selectedSessionRun.intervention_gate || selectedSessionRun.intervention_gate === 'none'
+                          }"
+                        >{{ selectedSessionRun.intervention_gate || 'NONE' }}</span>
+                      </div>
+                      <div class="flex items-center gap-1">
+                        <button
+                          @click="handleSetGate(selectedSessionRun, 'approve', 'Human sign-off approved')"
+                          class="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 hover:bg-emerald-200 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold transition-colors"
+                        >
+                          ✓ Approve
+                        </button>
+                        <button
+                          @click="handleSetGate(selectedSessionRun, 'reject', 'Rejected by operator')"
+                          class="px-2 py-0.5 rounded bg-rose-100 dark:bg-rose-950/60 hover:bg-rose-200 text-rose-700 dark:text-rose-300 text-[10px] font-bold transition-colors"
+                        >
+                          ✕ Reject
+                        </button>
+                        <button
+                          @click="handleSetGate(selectedSessionRun, 'require_review', 'Intervention required before ship')"
+                          class="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 hover:bg-amber-200 text-amber-700 dark:text-amber-300 text-[10px] font-bold transition-colors"
+                        >
+                          ⏳ Hold
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Live Human Instruction Injection Input -->
+                  <div class="p-3 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 space-y-2">
+                    <div class="text-xs font-bold text-zinc-800 dark:text-zinc-200 flex items-center justify-between">
+                      <span>💉 Inject Steering Instructions into Agent Context</span>
+                      <select
+                        v-model="interventionPriorityInput"
+                        class="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-[10px]"
+                      >
+                        <option value="normal">Priority: Normal</option>
+                        <option value="high">Priority: High</option>
+                        <option value="urgent">Priority: Urgent</option>
+                      </select>
+                    </div>
+                    <div class="flex gap-2">
+                      <input
+                        v-model="interventionInstructionInput"
+                        @keyup.enter="handleInjectInstruction(selectedSessionRun)"
+                        placeholder="Type steering constraint, instruction, or bug correction for live agent..."
+                        class="flex-1 px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-indigo-500"
+                      />
+                      <button
+                        @click="handleInjectInstruction(selectedSessionRun)"
+                        :disabled="isInjectingInstruction || !interventionInstructionInput.trim()"
+                        class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1 transition-colors"
+                      >
+                        <span>Send</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Intervention Audit Log Timeline -->
+                  <div class="flex-1 space-y-2 overflow-y-auto max-h-[220px]">
+                    <div class="text-[10px] font-bold uppercase text-zinc-400 tracking-wider">Intervention Audit Trail</div>
+                    <div v-if="!sessionInterventionsList.length" class="text-xs text-zinc-400 italic py-2">No human interventions or steerings recorded yet for this session.</div>
+                    <div
+                      v-for="item in sessionInterventionsList"
+                      :key="item.id"
+                      class="p-2 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs space-y-1"
+                    >
+                      <div class="flex items-center justify-between text-[10px] text-zinc-400">
+                        <div class="flex items-center gap-1.5">
+                          <span class="font-bold uppercase text-indigo-600 dark:text-indigo-400">{{ item.action_type }}</span>
+                          <span>by {{ item.author || 'operator' }}</span>
+                        </div>
+                        <span class="font-mono">{{ item.created }}</span>
+                      </div>
+                      <div class="text-zinc-800 dark:text-zinc-200 text-xs font-mono break-words">{{ item.instruction }}</div>
+                    </div>
+                  </div>
                 </div>
 
                 <!-- TAB 1: VISUAL GIT DIFF VIEWER -->
@@ -5450,6 +5789,84 @@ const AgentsViewComponent = {
               </div>
             </div>
 
+          </div>
+
+          <!-- Branch / Fork Modal (Milestone 4 / Epic 25) -->
+          <div v-if="branchModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="w-full max-w-lg rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-2xl space-y-4">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🔀</span>
+                  <div>
+                    <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Branch Agent Session</h3>
+                    <p class="text-[11px] text-zinc-500">Fork and continue execution DAG with preserved context</p>
+                  </div>
+                </div>
+                <button @click="branchModalOpen = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3 text-xs">
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Branch Name</label>
+                  <input
+                    v-model="branchNameInput"
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 font-mono text-xs focus:outline-none focus:border-indigo-500"
+                    placeholder="e.g. fix-auth-race-condition"
+                  />
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Branch Type</label>
+                    <select
+                      v-model="branchTypeInput"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="fork">Fork (Standard)</option>
+                      <option value="continuation">Continuation</option>
+                      <option value="retry">Retry</option>
+                      <option value="repair">Repair</option>
+                      <option value="swarm_worker">Swarm Worker</option>
+                      <option value="critique">Critique</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Model Override</label>
+                    <input
+                      v-model="branchModelInput"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 font-mono text-xs focus:outline-none focus:border-indigo-500"
+                      placeholder="e.g. gpt-5.5, claude-fable-5"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Follow-up Prompt / Steering Instructions</label>
+                  <textarea
+                    v-model="branchPromptInput"
+                    rows="3"
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono focus:outline-none focus:border-indigo-500"
+                    placeholder="Describe specific modifications, bug fixes, or new task requirements for this branch..."
+                  ></textarea>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  @click="branchModalOpen = false"
+                  class="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 text-zinc-700 dark:text-zinc-300 text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  @click="handleCreateBranch"
+                  :disabled="isBranchingSession || !branchNameInput.trim()"
+                  class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold transition-colors flex items-center gap-1 shadow-xs"
+                >
+                  <span>{{ isBranchingSession ? 'Branching...' : 'Launch Branch Run' }}</span>
+                </button>
+              </div>
+            </div>
           </div>
 
         </div>

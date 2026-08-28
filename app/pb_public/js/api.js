@@ -1780,5 +1780,121 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to run verification suite');
     return data;
+  },
+
+  // One-Click Session Branching, Re-Tasking & Human Intervention Gate (Milestone 4 / Epic 25)
+  async branchAgentSession(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/branch`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to branch agent session');
+    return data;
+  },
+
+  async getSessionDag(id) {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/dag`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch session DAG');
+    return data;
+  },
+
+  async getAllSessionsDag(projectId = '') {
+    const qs = projectId ? `?project=${encodeURIComponent(projectId)}` : '';
+    const res = await fetch(`/api/projectbase/sessions/dag${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch session DAGs');
+    return data;
+  },
+
+  async pauseAgentSession(id, reason = '') {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/pause`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ reason })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to pause session');
+    return data;
+  },
+
+  async resumeAgentSession(id, reason = '') {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/resume`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ reason })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to resume session');
+    return data;
+  },
+
+  async injectSessionInstruction(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/inject`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to inject session instruction');
+    return data;
+  },
+
+  async getSessionInterventions(id) {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/interventions`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch session interventions');
+    return data;
+  },
+
+  async setSessionInterventionGate(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/gate`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to set session intervention gate');
+    return data;
+  },
+
+  async arbitrateSessionConflicts(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/arbitrate`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to arbitrate session conflicts');
+    return data;
+  },
+
+  async getSessionConflicts(projectId = '') {
+    const qs = projectId ? `?project=${encodeURIComponent(projectId)}` : '';
+    const res = await fetch(`/api/projectbase/sessions/conflicts${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch session conflicts');
+    return data;
+  },
+
+  async dispatchSessionSwarm(payload = {}) {
+    const res = await fetch('/api/projectbase/sessions/swarm/dispatch', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to dispatch session swarm');
+    return data;
   }
 };

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "ProjectBase API",
-    "version": "1.22.0",
+    "version": "1.24.0",
     "description": "High-performance, ultra-lightweight Plane & Linear alternative for multi-project Kanban, sprint cycles, and autonomous AI agent orchestration.",
     "contact": {
       "name": "Andrian Balanescu",
@@ -826,7 +826,7 @@
                   "properties": {
                     "version": {
                       "type": "string",
-                      "example": "1.22.0"
+                      "example": "1.24.0"
                     },
                     "service": {
                       "type": "string",
@@ -6425,6 +6425,242 @@
         },
         "responses": {
           "200": { "description": "Suite verified" }
+        }
+      }
+    },
+    "/projectbase/sessions/{id}/branch": {
+      "post": {
+        "tags": ["Agent Session Branching & DAG"],
+        "summary": "Create a branched/forked child session in the execution DAG",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "branch_name": { "type": "string" },
+                  "branch_type": { "type": "string", "enum": ["fork", "continuation", "retry", "repair", "swarm_worker", "critique"] },
+                  "prompt": { "type": "string" },
+                  "model": { "type": "string" },
+                  "agent_name": { "type": "string" },
+                  "worktree_path": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Child session branched" },
+          "404": { "description": "Parent session not found" }
+        }
+      }
+    },
+    "/projectbase/sessions/{id}/dag": {
+      "get": {
+        "tags": ["Agent Session Branching & DAG"],
+        "summary": "Retrieve full lineage and downstream DAG execution tree for session",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Session DAG graph" },
+          "404": { "description": "Session not found" }
+        }
+      }
+    },
+    "/projectbase/sessions/dag": {
+      "get": {
+        "tags": ["Agent Session Branching & DAG"],
+        "summary": "Retrieve workspace or project-wide session DAG graphs",
+        "parameters": [
+          { "name": "project", "in": "query", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "All DAG graphs" }
+        }
+      }
+    },
+    "/projectbase/sessions/{id}/pause": {
+      "post": {
+        "tags": ["Agent Human Intervention"],
+        "summary": "Pause an active agent session execution run",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Session paused" },
+          "404": { "description": "Session not found" }
+        }
+      }
+    },
+    "/projectbase/sessions/{id}/resume": {
+      "post": {
+        "tags": ["Agent Human Intervention"],
+        "summary": "Resume a paused agent session execution run",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Session resumed" },
+          "404": { "description": "Session not found" }
+        }
+      }
+    },
+    "/projectbase/sessions/{id}/inject": {
+      "post": {
+        "tags": ["Agent Human Intervention"],
+        "summary": "Inject steering instructions, feedback, or constraints into live agent context",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "instruction": { "type": "string" },
+                  "author": { "type": "string" },
+                  "priority": { "type": "string", "enum": ["low", "normal", "high", "urgent"] }
+                },
+                "required": ["instruction"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Instruction injected" },
+          "404": { "description": "Session not found" }
+        }
+      }
+    },
+    "/projectbase/sessions/{id}/interventions": {
+      "get": {
+        "tags": ["Agent Human Intervention"],
+        "summary": "List all human interventions and steering inputs for session",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Interventions list" },
+          "404": { "description": "Session not found" }
+        }
+      }
+    },
+    "/projectbase/sessions/{id}/gate": {
+      "post": {
+        "tags": ["Agent Human Intervention"],
+        "summary": "Set or resolve Human Intervention Gate status (approve/reject/require_review)",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": { "type": "string", "enum": ["approve", "reject", "require_review", "auto_pass"] },
+                  "reviewer": { "type": "string" },
+                  "comment": { "type": "string" }
+                },
+                "required": ["action"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Gate status resolved" },
+          "404": { "description": "Session not found" }
+        }
+      }
+    },
+    "/projectbase/sessions/{id}/arbitrate": {
+      "post": {
+        "tags": ["Agent Swarm & Worktree Arbitration"],
+        "summary": "Arbitrate worktree and file collision conflicts with other sessions",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "strategy": { "type": "string", "enum": ["isolated_worktree_rebase", "direct_merge", "abort_conflicting"] },
+                  "resolve": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Arbitration evaluated" },
+          "404": { "description": "Session not found" }
+        }
+      }
+    },
+    "/projectbase/sessions/conflicts": {
+      "get": {
+        "tags": ["Agent Swarm & Worktree Arbitration"],
+        "summary": "Detect concurrent active sessions with colliding files_touched",
+        "parameters": [
+          { "name": "project", "in": "query", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Active session conflicts list" }
+        }
+      }
+    },
+    "/projectbase/sessions/swarm/dispatch": {
+      "post": {
+        "tags": ["Agent Swarm & Worktree Arbitration"],
+        "summary": "Dispatch multi-agent fan-out swarm child sessions",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "root_session_id": { "type": "string" },
+                  "workers": { "type": "array" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Swarm child sessions dispatched" }
         }
       }
     }

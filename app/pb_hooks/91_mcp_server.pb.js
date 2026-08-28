@@ -1434,6 +1434,113 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
                 },
                 required: ["session_id"]
             }
+        },
+        {
+            name: "branch_agent_session",
+            description: "Branch an agent session in the execution DAG with branch name, branch type (fork|continuation|retry|repair|swarm_worker|critique), prompt steering, and isolated worktree path.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    session_id: { type: "string", description: "Parent session ID to branch from" },
+                    branch_name: { type: "string", description: "Branch or fork identifier" },
+                    branch_type: { type: "string", description: "fork|continuation|retry|repair|swarm_worker|critique" },
+                    prompt: { type: "string", description: "New instruction or follow-up prompt" },
+                    agent_name: { type: "string", description: "Optional agent override" },
+                    model: { type: "string", description: "Optional LLM model override" },
+                    worktree_path: { type: "string", description: "Optional isolated git worktree path" }
+                },
+                required: ["session_id"]
+            }
+        },
+        {
+            name: "inject_session_instruction",
+            description: "Inject human steering instructions, feedback, or constraints into a running agent session context.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    session_id: { type: "string", description: "Target session ID" },
+                    instruction: { type: "string", description: "Human prompt / steering instruction to inject" },
+                    author: { type: "string", description: "Author / operator identity" },
+                    priority: { type: "string", description: "low|normal|high|urgent" }
+                },
+                required: ["session_id", "instruction"]
+            }
+        },
+        {
+            name: "pause_agent_session",
+            description: "Pause an active agent session execution run.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    session_id: { type: "string", description: "Target session ID to pause" },
+                    reason: { type: "string", description: "Reason for pausing" }
+                },
+                required: ["session_id"]
+            }
+        },
+        {
+            name: "resume_agent_session",
+            description: "Resume a paused agent session execution run.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    session_id: { type: "string", description: "Target session ID to resume" },
+                    reason: { type: "string", description: "Reason for resuming" }
+                },
+                required: ["session_id"]
+            }
+        },
+        {
+            name: "set_session_intervention_gate",
+            description: "Set or resolve human intervention gate status (approve, reject, require_review, auto_pass) for an agent session.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    session_id: { type: "string", description: "Target session ID" },
+                    action: { type: "string", description: "approve|reject|require_review|auto_pass" },
+                    reviewer: { type: "string", description: "Reviewer identifier or email" },
+                    comment: { type: "string", description: "Review comments or rationale" }
+                },
+                required: ["session_id", "action"]
+            }
+        },
+        {
+            name: "get_session_dag",
+            description: "Retrieve full lineage ancestry and downstream DAG execution graph for an agent session.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    session_id: { type: "string", description: "Session ID to retrieve DAG for" }
+                },
+                required: ["session_id"]
+            }
+        },
+        {
+            name: "arbitrate_session_conflicts",
+            description: "Detect and arbitrate worktree/file collisions between concurrent active agent sessions.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    session_id: { type: "string", description: "Target session ID to check" },
+                    strategy: { type: "string", description: "Resolution strategy: isolated_worktree_rebase|direct_merge|abort_conflicting" },
+                    resolve: { type: "boolean", description: "Mark conflicts as resolved" }
+                },
+                required: ["session_id"]
+            }
+        },
+        {
+            name: "dispatch_session_swarm",
+            description: "Dispatch a coordinated multi-agent fan-out swarm of child worker sessions attached to a root parent session in the DAG.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    root_session_id: { type: "string", description: "Root parent session ID" },
+                    workers: {
+                        type: "array",
+                        description: "List of worker specs [{role, agent_name, model, prompt}]"
+                    }
+                }
+            }
         }
     ]
 
@@ -5348,6 +5455,380 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         };
     }
 
+    const branchAgentSession = (args) => {
+        if (!args.session_id) throw new Error("session_id is required");
+        let parent = null;
+        try {
+            parent = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: args.session_id });
+        } catch (x) {}
+        if (!parent) throw new Error("Parent session not found: " + args.session_id);
+
+        let sessionCol = null;
+        try { sessionCol = e.app.findCollectionByNameOrId("agent_sessions"); } catch (x) {}
+        if (!sessionCol) throw new Error("agent_sessions collection not found");
+
+        const branchType = args.branch_type || "fork";
+        const branchName = (args.branch_name || ("branch-" + Math.random().toString(36).substring(2, 8))).trim();
+        const newSessionId = (args.new_session_id || ("sess_" + branchType + "_" + Math.random().toString(36).substring(2, 10))).trim();
+        const parentGeneration = parent.getInt("generation") || 0;
+        const worktreePath = args.worktree_path || (parent.getString("workdir") ? parent.getString("workdir") + "/.worktrees/" + branchName : "");
+
+        const newRecord = new Record(sessionCol);
+        newRecord.set("session_id", newSessionId);
+        newRecord.set("parent_session_id", parent.getString("session_id") || parent.getString("id"));
+        newRecord.set("branch_name", branchName);
+        newRecord.set("branch_type", branchType);
+        newRecord.set("generation", parentGeneration + 1);
+        newRecord.set("project", parent.getString("project"));
+        newRecord.set("issue", args.issue_id || parent.getString("issue"));
+        newRecord.set("agent_name", args.agent_name || parent.getString("agent_name"));
+        newRecord.set("runtime", parent.getString("runtime"));
+        newRecord.set("model", args.model || parent.getString("model"));
+        newRecord.set("status", "spawning");
+        newRecord.set("workdir", parent.getString("workdir"));
+        newRecord.set("worktree_path", worktreePath);
+        newRecord.set("git_branch", branchName);
+        newRecord.set("command", args.prompt || parent.getString("command"));
+        newRecord.set("is_paused", false);
+        newRecord.set("intervention_gate", "none");
+        newRecord.set("conflict_status", "clean");
+        newRecord.set("started_at", new Date().toISOString());
+
+        e.app.save(newRecord);
+        return {
+            success: true,
+            session_id: newSessionId,
+            parent_session_id: parent.getString("session_id") || parent.getString("id"),
+            branch_name: branchName,
+            branch_type: branchType,
+            generation: parentGeneration + 1,
+            worktree_path: worktreePath,
+            status: "spawning"
+        };
+    }
+
+    const injectSessionInstruction = (args) => {
+        if (!args.session_id) throw new Error("session_id is required");
+        if (!args.instruction) throw new Error("instruction is required");
+        let session = null;
+        try {
+            session = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: args.session_id });
+        } catch (x) {}
+        if (!session) throw new Error("Session not found: " + args.session_id);
+
+        let instructions = [];
+        try {
+            const raw = session.get("injected_instructions");
+            if (raw) instructions = JSON.parse(JSON.stringify(raw));
+        } catch (x) {}
+        if (!Array.isArray(instructions)) instructions = [];
+
+        const instructionId = "inj_" + Math.random().toString(36).substring(2, 9);
+        const item = {
+            id: instructionId,
+            instruction: args.instruction.trim(),
+            author: args.author || "mcp_operator",
+            priority: args.priority || "high",
+            injected_at: new Date().toISOString(),
+            applied: false
+        };
+        instructions.push(item);
+        session.set("injected_instructions", instructions);
+        e.app.save(session);
+
+        return {
+            success: true,
+            session_id: session.getString("session_id") || session.getString("id"),
+            instruction_id: instructionId,
+            total_injected: instructions.length,
+            instruction: item
+        };
+    }
+
+    const pauseAgentSession = (args) => {
+        if (!args.session_id) throw new Error("session_id is required");
+        let session = null;
+        try {
+            session = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: args.session_id });
+        } catch (x) {}
+        if (!session) throw new Error("Session not found: " + args.session_id);
+
+        session.set("is_paused", true);
+        e.app.save(session);
+        return {
+            success: true,
+            session_id: session.getString("session_id") || session.getString("id"),
+            is_paused: true,
+            status: session.getString("status")
+        };
+    }
+
+    const resumeAgentSession = (args) => {
+        if (!args.session_id) throw new Error("session_id is required");
+        let session = null;
+        try {
+            session = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: args.session_id });
+        } catch (x) {}
+        if (!session) throw new Error("Session not found: " + args.session_id);
+
+        session.set("is_paused", false);
+        e.app.save(session);
+        return {
+            success: true,
+            session_id: session.getString("session_id") || session.getString("id"),
+            is_paused: false,
+            status: session.getString("status")
+        };
+    }
+
+    const setSessionInterventionGate = (args) => {
+        if (!args.session_id) throw new Error("session_id is required");
+        if (!args.action) throw new Error("action is required");
+        let session = null;
+        try {
+            session = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: args.session_id });
+        } catch (x) {}
+        if (!session) throw new Error("Session not found: " + args.session_id);
+
+        const action = args.action.toLowerCase().trim();
+        let newGateState = "none";
+        if (action === "approve" || action === "human_approved" || action === "approved") {
+            newGateState = "human_approved";
+            if (session.getString("status") === "verifying" || session.getString("status") === "spawning") {
+                session.set("status", "completed");
+            }
+        } else if (action === "reject" || action === "human_rejected" || action === "rejected") {
+            newGateState = "human_rejected";
+            session.set("status", "failed");
+        } else if (action === "require_review" || action === "pending_human_review" || action === "pending") {
+            newGateState = "pending_human_review";
+        } else if (action === "auto_pass" || action === "auto_passed") {
+            newGateState = "auto_passed";
+        } else {
+            throw new Error("Invalid gate action: " + args.action);
+        }
+
+        session.set("intervention_gate", newGateState);
+        e.app.save(session);
+        return {
+            success: true,
+            session_id: session.getString("session_id") || session.getString("id"),
+            intervention_gate: newGateState,
+            status: session.getString("status"),
+            reviewer: args.reviewer || "mcp_operator"
+        };
+    }
+
+    const getSessionDag = (args) => {
+        if (!args.session_id) throw new Error("session_id is required");
+        let target = null;
+        try {
+            target = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: args.session_id });
+        } catch (x) {}
+        if (!target) throw new Error("Session not found: " + args.session_id);
+
+        const projectId = target.getString("project");
+        let filter = "1=1";
+        let params = {};
+        if (projectId) {
+            filter = "project = {:p}";
+            params = { p: projectId };
+        }
+        const allSessions = e.app.findRecordsByFilter("agent_sessions", filter, "created", 500, 0, params);
+
+        let sessionMap = {};
+        allSessions.forEach(s => {
+            const sid = s.getString("session_id") || s.getString("id");
+            sessionMap[sid] = s;
+        });
+
+        let current = target;
+        let root = target;
+        let visited = new Set();
+        while (current) {
+            const sid = current.getString("session_id") || current.getString("id");
+            if (visited.has(sid)) break;
+            visited.add(sid);
+            root = current;
+            const parentSid = current.getString("parent_session_id");
+            if (!parentSid || !sessionMap[parentSid]) break;
+            current = sessionMap[parentSid];
+        }
+
+        const rootSid = root.getString("session_id") || root.getString("id");
+        let dagNodeIds = new Set();
+        dagNodeIds.add(rootSid);
+
+        let expanded = true;
+        while (expanded) {
+            expanded = false;
+            allSessions.forEach(s => {
+                const sid = s.getString("session_id") || s.getString("id");
+                const psid = s.getString("parent_session_id");
+                if (psid && dagNodeIds.has(psid) && !dagNodeIds.has(sid)) {
+                    dagNodeIds.add(sid);
+                    expanded = true;
+                }
+            });
+        }
+
+        let nodes = [];
+        let edges = [];
+        dagNodeIds.forEach(sid => {
+            const s = sessionMap[sid];
+            if (!s) return;
+            nodes.push({
+                session_id: sid,
+                agent_name: s.getString("agent_name"),
+                status: s.getString("status"),
+                branch_name: s.getString("branch_name") || "main",
+                branch_type: s.getString("branch_type") || (sid === rootSid ? "root" : "fork"),
+                generation: s.getInt("generation") || 0,
+                is_paused: s.getBool("is_paused"),
+                intervention_gate: s.getString("intervention_gate") || "none",
+                parent_session_id: s.getString("parent_session_id") || null
+            });
+            const psid = s.getString("parent_session_id");
+            if (psid && dagNodeIds.has(psid)) {
+                edges.push({
+                    from: psid,
+                    to: sid,
+                    branch_type: s.getString("branch_type") || "fork"
+                });
+            }
+        });
+
+        return {
+            target_session_id: target.getString("session_id") || target.getString("id"),
+            root_session_id: rootSid,
+            total_nodes: nodes.length,
+            total_edges: edges.length,
+            nodes: nodes,
+            edges: edges
+        };
+    }
+
+    const arbitrateSessionConflicts = (args) => {
+        if (!args.session_id) throw new Error("session_id is required");
+        let session = null;
+        try {
+            session = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: args.session_id });
+        } catch (x) {}
+        if (!session) throw new Error("Session not found: " + args.session_id);
+
+        const sid = session.getString("session_id") || session.getString("id");
+        const projectId = session.getString("project");
+        let filesTouched = [];
+        try {
+            const raw = session.get("files_touched");
+            if (raw) filesTouched = JSON.parse(JSON.stringify(raw));
+        } catch (x) {}
+        if (!Array.isArray(filesTouched)) filesTouched = [];
+
+        let otherActive = [];
+        try {
+            let filter = "id != {:id} && session_id != {:sid} && (status = 'running' || status = 'verifying' || status = 'spawning')";
+            let params = { id: session.getString("id"), sid: sid };
+            if (projectId) {
+                filter = "project = {:p} && " + filter;
+                params.p = projectId;
+            }
+            otherActive = e.app.findRecordsByFilter("agent_sessions", filter, "-created", 50, 0, params);
+        } catch (x) {}
+
+        let conflicts = [];
+        otherActive.forEach(other => {
+            let otherFiles = [];
+            try {
+                const rawOther = other.get("files_touched");
+                if (rawOther) otherFiles = JSON.parse(JSON.stringify(rawOther));
+            } catch (x) {}
+            if (!Array.isArray(otherFiles)) otherFiles = [];
+            const overlapping = filesTouched.filter(f => otherFiles.indexOf(f) !== -1);
+            if (overlapping.length > 0) {
+                conflicts.push({
+                    conflicting_session_id: other.getString("session_id") || other.getString("id"),
+                    conflicting_agent: other.getString("agent_name"),
+                    overlapping_files: overlapping
+                });
+            }
+        });
+
+        const strategy = args.strategy || (conflicts.length > 0 ? "isolated_worktree_rebase" : "direct_merge");
+        const conflictStatus = conflicts.length > 0 ? (args.resolve ? "resolved" : "conflict_detected") : "clean";
+        session.set("conflict_status", conflictStatus);
+        e.app.save(session);
+
+        return {
+            success: true,
+            session_id: sid,
+            conflict_status: conflictStatus,
+            conflict_count: conflicts.length,
+            conflicts: conflicts,
+            recommended_strategy: strategy
+        };
+    }
+
+    const dispatchSessionSwarm = (args) => {
+        let parentRecord = null;
+        if (args.root_session_id) {
+            try {
+                parentRecord = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: args.root_session_id });
+            } catch (x) {}
+        }
+
+        let sessionCol = null;
+        try { sessionCol = e.app.findCollectionByNameOrId("agent_sessions"); } catch (x) {}
+        if (!sessionCol) throw new Error("agent_sessions collection not found");
+
+        const workers = args.workers || [
+            { role: "researcher", agent_name: "ResearchScout", model: "rc/perplexity-sonar-reasoning-pro", prompt: "Conduct analysis" },
+            { role: "implementer", agent_name: "FlomasterBuilder", model: "claude-api:claude-fable-5", prompt: "Implement architecture" }
+        ];
+
+        const projectId = (parentRecord && parentRecord.getString("project")) || args.project_id || "";
+        const baseGeneration = (parentRecord ? parentRecord.getInt("generation") : 0) + 1;
+        let spawnedSessions = [];
+
+        workers.forEach((w, idx) => {
+            const workerSessionId = "sess_swarm_" + (w.role || "worker") + "_" + Math.random().toString(36).substring(2, 8);
+            const branchName = "swarm/" + (w.role || "worker-" + (idx + 1));
+            const rec = new Record(sessionCol);
+            rec.set("session_id", workerSessionId);
+            if (parentRecord) {
+                rec.set("parent_session_id", parentRecord.getString("session_id") || parentRecord.getString("id"));
+            }
+            rec.set("branch_name", branchName);
+            rec.set("branch_type", "swarm_worker");
+            rec.set("generation", baseGeneration);
+            rec.set("project", projectId);
+            rec.set("agent_name", w.agent_name || ("Worker-" + (w.role || idx)));
+            rec.set("runtime", w.runtime || (parentRecord ? parentRecord.getString("runtime") : "flomaster"));
+            rec.set("model", w.model || (parentRecord ? parentRecord.getString("model") : "default"));
+            rec.set("status", "spawning");
+            rec.set("command", w.prompt || `Autonomous task for ${w.role}`);
+            rec.set("is_paused", false);
+            rec.set("intervention_gate", "none");
+            rec.set("conflict_status", "clean");
+            rec.set("started_at", new Date().toISOString());
+            e.app.save(rec);
+
+            spawnedSessions.push({
+                session_id: workerSessionId,
+                role: w.role,
+                branch_name: branchName,
+                status: "spawning"
+            });
+        });
+
+        return {
+            success: true,
+            root_session_id: args.root_session_id || null,
+            workers_count: spawnedSessions.length,
+            workers: spawnedSessions
+        };
+    }
+
     // ---------- 1. Authentication ----------
     let authRecord = e.auth || null
     let bypassEnabled = false
@@ -5512,6 +5993,14 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         else if (toolName === "get_session_observability") { result = getSessionObservability(args) }
         else if (toolName === "list_agent_sessions") { result = listAgentSessions(args) }
         else if (toolName === "fork_agent_session") { result = forkAgentSession(args) }
+        else if (toolName === "branch_agent_session") { result = branchAgentSession(args) }
+        else if (toolName === "inject_session_instruction") { result = injectSessionInstruction(args) }
+        else if (toolName === "pause_agent_session") { result = pauseAgentSession(args) }
+        else if (toolName === "resume_agent_session") { result = resumeAgentSession(args) }
+        else if (toolName === "set_session_intervention_gate") { result = setSessionInterventionGate(args) }
+        else if (toolName === "get_session_dag") { result = getSessionDag(args) }
+        else if (toolName === "arbitrate_session_conflicts") { result = arbitrateSessionConflicts(args) }
+        else if (toolName === "dispatch_session_swarm") { result = dispatchSessionSwarm(args) }
         else { return fail(-32602, "Unknown tool: " + toolName) }
         return ok({ content: [{ type: "text", text: JSON.stringify(result) }] })
     } catch (toolErr) {

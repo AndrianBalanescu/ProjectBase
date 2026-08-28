@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.24.0] - 2026-08-28 - Cycle 27
+### Added
+- **One-Click Session Branching, Re-Tasking & Human Intervention Gate (Milestone 4 / Epic 25):**
+  - Schema migration (`1710000037_add_session_branching_and_intervention.js`) extending `agent_sessions` with `parent_session_id`, `branch_name`, `branch_type`, `generation`, `is_paused`, `intervention_gate`, `injected_instructions`, `worktree_path`, and `conflict_status`, and introducing dedicated `session_interventions` collection for full auditability.
+  - Backend engine hook (`app/pb_hooks/109_session_branching_intervention_engine.pb.js`) with 11 endpoints for interactive DAG branching (`POST /api/projectbase/sessions/{id}/branch`), DAG tree graph queries (`GET /api/projectbase/sessions/{id}/dag` and `GET /api/projectbase/sessions/dag`), process pause/resume (`POST /pause`, `POST /resume`), live prompt steering injection (`POST /inject`), chronological intervention timelines (`GET /interventions`), Human Intervention Gate approval/rejection (`POST /gate`), worktree conflict detection and arbitration (`POST /arbitrate` and `GET /conflicts`), and multi-agent swarm fan-out dispatch (`POST /swarm/dispatch`).
+  - 8 FastMCP JSON-RPC 2.0 tools: `branch_agent_session`, `inject_session_instruction`, `pause_agent_session`, `resume_agent_session`, `set_session_intervention_gate`, `get_session_dag`, `arbitrate_session_conflicts`, `dispatch_session_swarm`.
+  - Frontend AgentsView with interactive 🌿 **DAG Lineage** tree visualizer, 💬 **Interventions & Control** console with live steering prompt injection, pause/resume toggle, 1-click Human Gate decision buttons (Approve / Reject / Hold), and 🔀 **1-Click Branch Modal** supporting fork, continuation, retry, repair, and swarm worker types.
+  - Complete automated test suite in `tests/test_session_branching_and_intervention.py` bringing total coverage to 418/418 passing tests across 30 test files with 100% frontend guard and full iBrowse browser verification.
+
 ## [1.23.0] - 2026-08-28 - Cycle 26
 ### Added
 - **Deep Observability & Ground Truth Verification Hub (Milestone 3):**
