@@ -598,6 +598,43 @@ const AgentsViewComponent = {
         error_rate_pct: 0.05,
         latency_p95_ms: 45,
         request_count: 500
+      },
+
+      // Autonomous Security Sentinel & Red-Team Hub (Milestone 14 / Epic 35)
+      securityScansList: [],
+      selectedSecurityScan: null,
+      selectedSecurityFindings: [],
+      selectedSecurityRemediations: [],
+      securityPosture: null,
+      secretFindingsList: [],
+      securityPoliciesList: [],
+      securityRemediationsList: [],
+      isLoadingSecurity: false,
+      securityErrorMsg: null,
+      securitySuccessMsg: null,
+      securityFilterType: '',
+      securityFilterStatus: '',
+      securitySearch: '',
+      securityActiveSubtab: 'vulnerabilities', // 'vulnerabilities' | 'secrets' | 'remediations' | 'policies'
+      showRunSecurityScanModal: false,
+      newScanForm: {
+        name: '',
+        scan_type: 'full_audit',
+        target_type: 'codebase',
+        target_ref: 'server/app.js',
+        content: ''
+      },
+      showScanContentModal: false,
+      scanContentInput: '',
+      scanContentResult: null,
+      showNewPolicyModal: false,
+      newPolicyForm: {
+        name: 'Zero-Trust Production Security Baseline',
+        enforce_zero_critical: true,
+        max_allowed_cvss: 7.0,
+        auto_quarantine_leaks: true,
+        block_unverified_mcp_tools: false,
+        require_sandbox_isolation: false
       }
     };
   },
@@ -3525,8 +3562,158 @@ const AgentsViewComponent = {
         this.releaseErrorMsg = 'Seed failed: ' + (e.message || String(e));
       }
     },
+    async loadSecurityData() {
+      this.isLoadingSecurity = true;
+      this.securityErrorMsg = null;
+      try {
+        const [scansRes, secretsRes, policiesRes, remsRes, postureRes] = await Promise.all([
+          API.listSecurityScans({
+            scan_type: this.securityFilterType || undefined,
+            status: this.securityFilterStatus || undefined,
+            search: this.securitySearch || undefined,
+            limit: 100
+          }).catch(() => ({ scans: [] })),
+          API.listSecretFindings({ limit: 100 }).catch(() => ({ secrets: [] })),
+          API.listSecurityPolicies().catch(() => ({ policies: [] })),
+          API.listSecurityRemediations().catch(() => ({ remediations: [] })),
+          API.getSecurityPosture().catch(() => null)
+        ]);
+        this.securityScansList = scansRes.scans || [];
+        this.secretFindingsList = secretsRes.secrets || [];
+        this.securityPoliciesList = policiesRes.policies || [];
+        this.securityRemediationsList = remsRes.remediations || [];
+        this.securityPosture = postureRes ? postureRes.posture : null;
+
+        if (this.securityScansList.length > 0 && !this.selectedSecurityScan) {
+          await this.inspectSecurityScan(this.securityScansList[0].id);
+        }
+      } catch (e) {
+        this.securityErrorMsg = 'Failed loading security data: ' + (e.message || String(e));
+      } finally {
+        this.isLoadingSecurity = false;
+      }
+    },
+    async inspectSecurityScan(id) {
+      if (!id) return;
+      try {
+        const data = await API.getSecurityScan(id);
+        if (data && data.scan) {
+          this.selectedSecurityScan = data.scan;
+          this.selectedSecurityFindings = data.scan.findings || [];
+          this.selectedSecurityRemediations = data.scan.remediations || [];
+        }
+      } catch (e) {
+        console.error('Failed inspecting security scan:', e);
+      }
+    },
+    async triggerNewSecurityScan() {
+      if (!this.newScanForm.name.trim()) return;
+      try {
+        const res = await API.createSecurityScan(this.newScanForm);
+        this.showRunSecurityScanModal = false;
+        this.securitySuccessMsg = `Security scan "${this.newScanForm.name}" completed! Found ${res.scan.findings_count || 0} items.`;
+        setTimeout(() => { this.securitySuccessMsg = null; }, 5000);
+        this.newScanForm.name = '';
+        this.newScanForm.content = '';
+        await this.loadSecurityData();
+        if (res && res.scan && res.scan.id) {
+          await this.inspectSecurityScan(res.scan.id);
+        }
+      } catch (e) {
+        this.securityErrorMsg = 'Scan failed: ' + (e.message || String(e));
+      }
+    },
+    async executeScanTarget(id) {
+      if (!id) return;
+      try {
+        await API.executeSecurityScan(id, { content: this.selectedSecurityScan ? JSON.stringify(this.selectedSecurityScan.metadata) : "" });
+        this.securitySuccessMsg = 'Scan re-executed successfully!';
+        setTimeout(() => { this.securitySuccessMsg = null; }, 4000);
+        await this.loadSecurityData();
+        await this.inspectSecurityScan(id);
+      } catch (e) {
+        this.securityErrorMsg = 'Re-scan failed: ' + (e.message || String(e));
+      }
+    },
+    async deleteScan(id) {
+      if (!id || !confirm('Delete this security scan report?')) return;
+      try {
+        await API.deleteSecurityScan(id);
+        this.selectedSecurityScan = null;
+        await this.loadSecurityData();
+      } catch (e) {
+        this.securityErrorMsg = 'Delete failed: ' + (e.message || String(e));
+      }
+    },
+    async runQuickContentScan() {
+      if (!this.scanContentInput.trim()) return;
+      try {
+        const res = await API.scanSecretContent({ content: this.scanContentInput });
+        this.scanContentResult = res;
+      } catch (e) {
+        this.securityErrorMsg = 'Content scan failed: ' + (e.message || String(e));
+      }
+    },
+    async quarantineSecret(id) {
+      if (!id) return;
+      try {
+        await API.quarantineSecretFinding(id);
+        this.securitySuccessMsg = 'Secret finding quarantined!';
+        setTimeout(() => { this.securitySuccessMsg = null; }, 3000);
+        await this.loadSecurityData();
+      } catch (e) {
+        this.securityErrorMsg = 'Quarantine failed: ' + (e.message || String(e));
+      }
+    },
+    async resolveSecret(id, status) {
+      if (!id) return;
+      try {
+        await API.resolveSecretFinding(id, { remediation_status: status });
+        this.securitySuccessMsg = `Secret marked as ${status}!`;
+        setTimeout(() => { this.securitySuccessMsg = null; }, 3000);
+        await this.loadSecurityData();
+      } catch (e) {
+        this.securityErrorMsg = 'Resolve failed: ' + (e.message || String(e));
+      }
+    },
+    async generateRemediation(scanId, finding) {
+      try {
+        const res = await API.generateSecurityRemediation({ scan_id: scanId, finding: finding });
+        this.securitySuccessMsg = 'Automated remediation patch synthesized!';
+        setTimeout(() => { this.securitySuccessMsg = null; }, 4000);
+        this.securityActiveSubtab = 'remediations';
+        await this.loadSecurityData();
+        if (scanId) await this.inspectSecurityScan(scanId);
+      } catch (e) {
+        this.securityErrorMsg = 'Remediation synthesis failed: ' + (e.message || String(e));
+      }
+    },
+    async applyRemediation(id) {
+      if (!id) return;
+      try {
+        await API.applySecurityRemediation(id, { verify: true });
+        this.securitySuccessMsg = 'Remediation patch applied and verified!';
+        setTimeout(() => { this.securitySuccessMsg = null; }, 4000);
+        await this.loadSecurityData();
+        if (this.selectedSecurityScan) await this.inspectSecurityScan(this.selectedSecurityScan.id);
+      } catch (e) {
+        this.securityErrorMsg = 'Apply remediation failed: ' + (e.message || String(e));
+      }
+    },
+    async saveNewSecurityPolicy() {
+      if (!this.newPolicyForm.name.trim()) return;
+      try {
+        await API.createSecurityPolicy(this.newPolicyForm);
+        this.showNewPolicyModal = false;
+        this.securitySuccessMsg = `Security policy "${this.newPolicyForm.name}" created!`;
+        setTimeout(() => { this.securitySuccessMsg = null; }, 4000);
+        await this.loadSecurityData();
+      } catch (e) {
+        this.securityErrorMsg = 'Save policy failed: ' + (e.message || String(e));
+      }
+    },
     isGovernanceTab(tab) {
-      return ['workload', 'anomalies', 'semantic', 'auto_heal', 'sso_rbac', 'automations', 'tenants', 'webhooks', 'observability', 'consensus', 'cluster', 'federation', 'throughput', 'swarm', 'merges', 'budget', 'evals', 'sandboxes', 'incidents', 'knowledge', 'code_reviews', 'releases'].includes(tab);
+      return ['workload', 'anomalies', 'semantic', 'auto_heal', 'sso_rbac', 'automations', 'tenants', 'webhooks', 'observability', 'consensus', 'cluster', 'federation', 'throughput', 'swarm', 'merges', 'budget', 'evals', 'sandboxes', 'incidents', 'knowledge', 'code_reviews', 'releases', 'security'].includes(tab);
     },
     onGovernanceTabSelect(tab) {
       if (!tab) return;
@@ -3550,6 +3737,8 @@ const AgentsViewComponent = {
         this.loadCodeReviewsData();
       } else if (tab === 'releases') {
         this.loadReleasesData();
+      } else if (tab === 'security') {
+        this.loadSecurityData();
       }
     }
   },
@@ -3667,7 +3856,7 @@ const AgentsViewComponent = {
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <h2 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 capitalize truncate">
-                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (activeTab === 'automations' ? 'Native Workflow Automations & AI Agent Trigger Pipelines' : (activeTab === 'tenants' ? 'Multi-Tenant Isolation & Granular Resource Quotas' : (activeTab === 'auto_heal' ? 'Autonomous AI Agent Auto-Healing & Self-Remediation Workflow Pipeline' : (activeTab === 'budget' ? 'Agent Fleet Budget & Cost Governance Hub' : (activeTab === 'evals' ? 'Agent Evaluation Benchmark Harness & Model Leaderboard' : (activeTab === 'sandboxes' ? 'Autonomous Ephemeral Dev Sandboxes & Worktree Container Orchestrator' : (activeTab === 'incidents' ? 'Autonomous Multi-Agent Incident Response & Live Debugging War-Room' : (activeTab === 'knowledge' ? 'Autonomous Knowledge Graph, Architectural Memory & Invariants' : (activeTab === 'code_reviews' ? 'Autonomous Multi-Persona Code Review Swarm & Merge Gate' : (activeTab === 'releases' ? 'Autonomous Release Flight Control, Canary Gates & Rollback Sentinel' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center'))))))))))))))))))) }}
+                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (activeTab === 'automations' ? 'Native Workflow Automations & AI Agent Trigger Pipelines' : (activeTab === 'tenants' ? 'Multi-Tenant Isolation & Granular Resource Quotas' : (activeTab === 'auto_heal' ? 'Autonomous AI Agent Auto-Healing & Self-Remediation Workflow Pipeline' : (activeTab === 'budget' ? 'Agent Fleet Budget & Cost Governance Hub' : (activeTab === 'evals' ? 'Agent Evaluation Benchmark Harness & Model Leaderboard' : (activeTab === 'sandboxes' ? 'Autonomous Ephemeral Dev Sandboxes & Worktree Container Orchestrator' : (activeTab === 'incidents' ? 'Autonomous Multi-Agent Incident Response & Live Debugging War-Room' : (activeTab === 'knowledge' ? 'Autonomous Knowledge Graph, Architectural Memory & Invariants' : (activeTab === 'code_reviews' ? 'Autonomous Multi-Persona Code Review Swarm & Merge Gate' : (activeTab === 'releases' ? 'Autonomous Release Flight Control, Canary Gates & Rollback Sentinel' : (activeTab === 'security' ? 'Autonomous Agent Security Red-Team, Secret Leak Sentinel & Auto-Hardening Engine' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center')))))))))))))))))))) }}
                 </h2>
                 <span v-if="selectedSession && selectedSession.is_active && activeTab === 'chat'" class="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-400 text-[10px] font-mono font-semibold flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -3723,6 +3912,7 @@ const AgentsViewComponent = {
                     <option value="knowledge">🧠 Knowledge Graph & Invariants</option>
                     <option value="code_reviews">🔍 Code Review Swarm & Merge Gate</option>
                     <option value="releases">🚀 Release Flight Control & Canary Rollback</option>
+                    <option value="security">🛡️ Security Sentinel & Auto-Hardening Hub</option>
                     <option value="federation">🌐 Multi-Cluster Federation</option>
                   </select>
                 </div>
@@ -11774,6 +11964,659 @@ const AgentsViewComponent = {
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- PANE 2L: AUTONOMOUS SECURITY SENTINEL & RED-TEAM HUB      -->
+        <!-- (Milestone 14 / Epic 35 / v1.34.0)                        -->
+        <!-- ========================================================= -->
+        <div
+          v-else-if="activeTab === 'security'"
+          class="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/30"
+        >
+          <!-- Header Hero Banner -->
+          <div class="p-4 rounded-xl bg-gradient-to-r from-rose-950/50 via-zinc-900 to-indigo-950/40 border border-rose-800/40 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xl">🛡️</span>
+                <h3 class="text-sm font-bold text-white tracking-wide">Autonomous Security Sentinel & Red-Team Hub</h3>
+                <span class="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] font-mono font-bold animate-pulse">AST SENTINEL</span>
+                <span class="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-mono">v1.34.0</span>
+              </div>
+              <p class="text-xs text-zinc-300 mt-1">
+                Real-time AST code vulnerability audits, entropy secret leak quarantine, automated patch synthesis, and fleet compliance governance.
+              </p>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap shrink-0">
+              <button
+                @click="showRunSecurityScanModal = true"
+                class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
+              >
+                <span>+</span>
+                <span>Run Security Scan</span>
+              </button>
+              <button
+                @click="showScanContentModal = true; scanContentResult = null;"
+                class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
+              >
+                <span>⚡</span>
+                <span>Quick Secret Scanner</span>
+              </button>
+              <button
+                @click="showNewPolicyModal = true"
+                class="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold transition-colors flex items-center gap-1"
+              >
+                <span>📜</span>
+                <span>Add Policy</span>
+              </button>
+              <button
+                @click="loadSecurityData()"
+                :disabled="isLoadingSecurity"
+                class="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold transition-colors flex items-center gap-1 disabled:opacity-50"
+              >
+                <span :class="{ 'animate-spin': isLoadingSecurity }">🔄</span>
+                <span>Refresh</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Alert Banners -->
+          <div v-if="securitySuccessMsg" class="p-3 rounded-lg bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <span>✅</span>
+              <span>{{ securitySuccessMsg }}</span>
+            </span>
+            <button @click="securitySuccessMsg = null" class="text-emerald-400 hover:text-emerald-200 font-bold">&times;</button>
+          </div>
+          <div v-if="securityErrorMsg" class="p-3 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-300 text-xs flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <span>⚠️</span>
+              <span>{{ securityErrorMsg }}</span>
+            </span>
+            <button @click="securityErrorMsg = null" class="text-rose-400 hover:text-rose-200 font-bold">&times;</button>
+          </div>
+
+          <!-- 5 Top KPI Cards -->
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+              <div class="text-[10px] font-medium text-zinc-500 uppercase flex items-center justify-between">
+                <span>Fleet Security Score</span>
+                <span>🛡️</span>
+              </div>
+              <div class="text-lg font-bold mt-1 flex items-baseline gap-1.5"
+                :class="{
+                  'text-emerald-500': (securityPosture && securityPosture.fleet_security_score >= 85),
+                  'text-amber-500': (securityPosture && securityPosture.fleet_security_score < 85 && securityPosture.fleet_security_score >= 60),
+                  'text-rose-500': (securityPosture && securityPosture.fleet_security_score < 60)
+                }"
+              >
+                <span>{{ securityPosture ? securityPosture.fleet_security_score : 100 }}/100</span>
+                <span class="text-[10px] font-mono font-normal uppercase text-zinc-400">{{ (securityPosture && securityPosture.posture_rating) || 'OPTIMAL' }}</span>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+              <div class="text-[10px] font-medium text-zinc-500 uppercase flex items-center justify-between">
+                <span>Active Critical/High CVEs</span>
+                <span>🚨</span>
+              </div>
+              <div class="text-lg font-bold mt-1 flex items-baseline gap-1.5"
+                :class="(securityPosture && (securityPosture.active_critical_cves > 0 || securityPosture.active_high_cves > 0)) ? 'text-rose-500' : 'text-emerald-500'"
+              >
+                <span>{{ securityPosture ? (securityPosture.active_critical_cves + securityPosture.active_high_cves) : 0 }}</span>
+                <span class="text-[10px] font-mono font-normal text-zinc-400">({{ (securityPosture && securityPosture.active_critical_cves) || 0 }} crit)</span>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+              <div class="text-[10px] font-medium text-zinc-500 uppercase flex items-center justify-between">
+                <span>Secret Containment</span>
+                <span>🔒</span>
+              </div>
+              <div class="text-lg font-bold text-zinc-900 dark:text-zinc-100 mt-1 flex items-baseline gap-1.5">
+                <span>{{ (securityPosture && securityPosture.secret_containment_rate_pct !== undefined) ? securityPosture.secret_containment_rate_pct : 100 }}%</span>
+                <span class="text-[10px] font-mono text-zinc-400">({{ (securityPosture && securityPosture.quarantined_secrets) || 0 }} locked)</span>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+              <div class="text-[10px] font-medium text-zinc-500 uppercase flex items-center justify-between">
+                <span>Auto-Remediation Rate</span>
+                <span>🛠️</span>
+              </div>
+              <div class="text-lg font-bold text-zinc-900 dark:text-zinc-100 mt-1 flex items-baseline gap-1.5">
+                <span>{{ (securityPosture && securityPosture.auto_remediation_rate_pct !== undefined) ? securityPosture.auto_remediation_rate_pct : 100 }}%</span>
+                <span class="text-[10px] font-mono text-zinc-400">({{ (securityPosture && securityPosture.applied_remediations) || 0 }} patches)</span>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+              <div class="text-[10px] font-medium text-zinc-500 uppercase flex items-center justify-between">
+                <span>Security MTTR</span>
+                <span>⏱️</span>
+              </div>
+              <div class="text-lg font-bold text-indigo-500 mt-1 flex items-baseline gap-1">
+                <span>{{ (securityPosture && securityPosture.mean_time_to_remediate_seconds) || 42 }}s</span>
+                <span class="text-[10px] font-mono text-zinc-400">automated</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Split Explorer Pane: Left (Scans List) + Right (Subtabs & Inspector) -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+            <!-- Left Column: Scans List (4 cols) -->
+            <div class="lg:col-span-4 p-3 rounded-xl bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                  <span>📋</span>
+                  <span>Security Scans ({{ securityScansList.length }})</span>
+                </span>
+                <span class="text-[10px] font-mono text-zinc-400">Audit History</span>
+              </div>
+
+              <!-- Filter Bar -->
+              <div class="space-y-2">
+                <input
+                  v-model="securitySearch"
+                  @input="loadSecurityData()"
+                  type="text"
+                  placeholder="Filter by target or agent..."
+                  class="w-full px-2.5 py-1 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 focus:outline-none"
+                />
+                <div class="grid grid-cols-2 gap-2">
+                  <select
+                    v-model="securityFilterType"
+                    @change="loadSecurityData()"
+                    class="px-2 py-1 text-xs rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300"
+                  >
+                    <option value="">All Types</option>
+                    <option value="full_audit">Full Audit</option>
+                    <option value="ast_vulnerability">AST Vulnerability</option>
+                    <option value="secret_leak">Secret Leak</option>
+                    <option value="prompt_injection">Prompt Injection</option>
+                  </select>
+                  <select
+                    v-model="securityFilterStatus"
+                    @change="loadSecurityData()"
+                    class="px-2 py-1 text-xs rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="passed">Passed</option>
+                    <option value="flagged">Flagged</option>
+                    <option value="running">Running</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Scans Cards List -->
+              <div class="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+                <div v-if="!securityScansList.length" class="text-xs text-zinc-400 italic py-6 text-center">
+                  No security scans found. Click "+ Run Security Scan" to trigger an automated audit.
+                </div>
+                <div
+                  v-for="scan in securityScansList"
+                  :key="scan.id"
+                  @click="inspectSecurityScan(scan.id)"
+                  class="p-2.5 rounded-lg border text-xs cursor-pointer transition-all space-y-1.5"
+                  :class="selectedSecurityScan && selectedSecurityScan.id === scan.id ? 'bg-indigo-50/60 dark:bg-indigo-950/40 border-indigo-500 shadow-xs' : 'bg-zinc-50/50 dark:bg-zinc-950/40 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'"
+                >
+                  <div class="flex items-center justify-between">
+                    <span class="font-bold text-zinc-900 dark:text-zinc-100 truncate max-w-[170px]">{{ scan.name }}</span>
+                    <span
+                      class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
+                      :class="{
+                        'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300': scan.status === 'passed',
+                        'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300': scan.status === 'flagged',
+                        'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 animate-pulse': scan.status === 'running'
+                      }"
+                    >{{ scan.status }}</span>
+                  </div>
+
+                  <div class="text-[11px] font-mono text-zinc-500 truncate flex items-center gap-1">
+                    <span>🎯</span>
+                    <span>{{ scan.target_ref || 'workspace' }}</span>
+                  </div>
+
+                  <div class="flex items-center justify-between text-[10px] text-zinc-400 pt-1 border-t border-zinc-100 dark:border-zinc-900">
+                    <span class="font-mono">Risk: {{ scan.risk_score || 0 }}/100</span>
+                    <div class="flex items-center gap-1.5">
+                      <span v-if="scan.critical_count" class="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold">{{ scan.critical_count }} crit</span>
+                      <span v-if="scan.high_count" class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold">{{ scan.high_count }} high</span>
+                      <span class="font-mono">{{ scan.duration_ms || 0 }}ms</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Column: Subtabs & Active Inspector (8 cols) -->
+            <div class="lg:col-span-8 space-y-3">
+
+              <!-- Subtab Switcher -->
+              <div class="flex items-center justify-between p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex-wrap gap-1">
+                <div class="flex items-center gap-1 flex-wrap">
+                  <button
+                    @click="securityActiveSubtab = 'vulnerabilities'"
+                    class="px-2.5 py-1 text-xs font-semibold rounded-md transition-colors flex items-center gap-1"
+                    :class="securityActiveSubtab === 'vulnerabilities' ? 'bg-indigo-600 text-white shadow-xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
+                  >
+                    <span>🛡️ Vulnerabilities & AST Probing</span>
+                    <span v-if="selectedSecurityFindings.length" class="px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 text-[10px]">
+                      {{ selectedSecurityFindings.length }}
+                    </span>
+                  </button>
+
+                  <button
+                    @click="securityActiveSubtab = 'secrets'"
+                    class="px-2.5 py-1 text-xs font-semibold rounded-md transition-colors flex items-center gap-1"
+                    :class="securityActiveSubtab === 'secrets' ? 'bg-indigo-600 text-white shadow-xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
+                  >
+                    <span>🔑 Secret Leak Sentinel</span>
+                    <span v-if="secretFindingsList.length" class="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px]">
+                      {{ secretFindingsList.length }}
+                    </span>
+                  </button>
+
+                  <button
+                    @click="securityActiveSubtab = 'remediations'"
+                    class="px-2.5 py-1 text-xs font-semibold rounded-md transition-colors flex items-center gap-1"
+                    :class="securityActiveSubtab === 'remediations' ? 'bg-indigo-600 text-white shadow-xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
+                  >
+                    <span>🛠️ Auto-Remediation & Patches</span>
+                    <span v-if="securityRemediationsList.length" class="px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px]">
+                      {{ securityRemediationsList.length }}
+                    </span>
+                  </button>
+
+                  <button
+                    @click="securityActiveSubtab = 'policies'"
+                    class="px-2.5 py-1 text-xs font-semibold rounded-md transition-colors flex items-center gap-1"
+                    :class="securityActiveSubtab === 'policies' ? 'bg-indigo-600 text-white shadow-xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
+                  >
+                    <span>📜 Policy Governance</span>
+                    <span v-if="securityPoliciesList.length" class="px-1.5 py-0.5 rounded-full bg-zinc-500/20 text-zinc-300 text-[10px]">
+                      {{ securityPoliciesList.length }}
+                    </span>
+                  </button>
+                </div>
+
+                <div v-if="selectedSecurityScan" class="flex items-center gap-1.5">
+                  <button
+                    @click="executeScanTarget(selectedSecurityScan.id)"
+                    class="px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-[10px] font-bold transition-colors"
+                  >⚡ Re-Scan</button>
+                  <button
+                    @click="deleteScan(selectedSecurityScan.id)"
+                    class="px-2 py-0.5 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 text-[10px] font-bold transition-colors"
+                  >🗑️</button>
+                </div>
+              </div>
+
+              <!-- SUBTAB 1: VULNERABILITIES & AST PROBING -->
+              <div v-if="securityActiveSubtab === 'vulnerabilities'" class="space-y-3">
+                <div v-if="!selectedSecurityFindings.length" class="p-8 rounded-xl bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-center space-y-2">
+                  <div class="text-2xl">✨</div>
+                  <div class="text-sm font-bold text-zinc-800 dark:text-zinc-200">Zero Security Vulnerabilities Detected</div>
+                  <div class="text-xs text-zinc-400">All AST and dynamic guardrail invariant assertions passed cleanly.</div>
+                </div>
+
+                <div
+                  v-for="(finding, fIdx) in selectedSecurityFindings"
+                  :key="fIdx"
+                  class="p-3.5 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-2.5 shadow-2xs"
+                >
+                  <div class="flex items-center justify-between flex-wrap gap-2">
+                    <div class="flex items-center gap-2">
+                      <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase"
+                        :class="{
+                          'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300': finding.severity === 'critical',
+                          'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300': finding.severity === 'high',
+                          'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300': finding.severity === 'medium',
+                          'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400': finding.severity === 'low'
+                        }"
+                      >
+                        {{ finding.severity }} • CVSS {{ finding.cvss || 'N/A' }}
+                      </span>
+                      <span class="font-mono text-xs font-bold text-zinc-900 dark:text-zinc-100">{{ finding.rule_id || 'SEC-FINDING' }}</span>
+                      <span v-if="finding.cwe" class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[9px] font-mono text-zinc-400">{{ finding.cwe }}</span>
+                    </div>
+
+                    <button
+                      @click="generateRemediation(selectedSecurityScan.id, finding)"
+                      class="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold transition-colors flex items-center gap-1 shadow-xs"
+                    >
+                      <span>🛠️</span>
+                      <span>Synthesize Patch Fix</span>
+                    </button>
+                  </div>
+
+                  <div class="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+                    {{ finding.name || finding.description }}
+                  </div>
+
+                  <div class="text-[10px] font-mono text-zinc-400 flex items-center gap-1">
+                    <span>📍</span>
+                    <span>{{ finding.location_ref }}</span>
+                  </div>
+
+                  <!-- Code snippet -->
+                  <div v-if="finding.code_snippet" class="p-2 rounded bg-zinc-950 border border-zinc-800 font-mono text-[10px] text-rose-300 overflow-x-auto">
+                    {{ finding.code_snippet }}
+                  </div>
+
+                  <!-- Fix suggestion -->
+                  <div v-if="finding.fix_suggestion" class="p-2 rounded bg-emerald-950/30 border border-emerald-900/50 text-[11px] text-emerald-300 flex items-start gap-1.5">
+                    <span class="shrink-0">💡</span>
+                    <span>{{ finding.fix_suggestion }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SUBTAB 2: SECRET LEAK SENTINEL -->
+              <div v-if="securityActiveSubtab === 'secrets'" class="space-y-3">
+                <div v-if="!secretFindingsList.length" class="p-8 rounded-xl bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-center space-y-2">
+                  <div class="text-2xl">🔒</div>
+                  <div class="text-sm font-bold text-zinc-800 dark:text-zinc-200">No Secret Leaks Detected</div>
+                  <div class="text-xs text-zinc-400">Entropy scans and token pattern matching found zero plaintext credentials.</div>
+                </div>
+
+                <div
+                  v-for="secret in secretFindingsList"
+                  :key="secret.id"
+                  class="p-3.5 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-2.5 shadow-2xs"
+                >
+                  <div class="flex items-center justify-between flex-wrap gap-2">
+                    <div class="flex items-center gap-2">
+                      <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase"
+                        :class="secret.severity === 'critical' ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300' : 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300'"
+                      >
+                        {{ secret.severity }}
+                      </span>
+                      <span class="font-bold text-xs text-zinc-900 dark:text-zinc-100 uppercase font-mono">{{ secret.secret_type }}</span>
+                      <span class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[9px] font-mono text-zinc-400">Entropy: {{ secret.entropy_score || 0 }}</span>
+                    </div>
+
+                    <div class="flex items-center gap-1.5">
+                      <button
+                        v-if="!secret.is_quarantined"
+                        @click="quarantineSecret(secret.id)"
+                        class="px-2 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold transition-colors flex items-center gap-1"
+                      >
+                        <span>🔒</span>
+                        <span>Quarantine</span>
+                      </button>
+                      <button
+                        @click="resolveSecret(secret.id, 'rotated')"
+                        class="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold transition-colors flex items-center gap-1"
+                      >
+                        <span>✓</span>
+                        <span>Mark Rotated</span>
+                      </button>
+                      <button
+                        @click="resolveSecret(secret.id, 'whitelisted')"
+                        class="px-2 py-1 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-[10px] font-bold hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
+                      >
+                        Whitelist
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="p-2 rounded bg-zinc-950 border border-zinc-800 font-mono text-[11px] text-amber-300 flex items-center justify-between">
+                    <span>Masked Token: {{ secret.masked_preview }}</span>
+                    <span class="text-[10px] text-zinc-500">{{ secret.location_ref }}</span>
+                  </div>
+
+                  <div class="flex items-center justify-between text-[10px] text-zinc-400">
+                    <span class="flex items-center gap-1">
+                      <span>Status:</span>
+                      <b class="uppercase" :class="secret.is_quarantined ? 'text-rose-400' : 'text-emerald-400'">{{ secret.remediation_status }}</b>
+                    </span>
+                    <span v-if="secret.quarantined_at" class="font-mono">Quarantined: {{ secret.quarantined_at.slice(0, 19) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SUBTAB 3: AUTO-REMEDIATION & PATCHES -->
+              <div v-if="securityActiveSubtab === 'remediations'" class="space-y-3">
+                <div v-if="!securityRemediationsList.length" class="p-8 rounded-xl bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-center space-y-2">
+                  <div class="text-2xl">🛠️</div>
+                  <div class="text-sm font-bold text-zinc-800 dark:text-zinc-200">No Remediations Synthesized Yet</div>
+                  <div class="text-xs text-zinc-400">Click "Synthesize Patch Fix" on any vulnerability finding to generate unified hardening diffs.</div>
+                </div>
+
+                <div
+                  v-for="rem in securityRemediationsList"
+                  :key="rem.id"
+                  class="p-3.5 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-2.5 shadow-2xs"
+                >
+                  <div class="flex items-center justify-between flex-wrap gap-2">
+                    <div class="flex items-center gap-2">
+                      <span class="font-mono text-xs font-bold text-zinc-900 dark:text-zinc-100">{{ rem.finding_ref }}</span>
+                      <span class="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-bold"
+                        :class="{
+                          'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300': rem.status === 'verified' || rem.status === 'applied',
+                          'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300': rem.status === 'proposed',
+                          'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300': rem.status === 'failed'
+                        }"
+                      >
+                        {{ rem.status }}
+                      </span>
+                    </div>
+
+                    <button
+                      v-if="rem.status !== 'verified'"
+                      @click="applyRemediation(rem.id)"
+                      class="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold transition-colors flex items-center gap-1 shadow-xs"
+                    >
+                      <span>✓</span>
+                      <span>Apply Patch & Verify</span>
+                    </button>
+                  </div>
+
+                  <div class="p-2.5 rounded bg-zinc-950 border border-zinc-800 font-mono text-[10px] text-zinc-300 whitespace-pre-wrap select-text overflow-x-auto leading-relaxed">
+                    {{ rem.diff_content }}
+                  </div>
+
+                  <div class="flex items-center justify-between text-[10px] text-zinc-400">
+                    <span>Applied by: <b class="font-mono text-zinc-300">{{ rem.applied_by || 'agent' }}</b></span>
+                    <span v-if="rem.applied_at" class="font-mono">{{ rem.applied_at.slice(0, 19) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SUBTAB 4: POLICY GOVERNANCE -->
+              <div v-if="securityActiveSubtab === 'policies'" class="space-y-3">
+                <div v-if="!securityPoliciesList.length" class="p-8 rounded-xl bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-center space-y-2">
+                  <div class="text-2xl">📜</div>
+                  <div class="text-sm font-bold text-zinc-800 dark:text-zinc-200">No Custom Policies Configured</div>
+                  <div class="text-xs text-zinc-400">Default Zero-Trust Fleet baseline is active. Click "+ Add Policy" to configure custom project rules.</div>
+                </div>
+
+                <div
+                  v-for="policy in securityPoliciesList"
+                  :key="policy.id"
+                  class="p-3.5 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-3 shadow-2xs"
+                >
+                  <div class="flex items-center justify-between">
+                    <span class="font-bold text-xs text-zinc-900 dark:text-zinc-100">{{ policy.name }}</span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                      :class="policy.is_active ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'"
+                    >
+                      {{ policy.is_active ? 'ACTIVE ENFORCEMENT' : 'DISABLED' }}
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    <div class="p-2 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                      <div class="text-[10px] text-zinc-400 uppercase font-semibold">Zero Critical Gate</div>
+                      <div class="font-bold mt-0.5" :class="policy.enforce_zero_critical ? 'text-emerald-500' : 'text-zinc-400'">
+                        {{ policy.enforce_zero_critical ? 'ENFORCED' : 'OFF' }}
+                      </div>
+                    </div>
+
+                    <div class="p-2 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                      <div class="text-[10px] text-zinc-400 uppercase font-semibold">Max CVSS Allowed</div>
+                      <div class="font-bold font-mono mt-0.5 text-indigo-500">{{ policy.max_allowed_cvss || 7.0 }}</div>
+                    </div>
+
+                    <div class="p-2 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                      <div class="text-[10px] text-zinc-400 uppercase font-semibold">Auto-Quarantine</div>
+                      <div class="font-bold mt-0.5" :class="policy.auto_quarantine_leaks ? 'text-emerald-500' : 'text-zinc-400'">
+                        {{ policy.auto_quarantine_leaks ? 'ACTIVE' : 'OFF' }}
+                      </div>
+                    </div>
+
+                    <div class="p-2 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                      <div class="text-[10px] text-zinc-400 uppercase font-semibold">Sandbox Required</div>
+                      <div class="font-bold mt-0.5" :class="policy.require_sandbox_isolation ? 'text-emerald-500' : 'text-zinc-400'">
+                        {{ policy.require_sandbox_isolation ? 'REQUIRED' : 'OPTIONAL' }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- MODAL 1: RUN SECURITY SCAN -->
+          <div v-if="showRunSecurityScanModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div class="w-full max-w-lg p-5 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 space-y-4 shadow-xl">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <h4 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <span>🛡️</span>
+                  <span>Initiate Autonomous Security Audit</span>
+                </h4>
+                <button @click="showRunSecurityScanModal = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3 text-xs">
+                <div>
+                  <label class="font-semibold text-zinc-700 dark:text-zinc-300">Scan Name / Descriptor</label>
+                  <input v-model="newScanForm.name" type="text" placeholder="e.g. Full AST & Prompt Injection Audit" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800" />
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="font-semibold text-zinc-700 dark:text-zinc-300">Scan Type</label>
+                    <select v-model="newScanForm.scan_type" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                      <option value="full_audit">Full Security Audit</option>
+                      <option value="ast_vulnerability">AST Vulnerability Check</option>
+                      <option value="secret_leak">Secret Leak Detection</option>
+                      <option value="prompt_injection">Prompt Injection Guardrail</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="font-semibold text-zinc-700 dark:text-zinc-300">Target Type</label>
+                    <select v-model="newScanForm.target_type" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                      <option value="codebase">Codebase Source</option>
+                      <option value="session_trajectory">Agent Trajectory</option>
+                      <option value="issue_description">Issue Description</option>
+                      <option value="raw_content">Raw Payload / Snippet</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="font-semibold text-zinc-700 dark:text-zinc-300">Target Reference / File Path</label>
+                  <input v-model="newScanForm.target_ref" type="text" placeholder="e.g. server/app.js or PB-10525" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 font-mono" />
+                </div>
+
+                <div>
+                  <label class="font-semibold text-zinc-700 dark:text-zinc-300">Code / Payload Content (Optional inline text)</label>
+                  <textarea v-model="newScanForm.content" rows="4" placeholder="Paste source code or prompt instructions to scan..." class="w-full mt-1 px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 font-mono text-[11px]"></textarea>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button @click="showRunSecurityScanModal = false" class="px-4 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold">Cancel</button>
+                <button @click="triggerNewSecurityScan()" :disabled="!newScanForm.name.trim()" class="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-xs disabled:opacity-50">Run Scan</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- MODAL 2: QUICK SECRET SCANNER -->
+          <div v-if="showScanContentModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div class="w-full max-w-lg p-5 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 space-y-4 shadow-xl">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <h4 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <span>⚡</span>
+                  <span>Real-Time Secret & Entropy Prober</span>
+                </h4>
+                <button @click="showScanContentModal = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3 text-xs">
+                <div>
+                  <label class="font-semibold text-zinc-700 dark:text-zinc-300">Paste Text / Diff / Logs to Probe</label>
+                  <textarea v-model="scanContentInput" rows="4" placeholder="Paste any text or code containing potential credentials..." class="w-full mt-1 px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 font-mono text-[11px]"></textarea>
+                </div>
+
+                <div v-if="scanContentResult" class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-2">
+                  <div class="flex items-center justify-between font-bold">
+                    <span>Detected Secrets: {{ scanContentResult.findings_count }}</span>
+                    <span class="font-mono text-zinc-400">Entropy: {{ scanContentResult.overall_entropy }}</span>
+                  </div>
+                  <div v-for="(f, i) in scanContentResult.findings" :key="i" class="p-2 rounded bg-zinc-950 text-amber-300 font-mono text-[10px] flex items-center justify-between">
+                    <span>{{ f.secret_type }}: {{ f.raw_preview }}</span>
+                    <span class="text-rose-400 uppercase font-bold">{{ f.severity }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button @click="showScanContentModal = false" class="px-4 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold">Close</button>
+                <button @click="runQuickContentScan()" :disabled="!scanContentInput.trim()" class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs disabled:opacity-50">Scan Now</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- MODAL 3: NEW SECURITY POLICY -->
+          <div v-if="showNewPolicyModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div class="w-full max-w-md p-5 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 space-y-4 shadow-xl">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <h4 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <span>📜</span>
+                  <span>Create Security Policy</span>
+                </h4>
+                <button @click="showNewPolicyModal = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3 text-xs">
+                <div>
+                  <label class="font-semibold text-zinc-700 dark:text-zinc-300">Policy Name</label>
+                  <input v-model="newPolicyForm.name" type="text" placeholder="e.g. Strict Autonomous Red-Team Gate" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800" />
+                </div>
+
+                <div>
+                  <label class="font-semibold text-zinc-700 dark:text-zinc-300">Max Allowed CVSS (0.0 - 10.0)</label>
+                  <input v-model.number="newPolicyForm.max_allowed_cvss" type="number" step="0.1" class="w-full mt-1 px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 font-mono" />
+                </div>
+
+                <div class="space-y-2 pt-1">
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input v-model="newPolicyForm.enforce_zero_critical" type="checkbox" class="rounded text-indigo-600" />
+                    <span>Enforce Zero Critical CVEs Gate</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input v-model="newPolicyForm.auto_quarantine_leaks" type="checkbox" class="rounded text-indigo-600" />
+                    <span>Auto-Quarantine Detected Secret Leaks</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input v-model="newPolicyForm.require_sandbox_isolation" type="checkbox" class="rounded text-indigo-600" />
+                    <span>Require Ephemeral Sandbox Isolation</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button @click="showNewPolicyModal = false" class="px-4 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold">Cancel</button>
+                <button @click="saveNewSecurityPolicy()" :disabled="!newPolicyForm.name.trim()" class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs disabled:opacity-50">Save Policy</button>
+              </div>
+            </div>
+          </div>
+
         </div>
 
         <!-- ========================================================= -->

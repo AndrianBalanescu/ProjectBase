@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.34.0] - 2026-08-28 - Cycle 38
+### Added
+- **Autonomous Agent Security Red-Team, Secret Leak Sentinel, AST Vulnerability Probing & Automated Remediation Hardening Engine (Milestone 14 / Epic 35):**
+  - Schema migration (`1710000048_add_security_sentinel_engine.js`) introducing 4 high-security collections: `security_scans`, `secret_findings`, `security_policies`, and `security_remediations`.
+  - Backend security engine hook (`app/pb_hooks/119_security_sentinel_engine.pb.js`) with 15 high-performance REST API endpoints:
+    - `GET /api/projectbase/security/scans` & `POST /api/projectbase/security/scans` for creating and triggering comprehensive security audits with real-time AST rule verification and entropy scanning.
+    - `GET /api/projectbase/security/scans/{id}`, `DELETE /api/projectbase/security/scans/{id}`, and `POST /api/projectbase/security/scans/{id}/execute` for inspecting scan details, structured findings, remediation plans, and re-executing security assertions.
+    - `GET /api/projectbase/security/secrets` & `POST /api/projectbase/security/secrets/scan-content` for listing detected credentials and running standalone real-time token/diff leak detection with Shannon entropy computation.
+    - `POST /api/projectbase/security/secrets/{id}/quarantine` & `POST /api/projectbase/security/secrets/{id}/resolve` for instant quarantine locking and resolution (rotated, whitelisted, dismissed).
+    - `GET /api/projectbase/security/policies` & `POST /api/projectbase/security/policies` for managing zero-trust security policy rules (zero-critical CVE gate, max allowed CVSS, auto-quarantine, sandbox requirement).
+    - `GET /api/projectbase/security/remediations`, `POST /api/projectbase/security/remediations/generate`, and `POST /api/projectbase/security/remediations/{id}/apply` for synthesizing automated unified git patch diffs and applying/verifying code fixes.
+    - `GET /api/projectbase/security/posture` for calculating fleet-wide security score (0-100), active CVE count, secret containment rate, auto-remediation velocity, and MTTR.
+  - 8 FastMCP JSON-RPC 2.0 tools in `app/pb_hooks/91_mcp_server.pb.js`: `run_security_scan`, `list_security_scans`, `get_security_scan_details`, `scan_for_secret_leaks`, `list_secret_findings`, `generate_security_remediation`, `apply_security_remediation`, and `get_fleet_security_posture`.
+  - Frontend AgentsView **🛡️ Autonomous Security Sentinel & Red-Team Hub** dashboard (`activeTab === 'security'`) with 5 KPI summary cards (Fleet Security Score, Active Critical/High CVEs, Secret Containment %, Auto-Remediation Rate %, Security MTTR), split-pane scan explorer, 4 interactive subtabs (🛡️ Vulnerabilities & AST Probing, 🔑 Secret Leak Sentinel & Quarantine Vault, 🛠️ Auto-Remediation & Patch Synthesis, 📜 Policy Governance & Compliance), and 3 interactive modals (+ Run Security Scan, Quick Secret Scanner, Create Policy).
+  - Comprehensive automated test suite `tests/test_security_sentinel_engine.py` with 10/10 passing tests, 512 total passing tests across 40 files, and 100% zero-console-error headless Playwright browser E2E validation.
+
 ## [1.33.0] - 2026-08-28 - Cycle 37
 ### Added
 - **Autonomous Agent Release Flight Control, Deployment Canary Gates, Production Health Probes & Self-Healing Rollback Engine (Milestone 13 / Epic 34):**

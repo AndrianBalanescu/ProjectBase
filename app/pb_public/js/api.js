@@ -3267,5 +3267,163 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to seed sample releases');
     return data;
+  },
+
+  // Milestone 14 / Epic 35 — Autonomous Agent Security Red-Team, Secret Sentinel & Auto-Hardening Engine
+  async listSecurityScans(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/security/scans${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list security scans');
+    return data;
+  },
+
+  async createSecurityScan(payload = {}) {
+    const res = await fetch('/api/projectbase/security/scans', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create security scan');
+    return data;
+  },
+
+  async getSecurityScan(id) {
+    const res = await fetch(`/api/projectbase/security/scans/${encodeURIComponent(id)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get security scan');
+    return data;
+  },
+
+  async deleteSecurityScan(id) {
+    const res = await fetch(`/api/projectbase/security/scans/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete security scan');
+    return data;
+  },
+
+  async executeSecurityScan(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/security/scans/${encodeURIComponent(id)}/execute`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to execute security scan');
+    return data;
+  },
+
+  async listSecretFindings(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/security/secrets${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list secret findings');
+    return data;
+  },
+
+  async scanSecretContent(payload = {}) {
+    const res = await fetch('/api/projectbase/security/secrets/scan-content', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to scan content for secrets');
+    return data;
+  },
+
+  async quarantineSecretFinding(id) {
+    const res = await fetch(`/api/projectbase/security/secrets/${encodeURIComponent(id)}/quarantine`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to quarantine secret');
+    return data;
+  },
+
+  async resolveSecretFinding(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/security/secrets/${encodeURIComponent(id)}/resolve`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to resolve secret');
+    return data;
+  },
+
+  async listSecurityPolicies(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/security/policies${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list security policies');
+    return data;
+  },
+
+  async createSecurityPolicy(payload = {}) {
+    const res = await fetch('/api/projectbase/security/policies', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create security policy');
+    return data;
+  },
+
+  async listSecurityRemediations(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/security/remediations${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list security remediations');
+    return data;
+  },
+
+  async generateSecurityRemediation(payload = {}) {
+    const res = await fetch('/api/projectbase/security/remediations/generate', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to generate security remediation');
+    return data;
+  },
+
+  async applySecurityRemediation(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/security/remediations/${encodeURIComponent(id)}/apply`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to apply security remediation');
+    return data;
+  },
+
+  async getSecurityPosture(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/security/posture${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get security posture');
+    return data;
   }
 };
