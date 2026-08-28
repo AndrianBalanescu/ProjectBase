@@ -1,7 +1,7 @@
 # ProjectBase – Candidate Roadmap (Epics)
 
-**Current Cycle:** 9
-**Focus:** Real-Time Multi-Agent Collaboration, Task Leases, Collision Avoidance, Webhooks & Telemetry
+**Current Cycle:** 10
+**Focus:** Autonomous Agent Swarm Choreography, Task Graph DAG Execution, Persona Roles & Validation Checkpoints
 
 ## Epic 0 – Core CRUD (✅ Done)
 - Projects, issues, cycles, users
@@ -56,10 +56,17 @@
 - [x] Outbound event webhooks subscription engine & HTTP event dispatcher for external orchestrators (Hermes, Windmill, Flomaster swarm coordinator)
 - [x] 238/238 automated tests passing across 13 test suites
 
+## Epic 10 – Autonomous Agent Swarm Choreography & Task Graph Decomposition (✅ Done)
+- [x] Multi-step parent/child issue task graph DAG execution with Kahn's algorithm cycle rejection (`/api/projectbase/dag/decompose`, `/api/projectbase/dag/status`, `/api/projectbase/dag/step`)
+- [x] Dynamic subtask splitting and assignment across specialized agent personas (`/api/projectbase/tasks/split`, `task_persona` and `parent_issue` fields)
+- [x] Automated peer-review and validation checkpoints before issue completion (`/api/projectbase/checkpoints/submit`, `/api/projectbase/checkpoints`, `task_checkpoints` collection)
+- [x] FastMCP JSON-RPC 2.0 & Python client tools (`decompose_task_graph`, `get_dag_status`, `execute_dag_step`, `split_subtasks`, `submit_validation_checkpoint`, `get_validation_checkpoints`)
+- [x] 245/245 automated tests passing across 14 test suites with warm cold-start at 51.8 ms
+
 ---
 
-## Next Milestone (Cycle 10)
-**Epic 10 – Autonomous Agent Swarm Choreography & Task Graph Decomposition**
-- Multi-step parent/child issue task graph DAG execution
-- Dynamic subtask splitting and assignment across specialized agent personas
-- Automated peer-review and validation checkpoints before issue completion
+## Next Milestone (Cycle 11)
+**Epic 11 – Autonomous Workspace Synthesis & Cross-Project Knowledge Retrieval**
+- Vector-free SQLite FTS5 semantic workspace indexing across issues, comments, and telemetry
+- Dynamic cross-project blocker detection and dependency alerting
+- Automated sprint retrospective generation and agent productivity metrics

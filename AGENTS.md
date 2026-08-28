@@ -7,7 +7,7 @@ ProjectBase = ultra-lightweight open-source Plane/Linear alternative. **MIT, 100
 - **Backend:** PocketBase **0.39.11** single binary `./pocketbase` at repo root. Serve with `./pocketbase serve --dir pb_data --hooksDir app/pb_hooks --migrationsDir app/pb_migrations --http 127.0.0.1:8120`. Note: PB data dir is `pb_data/` at root for local run, but Docker mounts `./app/pb_data` — keep both consistent.
 - **Frontend:** Zero-build **Vue 3 UMD** + static Tailwind. All served straight from `app/pb_public/`. No `node_modules`, no bundler.
 - **Styling:** Tailwind is **compiled to static CSS** via `scripts/build_css.sh` → `app/pb_public/css/style.css`. After editing templates/classes, rerun it. Do NOT add a runtime Tailwind CDN.
-- **Tests:** `pytest tests/` (run via `uv run --with pytest pytest tests/` or the pytest binary at `~/.local/bin/pytest`; NOT in repo venv). Tests run against the live instance (default `PROJECTBASE_URL=http://127.0.0.1:8120`, superuser `f@flow.com` / `superdev123`). 238 tests across 13 files.
+- **Tests:** `pytest tests/` (run via `uv run --with pytest pytest tests/` or the pytest binary at `~/.local/bin/pytest`; NOT in repo venv). Tests run against the live instance (default `PROJECTBASE_URL=http://127.0.0.1:8120`, superuser `f@flow.com` / `superdev123`). 245 tests across 14 files.
 - **Docker:** `docker compose up` — builds `Dockerfile`, mounts `app/` subdirs, exposes 8120.
 - **Deploy:** `deploy/projectbase.service` (systemd) + `deploy/Caddyfile`. Helper scripts: `scripts/install-systemd.sh`, `scripts/backup.sh`, `scripts/restore.sh`, `scripts/deploy-demo.sh`, `scripts/reset-demo.sh`.
 
@@ -37,11 +37,13 @@ app/
     20_issue_hooks.pb.js       <- auto issue_number/identifier + activity audit
     30_custom_routes.pb.js     <- /api/projectbase/* custom routes (health, version, stats, quick-task)
     31_bulk_actions.pb.js      <- /api/projectbase/issues/bulk-update + bulk-delete (multi-select)
+    32_issue_relations.pb.js   <- /api/projectbase/issues/{id}/relations (blocks/blocked_by/related)
     35_custom_fields.pb.js     <- per-project custom field validation
     40_importers.pb.js / 41_linear_importer.pb.js / 42_plane_importer.pb.js / 45_github_importer.pb.js  <- CSV + Linear + Plane + GitHub importers
     50_cron_automation.pb.js   <- scheduled automations
     55_notifications.pb.js / 60_notifications.pb.js  <- Telegram/Discord/webhook + in-app inbox
     70_ai_assist.pb.js / 80_agent_triggers.pb.js      <- AI-assisted actions + agent dispatch
+    90_agents.pb.js / 91_mcp_server.pb.js / 92_agent_collaboration.pb.js / 93_swarm_choreography_dag.pb.js <- agent bridge + FastMCP + leases & telemetry + swarm DAG choreography
   pb_migrations/       <- numbered schema + seed migrations (17100000xx). Add NEW number for changes.
   pb_data/             <- runtime SQLite data. NEVER commit.
 docs/                  <- research, ROADMAP, TODO, architecture, COMPETITORS, FEATURE_MATRIX
@@ -52,7 +54,8 @@ tests/                 <- test_api.py, test_selfhosting.py, test_autonomous_runn
                           test_css_sync.py (CSS/template drift guard), test_bulk_actions.py, test_issue_relations.py,
                           test_deploy_consistency.py, test_benchmarks.py, test_openapi_drift.py, test_secret_scan.py,
                           test_agents_drift_guard.py (locks the AGENTS.md test-count/file-map claims to the tree),
-                          test_fixture_hygiene.py (fails if test fixtures leak into the live instance's backlog)
+                          test_fixture_hygiene.py (fails if test fixtures leak into the live instance's backlog),
+                          test_swarm_dag.py (swarm choreography, DAG execution, checkpoints)
 deploy/                <- projectbase.service, Caddyfile
 .github/workflows/ci.yml  <- CI (seeds superuser, runs tests)
 ```

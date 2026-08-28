@@ -263,6 +263,90 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
                 },
                 required: ["webhook_id"]
             }
+        },
+        {
+            name: "decompose_task_graph",
+            description: "Decompose a parent issue into a DAG of child tasks with personas and dependency edges.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    parent_issue: { type: "string", description: "Parent issue record ID or identifier (e.g. PB-42)" },
+                    nodes: {
+                        type: "array",
+                        description: "List of task nodes: [{ key, title, description, persona, priority, estimate, depends_on: [] }]",
+                        items: { type: "object" }
+                    }
+                },
+                required: ["parent_issue", "nodes"]
+            }
+        },
+        {
+            name: "get_dag_status",
+            description: "Retrieve DAG execution status, topological states, ready/blocked nodes, and active leases.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    issue_id: { type: "string", description: "Parent or child issue record ID or identifier" }
+                },
+                required: ["issue_id"]
+            }
+        },
+        {
+            name: "execute_dag_step",
+            description: "Advance DAG execution by selecting the next ready unblocked task and claiming a lease for an agent persona.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    parent_issue: { type: "string", description: "Parent issue record ID or identifier" },
+                    agent_name: { type: "string", description: "Name of executing agent (default: Swarm Worker)" },
+                    persona: { type: "string", description: "Filter candidate ready node by persona (e.g. coder, reviewer, qa, architect)" }
+                },
+                required: ["parent_issue"]
+            }
+        },
+        {
+            name: "split_subtasks",
+            description: "Dynamically split an issue's subtask checklist with persona assignments and story points.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    issue_id: { type: "string", description: "Issue record ID or identifier" },
+                    subtasks: {
+                        type: "array",
+                        description: "Array of subtasks: [{ title, persona, estimate, done }]",
+                        items: { type: "object" }
+                    }
+                },
+                required: ["issue_id", "subtasks"]
+            }
+        },
+        {
+            name: "submit_validation_checkpoint",
+            description: "Submit a peer-review verdict, QA verification, or test checkpoint for an issue.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    issue_id: { type: "string", description: "Issue record ID or identifier" },
+                    agent_name: { type: "string", description: "Agent name performing review/verification" },
+                    persona: { type: "string", description: "Reviewer persona (e.g. reviewer, qa, security, architect)" },
+                    checkpoint_type: { type: "string", description: "peer_review|unit_test|qa_e2e|security_scan|schema_validation|acceptance" },
+                    status: { type: "string", description: "passed|failed|changes_requested|pending" },
+                    notes: { type: "string", description: "Detailed review comments or verification logs" },
+                    artifacts: { type: "object", description: "Optional structured artifacts (diffs, reports, logs)" }
+                },
+                required: ["issue_id", "agent_name", "checkpoint_type", "status"]
+            }
+        },
+        {
+            name: "get_validation_checkpoints",
+            description: "Get all validation checkpoints and quality gate status for an issue.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    issue_id: { type: "string", description: "Issue record ID or identifier" }
+                },
+                required: ["issue_id"]
+            }
         }
     ]
 
@@ -898,6 +982,347 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         return { success: true, webhook_id: id }
     }
 
+    const decomposeTaskGraph = (args) => {
+        let parentRef = (args.parent_issue || "").trim()
+        if (!parentRef) { throw new Error("parent_issue is required") }
+        let parent = resolveIssueRecord(parentRef)
+        let nodes = args.nodes || []
+        if (!Array.isArray(nodes) || nodes.length === 0) { throw new Error("nodes list is required") }
+
+        let issuesCol = e.app.findCollectionByNameOrId("issues")
+        let projectId = parent.get("project")
+        let cycleId = parent.get("cycle")
+        let milestoneId = parent.get("milestone")
+
+        let createdMap = {}
+        let createdList = []
+
+        for (let i = 0; i < nodes.length; i++) {
+            let n = nodes[i]
+            let key = n.key || ("node_" + (i + 1))
+            let rec = new Record(issuesCol)
+            rec.set("project", projectId)
+            rec.set("title", n.title || ("Task " + key))
+            rec.set("description", n.description || "")
+            rec.set("status", "todo")
+            rec.set("priority", n.priority || "medium")
+            rec.set("task_persona", n.persona || "coder")
+            rec.set("parent_issue", parent.id)
+            if (n.estimate) { rec.set("estimate", parseInt(n.estimate, 10) || 0) }
+            if (cycleId) { rec.set("cycle", cycleId) }
+            if (milestoneId) { rec.set("milestone", milestoneId) }
+            rec.set("relations", [])
+            rec.set("subtasks", [])
+
+            e.app.save(rec)
+            rec = e.app.findRecordById("issues", rec.id)
+            createdMap[key] = rec
+            createdList.push({
+                key: key,
+                id: rec.id,
+                identifier: rec.getString("identifier"),
+                title: rec.getString("title"),
+                persona: rec.getString("task_persona"),
+                depends_on: n.depends_on || []
+            })
+        }
+
+        // Setup relations for DAG edges
+        for (let i = 0; i < nodes.length; i++) {
+            let n = nodes[i]
+            let key = n.key || ("node_" + (i + 1))
+            let bRec = createdMap[key]
+            let deps = n.depends_on || []
+            for (let j = 0; j < deps.length; j++) {
+                let depKey = deps[j]
+                let aRec = createdMap[depKey]
+                if (!aRec) continue
+
+                let bRels = []
+                try { bRels = JSON.parse(String(bRec.get("relations") || "[]")) } catch (e) { bRels = [] }
+                bRels.push({ issue: aRec.id, type: "blocked_by" })
+                bRec.set("relations", bRels)
+                e.app.save(bRec)
+
+                let aRels = []
+                try { aRels = JSON.parse(String(aRec.get("relations") || "[]")) } catch (e) { aRels = [] }
+                aRels.push({ issue: bRec.id, type: "blocks" })
+                aRec.set("relations", aRels)
+                e.app.save(aRec)
+            }
+        }
+
+        return {
+            success: true,
+            parent_id: parent.id,
+            parent_identifier: parent.getString("identifier"),
+            total_nodes: createdList.length,
+            nodes: createdList
+        }
+    }
+
+    const getDagStatus = (args) => {
+        let issueRef = (args.issue_id || "").trim()
+        if (!issueRef) { throw new Error("issue_id is required") }
+        let issue = resolveIssueRecord(issueRef)
+        let parentId = issue.getString("parent_issue") || issue.id
+        let parent = (parentId === issue.id) ? issue : resolveIssueRecord(parentId)
+
+        let children = e.app.findRecordsByFilter("issues", "parent_issue = '" + parent.id + "'", "created", 200, 0)
+        let totalNodes = children.length
+        let completedNodes = 0
+        let inProgressNodes = 0
+        let readyNodes = []
+        let blockedNodes = []
+
+        let childMap = {}
+        for (let i = 0; i < children.length; i++) { childMap[children[i].id] = children[i] }
+
+        let nodesSummary = []
+        for (let i = 0; i < children.length; i++) {
+            let child = children[i]
+            let st = child.getString("status")
+            let ident = child.getString("identifier")
+            let rels = []
+            try { rels = JSON.parse(String(child.get("relations") || "[]")) } catch (e) { rels = [] }
+
+            let isBlocked = false
+            for (let r = 0; r < rels.length; r++) {
+                if (rels[r].type === "blocked_by") {
+                    let depRec = childMap[rels[r].issue]
+                    if (!depRec) {
+                        try { depRec = e.app.findRecordById("issues", rels[r].issue) } catch (dErr) {}
+                    }
+                    if (depRec && depRec.getString("status") !== "done") {
+                        isBlocked = true
+                        break
+                    }
+                }
+            }
+
+            if (st === "done") completedNodes++
+            else if (st === "in_progress") inProgressNodes++
+
+            let isReady = (st !== "done" && st !== "cancelled" && !isBlocked)
+            if (isReady) readyNodes.push(ident)
+            else if (isBlocked && st !== "done" && st !== "cancelled") blockedNodes.push(ident)
+
+            nodesSummary.push({
+                id: child.id,
+                identifier: ident,
+                title: child.getString("title"),
+                status: st,
+                persona: child.getString("task_persona"),
+                is_ready: isReady,
+                is_blocked: isBlocked
+            })
+        }
+
+        return {
+            success: true,
+            parent_id: parent.id,
+            parent_identifier: parent.getString("identifier"),
+            total_nodes: totalNodes,
+            completed_nodes: completedNodes,
+            in_progress_nodes: inProgressNodes,
+            progress_percent: totalNodes > 0 ? Math.round((completedNodes / totalNodes) * 100) : 0,
+            is_dag_completed: totalNodes > 0 && completedNodes === totalNodes,
+            ready_to_execute: readyNodes,
+            blocked: blockedNodes,
+            nodes: nodesSummary
+        }
+    }
+
+    const executeDagStep = (args) => {
+        let parentRef = (args.parent_issue || "").trim()
+        if (!parentRef) { throw new Error("parent_issue is required") }
+        let parent = resolveIssueRecord(parentRef)
+        let agentName = (args.agent_name || "Swarm Worker").trim()
+        let targetPersona = (args.persona || "").trim()
+
+        let parentId = parent.getString("parent_issue") || parent.id
+        let children = e.app.findRecordsByFilter("issues", "parent_issue = '" + parentId + "'", "created", 200, 0)
+        let nowIso = new Date().toISOString()
+
+        let childMap = {}
+        for (let i = 0; i < children.length; i++) { childMap[children[i].id] = children[i] }
+
+        let readyCandidates = []
+        for (let i = 0; i < children.length; i++) {
+            let child = children[i]
+            let status = child.getString("status")
+            if (status === "done" || status === "cancelled" || status === "in_progress") continue
+
+            let rels = []
+            try { rels = JSON.parse(String(child.get("relations") || "[]")) } catch (e) { rels = [] }
+            let isBlocked = false
+            for (let r = 0; r < rels.length; r++) {
+                if (rels[r].type === "blocked_by") {
+                    let depRec = childMap[rels[r].issue]
+                    if (!depRec) { try { depRec = e.app.findRecordById("issues", rels[r].issue) } catch (dErr) {} }
+                    if (depRec && depRec.getString("status") !== "done") { isBlocked = true; break }
+                }
+            }
+
+            if (!isBlocked) {
+                let activeLeases = e.app.findRecordsByFilter("task_leases", "issue = '" + child.id + "' && expires_at > '" + nowIso + "'", "", 1, 0)
+                if (activeLeases.length === 0) { readyCandidates.push(child) }
+            }
+        }
+
+        if (readyCandidates.length === 0) {
+            return { success: true, message: "No ready unblocked and unleased nodes available", node: null, remaining_ready: 0 }
+        }
+
+        let selectedNode = null
+        if (targetPersona) {
+            for (let i = 0; i < readyCandidates.length; i++) {
+                if (readyCandidates[i].getString("task_persona").toLowerCase() === targetPersona.toLowerCase()) {
+                    selectedNode = readyCandidates[i]
+                    break
+                }
+            }
+        }
+        if (!selectedNode) { selectedNode = readyCandidates[0] }
+
+        selectedNode.set("status", "in_progress")
+        if (agentName) { selectedNode.set("assignee", agentName) }
+        e.app.save(selectedNode)
+
+        let leaseCol = e.app.findCollectionByNameOrId("task_leases")
+        let leaseRec = new Record(leaseCol)
+        let ttl = 900
+        let expiresAt = new Date(Date.now() + (ttl * 1000)).toISOString()
+
+        leaseRec.set("issue", selectedNode.id)
+        leaseRec.set("agent_name", agentName)
+        leaseRec.set("acquired_at", nowIso)
+        leaseRec.set("expires_at", expiresAt)
+        leaseRec.set("reason", "DAG step execution by " + agentName + " (" + selectedNode.getString("task_persona") + ")")
+        e.app.save(leaseRec)
+
+        return {
+            success: true,
+            node: {
+                id: selectedNode.id,
+                identifier: selectedNode.getString("identifier"),
+                title: selectedNode.getString("title"),
+                status: selectedNode.getString("status"),
+                persona: selectedNode.getString("task_persona"),
+                assignee: selectedNode.getString("assignee")
+            },
+            lease_expires_at: expiresAt,
+            remaining_ready: readyCandidates.length - 1
+        }
+    }
+
+    const splitSubtasks = (args) => {
+        let issueRef = (args.issue_id || "").trim()
+        if (!issueRef) { throw new Error("issue_id is required") }
+        let issue = resolveIssueRecord(issueRef)
+        let subtasks = args.subtasks || []
+        if (!Array.isArray(subtasks)) { throw new Error("subtasks must be an array") }
+
+        let formatted = []
+        for (let i = 0; i < subtasks.length; i++) {
+            let st = subtasks[i]
+            let title = (typeof st === "string") ? st : (st.title || "")
+            if (!title) continue
+            formatted.push({
+                id: st.id || ("st_" + (i + 1)),
+                title: title,
+                persona: st.persona || "coder",
+                estimate: parseInt(st.estimate || "0", 10) || 0,
+                done: !!st.done,
+                order: i + 1
+            })
+        }
+        issue.set("subtasks", formatted)
+        e.app.save(issue)
+
+        return {
+            success: true,
+            issue_id: issue.id,
+            identifier: issue.getString("identifier"),
+            subtasks_count: formatted.length,
+            subtasks: formatted
+        }
+    }
+
+    const submitValidationCheckpoint = (args) => {
+        let issueRef = (args.issue_id || "").trim()
+        if (!issueRef) { throw new Error("issue_id is required") }
+        let issue = resolveIssueRecord(issueRef)
+        let agentName = (args.agent_name || "Verifier").trim()
+        let persona = (args.persona || "reviewer").trim()
+        let checkpointType = (args.checkpoint_type || "peer_review").trim()
+        let status = (args.status || "passed").trim().toLowerCase()
+        let notes = (args.notes || "").trim()
+        let artifacts = args.artifacts || {}
+
+        let cpCol = e.app.findCollectionByNameOrId("task_checkpoints")
+        let cpRec = new Record(cpCol)
+        cpRec.set("issue", issue.id)
+        cpRec.set("agent_name", agentName)
+        cpRec.set("persona", persona)
+        cpRec.set("checkpoint_type", checkpointType)
+        cpRec.set("status", status)
+        cpRec.set("notes", notes)
+        cpRec.set("artifacts", artifacts)
+        e.app.save(cpRec)
+
+        return {
+            success: true,
+            checkpoint: {
+                id: cpRec.id,
+                issue_id: issue.id,
+                identifier: issue.getString("identifier"),
+                agent_name: agentName,
+                persona: persona,
+                checkpoint_type: checkpointType,
+                status: status,
+                notes: notes,
+                created: cpRec.getString("created")
+            },
+            gate_passed: (status === "passed")
+        }
+    }
+
+    const getValidationCheckpoints = (args) => {
+        let issueRef = (args.issue_id || "").trim()
+        if (!issueRef) { throw new Error("issue_id is required") }
+        let issue = resolveIssueRecord(issueRef)
+        let cpList = e.app.findRecordsByFilter("task_checkpoints", "issue = '" + issue.id + "'", "-created", 100, 0)
+        let results = []
+        let failedCount = 0
+        let passedCount = 0
+        for (let i = 0; i < cpList.length; i++) {
+            let cp = cpList[i]
+            let st = cp.getString("status")
+            if (st === "passed") passedCount++
+            else if (st === "failed" || st === "changes_requested") failedCount++
+            results.push({
+                id: cp.id,
+                agent_name: cp.getString("agent_name"),
+                persona: cp.getString("persona"),
+                checkpoint_type: cp.getString("checkpoint_type"),
+                status: st,
+                notes: cp.getString("notes"),
+                created: cp.getString("created")
+            })
+        }
+        return {
+            success: true,
+            issue_id: issue.id,
+            identifier: issue.getString("identifier"),
+            total_checkpoints: results.length,
+            all_passed: results.length > 0 && failedCount === 0,
+            passed_count: passedCount,
+            failed_count: failedCount,
+            checkpoints: results
+        }
+    }
+
     // ---------- 1. Authentication ----------
     let authRecord = e.auth || null
     let bypassEnabled = false
@@ -969,6 +1394,12 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         else if (toolName === "register_webhook") { result = registerWebhook(args) }
         else if (toolName === "list_webhooks") { result = listWebhooks(args) }
         else if (toolName === "delete_webhook") { result = deleteWebhook(args) }
+        else if (toolName === "decompose_task_graph") { result = decomposeTaskGraph(args) }
+        else if (toolName === "get_dag_status") { result = getDagStatus(args) }
+        else if (toolName === "execute_dag_step") { result = executeDagStep(args) }
+        else if (toolName === "split_subtasks") { result = splitSubtasks(args) }
+        else if (toolName === "submit_validation_checkpoint") { result = submitValidationCheckpoint(args) }
+        else if (toolName === "get_validation_checkpoints") { result = getValidationCheckpoints(args) }
         else { return fail(-32602, "Unknown tool: " + toolName) }
         return ok({ content: [{ type: "text", text: JSON.stringify(result) }] })
     } catch (toolErr) {

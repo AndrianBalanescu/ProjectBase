@@ -2256,6 +2256,93 @@
           }
         }
       }
+    },
+    "/projectbase/dag/decompose": {
+      "post": {
+        "tags": [
+          "Agent Swarm DAG"
+        ],
+        "summary": "Decompose Task into DAG Nodes",
+        "description": "Decomposes a parent issue into a DAG of child tasks with personas and dependency edges.",
+        "responses": {
+          "200": {
+            "description": "Decomposed DAG nodes"
+          },
+          "400": {
+            "description": "Invalid body or cyclic dependency"
+          }
+        }
+      }
+    },
+    "/projectbase/dag/status": {
+      "get": {
+        "tags": [
+          "Agent Swarm DAG"
+        ],
+        "summary": "Get DAG Status",
+        "description": "Retrieves execution status, ready/blocked nodes, and leases for a task DAG.",
+        "responses": {
+          "200": {
+            "description": "DAG status summary"
+          }
+        }
+      }
+    },
+    "/projectbase/dag/step": {
+      "post": {
+        "tags": [
+          "Agent Swarm DAG"
+        ],
+        "summary": "Execute Next DAG Step",
+        "description": "Advances DAG execution by claiming next unblocked task for an agent persona.",
+        "responses": {
+          "200": {
+            "description": "Dispatched task step"
+          }
+        }
+      }
+    },
+    "/projectbase/tasks/split": {
+      "post": {
+        "tags": [
+          "Agent Swarm DAG"
+        ],
+        "summary": "Split Issue Subtasks with Personas",
+        "description": "Dynamically splits an issue checklist into subtasks with assigned agent personas.",
+        "responses": {
+          "200": {
+            "description": "Updated subtasks"
+          }
+        }
+      }
+    },
+    "/projectbase/checkpoints/submit": {
+      "post": {
+        "tags": [
+          "Validation Checkpoints"
+        ],
+        "summary": "Submit Validation Checkpoint",
+        "description": "Submits a peer-review verdict or test validation checkpoint for an issue.",
+        "responses": {
+          "200": {
+            "description": "Checkpoint recorded"
+          }
+        }
+      }
+    },
+    "/projectbase/checkpoints": {
+      "get": {
+        "tags": [
+          "Validation Checkpoints"
+        ],
+        "summary": "List Validation Checkpoints",
+        "description": "Lists validation checkpoints and quality gate status for an issue.",
+        "responses": {
+          "200": {
+            "description": "Checkpoints list"
+          }
+        }
+      }
     }
   }
 }

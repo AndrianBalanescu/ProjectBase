@@ -630,5 +630,113 @@ def delete_webhook(webhook_id: str) -> Dict[str, Any]:
     """Delete a registered webhook subscription by ID."""
     return _request(f"/api/projectbase/webhooks/{webhook_id}", method="DELETE")
 
+@mcp.tool()
+def decompose_task_graph(
+    parent_issue: str,
+    nodes: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """Decompose a parent issue into a DAG of child tasks with personas and dependency edges.
+
+    Args:
+        parent_issue: Parent issue identifier (e.g. "PB-42") or record ID.
+        nodes: List of task nodes: [{ key, title, description, persona, priority, estimate, depends_on }]
+    """
+    iss = _find_issue(parent_issue)
+    return _request("/api/projectbase/dag/decompose", method="POST", data={
+        "parent_issue": iss["id"],
+        "nodes": nodes
+    })
+
+@mcp.tool()
+def get_dag_status(issue: str) -> Dict[str, Any]:
+    """Retrieve DAG execution status, topological states, ready/blocked nodes, and active leases.
+
+    Args:
+        issue: Parent or child issue identifier (e.g. "PB-42") or record ID.
+    """
+    iss = _find_issue(issue)
+    return _request(f"/api/projectbase/dag/status?issue_id={iss['id']}")
+
+@mcp.tool()
+def execute_dag_step(
+    parent_issue: str,
+    agent_name: str = "Swarm Worker",
+    persona: str = ""
+) -> Dict[str, Any]:
+    """Advance DAG execution by selecting the next ready unblocked task and claiming a lease.
+
+    Args:
+        parent_issue: Parent issue identifier (e.g. "PB-42") or record ID.
+        agent_name: Name of executing agent (default: "Swarm Worker").
+        persona: Optional persona filter for ready nodes (e.g. "coder", "reviewer", "qa").
+    """
+    iss = _find_issue(parent_issue)
+    return _request("/api/projectbase/dag/step", method="POST", data={
+        "parent_issue": iss["id"],
+        "agent_name": agent_name,
+        "persona": persona
+    })
+
+@mcp.tool()
+def split_subtasks(
+    issue: str,
+    subtasks: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """Dynamically split an issue's subtasks checklist with persona assignments and story points.
+
+    Args:
+        issue: Issue identifier (e.g. "PB-42") or record ID.
+        subtasks: Array of subtasks: [{ title, persona, estimate, done }]
+    """
+    iss = _find_issue(issue)
+    return _request("/api/projectbase/tasks/split", method="POST", data={
+        "issue_id": iss["id"],
+        "subtasks": subtasks
+    })
+
+@mcp.tool()
+def submit_validation_checkpoint(
+    issue: str,
+    agent_name: str,
+    checkpoint_type: str,
+    status: str,
+    persona: str = "reviewer",
+    notes: str = "",
+    artifacts: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """Submit a peer-review verdict, QA verification, or test checkpoint for an issue.
+
+    Args:
+        issue: Issue identifier (e.g. "PB-42") or record ID.
+        agent_name: Agent name performing review/verification.
+        checkpoint_type: "peer_review" | "unit_test" | "qa_e2e" | "security_scan" | "schema_validation" | "acceptance"
+        status: "passed" | "failed" | "changes_requested" | "pending"
+        persona: Reviewer persona (e.g. "reviewer", "qa", "security", "architect").
+        notes: Detailed review comments or verification logs.
+        artifacts: Optional structured artifacts (diffs, reports, logs).
+    """
+    iss = _find_issue(issue)
+    data: Dict[str, Any] = {
+        "issue_id": iss["id"],
+        "agent_name": agent_name,
+        "persona": persona,
+        "checkpoint_type": checkpoint_type,
+        "status": status,
+        "notes": notes,
+    }
+    if artifacts:
+        data["artifacts"] = artifacts
+    return _request("/api/projectbase/checkpoints/submit", method="POST", data=data)
+
+@mcp.tool()
+def get_validation_checkpoints(issue: str) -> Dict[str, Any]:
+    """Get all validation checkpoints and quality gate status for an issue.
+
+    Args:
+        issue: Issue identifier (e.g. "PB-42") or record ID.
+    """
+    iss = _find_issue(issue)
+    return _request(f"/api/projectbase/checkpoints?issue_id={iss['id']}")
+
 if __name__ == "__main__":
     mcp.run()

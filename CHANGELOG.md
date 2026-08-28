@@ -11,6 +11,14 @@ subscriptions, Stripe, or paid tiers.
 ## [Unreleased]
 
 ### Added
+- **Autonomous Agent Swarm Choreography & Task Graph Decomposition (Epic 10)**:
+  - Task Graph DAG Decomposition (`POST /api/projectbase/dag/decompose`): Decomposes parent goals into child tasks with persona assignments (`architect`, `coder`, `reviewer`, `qa`, `security`), estimated points, and dependency edges (`blocks` / `blocked_by`), with Kahn's algorithm cycle detection preventing circular task deadlock.
+  - Topological DAG Execution Status (`GET /api/projectbase/dag/status`): Computes real-time execution states, ready vs blocked candidate tasks, progress percentages, active agent leases, and DAG completion status.
+  - Automated Step Dispatching (`POST /api/projectbase/dag/step`): Selects the next unblocked ready task, filters by requested agent persona, sets status to `in_progress`, and claims an exclusive execution lease.
+  - Dynamic Subtask Persona Splitting (`POST /api/projectbase/tasks/split`): Enables granular subtask checklist splitting with persona specialization and story point estimation.
+  - Automated Peer-Review & Validation Checkpoints (`POST /api/projectbase/checkpoints/submit`, `GET /api/projectbase/checkpoints`, `task_checkpoints` collection): Quality gates before issue resolution, supporting reviews, unit tests, QA E2E verification, security scans, and telemetry event logging.
+  - FastMCP JSON-RPC 2.0 & Python Client Tools: Exposes `decompose_task_graph`, `get_dag_status`, `execute_dag_step`, `split_subtasks`, `submit_validation_checkpoint`, and `get_validation_checkpoints` over HTTP and via `scripts/mcp_server.py`.
+  - Comprehensive automated test suite (`tests/test_swarm_dag.py`) expanding total test coverage to 245/245 passing tests across 14 test suites.
 - **FastMCP cycle + milestone tools** (`scripts/mcp_server.py`): the agent-facing
   FastMCP server previously exposed projects/issues/relations/notifications/
   dispatch tools but had **no** way to read cycles or milestones, even though
