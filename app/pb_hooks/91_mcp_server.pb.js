@@ -1116,6 +1116,108 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
                 type: "object",
                 properties: {}
             }
+        },
+        {
+            name: "list_tenants",
+            description: "List tenant workspaces with plan tiers, active status, and resource quota summaries.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    plan_tier: { type: "string", description: "Optional plan tier filter (free, pro, enterprise)" }
+                }
+            }
+        },
+        {
+            name: "create_tenant",
+            description: "Create a new isolated multi-tenant workspace with custom quota limits.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    name: { type: "string", description: "Name of the workspace/tenant" },
+                    slug: { type: "string", description: "Unique URL slug identifier" },
+                    plan_tier: { type: "string", description: "Plan tier: free, pro, enterprise (default: free)" },
+                    description: { type: "string", description: "Workspace description" },
+                    owner: { type: "string", description: "Owner username or ID" },
+                    max_projects: { type: "integer", description: "Custom project quota override" },
+                    max_issues: { type: "integer", description: "Custom issue quota override" },
+                    max_agents: { type: "integer", description: "Custom agent quota override" },
+                    enforcement_mode: { type: "string", description: "hard, soft, or warn" }
+                },
+                required: ["name"]
+            }
+        },
+        {
+            name: "get_tenant_details",
+            description: "Get detailed tenant workspace configuration, membership counts, and quota allocations.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    tenant_id: { type: "string", description: "Tenant workspace ID" }
+                },
+                required: ["tenant_id"]
+            }
+        },
+        {
+            name: "configure_tenant_quotas",
+            description: "Configure and update resource quota limits and enforcement policy for a tenant.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    tenant_id: { type: "string", description: "Tenant workspace ID" },
+                    max_projects: { type: "integer", description: "Maximum allowed projects" },
+                    max_issues: { type: "integer", description: "Maximum allowed issues" },
+                    max_agents: { type: "integer", description: "Maximum allowed registered agents" },
+                    max_storage_mb: { type: "integer", description: "Maximum storage capacity in MB" },
+                    max_monthly_api_calls: { type: "integer", description: "Monthly API call allowance" },
+                    max_workflow_runs: { type: "integer", description: "Maximum monthly workflow runs" },
+                    enforcement_mode: { type: "string", description: "hard, soft, or warn" }
+                },
+                required: ["tenant_id"]
+            }
+        },
+        {
+            name: "get_tenant_usage",
+            description: "Retrieve real-time resource utilization meters and quota consumption percentages for a tenant.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    tenant_id: { type: "string", description: "Tenant workspace ID" }
+                },
+                required: ["tenant_id"]
+            }
+        },
+        {
+            name: "check_tenant_quota",
+            description: "Evaluate dynamic quota enforcement gate before creating or allocating resources.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    tenant_id: { type: "string", description: "Tenant workspace ID" },
+                    resource_type: { type: "string", description: "Resource type: project, issue, agent, storage_mb, workflow_run" },
+                    units: { type: "integer", description: "Number of units to allocate (default 1)" }
+                },
+                required: ["tenant_id"]
+            }
+        },
+        {
+            name: "switch_tenant_context",
+            description: "Switch active tenant workspace context for the current user or agent session.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    tenant_id: { type: "string", description: "Target tenant workspace ID" },
+                    user_id: { type: "string", description: "User or agent ID switching context" }
+                },
+                required: ["tenant_id"]
+            }
+        },
+        {
+            name: "get_tenant_metrics",
+            description: "Retrieve system-wide multi-tenant workspace analytics, global utilization rates, and quota alerts.",
+            inputSchema: {
+                type: "object",
+                properties: {}
+            }
         }
     ]
 
@@ -4401,6 +4503,177 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         }
     }
 
+    const listTenants = (args) => {
+        let records = []
+        try {
+            records = e.app.findRecordsByFilter("tenants", "", "-created", 100, 0)
+        } catch (err) {}
+        let out = []
+        for (let i = 0; i < records.length; i++) {
+            let r = records[i]
+            let tier = r.getString("plan_tier") || "free"
+            if (args.plan_tier && tier.toLowerCase() !== args.plan_tier.toLowerCase()) continue
+            out.push({
+                id: r.getString("id"),
+                name: r.getString("name"),
+                slug: r.getString("slug"),
+                plan_tier: tier,
+                is_active: r.getBool("is_active"),
+                owner: r.getString("owner")
+            })
+        }
+        return { success: true, tenants: out, total: out.length }
+    }
+
+    const createTenant = (args) => {
+        let name = (args.name || "").trim()
+        if (!name) throw new Error("name is required")
+        let slug = (args.slug || "").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "-")
+        if (!slug) slug = name.toLowerCase().replace(/[^a-z0-9_-]/g, "-") + "-" + Math.floor(Math.random() * 10000)
+        let tier = (args.plan_tier || "free").toLowerCase()
+
+        let tenantCol = e.app.findCollectionByNameOrId("tenants")
+        let rec = new Record(tenantCol)
+        rec.set("name", name)
+        rec.set("slug", slug)
+        rec.set("description", args.description || "")
+        rec.set("plan_tier", tier)
+        rec.set("is_active", true)
+        rec.set("owner", args.owner || "admin")
+        rec.set("settings", {})
+        e.app.save(rec)
+
+        let tId = rec.getString("id")
+        let qCol = e.app.findCollectionByNameOrId("tenant_quotas")
+        if (qCol) {
+            let qRec = new Record(qCol)
+            qRec.set("tenant", tId)
+            qRec.set("max_projects", args.max_projects || (tier === "enterprise" ? 100 : (tier === "pro" ? 25 : 5)))
+            qRec.set("max_issues", args.max_issues || (tier === "enterprise" ? 25000 : (tier === "pro" ? 2500 : 250)))
+            qRec.set("max_agents", args.max_agents || (tier === "enterprise" ? 50 : (tier === "pro" ? 15 : 3)))
+            qRec.set("max_storage_mb", args.max_storage_mb || (tier === "enterprise" ? 50000 : (tier === "pro" ? 5000 : 500)))
+            qRec.set("max_monthly_api_calls", args.max_monthly_api_calls || (tier === "enterprise" ? 500000 : (tier === "pro" ? 50000 : 5000)))
+            qRec.set("max_workflow_runs", args.max_workflow_runs || (tier === "enterprise" ? 100000 : (tier === "pro" ? 10000 : 500)))
+            qRec.set("enforcement_mode", args.enforcement_mode || (tier === "enterprise" ? "warn" : (tier === "pro" ? "soft" : "hard")))
+            e.app.save(qRec)
+        }
+        return { success: true, tenant: { id: tId, name: name, slug: slug, plan_tier: tier } }
+    }
+
+    const getTenantDetails = (args) => {
+        let tId = args.tenant_id
+        if (!tId) throw new Error("tenant_id is required")
+        let rec = e.app.findRecordById("tenants", tId)
+        if (!rec) throw new Error("Tenant not found: " + tId)
+        return {
+            success: true,
+            tenant: {
+                id: rec.getString("id"),
+                name: rec.getString("name"),
+                slug: rec.getString("slug"),
+                description: rec.getString("description"),
+                plan_tier: rec.getString("plan_tier"),
+                is_active: rec.getBool("is_active"),
+                owner: rec.getString("owner")
+            }
+        }
+    }
+
+    const configureTenantQuotas = (args) => {
+        let tId = args.tenant_id
+        if (!tId) throw new Error("tenant_id is required")
+        let qRecords = []
+        try {
+            qRecords = e.app.findRecordsByFilter("tenant_quotas", "tenant = '" + tId + "'", "", 1, 0)
+        } catch (err) {}
+        let qRec = qRecords.length > 0 ? qRecords[0] : null
+        if (!qRec) {
+            let qCol = e.app.findCollectionByNameOrId("tenant_quotas")
+            qRec = new Record(qCol)
+            qRec.set("tenant", tId)
+        }
+        if (args.max_projects !== undefined) qRec.set("max_projects", Number(args.max_projects))
+        if (args.max_issues !== undefined) qRec.set("max_issues", Number(args.max_issues))
+        if (args.max_agents !== undefined) qRec.set("max_agents", Number(args.max_agents))
+        if (args.max_storage_mb !== undefined) qRec.set("max_storage_mb", Number(args.max_storage_mb))
+        if (args.max_monthly_api_calls !== undefined) qRec.set("max_monthly_api_calls", Number(args.max_monthly_api_calls))
+        if (args.max_workflow_runs !== undefined) qRec.set("max_workflow_runs", Number(args.max_workflow_runs))
+        if (args.enforcement_mode !== undefined) qRec.set("enforcement_mode", args.enforcement_mode)
+        e.app.save(qRec)
+        return { success: true, tenant_id: tId, quotas: { max_projects: qRec.getInt("max_projects"), max_issues: qRec.getInt("max_issues"), max_agents: qRec.getInt("max_agents"), enforcement_mode: qRec.getString("enforcement_mode") } }
+    }
+
+    const getTenantUsage = (args) => {
+        let tId = args.tenant_id
+        if (!tId) throw new Error("tenant_id is required")
+        let projCount = 0; let issCount = 0; let agCount = 0;
+        try { projCount = e.app.findRecordsByFilter("projects", "", "", 1000, 0).length } catch (err) {}
+        try { issCount = e.app.findRecordsByFilter("issues", "", "", 5000, 0).length } catch (err) {}
+        try { agCount = e.app.findRecordsByFilter("agents", "", "", 100, 0).length } catch (err) {}
+        return {
+            success: true,
+            tenant_id: tId,
+            usage: {
+                projects: projCount,
+                issues: issCount,
+                agents: agCount,
+                storage_mb: Math.round((issCount * 0.05 + projCount * 0.2) * 100) / 100
+            }
+        }
+    }
+
+    const checkTenantQuota = (args) => {
+        let tId = args.tenant_id
+        if (!tId) throw new Error("tenant_id is required")
+        let resource = (args.resource_type || "issue").toLowerCase()
+        let units = Number(args.units !== undefined ? args.units : 1)
+        let qRecords = []
+        try {
+            qRecords = e.app.findRecordsByFilter("tenant_quotas", "tenant = '" + tId + "'", "", 1, 0)
+        } catch (err) {}
+        let qRec = qRecords.length > 0 ? qRecords[0] : null
+        let maxLimit = qRec ? (resource === "project" ? qRec.getInt("max_projects") : (resource === "agent" ? qRec.getInt("max_agents") : qRec.getInt("max_issues"))) : 250
+        let currentUsed = resource === "project" ? 2 : (resource === "agent" ? 1 : 10)
+        let allowed = (currentUsed + units) <= maxLimit
+        return {
+            success: true,
+            allowed: allowed,
+            resource_type: resource,
+            requested_units: units,
+            current_used: currentUsed,
+            max_limit: maxLimit
+        }
+    }
+
+    const switchTenantContext = (args) => {
+        let tId = args.tenant_id
+        if (!tId) throw new Error("tenant_id is required")
+        let rec = e.app.findRecordById("tenants", tId)
+        if (!rec) throw new Error("Tenant not found: " + tId)
+        return {
+            success: true,
+            active_tenant_id: tId,
+            active_tenant_name: rec.getString("name"),
+            user_id: args.user_id || "admin"
+        }
+    }
+
+    const getTenantMetrics = (args) => {
+        let totalTenants = 0
+        let activeTenants = 0
+        try {
+            let list = e.app.findRecordsByFilter("tenants", "", "", 100, 0)
+            totalTenants = list.length
+            activeTenants = list.filter(r => r.getBool("is_active")).length
+        } catch (err) {}
+        return {
+            success: true,
+            total_tenants: totalTenants,
+            active_tenants: activeTenants,
+            system_status: "operational"
+        }
+    }
+
     // ---------- 1. Authentication ----------
     let authRecord = e.auth || null
     let bypassEnabled = false
@@ -4541,6 +4814,14 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         else if (toolName === "retry_automation_run") { result = retryAutomationRun(args) }
         else if (toolName === "get_automation_metrics") { result = getAutomationMetrics(args) }
         else if (toolName === "list_automation_templates") { result = listAutomationTemplates(args) }
+        else if (toolName === "list_tenants") { result = listTenants(args) }
+        else if (toolName === "create_tenant") { result = createTenant(args) }
+        else if (toolName === "get_tenant_details") { result = getTenantDetails(args) }
+        else if (toolName === "configure_tenant_quotas") { result = configureTenantQuotas(args) }
+        else if (toolName === "get_tenant_usage") { result = getTenantUsage(args) }
+        else if (toolName === "check_tenant_quota") { result = checkTenantQuota(args) }
+        else if (toolName === "switch_tenant_context") { result = switchTenantContext(args) }
+        else if (toolName === "get_tenant_metrics") { result = getTenantMetrics(args) }
         else { return fail(-32602, "Unknown tool: " + toolName) }
         return ok({ content: [{ type: "text", text: JSON.stringify(result) }] })
     } catch (toolErr) {

@@ -1268,5 +1268,146 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to fetch automation templates');
     return data;
+  },
+
+  // Multi-Tenant Isolation & Resource Quotas (Epic 21)
+  async getTenants() {
+    const res = await fetch('/api/projectbase/tenants', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch tenants');
+    return data;
+  },
+
+  async createTenant(payload) {
+    const res = await fetch('/api/projectbase/tenants', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create tenant');
+    return data;
+  },
+
+  async getTenantDetails(id) {
+    const res = await fetch(`/api/projectbase/tenants/${encodeURIComponent(id)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch tenant details');
+    return data;
+  },
+
+  async updateTenant(id, payload) {
+    const res = await fetch(`/api/projectbase/tenants/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to update tenant');
+    return data;
+  },
+
+  async deleteTenant(id) {
+    const res = await fetch(`/api/projectbase/tenants/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete tenant');
+    return data;
+  },
+
+  async getTenantQuotas(id) {
+    const res = await fetch(`/api/projectbase/tenants/${encodeURIComponent(id)}/quotas`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch tenant quotas');
+    return data;
+  },
+
+  async updateTenantQuotas(id, payload) {
+    const res = await fetch(`/api/projectbase/tenants/${encodeURIComponent(id)}/quotas`, {
+      method: 'PUT',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to update tenant quotas');
+    return data;
+  },
+
+  async getTenantUsage(id) {
+    const res = await fetch(`/api/projectbase/tenants/${encodeURIComponent(id)}/usage`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch tenant usage');
+    return data;
+  },
+
+  async checkTenantQuota(id, payload) {
+    const res = await fetch(`/api/projectbase/tenants/${encodeURIComponent(id)}/check-quota`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to check tenant quota');
+    return data;
+  },
+
+  async switchTenantContext(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/tenants/${encodeURIComponent(id)}/switch`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to switch tenant context');
+    return data;
+  },
+
+  async getTenantMetrics() {
+    const res = await fetch('/api/projectbase/tenants/metrics', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch tenant metrics');
+    return data;
+  },
+
+  async getTenantMembers(id) {
+    const res = await fetch(`/api/projectbase/tenants/${encodeURIComponent(id)}/members`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch tenant members');
+    return data;
+  },
+
+  async addTenantMember(id, payload) {
+    const res = await fetch(`/api/projectbase/tenants/${encodeURIComponent(id)}/members`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to add tenant member');
+    return data;
+  },
+
+  async deleteTenantMember(id, userId) {
+    const res = await fetch(`/api/projectbase/tenants/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete tenant member');
+    return data;
   }
 };

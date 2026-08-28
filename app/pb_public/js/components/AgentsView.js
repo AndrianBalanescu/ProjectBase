@@ -161,7 +161,29 @@ const AgentsViewComponent = {
       isSavingRule: false,
       automationSuccessMsg: null,
       automationErrorMsg: null,
-      isLoadingAutomations: false
+      isLoadingAutomations: false,
+      // Multi-Tenant Isolation & Resource Quotas (Epic 21)
+      tenantsList: [],
+      selectedTenant: null,
+      tenantMetrics: null,
+      tenantMembers: [],
+      tenantUsage: null,
+      tenantQuotas: null,
+      newTenantName: '',
+      newTenantSlug: '',
+      newTenantDesc: '',
+      newTenantPlanTier: 'free',
+      newTenantOwner: 'admin',
+      testQuotaResourceType: 'issues',
+      testQuotaUnits: 5,
+      testQuotaResult: null,
+      isCheckingTenantQuota: false,
+      isCreatingTenant: false,
+      isSavingQuotas: false,
+      tenantSuccessMsg: null,
+      tenantErrorMsg: null,
+      isLoadingTenants: false,
+      activeTenantContextId: null
     };
   },
   computed: {
@@ -1191,6 +1213,131 @@ const AgentsViewComponent = {
     },
     inspectWorkflowRun(run) {
       this.selectedWorkflowRun = run;
+    },
+    async loadTenantsState() {
+      this.isLoadingTenants = true;
+      this.tenantSuccessMsg = null;
+      this.tenantErrorMsg = null;
+      try {
+        const [tRes, mRes] = await Promise.all([
+          API.getTenants().catch(() => ({ tenants: [] })),
+          API.getTenantMetrics().catch(() => null)
+        ]);
+        this.tenantsList = (tRes && tRes.tenants) || [];
+        this.tenantMetrics = mRes || {
+          total_tenants: this.tenantsList.length,
+          active_tenants: this.tenantsList.filter(t => t.is_active).length,
+          tier_breakdown: { free: this.tenantsList.length, pro: 0, enterprise: 0 },
+          aggregate_resources: { total_projects: 0, total_issues: 0 },
+          alerts_count: 0,
+          alerts: []
+        };
+        if (!this.selectedTenant && this.tenantsList.length > 0) {
+          await this.selectTenantWorkspace(this.tenantsList[0]);
+        }
+      } catch (e) {
+        this.tenantErrorMsg = e.message || String(e);
+      } finally {
+        this.isLoadingTenants = false;
+      }
+    },
+    async selectTenantWorkspace(t) {
+      if (!t) return;
+      this.selectedTenant = t;
+      try {
+        const [uRes, qRes, memRes] = await Promise.all([
+          API.getTenantUsage(t.id).catch(() => null),
+          API.getTenantQuotas(t.id).catch(() => null),
+          API.getTenantMembers(t.id).catch(() => ({ members: [] }))
+        ]);
+        this.tenantUsage = uRes || null;
+        this.tenantQuotas = (qRes && qRes.quotas) || t.quotas || null;
+        this.tenantMembers = (memRes && memRes.members) || [];
+      } catch (e) {
+        this.tenantErrorMsg = 'Failed loading tenant details: ' + (e.message || String(e));
+      }
+    },
+    async createTenantWorkspace() {
+      if (!this.newTenantName) {
+        this.tenantErrorMsg = 'Tenant workspace name is required';
+        return;
+      }
+      this.isCreatingTenant = true;
+      this.tenantSuccessMsg = null;
+      this.tenantErrorMsg = null;
+      try {
+        const res = await API.createTenant({
+          name: this.newTenantName,
+          slug: this.newTenantSlug || undefined,
+          description: this.newTenantDesc,
+          plan_tier: this.newTenantPlanTier,
+          owner: this.newTenantOwner || 'admin'
+        });
+        this.tenantSuccessMsg = `Tenant workspace "${this.newTenantName}" created successfully!`;
+        this.newTenantName = '';
+        this.newTenantSlug = '';
+        this.newTenantDesc = '';
+        await this.loadTenantsState();
+        if (res && res.tenant && res.tenant.id) {
+          const found = this.tenantsList.find(x => x.id === res.tenant.id);
+          if (found) await this.selectTenantWorkspace(found);
+        }
+      } catch (e) {
+        this.tenantErrorMsg = 'Failed creating tenant: ' + (e.message || String(e));
+      } finally {
+        this.isCreatingTenant = false;
+      }
+    },
+    async saveTenantQuotas() {
+      if (!this.selectedTenant || !this.tenantQuotas) return;
+      this.isSavingQuotas = true;
+      this.tenantSuccessMsg = null;
+      this.tenantErrorMsg = null;
+      try {
+        await API.updateTenantQuotas(this.selectedTenant.id, this.tenantQuotas);
+        this.tenantSuccessMsg = `Quotas updated for ${this.selectedTenant.name}.`;
+        await this.selectTenantWorkspace(this.selectedTenant);
+      } catch (e) {
+        this.tenantErrorMsg = 'Failed saving quotas: ' + (e.message || String(e));
+      } finally {
+        this.isSavingQuotas = false;
+      }
+    },
+    async deleteTenantWorkspace(id) {
+      if (!confirm('Are you sure you want to delete this tenant workspace?')) return;
+      try {
+        await API.deleteTenant(id);
+        this.tenantSuccessMsg = 'Tenant workspace deleted.';
+        this.selectedTenant = null;
+        await this.loadTenantsState();
+      } catch (e) {
+        this.tenantErrorMsg = 'Delete failed: ' + (e.message || String(e));
+      }
+    },
+    async testQuotaGateCheck() {
+      if (!this.selectedTenant) return;
+      this.isCheckingTenantQuota = true;
+      this.testQuotaResult = null;
+      try {
+        const res = await API.checkTenantQuota(this.selectedTenant.id, {
+          resource_type: this.testQuotaResourceType,
+          units: Number(this.testQuotaUnits)
+        });
+        this.testQuotaResult = res;
+      } catch (e) {
+        this.tenantErrorMsg = 'Quota check failed: ' + (e.message || String(e));
+      } finally {
+        this.isCheckingTenantQuota = false;
+      }
+    },
+    async switchActiveTenant(id) {
+      try {
+        const res = await API.switchTenantContext(id);
+        this.activeTenantContextId = id;
+        this.tenantSuccessMsg = `Active context switched to workspace: ${res.active_tenant_name}`;
+      } catch (e) {
+        this.tenantErrorMsg = 'Context switch failed: ' + (e.message || String(e));
+      }
     }
   },
   template: `
@@ -1307,7 +1454,7 @@ const AgentsViewComponent = {
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <h2 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 capitalize truncate">
-                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (activeTab === 'automations' ? 'Native Workflow Automations & AI Agent Trigger Pipelines' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center')))))))))) }}
+                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (activeTab === 'automations' ? 'Native Workflow Automations & AI Agent Trigger Pipelines' : (activeTab === 'tenants' ? 'Multi-Tenant Isolation & Granular Resource Quotas' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center'))))))))))) }}
                 </h2>
                 <span v-if="selectedSession && selectedSession.is_active && activeTab === 'chat'" class="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-400 text-[10px] font-mono font-semibold flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -1376,6 +1523,11 @@ const AgentsViewComponent = {
                   class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
                   :class="activeTab === 'automations' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
                 >⚡ Automations</button>
+                <button
+                  @click="activeTab = 'tenants'; loadTenantsState();"
+                  class="px-2 py-0.5 text-[10px] font-medium rounded transition-colors flex items-center gap-1"
+                  :class="activeTab === 'tenants' ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                >🏢 Multi-Tenant</button>
               </div>
             </div>
           </div>
@@ -3643,6 +3795,401 @@ const AgentsViewComponent = {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- PANE 2: MULTI-TENANT ISOLATION & RESOURCE QUOTAS TAB      -->
+        <!-- ========================================================= -->
+        <div
+          v-if="activeTab === 'tenants'"
+          class="flex-1 overflow-y-auto p-4 space-y-4"
+        >
+          <!-- Metric KPI Meters Header -->
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Total Tenants</div>
+              <div class="text-xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
+                {{ (tenantMetrics && tenantMetrics.total_tenants) || tenantsList.length }}
+              </div>
+            </div>
+            <div class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Active Workspaces</div>
+              <div class="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                {{ (tenantMetrics && tenantMetrics.active_tenants) || tenantsList.filter(t => t.is_active).length }}
+              </div>
+            </div>
+            <div class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Total Projects</div>
+              <div class="text-xl font-bold text-blue-600 dark:text-blue-400 mt-1">
+                {{ (tenantMetrics && tenantMetrics.aggregate_resources && tenantMetrics.aggregate_resources.total_projects) || 0 }}
+              </div>
+            </div>
+            <div class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Total Issues</div>
+              <div class="text-xl font-bold text-purple-600 dark:text-purple-400 mt-1">
+                {{ (tenantMetrics && tenantMetrics.aggregate_resources && tenantMetrics.aggregate_resources.total_issues) || 0 }}
+              </div>
+            </div>
+            <div class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Quota Alerts</div>
+              <div class="text-xl font-bold mt-1" :class="((tenantMetrics && tenantMetrics.alerts_count) || 0) > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-600 dark:text-zinc-400'">
+                {{ (tenantMetrics && tenantMetrics.alerts_count) || 0 }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Alert Banners -->
+          <div v-if="tenantSuccessMsg" class="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-200 flex items-center justify-between">
+            <span>{{ tenantSuccessMsg }}</span>
+            <button @click="tenantSuccessMsg = null" class="text-emerald-600 font-bold">&times;</button>
+          </div>
+          <div v-if="tenantErrorMsg" class="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs text-rose-800 dark:text-rose-200 flex items-center justify-between">
+            <span>{{ tenantErrorMsg }}</span>
+            <button @click="tenantErrorMsg = null" class="text-rose-600 font-bold">&times;</button>
+          </div>
+
+          <!-- Main Layout Grid -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            
+            <!-- Left Col: Tenant Workspace Roster & Creator -->
+            <div class="space-y-4">
+              <!-- Workspace List -->
+              <div class="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 space-y-3">
+                <div class="flex items-center justify-between">
+                  <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                    <span>🏢</span>
+                    <span>Tenant Workspaces</span>
+                  </div>
+                  <button
+                    @click="loadTenantsState"
+                    class="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-400"
+                    title="Refresh"
+                  >
+                    🔄
+                  </button>
+                </div>
+
+                <div v-if="tenantsList.length === 0" class="text-xs text-zinc-400 py-3 text-center">
+                  No tenant workspaces found. Create one below.
+                </div>
+                <div v-else class="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
+                  <div
+                    v-for="t in tenantsList"
+                    :key="t.id"
+                    @click="selectTenantWorkspace(t)"
+                    class="p-2 rounded-lg border cursor-pointer transition-all flex items-center justify-between"
+                    :class="selectedTenant && selectedTenant.id === t.id ? 'bg-zinc-200 dark:bg-zinc-800 border-zinc-400 dark:border-zinc-600 shadow-xs' : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'"
+                  >
+                    <div class="min-w-0">
+                      <div class="flex items-center gap-1.5">
+                        <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">{{ t.name }}</span>
+                        <span
+                          class="px-1.5 py-0.2 rounded text-[9px] font-semibold uppercase"
+                          :class="t.plan_tier === 'enterprise' ? 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300' : (t.plan_tier === 'pro' ? 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400')"
+                        >
+                          {{ t.plan_tier || 'free' }}
+                        </span>
+                      </div>
+                      <div class="text-[10px] font-mono text-zinc-400 truncate">/{{ t.slug }}</div>
+                    </div>
+
+                    <div class="flex items-center gap-1">
+                      <button
+                        @click.stop="switchActiveTenant(t.id)"
+                        class="px-1.5 py-0.5 rounded text-[9px] font-medium border"
+                        :class="activeTenantContextId === t.id ? 'bg-emerald-100 dark:bg-emerald-950/80 border-emerald-300 text-emerald-700 font-bold' : 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-zinc-600 hover:bg-zinc-200'"
+                        title="Switch active context"
+                      >
+                        {{ activeTenantContextId === t.id ? 'Active' : 'Switch' }}
+                      </button>
+                      <button
+                        @click.stop="deleteTenantWorkspace(t.id)"
+                        class="p-1 rounded hover:bg-red-100 dark:hover:bg-red-950/60 text-zinc-400 hover:text-red-600 text-[10px]"
+                        title="Delete tenant"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Create Tenant Form -->
+              <div class="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 space-y-2.5">
+                <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                  <span>➕</span>
+                  <span>Create Workspace</span>
+                </div>
+
+                <div>
+                  <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Workspace Name</label>
+                  <input
+                    v-model="newTenantName"
+                    type="text"
+                    placeholder="e.g. Acme Corp Autonomous"
+                    class="w-full px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs"
+                  />
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Slug (Optional)</label>
+                    <input
+                      v-model="newTenantSlug"
+                      type="text"
+                      placeholder="acme-corp"
+                      class="w-full px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Plan Tier</label>
+                    <select
+                      v-model="newTenantPlanTier"
+                      class="w-full px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs"
+                    >
+                      <option value="free">Free (Default limits)</option>
+                      <option value="pro">Pro (Scale limits)</option>
+                      <option value="enterprise">Enterprise (Max limits)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Description</label>
+                  <input
+                    v-model="newTenantDesc"
+                    type="text"
+                    placeholder="Workspace mission and description"
+                    class="w-full px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs"
+                  />
+                </div>
+
+                <button
+                  @click="createTenantWorkspace"
+                  :disabled="isCreatingTenant"
+                  class="w-full py-1.5 rounded bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  <span>{{ isCreatingTenant ? 'Creating...' : 'Provision Tenant' }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Middle Col: Selected Workspace Usage & Quota Gauges -->
+            <div class="space-y-4">
+              <div v-if="!selectedTenant" class="p-8 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 text-center text-xs text-zinc-400">
+                Select a tenant workspace from the left to inspect usage and resource quotas.
+              </div>
+              <div v-else class="space-y-4">
+                <!-- Tenant Header Card -->
+                <div class="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="text-sm font-bold text-zinc-900 dark:text-zinc-100">{{ selectedTenant.name }}</div>
+                      <div class="text-[10px] font-mono text-zinc-400">ID: {{ selectedTenant.id }} • Slug: /{{ selectedTenant.slug }}</div>
+                    </div>
+                    <span
+                      class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
+                      :class="selectedTenant.plan_tier === 'enterprise' ? 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300' : (selectedTenant.plan_tier === 'pro' ? 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300')"
+                    >
+                      {{ selectedTenant.plan_tier || 'free' }}
+                    </span>
+                  </div>
+                  <p v-if="selectedTenant.description" class="text-xs text-zinc-600 dark:text-zinc-400">{{ selectedTenant.description }}</p>
+                </div>
+
+                <!-- Live Quota Gauges -->
+                <div class="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 space-y-3">
+                  <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center justify-between">
+                    <span class="flex items-center gap-1.5">
+                      <span>📊</span>
+                      <span>Resource Quota Gauges</span>
+                    </span>
+                    <span class="text-[10px] font-mono text-zinc-400">Enforcement: {{ (tenantUsage && tenantUsage.enforcement_mode) || 'hard' }}</span>
+                  </div>
+
+                  <div class="space-y-2.5">
+                    <div
+                      v-for="meter in ((tenantUsage && tenantUsage.meters) || [])"
+                      :key="meter.resource"
+                      class="space-y-1"
+                    >
+                      <div class="flex items-center justify-between text-xs">
+                        <span class="font-medium capitalize text-zinc-700 dark:text-zinc-300">{{ meter.resource.replace('_', ' ') }}</span>
+                        <span class="font-mono text-[11px]" :class="meter.status === 'exceeded' ? 'text-red-500 font-bold' : (meter.status === 'warning' ? 'text-amber-500 font-bold' : 'text-zinc-500')">
+                          {{ meter.used }} / {{ meter.limit }} ({{ meter.pct }}%)
+                        </span>
+                      </div>
+                      <div class="w-full bg-zinc-200 dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
+                        <div
+                          class="h-full rounded-full transition-all"
+                          :style="{ width: meter.pct + '%' }"
+                          :class="meter.status === 'exceeded' ? 'bg-red-500' : (meter.status === 'warning' ? 'bg-amber-500' : 'bg-emerald-500')"
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Dynamic Quota Simulator -->
+                <div class="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 space-y-2.5">
+                  <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                    <span>⚡</span>
+                    <span>Quota Enforcement Simulator</span>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2">
+                    <div>
+                      <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Resource</label>
+                      <select
+                        v-model="testQuotaResourceType"
+                        class="w-full px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono"
+                      >
+                        <option value="issues">Issues</option>
+                        <option value="projects">Projects</option>
+                        <option value="agents">Agents</option>
+                        <option value="workflow_runs">Workflow Runs</option>
+                        <option value="storage_mb">Storage MB</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Units to Allocate</label>
+                      <input
+                        v-model.number="testQuotaUnits"
+                        type="number"
+                        min="1"
+                        class="w-full px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    @click="testQuotaGateCheck"
+                    :disabled="isCheckingTenantQuota"
+                    class="w-full py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  >
+                    <span>{{ isCheckingTenantQuota ? 'Checking Gate...' : 'Evaluate Quota Gate' }}</span>
+                  </button>
+
+                  <div
+                    v-if="testQuotaResult"
+                    class="p-2 rounded-lg border text-xs space-y-1"
+                    :class="testQuotaResult.allowed ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200' : 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200'"
+                  >
+                    <div class="font-bold flex items-center gap-1">
+                      <span>{{ testQuotaResult.allowed ? '✅ ALLOWED' : '🚫 QUOTA REJECTED' }}</span>
+                    </div>
+                    <div class="text-[11px]">{{ testQuotaResult.reason }}</div>
+                    <div class="text-[10px] font-mono text-zinc-500">
+                      Current: {{ testQuotaResult.current_used }} + Requested: {{ testQuotaResult.requested_units }} / Limit: {{ testQuotaResult.max_limit }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Col: Quota Limits Editor & Workspace Roster -->
+            <div class="space-y-4">
+              <!-- Edit Quotas -->
+              <div v-if="selectedTenant && tenantQuotas" class="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 space-y-2.5">
+                <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center justify-between">
+                  <span class="flex items-center gap-1.5">
+                    <span>⚙️</span>
+                    <span>Quota Limits & Rules</span>
+                  </span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Max Projects</label>
+                    <input
+                      v-model.number="tenantQuotas.max_projects"
+                      type="number"
+                      class="w-full px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Max Issues</label>
+                    <input
+                      v-model.number="tenantQuotas.max_issues"
+                      type="number"
+                      class="w-full px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Max Agents</label>
+                    <input
+                      v-model.number="tenantQuotas.max_agents"
+                      type="number"
+                      class="w-full px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Max Storage (MB)</label>
+                    <input
+                      v-model.number="tenantQuotas.max_storage_mb"
+                      type="number"
+                      class="w-full px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Max Monthly Calls</label>
+                    <input
+                      v-model.number="tenantQuotas.max_monthly_api_calls"
+                      type="number"
+                      class="w-full px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label class="text-[10px] font-medium text-zinc-500 block mb-0.5">Enforcement</label>
+                    <select
+                      v-model="tenantQuotas.enforcement_mode"
+                      class="w-full px-2 py-1 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs"
+                    >
+                      <option value="hard">Hard (Strict Block)</option>
+                      <option value="soft">Soft (Allow with Warn)</option>
+                      <option value="warn">Warn Only</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button
+                  @click="saveTenantQuotas"
+                  :disabled="isSavingQuotas"
+                  class="w-full py-1.5 rounded bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  <span>{{ isSavingQuotas ? 'Saving...' : 'Save Quota Settings' }}</span>
+                </button>
+              </div>
+
+              <!-- Members & Agents Roster -->
+              <div v-if="selectedTenant" class="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 space-y-2.5">
+                <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center justify-between">
+                  <span class="flex items-center gap-1.5">
+                    <span>👥</span>
+                    <span>Tenant Memberships ({{ tenantMembers.length }})</span>
+                  </span>
+                </div>
+
+                <div v-if="tenantMembers.length === 0" class="text-xs text-zinc-400 py-2 text-center">
+                  No explicit memberships found.
+                </div>
+                <div v-else class="space-y-1.5 max-h-[180px] overflow-y-auto pr-1">
+                  <div
+                    v-for="m in tenantMembers"
+                    :key="m.id"
+                    class="p-2 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs"
+                  >
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span class="font-bold text-zinc-900 dark:text-zinc-100 truncate">{{ m.user }}</span>
+                      <span class="px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 text-[9px] font-mono uppercase text-zinc-600 dark:text-zinc-400">{{ m.role }}</span>
+                    </div>
+                    <span class="text-[9px] font-mono text-zinc-400">{{ m.is_active ? 'Active' : 'Disabled' }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
 

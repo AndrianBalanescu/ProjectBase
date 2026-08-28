@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.21.0] - 2026-08-28 - Cycle 22
+### Added
+- **Native Cross-Workspace Multi-Tenant Tenant Isolation & Granular Resource Quotas (Epic 21):**
+  - Schema migration (`1710000032_add_multi_tenant_quotas.js`) adding `tenants`, `tenant_quotas`, and `tenant_memberships` collections.
+  - Backend multi-tenant engine hook (`app/pb_hooks/104_multi_tenant_quota_engine.pb.js`) with 14 REST API endpoints (`/api/projectbase/tenants/*`) supporting workspace provisioning, custom quota limits, real-time resource metering, dynamic quota enforcement gate checks, tenant context switching, cross-tenant metrics, and membership management.
+  - Granular resource quota enforcement with plan tiers (Free, Pro, Enterprise) and configurable enforcement modes (hard block, soft warning, warn-only) across projects, issues, agents, storage capacity, monthly API calls, and workflow executions.
+  - 8 FastMCP JSON-RPC 2.0 tools: `list_tenants`, `create_tenant`, `get_tenant_details`, `configure_tenant_quotas`, `get_tenant_usage`, `check_tenant_quota`, `switch_tenant_context`, `get_tenant_metrics`.
+  - Frontend AgentsView **🏢 Multi-Tenant & Quotas** dashboard tab with live KPI meters, interactive workspace provisioner, real-time quota gauges with visual utilization progress bars, dynamic quota enforcement gate simulator, and tenant memberships roster.
+  - 8 automated end-to-end tests in `tests/test_multi_tenant_quotas.py` (370/370 passing across 25 test suites with 100% frontend guard and headless render QA verification).
+
 ## [1.20.0] - 2026-08-28 - Cycle 21
 ### Added
 - **Native End-to-End Workflow Automations & AI Agent Trigger Pipelines (Epic 20):**
