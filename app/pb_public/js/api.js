@@ -2720,5 +2720,205 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to seed demo incident');
     return data;
+  },
+
+  // ==========================================
+  // Knowledge Graph & Architectural Memory APIs (Epic 32)
+  // ==========================================
+  async listKnowledgeNodes(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/knowledge/nodes${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list knowledge nodes');
+    return data;
+  },
+
+  async createKnowledgeNode(payload = {}) {
+    const res = await fetch('/api/projectbase/knowledge/nodes', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create knowledge node');
+    return data;
+  },
+
+  async getKnowledgeNodeDetails(id) {
+    const res = await fetch(`/api/projectbase/knowledge/nodes/${encodeURIComponent(id)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get knowledge node details');
+    return data;
+  },
+
+  async updateKnowledgeNode(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/knowledge/nodes/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to update knowledge node');
+    return data;
+  },
+
+  async deleteKnowledgeNode(id) {
+    const res = await fetch(`/api/projectbase/knowledge/nodes/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete knowledge node');
+    return data;
+  },
+
+  async setKnowledgeNodeStatus(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/knowledge/nodes/${encodeURIComponent(id)}/status`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to update node status');
+    return data;
+  },
+
+  async listKnowledgeRelations(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/knowledge/relations${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list relations');
+    return data;
+  },
+
+  async createKnowledgeRelation(payload = {}) {
+    const res = await fetch('/api/projectbase/knowledge/relations', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create knowledge relation');
+    return data;
+  },
+
+  async deleteKnowledgeRelation(id) {
+    const res = await fetch(`/api/projectbase/knowledge/relations/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete relation');
+    return data;
+  },
+
+  async getKnowledgeGraphTopology(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/knowledge/graph${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get knowledge graph topology');
+    return data;
+  },
+
+  async listArchitecturalInvariants(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/knowledge/invariants${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list architectural invariants');
+    return data;
+  },
+
+  async createArchitecturalInvariant(payload = {}) {
+    const res = await fetch('/api/projectbase/knowledge/invariants', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create architectural invariant');
+    return data;
+  },
+
+  async updateArchitecturalInvariant(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/knowledge/invariants/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to update architectural invariant');
+    return data;
+  },
+
+  async deleteArchitecturalInvariant(id) {
+    const res = await fetch(`/api/projectbase/knowledge/invariants/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete architectural invariant');
+    return data;
+  },
+
+  async verifyChangesAgainstInvariants(payload = {}) {
+    const res = await fetch('/api/projectbase/knowledge/verify-invariants', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to verify changes against invariants');
+    return data;
+  },
+
+  async listInvariantVerifications(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/knowledge/verifications${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list verifications');
+    return data;
+  },
+
+  async getKnowledgeGraphMetrics() {
+    const res = await fetch('/api/projectbase/knowledge/metrics', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get knowledge graph metrics');
+    return data;
+  },
+
+  async queryKnowledgeSemantic(payload = {}) {
+    const res = await fetch('/api/projectbase/knowledge/query', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to query knowledge graph');
+    return data;
+  },
+
+  async seedDemoKnowledgeGraph() {
+    const res = await fetch('/api/projectbase/knowledge/seed-demo', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to seed demo knowledge graph');
+    return data;
   }
 };

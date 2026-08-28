@@ -78,7 +78,7 @@ const HeaderComponent = {
             ⚡
           </div>
           <span class="text-sm font-semibold tracking-tight">ProjectBase</span>
-          <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700/50 select-none">v1.30.0</span>
+          <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700/50 select-none">v1.31.0</span>
         </div>
 
         <div class="h-4 w-px bg-zinc-200 dark:bg-zinc-800"></div>

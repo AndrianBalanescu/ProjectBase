@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "ProjectBase API",
-    "version": "1.30.0",
+    "version": "1.31.0",
     "description": "High-performance, ultra-lightweight Plane & Linear alternative for multi-project Kanban, sprint cycles, and autonomous AI agent orchestration.",
     "contact": {
       "name": "Andrian Balanescu",
@@ -8245,6 +8245,315 @@
         },
         "responses": {
           "200": { "description": "Post-mortem updated" }
+        }
+      }
+    },
+    "/projectbase/knowledge/nodes": {
+      "get": {
+        "tags": ["Knowledge Graph & Architectural Memory"],
+        "summary": "List architectural knowledge nodes, ADRs, and symbols",
+        "parameters": [
+          { "name": "kind", "in": "query", "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "schema": { "type": "string" } },
+          { "name": "project_id", "in": "query", "schema": { "type": "string" } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "file_path", "in": "query", "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "List of knowledge nodes" }
+        }
+      },
+      "post": {
+        "tags": ["Knowledge Graph & Architectural Memory"],
+        "summary": "Create architectural knowledge node or decision record",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string" },
+                  "slug": { "type": "string" },
+                  "kind": { "type": "string", "enum": ["invariant", "adr", "convention", "subsystem", "symbol", "runbook", "antipattern"] },
+                  "summary": { "type": "string" },
+                  "content_markdown": { "type": "string" },
+                  "project_id": { "type": "string" },
+                  "file_path": { "type": "string" },
+                  "symbol_name": { "type": "string" },
+                  "status": { "type": "string" },
+                  "confidence_score": { "type": "number" },
+                  "author_agent": { "type": "string" },
+                  "tags_json": { "type": "array", "items": { "type": "string" } }
+                },
+                "required": ["title"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Knowledge node created" }
+        }
+      }
+    },
+    "/projectbase/knowledge/nodes/{id}": {
+      "get": {
+        "tags": ["Knowledge Graph & Architectural Memory"],
+        "summary": "Get knowledge node details with inbound/outbound relations and invariants",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Knowledge node details" },
+          "404": { "description": "Node not found" }
+        }
+      },
+      "patch": {
+        "tags": ["Knowledge Graph & Architectural Memory"],
+        "summary": "Update knowledge node specification or status",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Knowledge node updated" }
+        }
+      },
+      "delete": {
+        "tags": ["Knowledge Graph & Architectural Memory"],
+        "summary": "Delete knowledge node and cascade delete connected relations",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Knowledge node deleted" }
+        }
+      }
+    },
+    "/projectbase/knowledge/nodes/{id}/status": {
+      "post": {
+        "tags": ["Knowledge Graph & Architectural Memory"],
+        "summary": "Transition status of a knowledge node (deprecate, supersede)",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": { "type": "string" },
+                  "superseded_by_id": { "type": "string" },
+                  "reason": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Status updated" }
+        }
+      }
+    },
+    "/projectbase/knowledge/relations": {
+      "get": {
+        "tags": ["Knowledge Graph & Architectural Memory"],
+        "summary": "List knowledge relations between nodes",
+        "parameters": [
+          { "name": "source_node_id", "in": "query", "schema": { "type": "string" } },
+          { "name": "target_node_id", "in": "query", "schema": { "type": "string" } },
+          { "name": "relation_type", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "List of relations" }
+        }
+      },
+      "post": {
+        "tags": ["Knowledge Graph & Architectural Memory"],
+        "summary": "Create directional relation between knowledge nodes",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "source_node_id": { "type": "string" },
+                  "target_node_id": { "type": "string" },
+                  "relation_type": { "type": "string" },
+                  "weight": { "type": "number" },
+                  "description": { "type": "string" }
+                },
+                "required": ["source_node_id", "target_node_id", "relation_type"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Relation created" }
+        }
+      }
+    },
+    "/projectbase/knowledge/relations/{id}": {
+      "delete": {
+        "tags": ["Knowledge Graph & Architectural Memory"],
+        "summary": "Delete knowledge relation",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Relation deleted" }
+        }
+      }
+    },
+    "/projectbase/knowledge/graph": {
+      "get": {
+        "tags": ["Knowledge Graph & Architectural Memory"],
+        "summary": "Get full knowledge graph topology (nodes and edges)",
+        "responses": {
+          "200": { "description": "Graph topology" }
+        }
+      }
+    },
+    "/projectbase/knowledge/invariants": {
+      "get": {
+        "tags": ["Knowledge Graph & Architectural Memory"],
+        "summary": "List registered architectural invariants and compliance gates",
+        "parameters": [
+          { "name": "rule_type", "in": "query", "schema": { "type": "string" } },
+          { "name": "severity", "in": "query", "schema": { "type": "string" } },
+          { "name": "is_active", "in": "query", "schema": { "type": "boolean" } }
+        ],
+        "responses": {
+          "200": { "description": "List of architectural invariants" }
+        }
+      },
+      "post": {
+        "tags": ["Knowledge Graph & Architectural Memory"],
+        "summary": "Register new architectural invariant rule",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rule_name": { "type": "string" },
+                  "rule_type": { "type": "string" },
+                  "pattern_expression": { "type": "string" },
+                  "severity": { "type": "string" },
+                  "enforcement_action": { "type": "string" },
+                  "is_active": { "type": "boolean" },
+                  "node_id": { "type": "string" }
+                },
+                "required": ["rule_name", "rule_type", "pattern_expression"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Invariant created" }
+        }
+      }
+    },
+    "/projectbase/knowledge/invariants/{id}": {
+      "patch": {
+        "tags": ["Knowledge Graph & Architectural Memory"],
+        "summary": "Update invariant rule parameters or active status",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Invariant updated" }
+        }
+      },
+      "delete": {
+        "tags": ["Knowledge Graph & Architectural Memory"],
+        "summary": "Delete architectural invariant",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Invariant deleted" }
+        }
+      }
+    },
+    "/projectbase/knowledge/verify-invariants": {
+      "post": {
+        "tags": ["Knowledge Graph & Architectural Memory"],
+        "summary": "Verify touched files or diff against active architectural invariants",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "target_files": { "type": "array", "items": { "type": "string" } },
+                  "diff_summary": { "type": "string" },
+                  "project_id": { "type": "string" },
+                  "mcp_session_id": { "type": "string" },
+                  "agent_name": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Invariant verification verdict and violation report" }
+        }
+      }
+    },
+    "/projectbase/knowledge/verifications": {
+      "get": {
+        "tags": ["Knowledge Graph & Architectural Memory"],
+        "summary": "List historical invariant verification audit runs",
+        "responses": {
+          "200": { "description": "List of verification runs" }
+        }
+      }
+    },
+    "/projectbase/knowledge/metrics": {
+      "get": {
+        "tags": ["Knowledge Graph & Architectural Memory"],
+        "summary": "Get architectural knowledge base and invariant verification health metrics",
+        "responses": {
+          "200": { "description": "Knowledge metrics and breakdown" }
+        }
+      }
+    },
+    "/projectbase/knowledge/query": {
+      "post": {
+        "tags": ["Knowledge Graph & Architectural Memory"],
+        "summary": "Semantic & keyword query over codebase architectural memory",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query": { "type": "string" },
+                  "kind": { "type": "string" },
+                  "limit": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Ranked knowledge nodes" }
+        }
+      }
+    },
+    "/projectbase/knowledge/seed-demo": {
+      "post": {
+        "tags": ["Knowledge Graph & Architectural Memory"],
+        "summary": "Seed canonical architectural ADRs, invariants, and graph edges",
+        "responses": {
+          "200": { "description": "Seeded successfully" }
         }
       }
     }

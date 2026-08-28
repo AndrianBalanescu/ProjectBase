@@ -22,3 +22,8 @@
 - [x] One-click session branching, DAG continuation & Human Intervention Gate (Milestone 4)
 - [x] Live step-by-step trajectory stream, tool telemetry & autonomous swarm choreography hub (Milestone 5)
 - [x] Multi-Agent Merge & Semantic Conflict Auto-Resolution Engine, 3-Way Diff Matrix & Deterministic Merge Barrier (Milestone 6)
+- [x] Agent Fleet Budget, Token Quotas & Cost Attribution Governance Engine (Milestone 7)
+- [x] Agent Evaluation Benchmark Harness, Leaderboard & Regression Matrix (Milestone 8)
+- [x] Autonomous Ephemeral Dev Sandboxes & Worktree Container Orchestrator (Milestone 9)
+- [x] Autonomous Multi-Agent Incident Response & War-Room Engine (Milestone 10)
+- [x] Autonomous Agent Knowledge Graph, Architectural Memory Index & Invariant Compliance Engine (Milestone 11)

@@ -1,6 +1,24 @@
 # Changelog
 
-## [1.30.0] - 2026-08-28 - Cycle 34
+## [1.31.0] - 2026-08-28 - Cycle 35
+### Added
+- **Autonomous Agent Knowledge Graph, Architectural Memory Index & Invariant Compliance Engine (Milestone 11 / Epic 32):**
+  - Schema migration (`1710000044_add_knowledge_graph_and_architectural_memory.js`) introducing 4 dedicated collections: `knowledge_nodes`, `knowledge_relations`, `architectural_invariants`, and `invariant_verifications`.
+  - Backend engine hook (`app/pb_hooks/116_knowledge_graph_engine.pb.js`) with 19 high-performance REST API endpoints:
+    - `GET /api/projectbase/knowledge/nodes` and `POST /api/projectbase/knowledge/nodes` for listing and storing architectural facts, ADRs, conventions, subsystems, and symbol nodes with confidence scoring and tag metadata.
+    - `GET /api/projectbase/knowledge/nodes/{id}`, `PATCH /api/projectbase/knowledge/nodes/{id}`, and `DELETE /api/projectbase/knowledge/nodes/{id}` for querying complete node specifications, inbound/outbound relations, linked invariants, and cascading deletion.
+    - `POST /api/projectbase/knowledge/nodes/{id}/status` for lifecycle status management (`active`, `proposed`, `accepted`, `deprecated`, `superseded`, `violated`) with automated `superseded_by` relation generation.
+    - `GET /api/projectbase/knowledge/relations`, `POST /api/projectbase/knowledge/relations`, and `DELETE /api/projectbase/knowledge/relations/{id}` for building directional dependency and governance graphs (`depends_on`, `implements`, `modifies`, `violates`, `supersedes`, `verifies`, `governs`, `related_to`).
+    - `GET /api/projectbase/knowledge/graph` returning full graph topology (nodes and edges) for visual rendering and analysis.
+    - `GET /api/projectbase/knowledge/invariants`, `POST /api/projectbase/knowledge/invariants`, `PATCH /api/projectbase/knowledge/invariants/{id}`, and `DELETE /api/projectbase/knowledge/invariants/{id}` for registering and managing active architectural compliance gates (`path_pattern`, `dependency_constraint`, `naming_convention`, `security_policy`).
+    - `POST /api/projectbase/knowledge/verify-invariants` for evaluating proposed file paths and diffs against all active invariants, recording verification audits, and returning blocking vs warning verdicts.
+    - `GET /api/projectbase/knowledge/verifications` for querying historical invariant compliance audit logs.
+    - `GET /api/projectbase/knowledge/metrics` providing comprehensive architectural health stats, invariant pass rates, and breakdown by kind/status/author.
+    - `POST /api/projectbase/knowledge/query` providing tokenized semantic and keyword retrieval over codebase architectural memory.
+    - `POST /api/projectbase/knowledge/seed-demo` seeding canonical ADRs (ADR-001 Zero-Build Vue 3, ADR-002 Single PocketBase Binary, ADR-003 Sub-50MB RAM, ADR-004 FastMCP Native), core subsystems, and P0 invariants.
+  - 8 FastMCP JSON-RPC 2.0 tools in `app/pb_hooks/91_mcp_server.pb.js`: `store_architectural_fact`, `query_knowledge_graph`, `create_codebase_symbol_node`, `link_knowledge_nodes`, `verify_change_against_invariants`, `list_architectural_decisions`, `invalidate_knowledge_node`, and `get_knowledge_graph_metrics`.
+  - Frontend AgentsView **🧠 Autonomous Knowledge Graph & Architectural Memory** dashboard with 5 KPI overview cards, interactive 4-subtab layout (Knowledge & Symbol Graph Explorer with detail viewer and relations grid, Architectural Decision Records (ADRs) gallery, Invariants & Compliance Rules table with active toggles, and Interactive Invariant Verifier Playground with live violation diagnostic audits), and "+ Record Fact / ADR" / "+ New Invariant" modals.
+  - Comprehensive automated test suite `tests/test_knowledge_graph_engine.py` with 11/11 passing tests, bringing total test coverage to 482 passing tests across 37 files.
 ### Added
 - **Autonomous Multi-Agent Incident Response, Live Debugging War-Room & Root-Cause Post-Mortem Engine (Milestone 10 / Epic 31):**
   - Schema migration (`1710000043_add_incident_warrooms_and_postmortems.js`) introducing 5 dedicated collections: `incidents`, `incident_events`, `incident_hypotheses`, `incident_mitigations`, and `incident_postmortems`.

@@ -451,7 +451,56 @@ const AgentsViewComponent = {
         rollback_plan: 'Revert PRAGMA setting and reset pool worker timeout.',
         executed_by: 'Flomaster-Commander'
       },
-      incidentActiveSubtab: 'timeline' // 'timeline' | 'hypotheses' | 'mitigations' | 'postmortem'
+      incidentActiveSubtab: 'timeline', // 'timeline' | 'hypotheses' | 'mitigations' | 'postmortem'
+
+      // Autonomous Agent Knowledge Graph & Architectural Memory Index (Milestone 11 / Epic 32)
+      knowledgeNodesList: [],
+      knowledgeRelationsList: [],
+      architecturalInvariantsList: [],
+      invariantVerificationsList: [],
+      knowledgeMetrics: null,
+      selectedKnowledgeNode: null,
+      selectedKnowledgeNodeInbound: [],
+      selectedKnowledgeNodeOutbound: [],
+      selectedKnowledgeNodeInvariants: [],
+      isLoadingKnowledge: false,
+      knowledgeSuccessMsg: null,
+      knowledgeErrorMsg: null,
+      knowledgeFilterKind: '',
+      knowledgeFilterStatus: '',
+      knowledgeSearch: '',
+      knowledgeActiveSubtab: 'graph', // 'graph' | 'adrs' | 'invariants' | 'verifier'
+      newKnowledgeModalOpen: false,
+      newInvariantModalOpen: false,
+      newKnowledgeNode: {
+        title: '',
+        slug: '',
+        kind: 'invariant',
+        summary: '',
+        content_markdown: '',
+        file_path: '',
+        symbol_name: '',
+        status: 'active',
+        confidence_score: 1.0,
+        author_agent: 'flomaster',
+        tags_str: 'architecture, core'
+      },
+      newArchitecturalInvariant: {
+        rule_name: '',
+        rule_type: 'path_pattern',
+        pattern_expression: 'forbidden:node_modules',
+        severity: 'p0_blocking',
+        enforcement_action: 'block_merge',
+        is_active: true,
+        node_id: ''
+      },
+      verifierPlaygroundInput: {
+        target_files_str: 'app/pb_public/js/components/CustomView.js\napp/pb_hooks/116_custom.pb.js',
+        diff_summary: 'Refactored backend hook to use native SQLite transactions',
+        agent_name: 'flomaster'
+      },
+      latestVerificationResult: null,
+      isVerifyingInvariants: false
     };
   },
   computed: {
@@ -2841,8 +2890,123 @@ const AgentsViewComponent = {
         this.incidentErrorMsg = 'Seed demo war-room failed: ' + (e.message || String(e));
       }
     },
+    // Knowledge Graph & Architectural Invariants Methods (Milestone 11 / Epic 32)
+    async loadKnowledgeGovernanceData() {
+      this.isLoadingKnowledge = true;
+      this.knowledgeErrorMsg = null;
+      try {
+        const [nodesRes, relsRes, invsRes, verRes, metRes] = await Promise.all([
+          API.listKnowledgeNodes({
+            kind: this.knowledgeFilterKind || undefined,
+            status: this.knowledgeFilterStatus || undefined,
+            search: this.knowledgeSearch || undefined,
+            limit: 200
+          }).catch(() => ({ items: [] })),
+          API.listKnowledgeRelations({ limit: 300 }).catch(() => ({ items: [] })),
+          API.listArchitecturalInvariants().catch(() => ({ items: [] })),
+          API.listInvariantVerifications({ limit: 50 }).catch(() => ({ items: [] })),
+          API.getKnowledgeGraphMetrics().catch(() => null)
+        ]);
+        this.knowledgeNodesList = nodesRes.items || [];
+        this.knowledgeRelationsList = relsRes.items || [];
+        this.architecturalInvariantsList = invsRes.items || [];
+        this.invariantVerificationsList = verRes.items || [];
+        this.knowledgeMetrics = metRes;
+        if (this.knowledgeNodesList.length > 0 && !this.selectedKnowledgeNode) {
+          await this.inspectKnowledgeNode(this.knowledgeNodesList[0].id);
+        }
+      } catch (e) {
+        this.knowledgeErrorMsg = 'Failed loading knowledge base: ' + (e.message || String(e));
+      } finally {
+        this.isLoadingKnowledge = false;
+      }
+    },
+    async inspectKnowledgeNode(id) {
+      if (!id) return;
+      try {
+        const data = await API.getKnowledgeNodeDetails(id);
+        this.selectedKnowledgeNode = data.node || null;
+        this.selectedKnowledgeNodeInbound = data.inbound_relations || [];
+        this.selectedKnowledgeNodeOutbound = data.outbound_relations || [];
+        this.selectedKnowledgeNodeInvariants = data.invariants || [];
+      } catch (e) {
+        console.error('Failed inspecting knowledge node:', e);
+      }
+    },
+    async createKnowledgeNodeSubmit() {
+      try {
+        const tags = (this.newKnowledgeNode.tags_str || '').split(',').map(s => s.trim()).filter(Boolean);
+        const payload = {
+          title: this.newKnowledgeNode.title,
+          slug: this.newKnowledgeNode.slug || undefined,
+          kind: this.newKnowledgeNode.kind,
+          summary: this.newKnowledgeNode.summary,
+          content_markdown: this.newKnowledgeNode.content_markdown,
+          file_path: this.newKnowledgeNode.file_path,
+          symbol_name: this.newKnowledgeNode.symbol_name,
+          status: this.newKnowledgeNode.status,
+          confidence_score: parseFloat(this.newKnowledgeNode.confidence_score) || 1.0,
+          author_agent: this.newKnowledgeNode.author_agent,
+          tags_json: tags
+        };
+        const res = await API.createKnowledgeNode(payload);
+        this.knowledgeSuccessMsg = 'Created knowledge node: ' + (res.node ? res.node.title : '');
+        this.newKnowledgeModalOpen = false;
+        await this.loadKnowledgeGovernanceData();
+        if (res.node) await this.inspectKnowledgeNode(res.node.id);
+      } catch (e) {
+        this.knowledgeErrorMsg = 'Failed creating node: ' + (e.message || String(e));
+      }
+    },
+    async createArchitecturalInvariantSubmit() {
+      try {
+        const res = await API.createArchitecturalInvariant(this.newArchitecturalInvariant);
+        this.knowledgeSuccessMsg = 'Created invariant rule: ' + (res.invariant ? res.invariant.rule_name : '');
+        this.newInvariantModalOpen = false;
+        await this.loadKnowledgeGovernanceData();
+      } catch (e) {
+        this.knowledgeErrorMsg = 'Failed creating invariant: ' + (e.message || String(e));
+      }
+    },
+    async toggleInvariantActive(inv) {
+      try {
+        await API.updateArchitecturalInvariant(inv.id, { is_active: !inv.is_active });
+        inv.is_active = !inv.is_active;
+        this.knowledgeSuccessMsg = `Invariant ${inv.rule_name} is now ${inv.is_active ? 'ACTIVE' : 'DISABLED'}`;
+      } catch (e) {
+        this.knowledgeErrorMsg = 'Failed toggling invariant: ' + (e.message || String(e));
+      }
+    },
+    async runPlaygroundVerification() {
+      this.isVerifyingInvariants = true;
+      this.latestVerificationResult = null;
+      try {
+        const files = (this.verifierPlaygroundInput.target_files_str || '').split('\n').map(s => s.trim()).filter(Boolean);
+        const payload = {
+          target_files: files,
+          diff_summary: this.verifierPlaygroundInput.diff_summary,
+          agent_name: this.verifierPlaygroundInput.agent_name
+        };
+        const res = await API.verifyChangesAgainstInvariants(payload);
+        this.latestVerificationResult = res;
+        await this.loadKnowledgeGovernanceData();
+      } catch (e) {
+        this.knowledgeErrorMsg = 'Verification failed: ' + (e.message || String(e));
+      } finally {
+        this.isVerifyingInvariants = false;
+      }
+    },
+    async seedDemoKnowledge() {
+      try {
+        const res = await API.seedDemoKnowledgeGraph();
+        this.knowledgeSuccessMsg = res.message || 'Demo architectural memory seeded';
+        await this.loadKnowledgeGovernanceData();
+      } catch (e) {
+        this.knowledgeErrorMsg = 'Seed demo failed: ' + (e.message || String(e));
+      }
+    },
     isGovernanceTab(tab) {
-      return ['workload', 'anomalies', 'semantic', 'auto_heal', 'sso_rbac', 'automations', 'tenants', 'webhooks', 'observability', 'consensus', 'cluster', 'federation', 'throughput', 'swarm', 'merges', 'budget', 'evals', 'sandboxes', 'incidents'].includes(tab);
+      return ['workload', 'anomalies', 'semantic', 'auto_heal', 'sso_rbac', 'automations', 'tenants', 'webhooks', 'observability', 'consensus', 'cluster', 'federation', 'throughput', 'swarm', 'merges', 'budget', 'evals', 'sandboxes', 'incidents', 'knowledge'].includes(tab);
     },
     onGovernanceTabSelect(tab) {
       if (!tab) return;
@@ -2860,6 +3024,8 @@ const AgentsViewComponent = {
         this.loadSandboxesGovernanceData();
       } else if (tab === 'incidents') {
         this.loadIncidentsGovernanceData();
+      } else if (tab === 'knowledge') {
+        this.loadKnowledgeGovernanceData();
       }
     }
   },
@@ -2977,7 +3143,7 @@ const AgentsViewComponent = {
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <h2 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 capitalize truncate">
-                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (activeTab === 'automations' ? 'Native Workflow Automations & AI Agent Trigger Pipelines' : (activeTab === 'tenants' ? 'Multi-Tenant Isolation & Granular Resource Quotas' : (activeTab === 'auto_heal' ? 'Autonomous AI Agent Auto-Healing & Self-Remediation Workflow Pipeline' : (activeTab === 'budget' ? 'Agent Fleet Budget & Cost Governance Hub' : (activeTab === 'evals' ? 'Agent Evaluation Benchmark Harness & Model Leaderboard' : (activeTab === 'sandboxes' ? 'Autonomous Ephemeral Dev Sandboxes & Worktree Container Orchestrator' : (activeTab === 'incidents' ? 'Autonomous Multi-Agent Incident Response & Live Debugging War-Room' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center')))))))))))))))) }}
+                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (activeTab === 'automations' ? 'Native Workflow Automations & AI Agent Trigger Pipelines' : (activeTab === 'tenants' ? 'Multi-Tenant Isolation & Granular Resource Quotas' : (activeTab === 'auto_heal' ? 'Autonomous AI Agent Auto-Healing & Self-Remediation Workflow Pipeline' : (activeTab === 'budget' ? 'Agent Fleet Budget & Cost Governance Hub' : (activeTab === 'evals' ? 'Agent Evaluation Benchmark Harness & Model Leaderboard' : (activeTab === 'sandboxes' ? 'Autonomous Ephemeral Dev Sandboxes & Worktree Container Orchestrator' : (activeTab === 'incidents' ? 'Autonomous Multi-Agent Incident Response & Live Debugging War-Room' : (activeTab === 'knowledge' ? 'Autonomous Knowledge Graph, Architectural Memory & Invariants' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center'))))))))))))))))) }}
                 </h2>
                 <span v-if="selectedSession && selectedSession.is_active && activeTab === 'chat'" class="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-400 text-[10px] font-mono font-semibold flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -3030,6 +3196,7 @@ const AgentsViewComponent = {
                     <option value="evals">📊 Evals & Leaderboard</option>
                     <option value="sandboxes">📦 Ephemeral Sandboxes & Dev Envs</option>
                     <option value="incidents">🚨 Live Incident War-Room & Post-Mortem</option>
+                    <option value="knowledge">🧠 Knowledge Graph & Invariants</option>
                     <option value="federation">🌐 Multi-Cluster Federation</option>
                   </select>
                 </div>
@@ -9280,6 +9447,619 @@ const AgentsViewComponent = {
                 >
                   {{ isLoadingIncidents ? 'Declaring...' : 'Declare & Open War-Room' }}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- PANE 2J0: KNOWLEDGE GRAPH & ARCHITECTURAL MEMORY (EPIC 32) -->
+        <!-- ========================================================= -->
+        <div v-else-if="activeTab === 'knowledge'" class="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/30">
+          <!-- Top Header Banner -->
+          <div class="p-4 rounded-xl bg-gradient-to-r from-violet-950/50 via-indigo-950/40 to-zinc-900 border border-violet-800/40 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xl">🧠</span>
+                <h3 class="text-sm font-bold text-white tracking-wide">Autonomous Knowledge Graph & Architectural Memory</h3>
+                <span class="px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30 text-[10px] font-mono font-bold">KNOWLEDGE ENGINE</span>
+              </div>
+              <p class="text-xs text-zinc-300 mt-1">
+                Persistent Architectural Facts • Codebase Invariant Compliance Gate • Decision Records (ADRs) • Semantic Symbol Index
+              </p>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <button
+                @click="newKnowledgeModalOpen = true"
+                class="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold shadow-xs flex items-center gap-1 transition-all"
+              >
+                <span>+ Record Fact / ADR</span>
+              </button>
+              <button
+                @click="newInvariantModalOpen = true"
+                class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-xs flex items-center gap-1 transition-all"
+              >
+                <span>+ New Invariant</span>
+              </button>
+              <button
+                @click="seedDemoKnowledge()"
+                class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-xs font-medium transition-all"
+              >
+                <span>🌱 Seed Architecture Demo</span>
+              </button>
+              <button
+                @click="loadKnowledgeGovernanceData()"
+                class="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 text-xs"
+                title="Refresh Knowledge Base"
+              >
+                <span>🔄</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Alert Toasts -->
+          <div v-if="knowledgeSuccessMsg" class="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400 flex items-center justify-between">
+            <div class="flex items-center gap-2"><span>✅</span><span>{{ knowledgeSuccessMsg }}</span></div>
+            <button @click="knowledgeSuccessMsg = null" class="text-emerald-500 hover:text-emerald-300 font-bold">&times;</button>
+          </div>
+          <div v-if="knowledgeErrorMsg" class="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-xs text-red-400 flex items-center justify-between">
+            <div class="flex items-center gap-2"><span>⚠️</span><span>{{ knowledgeErrorMsg }}</span></div>
+            <button @click="knowledgeErrorMsg = null" class="text-red-500 hover:text-red-300 font-bold">&times;</button>
+          </div>
+
+          <!-- Top KPI Metrics -->
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Total Knowledge Nodes</div>
+              <div class="text-xl font-bold text-violet-400 font-mono mt-0.5">
+                {{ knowledgeMetrics ? knowledgeMetrics.total_nodes : knowledgeNodesList.length }}
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">
+                {{ (knowledgeNodesList.filter(n => n.kind === 'adr')).length }} ADRs • {{ (knowledgeNodesList.filter(n => n.kind === 'symbol')).length }} Symbols
+              </div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Active Invariants</div>
+              <div class="text-xl font-bold text-indigo-400 font-mono mt-0.5">
+                {{ knowledgeMetrics ? knowledgeMetrics.active_invariants : (architecturalInvariantsList.filter(i => i.is_active).length) }}
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">
+                {{ architecturalInvariantsList.filter(i => i.severity === 'p0_blocking').length }} Blocking P0 Gates
+              </div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Accepted ADRs</div>
+              <div class="text-xl font-bold text-emerald-400 font-mono mt-0.5">
+                {{ knowledgeNodesList.filter(n => n.kind === 'adr' && n.status === 'accepted').length }}
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">Architectural Decisions</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Verification Pass Rate</div>
+              <div class="text-xl font-bold text-teal-400 font-mono mt-0.5">
+                {{ knowledgeMetrics ? (knowledgeMetrics.pass_rate_percent + '%') : '100%' }}
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">
+                {{ invariantVerificationsList.length }} Audits Run
+              </div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Graph Relations</div>
+              <div class="text-xl font-bold text-purple-400 font-mono mt-0.5">
+                {{ knowledgeMetrics ? knowledgeMetrics.total_relations : knowledgeRelationsList.length }}
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">Dependency & Governance Edges</div>
+            </div>
+          </div>
+
+          <!-- Subtab Navigation Bar -->
+          <div class="flex items-center gap-1 border-b border-zinc-200 dark:border-zinc-800 pb-2">
+            <button
+              @click="knowledgeActiveSubtab = 'graph'"
+              class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              :class="knowledgeActiveSubtab === 'graph' ? 'bg-violet-600 text-white shadow-xs' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'"
+            >
+              <span>🌐</span>
+              <span>Knowledge & Symbol Graph ({{ knowledgeNodesList.length }})</span>
+            </button>
+            <button
+              @click="knowledgeActiveSubtab = 'adrs'"
+              class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              :class="knowledgeActiveSubtab === 'adrs' ? 'bg-violet-600 text-white shadow-xs' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'"
+            >
+              <span>📐</span>
+              <span>Architectural Decision Records ({{ knowledgeNodesList.filter(n => n.kind === 'adr').length }})</span>
+            </button>
+            <button
+              @click="knowledgeActiveSubtab = 'invariants'"
+              class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              :class="knowledgeActiveSubtab === 'invariants' ? 'bg-violet-600 text-white shadow-xs' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'"
+            >
+              <span>🛡️</span>
+              <span>Architectural Invariants ({{ architecturalInvariantsList.length }})</span>
+            </button>
+            <button
+              @click="knowledgeActiveSubtab = 'verifier'"
+              class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              :class="knowledgeActiveSubtab === 'verifier' ? 'bg-violet-600 text-white shadow-xs' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'"
+            >
+              <span>⚡</span>
+              <span>Invariant Verifier Playground & Audits ({{ invariantVerificationsList.length }})</span>
+            </button>
+          </div>
+
+          <!-- SUBTAB 1: KNOWLEDGE & SYMBOL GRAPH EXPLORER -->
+          <div v-if="knowledgeActiveSubtab === 'graph'" class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <!-- Left List (1 col) -->
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-3">
+              <div class="flex items-center gap-2">
+                <input
+                  type="text"
+                  v-model="knowledgeSearch"
+                  @input="loadKnowledgeGovernanceData()"
+                  placeholder="Search facts, symbols, files..."
+                  class="flex-1 px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-violet-500"
+                />
+                <select
+                  v-model="knowledgeFilterKind"
+                  @change="loadKnowledgeGovernanceData()"
+                  class="px-2 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-[11px] focus:outline-none"
+                >
+                  <option value="">All Kinds</option>
+                  <option value="invariant">Invariant</option>
+                  <option value="adr">ADR</option>
+                  <option value="convention">Convention</option>
+                  <option value="subsystem">Subsystem</option>
+                  <option value="symbol">Symbol</option>
+                  <option value="runbook">Runbook</option>
+                </select>
+              </div>
+
+              <div v-if="isLoadingKnowledge" class="py-8 text-center text-xs text-zinc-500">
+                Loading knowledge nodes...
+              </div>
+              <div v-else-if="knowledgeNodesList.length === 0" class="py-8 text-center text-xs text-zinc-500">
+                No knowledge nodes recorded. Record one or click "Seed Architecture Demo".
+              </div>
+              <div v-else class="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+                <div
+                  v-for="node in knowledgeNodesList"
+                  :key="node.id"
+                  @click="inspectKnowledgeNode(node.id)"
+                  class="p-2.5 rounded-lg border text-left cursor-pointer transition-all"
+                  :class="selectedKnowledgeNode && selectedKnowledgeNode.id === node.id ? 'bg-violet-50 dark:bg-violet-950/40 border-violet-500/50' : 'bg-zinc-50/70 dark:bg-zinc-950/40 border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700'"
+                >
+                  <div class="flex items-center justify-between gap-1 mb-1">
+                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold uppercase"
+                      :class="node.kind === 'adr' ? 'bg-blue-500/20 text-blue-400' : (node.kind === 'invariant' ? 'bg-red-500/20 text-red-400' : (node.kind === 'subsystem' ? 'bg-purple-500/20 text-purple-400' : 'bg-zinc-500/20 text-zinc-400'))">
+                      {{ node.kind }}
+                    </span>
+                    <span class="text-[10px] font-mono text-zinc-400">
+                      {{ node.status }}
+                    </span>
+                  </div>
+                  <div class="text-xs font-semibold text-zinc-900 dark:text-zinc-100 line-clamp-1">
+                    {{ node.title }}
+                  </div>
+                  <div v-if="node.summary" class="text-[11px] text-zinc-500 line-clamp-2 mt-0.5">
+                    {{ node.summary }}
+                  </div>
+                  <div v-if="node.file_path" class="text-[10px] font-mono text-violet-400/80 truncate mt-1">
+                    📄 {{ node.file_path }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Detail (2 cols) -->
+            <div class="lg:col-span-2 p-4 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-4">
+              <div v-if="!selectedKnowledgeNode" class="py-16 text-center text-xs text-zinc-500">
+                Select a knowledge node on the left to inspect architectural details, relations, and invariants.
+              </div>
+              <div v-else class="space-y-4">
+                <!-- Node Header -->
+                <div class="flex items-start justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-base font-bold text-zinc-900 dark:text-zinc-100">{{ selectedKnowledgeNode.title }}</span>
+                      <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-violet-500/20 text-violet-300 font-bold uppercase">{{ selectedKnowledgeNode.kind }}</span>
+                      <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold uppercase">{{ selectedKnowledgeNode.status }}</span>
+                    </div>
+                    <div class="text-[11px] font-mono text-zinc-400 mt-1 flex items-center gap-3">
+                      <span>Slug: {{ selectedKnowledgeNode.slug }}</span>
+                      <span v-if="selectedKnowledgeNode.author_agent">Author: {{ selectedKnowledgeNode.author_agent }}</span>
+                      <span v-if="selectedKnowledgeNode.confidence_score">Confidence: {{ (selectedKnowledgeNode.confidence_score * 100).toFixed(0) }}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Associated File & Symbol info -->
+                <div v-if="selectedKnowledgeNode.file_path || selectedKnowledgeNode.symbol_name" class="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono space-y-1">
+                  <div v-if="selectedKnowledgeNode.file_path" class="text-zinc-300">
+                    <span class="text-zinc-500">File Path:</span> {{ selectedKnowledgeNode.file_path }}
+                  </div>
+                  <div v-if="selectedKnowledgeNode.symbol_name" class="text-violet-400">
+                    <span class="text-zinc-500">Symbol Name:</span> {{ selectedKnowledgeNode.symbol_name }}
+                  </div>
+                </div>
+
+                <!-- Markdown Content / Specification -->
+                <div class="space-y-1">
+                  <div class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Specification & Rationale</div>
+                  <div class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-300 whitespace-pre-wrap font-sans leading-relaxed">
+                    {{ selectedKnowledgeNode.content_markdown || selectedKnowledgeNode.summary || 'No detailed content provided.' }}
+                  </div>
+                </div>
+
+                <!-- Relations Grid (Inbound & Outbound) -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                  <div class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 space-y-2">
+                    <div class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
+                      <span>Outbound Relations ({{ selectedKnowledgeNodeOutbound.length }})</span>
+                      <span class="text-violet-400">→ Target</span>
+                    </div>
+                    <div v-if="selectedKnowledgeNodeOutbound.length === 0" class="text-[11px] text-zinc-500">
+                      No outbound relations registered.
+                    </div>
+                    <div v-else class="space-y-1.5">
+                      <div v-for="rel in selectedKnowledgeNodeOutbound" :key="rel.id" class="text-xs p-1.5 rounded bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                        <span class="font-mono text-[10px] px-1 rounded bg-violet-500/20 text-violet-300 font-bold uppercase mr-1">{{ rel.relation_type }}</span>
+                        <span class="text-zinc-300">{{ rel.description || ('Node: ' + rel.target_node_id) }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 space-y-2">
+                    <div class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
+                      <span>Inbound Relations ({{ selectedKnowledgeNodeInbound.length }})</span>
+                      <span class="text-indigo-400">← Source</span>
+                    </div>
+                    <div v-if="selectedKnowledgeNodeInbound.length === 0" class="text-[11px] text-zinc-500">
+                      No inbound relations registered.
+                    </div>
+                    <div v-else class="space-y-1.5">
+                      <div v-for="rel in selectedKnowledgeNodeInbound" :key="rel.id" class="text-xs p-1.5 rounded bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                        <span class="font-mono text-[10px] px-1 rounded bg-indigo-500/20 text-indigo-300 font-bold uppercase mr-1">{{ rel.relation_type }}</span>
+                        <span class="text-zinc-300">{{ rel.description || ('Node: ' + rel.source_node_id) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SUBTAB 2: ARCHITECTURAL DECISION RECORDS (ADRs) -->
+          <div v-else-if="knowledgeActiveSubtab === 'adrs'" class="space-y-3">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div
+                v-for="adr in knowledgeNodesList.filter(n => n.kind === 'adr')"
+                :key="adr.id"
+                class="p-4 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-2"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 line-clamp-1">{{ adr.title }}</div>
+                  <span
+                    class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase shrink-0"
+                    :class="adr.status === 'accepted' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'"
+                  >
+                    {{ adr.status }}
+                  </span>
+                </div>
+                <p class="text-xs text-zinc-400 line-clamp-2">{{ adr.summary }}</p>
+                <div class="p-2.5 rounded bg-zinc-50 dark:bg-zinc-950 text-xs font-sans text-zinc-300 max-h-36 overflow-y-auto whitespace-pre-wrap">
+                  {{ adr.content_markdown }}
+                </div>
+                <div class="flex items-center justify-between text-[10px] text-zinc-500 pt-1">
+                  <span>Author: {{ adr.author_agent || 'Architect' }}</span>
+                  <span>{{ adr.created ? new Date(adr.created).toLocaleDateString() : '' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SUBTAB 3: ARCHITECTURAL INVARIANTS -->
+          <div v-else-if="knowledgeActiveSubtab === 'invariants'" class="p-4 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Registered Architectural Invariants & Compliance Rules</span>
+              <button
+                @click="newInvariantModalOpen = true"
+                class="px-2.5 py-1 rounded bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold shadow-xs"
+              >
+                + Add Rule
+              </button>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs text-left">
+                <thead class="text-[10px] uppercase text-zinc-400 bg-zinc-100 dark:bg-zinc-950/60 border-b border-zinc-200 dark:border-zinc-800">
+                  <tr>
+                    <th class="p-2.5">Rule Name</th>
+                    <th class="p-2.5">Type</th>
+                    <th class="p-2.5">Pattern / Expression</th>
+                    <th class="p-2.5">Severity</th>
+                    <th class="p-2.5">Enforcement</th>
+                    <th class="p-2.5">Status</th>
+                    <th class="p-2.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800">
+                  <tr v-for="inv in architecturalInvariantsList" :key="inv.id" class="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30">
+                    <td class="p-2.5 font-semibold text-zinc-900 dark:text-zinc-100">{{ inv.rule_name }}</td>
+                    <td class="p-2.5 font-mono text-[10px] text-zinc-400">{{ inv.rule_type }}</td>
+                    <td class="p-2.5 font-mono text-[10px] text-violet-400">{{ inv.pattern_expression }}</td>
+                    <td class="p-2.5">
+                      <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase"
+                        :class="inv.severity === 'p0_blocking' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'">
+                        {{ inv.severity }}
+                      </span>
+                    </td>
+                    <td class="p-2.5 font-mono text-[10px] text-zinc-400">{{ inv.enforcement_action }}</td>
+                    <td class="p-2.5">
+                      <button
+                        @click="toggleInvariantActive(inv)"
+                        class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                        :class="inv.is_active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-500/20 text-zinc-400'"
+                      >
+                        {{ inv.is_active ? 'Active' : 'Disabled' }}
+                      </button>
+                    </td>
+                    <td class="p-2.5 text-right">
+                      <button
+                        @click="toggleInvariantActive(inv)"
+                        class="text-[11px] text-zinc-400 hover:text-zinc-200"
+                      >
+                        Toggle
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- SUBTAB 4: INVARIANT VERIFIER PLAYGROUND & AUDITS -->
+          <div v-else-if="knowledgeActiveSubtab === 'verifier'" class="space-y-4">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <!-- Left: Form -->
+              <div class="p-4 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-3">
+                <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                  <span>⚡</span>
+                  <span>Interactive Invariant Verification Playground</span>
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Target File Paths (one per line)</label>
+                  <textarea
+                    v-model="verifierPlaygroundInput.target_files_str"
+                    rows="4"
+                    class="w-full px-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono focus:outline-none focus:border-violet-500"
+                    placeholder="app/pb_public/js/components/Custom.js&#10;app/pb_hooks/116_test.pb.js"
+                  ></textarea>
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-400 mb-1">Proposed Code Diff / Change Summary</label>
+                  <input
+                    type="text"
+                    v-model="verifierPlaygroundInput.diff_summary"
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-violet-500"
+                    placeholder="Refactored database transaction logic"
+                  />
+                </div>
+                <div class="flex items-center justify-between pt-2">
+                  <span class="text-[11px] text-zinc-500">Evaluates against all {{ architecturalInvariantsList.filter(i => i.is_active).length }} active invariants</span>
+                  <button
+                    @click="runPlaygroundVerification()"
+                    :disabled="isVerifyingInvariants"
+                    class="px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold shadow-xs disabled:opacity-50 flex items-center gap-1"
+                  >
+                    <span>{{ isVerifyingInvariants ? 'Verifying...' : '⚡ Verify Invariants' }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Right: Result -->
+              <div class="p-4 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-3">
+                <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center justify-between">
+                  <span>Audit Verification Result</span>
+                  <span v-if="latestVerificationResult" class="text-[10px] font-mono text-zinc-500">{{ latestVerificationResult.execution_ms }}ms</span>
+                </div>
+
+                <div v-if="!latestVerificationResult" class="py-12 text-center text-xs text-zinc-500">
+                  Run a verification on the left to inspect invariant compliance, violations, and rule results.
+                </div>
+                <div v-else class="space-y-3">
+                  <div
+                    class="p-3 rounded-lg border flex items-center justify-between"
+                    :class="latestVerificationResult.verdict === 'passed' ? 'bg-emerald-500/10 border-emerald-500/30' : (latestVerificationResult.verdict === 'warnings_only' ? 'bg-amber-500/10 border-amber-500/30' : 'bg-red-500/10 border-red-500/30')"
+                  >
+                    <div class="flex items-center gap-2">
+                      <span class="text-lg">{{ latestVerificationResult.verdict === 'passed' ? '✅' : '❌' }}</span>
+                      <div>
+                        <div class="text-xs font-bold uppercase tracking-wider"
+                          :class="latestVerificationResult.verdict === 'passed' ? 'text-emerald-400' : (latestVerificationResult.verdict === 'warnings_only' ? 'text-amber-400' : 'text-red-400')">
+                          VERDICT: {{ latestVerificationResult.verdict }}
+                        </div>
+                        <div class="text-[10px] text-zinc-400">Total Checked Rules: {{ latestVerificationResult.total_rules_checked }}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div v-if="latestVerificationResult.violations && latestVerificationResult.violations.length" class="space-y-1.5">
+                    <div class="text-[10px] font-bold text-red-400 uppercase tracking-wider">Violations Detected ({{ latestVerificationResult.violations.length }})</div>
+                    <div v-for="(v, idx) in latestVerificationResult.violations" :key="idx" class="p-2 rounded bg-red-500/10 border border-red-500/20 text-xs text-red-300">
+                      <div class="font-bold">{{ v.rule_name }} [{{ v.severity }}]</div>
+                      <div class="text-[11px] text-zinc-400 mt-0.5">{{ v.reason }}</div>
+                    </div>
+                  </div>
+
+                  <div v-if="latestVerificationResult.passed_rules && latestVerificationResult.passed_rules.length" class="space-y-1">
+                    <div class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Passed Rules ({{ latestVerificationResult.passed_rules.length }})</div>
+                    <div class="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
+                      <span v-for="(pr, idx) in latestVerificationResult.passed_rules" :key="idx" class="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-300">
+                        ✓ {{ pr.rule_name }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Recent Verifications History Table -->
+            <div class="p-4 rounded-xl bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-3">
+              <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Audit History & Verification Logs</div>
+              <div v-if="invariantVerificationsList.length === 0" class="py-6 text-center text-xs text-zinc-500">
+                No past verification runs logged yet.
+              </div>
+              <div v-else class="overflow-x-auto">
+                <table class="w-full text-xs text-left">
+                  <thead class="text-[10px] uppercase text-zinc-400 bg-zinc-100 dark:bg-zinc-950/60 border-b border-zinc-200 dark:border-zinc-800">
+                    <tr>
+                      <th class="p-2.5">Verdict</th>
+                      <th class="p-2.5">Agent</th>
+                      <th class="p-2.5">Touched Files</th>
+                      <th class="p-2.5">Diff Summary</th>
+                      <th class="p-2.5">Duration</th>
+                      <th class="p-2.5">Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800">
+                    <tr v-for="ver in invariantVerificationsList" :key="ver.id" class="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30">
+                      <td class="p-2.5">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase"
+                          :class="ver.verdict === 'passed' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'">
+                          {{ ver.verdict }}
+                        </span>
+                      </td>
+                      <td class="p-2.5 font-mono text-[10px] text-zinc-300">{{ ver.agent_name }}</td>
+                      <td class="p-2.5 font-mono text-[10px] text-violet-400">{{ (ver.target_files_json || []).join(', ') }}</td>
+                      <td class="p-2.5 text-zinc-400 truncate max-w-xs">{{ ver.diff_summary }}</td>
+                      <td class="p-2.5 font-mono text-[10px] text-zinc-500">{{ ver.execution_ms }}ms</td>
+                      <td class="p-2.5 text-[10px] text-zinc-500">{{ ver.created ? new Date(ver.created).toLocaleTimeString() : '' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- MODAL: NEW KNOWLEDGE NODE -->
+          <div v-if="newKnowledgeModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="w-full max-w-lg rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🧠</span>
+                  <h4 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Record Knowledge Node / ADR</h4>
+                </div>
+                <button @click="newKnowledgeModalOpen = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Title</label>
+                  <input type="text" v-model="newKnowledgeNode.title" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs" placeholder="e.g. ADR-005: SQLite WAL Mode for High Concurrency" />
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Kind</label>
+                    <select v-model="newKnowledgeNode.kind" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs">
+                      <option value="invariant">Invariant</option>
+                      <option value="adr">ADR (Decision Record)</option>
+                      <option value="convention">Convention</option>
+                      <option value="subsystem">Subsystem</option>
+                      <option value="symbol">Symbol</option>
+                      <option value="runbook">Runbook</option>
+                      <option value="antipattern">Antipattern</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Status</label>
+                    <select v-model="newKnowledgeNode.status" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs">
+                      <option value="active">Active</option>
+                      <option value="accepted">Accepted</option>
+                      <option value="proposed">Proposed</option>
+                      <option value="deprecated">Deprecated</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Summary</label>
+                  <input type="text" v-model="newKnowledgeNode.summary" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs" placeholder="Concise summary of fact" />
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Associated File Path</label>
+                    <input type="text" v-model="newKnowledgeNode.file_path" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono" placeholder="app/pb_hooks/116_*.pb.js" />
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Symbol Name</label>
+                    <input type="text" v-model="newKnowledgeNode.symbol_name" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono" placeholder="routerAdd" />
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Markdown Specification / Rationale</label>
+                  <textarea v-model="newKnowledgeNode.content_markdown" rows="4" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono" placeholder="# Context&#10;Describe architectural background and implications..."></textarea>
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Tags (comma-separated)</label>
+                  <input type="text" v-model="newKnowledgeNode.tags_str" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono" />
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button @click="newKnowledgeModalOpen = false" class="px-4 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold">Cancel</button>
+                <button @click="createKnowledgeNodeSubmit()" :disabled="!newKnowledgeNode.title.trim()" class="px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-bold shadow-xs">Save Node</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- MODAL: NEW INVARIANT -->
+          <div v-if="newInvariantModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="w-full max-w-lg rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-xl space-y-4">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🛡️</span>
+                  <h4 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Add Architectural Invariant Rule</h4>
+                </div>
+                <button @click="newInvariantModalOpen = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Rule Name</label>
+                  <input type="text" v-model="newArchitecturalInvariant.rule_name" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs" placeholder="e.g. Disallow runtime node_modules in frontend" />
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Rule Type</label>
+                    <select v-model="newArchitecturalInvariant.rule_type" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs">
+                      <option value="path_pattern">Path Pattern</option>
+                      <option value="dependency_constraint">Dependency Constraint</option>
+                      <option value="naming_convention">Naming Convention</option>
+                      <option value="security_policy">Security Policy</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Severity</label>
+                    <select v-model="newArchitecturalInvariant.severity" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs">
+                      <option value="p0_blocking">P0 Blocking</option>
+                      <option value="p1_warning">P1 Warning</option>
+                      <option value="p2_advisory">P2 Advisory</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Pattern Expression</label>
+                  <input type="text" v-model="newArchitecturalInvariant.pattern_expression" class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono" placeholder="forbidden:node_modules or require_match:^tests/test_.*" />
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button @click="newInvariantModalOpen = false" class="px-4 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold">Cancel</button>
+                <button @click="createArchitecturalInvariantSubmit()" :disabled="!newArchitecturalInvariant.rule_name.trim()" class="px-4 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-bold shadow-xs">Register Invariant</button>
               </div>
             </div>
           </div>

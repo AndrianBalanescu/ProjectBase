@@ -2201,6 +2201,117 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
                 },
                 required: ["incident_id"]
             }
+        },
+        {
+            name: "store_architectural_fact",
+            description: "Store an architectural invariant, decision record, convention, subsystem, or fact in the codebase knowledge graph.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    title: { type: "string", description: "Fact or node title" },
+                    slug: { type: "string", description: "Unique slug identifier (optional, auto-generated if omitted)" },
+                    kind: { type: "string", description: "invariant|adr|convention|subsystem|symbol|runbook|antipattern" },
+                    summary: { type: "string", description: "Concise summary of the architectural fact" },
+                    content_markdown: { type: "string", description: "Detailed markdown specification or rationale" },
+                    file_path: { type: "string", description: "Associated source file path" },
+                    symbol_name: { type: "string", description: "Associated symbol or function name" },
+                    status: { type: "string", description: "active|proposed|accepted|deprecated|superseded|violated" },
+                    confidence_score: { type: "number", description: "Confidence score between 0.0 and 1.0" },
+                    author_agent: { type: "string", description: "Author agent or engineer" },
+                    tags: { type: "array", items: { type: "string" }, description: "Tags list" }
+                },
+                required: ["title"]
+            }
+        },
+        {
+            name: "query_knowledge_graph",
+            description: "Query and retrieve architectural facts, decisions, and symbol nodes from the knowledge graph.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    query: { type: "string", description: "Search keyword or symbol" },
+                    kind: { type: "string", description: "Optional filter by kind: invariant|adr|convention|subsystem|symbol|runbook" },
+                    limit: { type: "integer", description: "Max results to return (default: 20)" }
+                }
+            }
+        },
+        {
+            name: "create_codebase_symbol_node",
+            description: "Index a codebase symbol or module in the knowledge graph with its architectural role.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    title: { type: "string", description: "Symbol node title" },
+                    symbol_name: { type: "string", description: "Symbol name" },
+                    file_path: { type: "string", description: "Source file path" },
+                    summary: { type: "string", description: "Symbol architectural purpose" },
+                    kind: { type: "string", description: "symbol|subsystem (default: symbol)" },
+                    author_agent: { type: "string", description: "Declaring agent" }
+                },
+                required: ["title", "symbol_name", "file_path"]
+            }
+        },
+        {
+            name: "link_knowledge_nodes",
+            description: "Create a directional relation between two architectural knowledge nodes.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    source_node_id: { type: "string", description: "Originating node ID" },
+                    target_node_id: { type: "string", description: "Target node ID" },
+                    relation_type: { type: "string", description: "depends_on|implements|modifies|violates|supersedes|verifies|governs|related_to" },
+                    weight: { type: "number", description: "Relation weight (default 1.0)" },
+                    description: { type: "string", description: "Contextual relationship description" }
+                },
+                required: ["source_node_id", "target_node_id", "relation_type"]
+            }
+        },
+        {
+            name: "verify_change_against_invariants",
+            description: "Verify a set of touched file paths or diff against all active codebase architectural invariants.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    target_files: { type: "array", items: { type: "string" }, description: "List of files to verify" },
+                    diff_summary: { type: "string", description: "Optional git diff summary or patch preview" },
+                    agent_name: { type: "string", description: "Executing agent name" },
+                    mcp_session_id: { type: "string", description: "Optional session ID" }
+                },
+                required: ["target_files"]
+            }
+        },
+        {
+            name: "list_architectural_decisions",
+            description: "List Architectural Decision Records (ADRs) with their acceptance status and summaries.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    status: { type: "string", description: "Filter by status: accepted|proposed|deprecated|superseded" },
+                    limit: { type: "integer", description: "Max results (default: 50)" }
+                }
+            }
+        },
+        {
+            name: "invalidate_knowledge_node",
+            description: "Mark a knowledge node as superseded, deprecated, or violated with rationale.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    node_id: { type: "string", description: "Knowledge node ID or slug" },
+                    new_status: { type: "string", description: "deprecated|superseded|violated" },
+                    superseded_by_id: { type: "string", description: "Optional replacement node ID" },
+                    reason: { type: "string", description: "Explanation of invalidation" }
+                },
+                required: ["node_id"]
+            }
+        },
+        {
+            name: "get_knowledge_graph_metrics",
+            description: "Retrieve summary health metrics, invariant counts, pass rates, and knowledge graph statistics.",
+            inputSchema: {
+                type: "object",
+                properties: {}
+            }
         }
     ]
 
@@ -8236,6 +8347,182 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         return { id: pm.id, incident_id: inc.id, title: pm.get("title"), status: pm.get("status") };
     };
 
+    // Epic 32 Knowledge Graph & Invariants Handlers
+    const storeArchitecturalFact = (a) => {
+        let title = a.title || "";
+        if (!title) throw new Error("title is required");
+        let nodeCol = e.app.findCollectionByNameOrId("knowledge_nodes");
+        let rec = new Record(nodeCol);
+        let slug = a.slug || title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+        try {
+            let existing = e.app.findFirstRecordByData("knowledge_nodes", "slug", slug);
+            if (existing) slug = slug + "-" + Math.random().toString(36).substring(2, 6);
+        } catch (_) {}
+        rec.set("title", title);
+        rec.set("slug", slug);
+        rec.set("kind", a.kind || "invariant");
+        rec.set("summary", a.summary || "");
+        rec.set("content_markdown", a.content_markdown || "");
+        rec.set("file_path", a.file_path || "");
+        rec.set("symbol_name", a.symbol_name || "");
+        rec.set("status", a.status || "active");
+        rec.set("confidence_score", typeof a.confidence_score === "number" ? a.confidence_score : 1.0);
+        rec.set("author_agent", a.author_agent || "mcp_agent");
+        if (a.tags) rec.set("tags_json", a.tags);
+        if (a.metadata) rec.set("metadata_json", a.metadata);
+        e.app.save(rec);
+        return { id: rec.id, slug: rec.get("slug"), title: rec.get("title"), status: rec.get("status") };
+    };
+
+    const queryKnowledgeGraph = (a) => {
+        let q = (a.query || "").toLowerCase();
+        let kind = a.kind || "";
+        let limit = a.limit || 20;
+        let filter = kind ? `kind = '${kind}'` : "id != ''";
+        let recs = e.app.findRecordsByFilter("knowledge_nodes", filter, "-created", 100, 0);
+        let matched = recs.filter(r => {
+            if (!q) return true;
+            return r.getString("title").toLowerCase().includes(q) ||
+                   r.getString("summary").toLowerCase().includes(q) ||
+                   r.getString("symbol_name").toLowerCase().includes(q) ||
+                   r.getString("file_path").toLowerCase().includes(q);
+        }).slice(0, limit);
+        return {
+            total: matched.length,
+            nodes: matched.map(r => ({
+                id: r.id,
+                title: r.getString("title"),
+                slug: r.getString("slug"),
+                kind: r.getString("kind"),
+                summary: r.getString("summary"),
+                file_path: r.getString("file_path"),
+                status: r.getString("status"),
+                confidence_score: r.getFloat("confidence_score")
+            }))
+        };
+    };
+
+    const createCodebaseSymbolNode = (a) => {
+        let title = a.title || "";
+        let symbol = a.symbol_name || "";
+        let filePath = a.file_path || "";
+        if (!title || !symbol || !filePath) throw new Error("title, symbol_name, and file_path are required");
+        let nodeCol = e.app.findCollectionByNameOrId("knowledge_nodes");
+        let rec = new Record(nodeCol);
+        let slug = "sym-" + symbol.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+        try {
+            let existing = e.app.findFirstRecordByData("knowledge_nodes", "slug", slug);
+            if (existing) slug = slug + "-" + Math.random().toString(36).substring(2, 6);
+        } catch (_) {}
+        rec.set("title", title);
+        rec.set("slug", slug);
+        rec.set("kind", a.kind || "symbol");
+        rec.set("summary", a.summary || "");
+        rec.set("file_path", filePath);
+        rec.set("symbol_name", symbol);
+        rec.set("status", "active");
+        rec.set("confidence_score", 1.0);
+        rec.set("author_agent", a.author_agent || "mcp_agent");
+        e.app.save(rec);
+        return { id: rec.id, symbol_name: symbol, file_path: filePath, status: "active" };
+    };
+
+    const linkKnowledgeNodes = (a) => {
+        if (!a.source_node_id || !a.target_node_id || !a.relation_type) throw new Error("source_node_id, target_node_id, and relation_type are required");
+        let relCol = e.app.findCollectionByNameOrId("knowledge_relations");
+        let rec = new Record(relCol);
+        rec.set("source_node_id", a.source_node_id);
+        rec.set("target_node_id", a.target_node_id);
+        rec.set("relation_type", a.relation_type);
+        rec.set("weight", a.weight || 1.0);
+        rec.set("description", a.description || "");
+        e.app.save(rec);
+        return { id: rec.id, source: a.source_node_id, target: a.target_node_id, relation_type: a.relation_type };
+    };
+
+    const verifyChangeAgainstInvariants = (a) => {
+        let files = a.target_files || [];
+        let diff = a.diff_summary || "";
+        let invs = e.app.findRecordsByFilter("architectural_invariants", "is_active = true", "-created", 100, 0);
+        let violations = [];
+        for (let inv of invs) {
+            let pattern = inv.getString("pattern_expression");
+            let sev = inv.getString("severity");
+            let violated = false;
+            for (let f of files) {
+                if (pattern.startsWith("forbidden:") && f.toLowerCase().includes(pattern.replace("forbidden:", "").toLowerCase())) {
+                    violated = true;
+                    violations.push({ invariant_id: inv.id, rule_name: inv.getString("rule_name"), severity: sev, file: f });
+                    break;
+                }
+            }
+            if (!violated && diff && pattern.startsWith("forbidden:") && diff.toLowerCase().includes(pattern.replace("forbidden:", "").toLowerCase())) {
+                violations.push({ invariant_id: inv.id, rule_name: inv.getString("rule_name"), severity: sev, diff_violation: true });
+            }
+        }
+        let hasBlocking = violations.some(v => v.severity === "p0_blocking");
+        let verdict = hasBlocking ? "violations_detected" : (violations.length > 0 ? "warnings_only" : "passed");
+        return { verdict: verdict, passed: verdict === "passed" || verdict === "warnings_only", violations: violations, total_rules_checked: invs.length };
+    };
+
+    const listArchitecturalDecisions = (a) => {
+        let status = a.status || "";
+        let limit = a.limit || 50;
+        let filter = "kind = 'adr'";
+        if (status) filter += ` && status = '${status}'`;
+        let recs = e.app.findRecordsByFilter("knowledge_nodes", filter, "-created", limit, 0);
+        return {
+            total: recs.length,
+            adrs: recs.map(r => ({
+                id: r.id,
+                title: r.getString("title"),
+                slug: r.getString("slug"),
+                status: r.getString("status"),
+                summary: r.getString("summary"),
+                author_agent: r.getString("author_agent"),
+                created: r.getString("created")
+            }))
+        };
+    };
+
+    const invalidateKnowledgeNode = (a) => {
+        let nodeId = a.node_id || "";
+        if (!nodeId) throw new Error("node_id is required");
+        let rec = null;
+        try { rec = e.app.findRecordById("knowledge_nodes", nodeId); } catch (_) {
+            try { rec = e.app.findFirstRecordByData("knowledge_nodes", "slug", nodeId); } catch (_) {}
+        }
+        if (!rec) throw new Error("Knowledge node not found: " + nodeId);
+        let newStatus = a.new_status || "deprecated";
+        rec.set("status", newStatus);
+        if (a.superseded_by_id) {
+            try {
+                let relCol = e.app.findCollectionByNameOrId("knowledge_relations");
+                let rel = new Record(relCol);
+                rel.set("source_node_id", rec.id);
+                rel.set("target_node_id", a.superseded_by_id);
+                rel.set("relation_type", "superseded_by");
+                rel.set("description", a.reason || "Superseded");
+                e.app.save(rel);
+            } catch (_) {}
+        }
+        e.app.save(rec);
+        return { id: rec.id, status: newStatus };
+    };
+
+    const getKnowledgeGraphMetrics = () => {
+        let nodes = e.app.findRecordsByFilter("knowledge_nodes", "id != ''", "", 5000, 0);
+        let invariants = e.app.findRecordsByFilter("architectural_invariants", "is_active = true", "", 500, 0);
+        let relations = e.app.findRecordsByFilter("knowledge_relations", "id != ''", "", 5000, 0);
+        let adrs = nodes.filter(n => n.getString("kind") === "adr");
+        return {
+            total_nodes: nodes.length,
+            total_relations: relations.length,
+            active_invariants: invariants.length,
+            total_adrs: adrs.length
+        };
+    };
+
     // ---------- 1. Authentication ----------
     let authRecord = e.auth || null
     let bypassEnabled = false
@@ -8456,6 +8743,14 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         else if (toolName === "execute_incident_mitigation") { result = executeIncidentMitigation(args) }
         else if (toolName === "update_incident_status") { result = updateIncidentStatus(args) }
         else if (toolName === "generate_incident_postmortem") { result = generateIncidentPostmortem(args) }
+        else if (toolName === "store_architectural_fact") { result = storeArchitecturalFact(args) }
+        else if (toolName === "query_knowledge_graph") { result = queryKnowledgeGraph(args) }
+        else if (toolName === "create_codebase_symbol_node") { result = createCodebaseSymbolNode(args) }
+        else if (toolName === "link_knowledge_nodes") { result = linkKnowledgeNodes(args) }
+        else if (toolName === "verify_change_against_invariants") { result = verifyChangeAgainstInvariants(args) }
+        else if (toolName === "list_architectural_decisions") { result = listArchitecturalDecisions(args) }
+        else if (toolName === "invalidate_knowledge_node") { result = invalidateKnowledgeNode(args) }
+        else if (toolName === "get_knowledge_graph_metrics") { result = getKnowledgeGraphMetrics() }
         else { return fail(-32602, "Unknown tool: " + toolName) }
         return ok({ content: [{ type: "text", text: JSON.stringify(result) }] })
     } catch (toolErr) {

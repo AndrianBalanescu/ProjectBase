@@ -276,3 +276,13 @@
 - [x] 8 FastMCP JSON-RPC 2.0 tools (`declare_incident`, `list_incidents`, `get_incident_details`, `add_incident_event`, `propose_incident_hypothesis`, `execute_incident_mitigation`, `update_incident_status`, `generate_incident_postmortem`)
 - [x] Frontend AgentsView **🚨 Live Incident War-Room & Post-Mortem** dashboard with KPI cards, incident triage roster with severity badges, interactive War-Room Workbench with 4 subtabs (Live Timeline Stream, Hypotheses Board with confidence meters, Mitigations Tracker, 5-Whys Post-Mortem Viewer/Editor), and "+ Declare Incident" modal
 - [x] Comprehensive automated test suite `tests/test_incident_warroom_engine.py` with 11/11 passing assertions, 471 total passing tests across 36 files, and 100% frontend guard verification
+
+---
+
+## Milestone (Cycle 35)
+**Epic 32 – Autonomous Agent Knowledge Graph, Architectural Memory Index & Invariant Compliance Engine (✅ Done)**
+- [x] Schema migration (`1710000044_add_knowledge_graph_and_architectural_memory.js`) introducing `knowledge_nodes`, `knowledge_relations`, `architectural_invariants`, and `invariant_verifications` collections
+- [x] Backend knowledge graph engine hook (`app/pb_hooks/116_knowledge_graph_engine.pb.js`) with 19 high-performance REST API endpoints for architectural node/ADR storage, directional graph relationships, active invariant gate compliance checking, automated verification audits, and semantic keyword retrieval
+- [x] 8 FastMCP JSON-RPC 2.0 tools (`store_architectural_fact`, `query_knowledge_graph`, `create_codebase_symbol_node`, `link_knowledge_nodes`, `verify_change_against_invariants`, `list_architectural_decisions`, `invalidate_knowledge_node`, `get_knowledge_graph_metrics`)
+- [x] Frontend AgentsView **🧠 Autonomous Knowledge Graph & Architectural Memory** dashboard with 5 KPI overview cards, interactive 4-subtab layout (Knowledge & Symbol Graph Explorer with detail viewer and relations grid, Architectural Decision Records (ADRs) gallery, Invariants & Compliance Rules table with active toggles, and Interactive Invariant Verifier Playground with live violation diagnostic audits), and "+ Record Fact / ADR" / "+ New Invariant" modals
+- [x] Comprehensive automated test suite `tests/test_knowledge_graph_engine.py` with 11/11 passing assertions, 482 total passing tests across 37 files, and 100% frontend guard verification
