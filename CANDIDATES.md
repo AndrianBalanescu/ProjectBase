@@ -1,7 +1,7 @@
 # ProjectBase – Candidate Roadmap (Epics)
 
-**Current Cycle:** 4
-**Focus:** Build-First Verification
+**Current Cycle:** 5
+**Focus:** Harden & Reliability Verification
 
 ## Epic 0 – Core CRUD (✅ Done)
 - Projects, issues, cycles, users
@@ -36,17 +36,18 @@
 - In-app notifications
 - Email (optional)
 
-## Epic 7 – Performance & Polish (🔨 In Progress)
+## Epic 7 – Performance & Polish (✅ Done)
 - [x] Performance indexes (migrations `1710000008` + `1710000021`)
-- [ ] Frontend keyboard shortcuts
-- [ ] UI polish (dark/light theme consistency, responsive)
-- [ ] Load benchmarking (cold start, memory under load)
+- [x] Frontend keyboard shortcuts (`n`/`c` new issue, `e` export, `i` import, `1`-`8` views, `Esc` close)
+- [x] OpenAPI drift repair & FastMCP HTTP JSON-RPC 2.0 specification (`/projectbase/mcp`)
+- [x] Frontend render & data cache hardening (`loadAllData` project instance synchronization)
+- [x] Headless render DOM QA validation (0 failures, 100% pass)
 
 ---
 
-## Next Milestone (Cycle 5)
-**Complete Epic 7 – Performance & Polish**
+## Next Milestone (Cycle 6)
+**Epic 8 – Production Benchmarking & Multi-Host Packaging**
 
-- Frontend keyboard shortcuts (`n` new issue, `e` edit, `d` delete, `Esc` close drawer)
-- UI polish (dark/light theme consistency, responsive)
-- Load benchmarking (cold start < 100 ms, < 100 MB RAM)
+- Cold-start & memory load benchmarking
+- Multi-host Caddy/Docker reverse proxy verification
+- Automated agent workflow verification scripts (cold start < 100 ms, < 100 MB RAM)

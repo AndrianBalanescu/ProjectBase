@@ -273,14 +273,30 @@ const App = {
     handleOffline() {
       this.isOnline = false;
     },
-    async signIn() {
+    async signIn(e) {
       this.authError = '';
+      let email = (this.loginEmail || '').trim();
+      let password = this.loginPassword || '';
+      if (!email || !password) {
+        if (e && e.target) {
+          try {
+            const emailInput = e.target.querySelector('input[type="email"]') || (e.target.elements && e.target.elements['email']);
+            const passInput = e.target.querySelector('input[type="password"]') || (e.target.elements && e.target.elements['password']);
+            if (emailInput && emailInput.value) email = emailInput.value.trim();
+            if (passInput && passInput.value) password = passInput.value;
+          } catch (domErr) {}
+        }
+      }
+      if (!email || !password) {
+        this.authError = 'Please enter your email and password.';
+        return;
+      }
       try {
         try {
-          await API.client.collection('users').authWithPassword(this.loginEmail, this.loginPassword);
+          await API.client.collection('users').authWithPassword(email, password);
         } catch (uErr) {
           // Allow superuser login from the same unified gate
-          await API.client.collection('_superusers').authWithPassword(this.loginEmail, this.loginPassword);
+          await API.client.collection('_superusers').authWithPassword(email, password);
         }
         this.isAuthenticated = true;
         this.loginPassword = '';
@@ -372,15 +388,18 @@ const App = {
         this.agentSessions = (agents && agents.sessions) || [];
         this.agentSource = (agents && agents.source) || 'bridge';
 
-        // Persist the fresh snapshot so a later refresh keeps content on screen.
-        writeDataCache(this);
-
-        // Auto-select first favorite project if none selected
-        if (!this.currentProject && this.projects.length > 0) {
+        // Auto-select first favorite project if none selected, or refresh current project reference
+        if (this.currentProject) {
+          const fresh = this.projects.find(p => p.id === this.currentProject.id);
+          if (fresh) this.currentProject = fresh;
+        } else if (this.projects.length > 0) {
           const fav = this.projects.find(p => p.is_favorite);
           this.currentProject = fav || this.projects[0];
           await this.loadIssues();
         }
+
+        // Persist the fresh snapshot so a later refresh keeps content on screen.
+        writeDataCache(this);
       } catch (err) {
         console.error('Initial data load error:', err);
         this.showToast('Failed to connect to PocketBase backend', 'error');
@@ -545,7 +564,7 @@ const App = {
         if (isInput || e.metaKey || e.ctrlKey || e.altKey) return;
         if (this.isNewIssueOpen || this.isOmnibarOpen || this.isProjectModalOpen || this.isCycleModalOpen || this.isImportOpen || this.isExportOpen || this.isNotificationSettingsOpen || this.isWelcomeOpen || this.selectedIssue) return;
 
-        if (e.key === 'c' || e.key === 'C') {
+        if (e.key === 'c' || e.key === 'C' || e.key === 'n' || e.key === 'N') {
           e.preventDefault();
           this.isNewIssueOpen = true;
         } else if (e.key === 'i' || e.key === 'I') {
@@ -656,13 +675,16 @@ const App = {
         const projKey = parts[0].toUpperCase();
         const proj = this.projects.find(p => p.identifier === projKey);
         const prevProjId = this.currentProject ? this.currentProject.id : null;
-        if (proj && proj.id !== prevProjId) {
+        if (proj) {
+          const changed = !this.currentProject || this.currentProject.id !== proj.id;
           this.currentProject = proj;
-          // The board is project-scoped: reload issues for the route's project so
-          // a hard refresh (#/pb/board) shows that project's tasks, not the
-          // all-projects snapshot loaded during mounted().
-          this.selectedIssue = null;
-          await this.loadIssues();
+          if (changed) {
+            // The board is project-scoped: reload issues for the route's project so
+            // a hard refresh (#/pb/board) shows that project's tasks, not the
+            // all-projects snapshot loaded during mounted().
+            this.selectedIssue = null;
+            await this.loadIssues();
+          }
         }
         this.currentView = viewMap[parts[1]] || 'board';
         // Agent detail route: #/<proj-or-@>/agents/<name>

@@ -285,6 +285,7 @@ DOCUMENTED_CUSTOM_ROUTES = [
     "/projectbase/notification-settings",
     "/projectbase/ai-assist",
     "/projectbase/dispatch-agent",
+    "/projectbase/mcp",
 ]
 
 
