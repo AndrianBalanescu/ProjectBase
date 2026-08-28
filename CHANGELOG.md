@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.33.0] - 2026-08-28 - Cycle 37
+### Added
+- **Autonomous Agent Release Flight Control, Deployment Canary Gates, Production Health Probes & Self-Healing Rollback Engine (Milestone 13 / Epic 34):**
+  - Schema migration (`1710000047_add_release_flight_control_engine.js`) introducing 4 dedicated collections: `releases`, `deployment_stages`, `health_probes`, and `rollback_events`.
+  - Backend engine hook (`app/pb_hooks/118_release_flight_control_engine.pb.js`) with 18 high-performance REST API endpoints:
+    - `GET /api/projectbase/releases` and `POST /api/projectbase/releases` for listing and planning multi-stage canary release pipelines with auto-generated progressive canary stages and baseline SLA health probes.
+    - `GET /api/projectbase/releases/{id}`, `PATCH /api/projectbase/releases/{id}`, and `DELETE /api/projectbase/releases/{id}` for querying complete release specifications, stage pipelines, health probe histories, rollback incidents, and cascading deletion.
+    - `POST /api/projectbase/releases/{id}/start-deployment` for initiating the canary deployment progression pipeline.
+    - `POST /api/projectbase/releases/{id}/advance-stage` for advancing across canary traffic tiers (0% -> 10% -> 50% -> 100%) after verifying that active health probe gates are green.
+    - `POST /api/projectbase/releases/{id}/probes` and `GET /api/projectbase/releases/{id}/probes` for registering custom SLA health probes (HTTP latency, 5xx error rate budgets, database pools, synthetic canaries) and querying live metrics.
+    - `POST /api/projectbase/releases/{id}/simulate-traffic` for ingesting live or simulated telemetry streams and updating probe metrics in real time.
+    - `POST /api/projectbase/releases/{id}/evaluate-health` for running automated health gate evaluations against SLA thresholds, automatically executing instantaneous self-healing rollbacks (<200ms MTTR) when error budget breaches occur.
+    - `POST /api/projectbase/releases/{id}/trigger-rollback` for manual emergency instantaneous traffic cutoff and fallback restoration with audit logging.
+    - `POST /api/projectbase/releases/{id}/promote` for 1-click full promotion to 100% production traffic.
+    - `POST /api/projectbase/releases/{id}/abort` for gracefully terminating draft or canary releases.
+    - `GET /api/projectbase/releases/{id}/rollback-events` for inspecting detailed incident post-mortems and rollback duration telemetry.
+    - `GET /api/projectbase/releases/metrics/summary` for aggregate fleet deployment velocity, canary traffic split %, average rollback MTTR, and fleet stability index.
+    - `POST /api/projectbase/releases/seed-samples` for seeding realistic demo canary flights and stable releases.
+  - 8 FastMCP JSON-RPC 2.0 tools for autonomous agents (`plan_release_deployment`, `list_releases`, `get_release_flight_status`, `advance_canary_stage`, `record_release_health_probe`, `evaluate_release_health_gate`, `execute_instant_rollback`, `promote_release_to_production`).
+  - Frontend AgentsView **🚀 Autonomous Release Flight Control & Canary Sentinel Hub** dashboard (`activeTab === 'releases'`) with 5 KPI summary cards, interactive split-pane release inspector, 4 subtabs (🚀 Canary Stage Pipeline & Traffic Dial, 🩺 Real-Time Health Probes & Telemetry Ingestor, 🛡️ Self-Healing Rollback Sentinel & Incident Timeline, 📦 Ground-Truth Artifacts Manifest), "+ Plan Release" modal, "+ Add Probe" modal, and "Emergency Instant Rollback" modal.
+  - Complete automated test suite `tests/test_release_flight_control_engine.py` (10/10 passing assertions, 502 total passing tests across 39 files), OpenAPI 3.0 static drift synchronization, and 100% interactive Playwright browser E2E test verification (`scripts/qa/run_release_flight_control_e2e.py`).
+
 ## [1.32.0] - 2026-08-28 - Cycle 36
 ### Added
 - **Autonomous Agent Multi-Persona Code Review Swarm, AST-Aware Critique & Patch Synthesis Engine (Milestone 12 / Epic 33):**

@@ -3109,5 +3109,163 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to get code review metrics');
     return data;
+  },
+
+  // Milestone 13 / Epic 34 — Autonomous Release Flight Control & Canary Sentinel
+  async listReleases(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/releases${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list releases');
+    return data;
+  },
+
+  async createRelease(payload = {}) {
+    const res = await fetch('/api/projectbase/releases', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create release');
+    return data;
+  },
+
+  async getRelease(id) {
+    const res = await fetch(`/api/projectbase/releases/${encodeURIComponent(id)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get release');
+    return data;
+  },
+
+  async updateRelease(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/releases/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to update release');
+    return data;
+  },
+
+  async deleteRelease(id) {
+    const res = await fetch(`/api/projectbase/releases/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete release');
+    return data;
+  },
+
+  async startReleaseDeployment(id) {
+    const res = await fetch(`/api/projectbase/releases/${encodeURIComponent(id)}/start-deployment`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to start deployment');
+    return data;
+  },
+
+  async advanceReleaseStage(id) {
+    const res = await fetch(`/api/projectbase/releases/${encodeURIComponent(id)}/advance-stage`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to advance canary stage');
+    return data;
+  },
+
+  async createReleaseProbe(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/releases/${encodeURIComponent(id)}/probes`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create release probe');
+    return data;
+  },
+
+  async listReleaseProbes(id) {
+    const res = await fetch(`/api/projectbase/releases/${encodeURIComponent(id)}/probes`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list release probes');
+    return data;
+  },
+
+  async simulateReleaseTraffic(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/releases/${encodeURIComponent(id)}/simulate-traffic`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to simulate release traffic');
+    return data;
+  },
+
+  async evaluateReleaseHealth(id) {
+    const res = await fetch(`/api/projectbase/releases/${encodeURIComponent(id)}/evaluate-health`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to evaluate release health');
+    return data;
+  },
+
+  async triggerReleaseRollback(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/releases/${encodeURIComponent(id)}/trigger-rollback`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to trigger rollback');
+    return data;
+  },
+
+  async promoteRelease(id) {
+    const res = await fetch(`/api/projectbase/releases/${encodeURIComponent(id)}/promote`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to promote release');
+    return data;
+  },
+
+  async getReleaseMetrics() {
+    const res = await fetch('/api/projectbase/releases/metrics/summary', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get release metrics');
+    return data;
+  },
+
+  async seedReleaseSamples() {
+    const res = await fetch('/api/projectbase/releases/seed-samples', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to seed sample releases');
+    return data;
   }
 };

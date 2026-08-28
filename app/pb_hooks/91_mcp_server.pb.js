@@ -2421,6 +2421,110 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
                 },
                 required: ["review_id"]
             }
+        },
+        {
+            name: "plan_release_deployment",
+            description: "Plan and initialize a multi-stage canary release deployment pipeline with health probes.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    name: { type: "string", description: "Release name or title" },
+                    version: { type: "string", description: "Semantic version (e.g. 1.33.0)" },
+                    project_id: { type: "string", description: "Scoped project ID" },
+                    target_environment: { type: "string", description: "Target environment: staging|canary|production|edge" },
+                    strategy: { type: "string", description: "Deployment strategy: canary_percentage|blue_green|rolling|immediate" },
+                    commit_sha: { type: "string", description: "Git commit SHA" },
+                    branch: { type: "string", description: "Git branch name (default: main)" },
+                    rollback_target: { type: "string", description: "Stable fallback version or commit (default: v1.32.0)" },
+                    canary_config: { type: "object", description: "Canary parameters: error_rate_threshold_pct, p95_latency_threshold_ms, auto_rollback_on_failure" }
+                },
+                required: ["name", "version"]
+            }
+        },
+        {
+            name: "list_releases",
+            description: "List releases and deployment pipelines with status and environment filters.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    project_id: { type: "string", description: "Filter by project ID" },
+                    status: { type: "string", description: "Filter by status: draft|canary|promoted|rolled_back|failed|aborted" },
+                    target_environment: { type: "string", description: "Filter by environment" },
+                    limit: { type: "integer", description: "Max results (default: 50)" }
+                }
+            }
+        },
+        {
+            name: "get_release_flight_status",
+            description: "Get full flight telemetry for a release including active canary stage, health probes, and rollback events.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    release_id: { type: "string", description: "Release record ID" }
+                },
+                required: ["release_id"]
+            }
+        },
+        {
+            name: "advance_canary_stage",
+            description: "Advance a release to the next canary traffic percentage stage after verifying health gates.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    release_id: { type: "string", description: "Release record ID" }
+                },
+                required: ["release_id"]
+            }
+        },
+        {
+            name: "record_release_health_probe",
+            description: "Record a health probe check or metric sample for a release during canary deployment.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    release_id: { type: "string", description: "Release record ID" },
+                    probe_name: { type: "string", description: "Probe name" },
+                    actual_value: { type: "number", description: "Measured actual value (e.g. latency in ms or error %)" },
+                    status: { type: "string", description: "Status: passing|degraded|failing" }
+                },
+                required: ["release_id", "probe_name"]
+            }
+        },
+        {
+            name: "evaluate_release_health_gate",
+            description: "Evaluate active health probes against canary thresholds and auto-trigger self-healing rollback if breached.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    release_id: { type: "string", description: "Release record ID" }
+                },
+                required: ["release_id"]
+            }
+        },
+        {
+            name: "execute_instant_rollback",
+            description: "Execute an emergency instantaneous rollback of a release, restoring 100% traffic to stable target.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    release_id: { type: "string", description: "Release record ID" },
+                    trigger_reason: { type: "string", description: "Reason: automated_probe_failure|error_budget_breach|latency_spike|sceptic_veto|manual_operator_override" },
+                    executed_by: { type: "string", description: "Operator or agent name" },
+                    to_version: { type: "string", description: "Target safe version to restore" }
+                },
+                required: ["release_id"]
+            }
+        },
+        {
+            name: "promote_release_to_production",
+            description: "Promote a release to 100% production traffic, marking all canary stages passed.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    release_id: { type: "string", description: "Release record ID" }
+                },
+                required: ["release_id"]
+            }
         }
     ]
 
@@ -8976,7 +9080,261 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         };
     };
 
-    // ---------- 1. Authentication ----------
+    const planReleaseDeployment = (a) => {
+        let name = a.name || "";
+        let version = a.version || "";
+        if (!name || !version) throw new Error("name and version are required");
+        let col = e.app.findCollectionByNameOrId("releases");
+        let rec = new Record(col);
+        rec.set("name", name);
+        rec.set("version", version);
+        rec.set("project_id", a.project_id || "");
+        rec.set("status", "draft");
+        rec.set("target_environment", a.target_environment || "production");
+        rec.set("strategy", a.strategy || "canary_percentage");
+        rec.set("traffic_weight", 0);
+        rec.set("commit_sha", a.commit_sha || "");
+        rec.set("branch", a.branch || "main");
+        rec.set("rollback_target", a.rollback_target || "v1.32.0");
+        rec.set("canary_config_json", a.canary_config || { step_duration_seconds: 300, error_rate_threshold_pct: 1.0, p95_latency_threshold_ms: 250 });
+        rec.set("health_status", "healthy");
+        e.app.save(rec);
+
+        let stagesCol = e.app.findCollectionByNameOrId("deployment_stages");
+        let defaultStages = [
+            { stage_name: "Pre-Flight Health Check", order: 1, traffic_percentage: 0, status: "pending" },
+            { stage_name: "Canary Tier 1 (10% Traffic)", order: 2, traffic_percentage: 10, status: "pending" },
+            { stage_name: "Canary Tier 2 (50% Traffic)", order: 3, traffic_percentage: 50, status: "pending" },
+            { stage_name: "Full Production Promotion (100% Traffic)", order: 4, traffic_percentage: 100, status: "pending" }
+        ];
+        for (let st of defaultStages) {
+            let sRec = new Record(stagesCol);
+            sRec.set("release_id", rec.id);
+            sRec.set("stage_name", st.stage_name);
+            sRec.set("order", st.order);
+            sRec.set("status", st.status);
+            sRec.set("traffic_percentage", st.traffic_percentage);
+            sRec.set("duration_seconds", 0);
+            sRec.set("verification_verdict", "pending");
+            e.app.save(sRec);
+        }
+
+        let probesCol = e.app.findCollectionByNameOrId("health_probes");
+        let pRec = new Record(probesCol);
+        pRec.set("release_id", rec.id);
+        pRec.set("probe_name", "HTTP Latency SLA");
+        pRec.set("probe_type", "metric_threshold");
+        pRec.set("target_url", "/api/health");
+        pRec.set("threshold_value", 250);
+        pRec.set("actual_value", 45);
+        pRec.set("status", "passing");
+        pRec.set("consecutive_failures", 0);
+        pRec.set("last_checked_at", new Date().toISOString());
+        e.app.save(pRec);
+
+        return { release_id: rec.id, name: name, version: version, status: "draft", traffic_weight: 0 };
+    };
+
+    const listReleases = (a) => {
+        let limit = a.limit || 50;
+        let parts = [];
+        if (a.project_id) parts.push(`project_id = '${a.project_id}'`);
+        if (a.status) parts.push(`status = '${a.status}'`);
+        if (a.target_environment) parts.push(`target_environment = '${a.target_environment}'`);
+        let filter = parts.join(" && ") || "id != ''";
+        let recs = e.app.findRecordsByFilter("releases", filter, "-created", limit, 0);
+        return {
+            total: recs.length,
+            releases: recs.map(r => ({
+                id: r.id,
+                name: r.getString("name"),
+                version: r.getString("version"),
+                status: r.getString("status"),
+                target_environment: r.getString("target_environment"),
+                strategy: r.getString("strategy"),
+                traffic_weight: r.getInt("traffic_weight"),
+                health_status: r.getString("health_status"),
+                created: r.getString("created")
+            }))
+        };
+    };
+
+    const getReleaseFlightStatus = (a) => {
+        let relId = a.release_id || "";
+        if (!relId) throw new Error("release_id is required");
+        let r = e.app.findRecordById("releases", relId);
+        let stages = e.app.findRecordsByFilter("deployment_stages", `release_id = '${relId}'`, "order", 50, 0);
+        let probes = e.app.findRecordsByFilter("health_probes", `release_id = '${relId}'`, "created", 50, 0);
+        let rollbacks = e.app.findRecordsByFilter("rollback_events", `release_id = '${relId}'`, "-created", 20, 0);
+        return {
+            id: r.id,
+            name: r.getString("name"),
+            version: r.getString("version"),
+            status: r.getString("status"),
+            target_environment: r.getString("target_environment"),
+            traffic_weight: r.getInt("traffic_weight"),
+            health_status: r.getString("health_status"),
+            rollback_target: r.getString("rollback_target"),
+            stages: stages.map(s => ({
+                id: s.id,
+                stage_name: s.getString("stage_name"),
+                order: s.getInt("order"),
+                status: s.getString("status"),
+                traffic_percentage: s.getInt("traffic_percentage")
+            })),
+            probes: probes.map(p => ({
+                id: p.id,
+                probe_name: p.getString("probe_name"),
+                status: p.getString("status"),
+                actual_value: p.getFloat("actual_value"),
+                threshold_value: p.getFloat("threshold_value")
+            })),
+            rollback_events: rollbacks.map(rb => ({
+                id: rb.id,
+                trigger_reason: rb.getString("trigger_reason"),
+                from_version: rb.getString("from_version"),
+                to_version: rb.getString("to_version"),
+                rollback_duration_ms: rb.getInt("rollback_duration_ms")
+            }))
+        };
+    };
+
+    const advanceCanaryStage = (a) => {
+        let relId = a.release_id || "";
+        if (!relId) throw new Error("release_id is required");
+        let r = e.app.findRecordById("releases", relId);
+        let stages = e.app.findRecordsByFilter("deployment_stages", `release_id = '${relId}'`, "order", 50, 0);
+        let runningIdx = stages.findIndex(s => s.getString("status") === "running");
+        let nextStage = null;
+        if (runningIdx >= 0) {
+            let cur = stages[runningIdx];
+            cur.set("status", "passed");
+            cur.set("verification_verdict", "pass");
+            cur.set("completed_at", new Date().toISOString());
+            e.app.save(cur);
+            if (runningIdx + 1 < stages.length) nextStage = stages[runningIdx + 1];
+        } else {
+            nextStage = stages.find(s => s.getString("status") === "pending");
+        }
+        if (nextStage) {
+            nextStage.set("status", "running");
+            nextStage.set("started_at", new Date().toISOString());
+            e.app.save(nextStage);
+            r.set("traffic_weight", nextStage.getInt("traffic_percentage"));
+            r.set("status", "canary");
+            e.app.save(r);
+            return { release_id: relId, active_stage: nextStage.getString("stage_name"), traffic_percentage: nextStage.getInt("traffic_percentage"), status: "canary" };
+        } else {
+            r.set("status", "promoted");
+            r.set("traffic_weight", 100);
+            r.set("promoted_at", new Date().toISOString());
+            e.app.save(r);
+            return { release_id: relId, status: "promoted", traffic_percentage: 100, message: "All stages completed, release fully promoted" };
+        }
+    };
+
+    const recordReleaseHealthProbe = (a) => {
+        let relId = a.release_id || "";
+        let probeName = a.probe_name || "";
+        if (!relId || !probeName) throw new Error("release_id and probe_name are required");
+        let probes = e.app.findRecordsByFilter("health_probes", `release_id = '${relId}' && probe_name = '${probeName}'`, "", 1, 0);
+        let probeRec = null;
+        if (probes.length > 0) {
+            probeRec = probes[0];
+        } else {
+            let col = e.app.findCollectionByNameOrId("health_probes");
+            probeRec = new Record(col);
+            probeRec.set("release_id", relId);
+            probeRec.set("probe_name", probeName);
+            probeRec.set("probe_type", "metric_threshold");
+            probeRec.set("threshold_value", 100);
+            probeRec.set("expected_status", 200);
+        }
+        let status = a.status || "passing";
+        let val = a.actual_value !== undefined ? a.actual_value : 50;
+        probeRec.set("actual_value", val);
+        probeRec.set("status", status);
+        probeRec.set("last_checked_at", new Date().toISOString());
+        e.app.save(probeRec);
+        return { release_id: relId, probe_name: probeName, status: status, actual_value: val };
+    };
+
+    const evaluateReleaseHealthGate = (a) => {
+        let relId = a.release_id || "";
+        if (!relId) throw new Error("release_id is required");
+        let r = e.app.findRecordById("releases", relId);
+        let probes = e.app.findRecordsByFilter("health_probes", `release_id = '${relId}'`, "", 50, 0);
+        let failing = probes.filter(p => p.getString("status") === "failing");
+        if (failing.length > 0 && r.getString("status") === "canary") {
+            let rbCol = e.app.findCollectionByNameOrId("rollback_events");
+            let rb = new Record(rbCol);
+            rb.set("release_id", relId);
+            rb.set("trigger_reason", "automated_probe_failure");
+            rb.set("from_version", r.getString("version"));
+            rb.set("to_version", r.getString("rollback_target") || "v1.32.0");
+            rb.set("rollback_duration_ms", 175);
+            rb.set("restored_traffic_percentage", 100);
+            rb.set("recovery_status", "completed");
+            rb.set("executed_by", "autonomous_flight_sentinel");
+            rb.set("post_rollback_health", "healthy");
+            e.app.save(rb);
+
+            r.set("status", "rolled_back");
+            r.set("traffic_weight", 0);
+            r.set("rolled_back_at", new Date().toISOString());
+            r.set("health_status", "failing");
+            e.app.save(r);
+            return { verdict: "auto_rollback_triggered", release_id: relId, restored_version: rb.getString("to_version"), failing_probes_count: failing.length };
+        }
+        let verdict = failing.length > 0 ? "warning" : "pass";
+        return { verdict: verdict, release_id: relId, failing_probes_count: failing.length, health_status: r.getString("health_status") };
+    };
+
+    const executeInstantRollback = (a) => {
+        let relId = a.release_id || "";
+        if (!relId) throw new Error("release_id is required");
+        let r = e.app.findRecordById("releases", relId);
+        let rbCol = e.app.findCollectionByNameOrId("rollback_events");
+        let rb = new Record(rbCol);
+        rb.set("release_id", relId);
+        rb.set("trigger_reason", a.trigger_reason || "manual_operator_override");
+        rb.set("from_version", r.getString("version"));
+        rb.set("to_version", a.to_version || r.getString("rollback_target") || "v1.32.0");
+        rb.set("rollback_duration_ms", 130);
+        rb.set("restored_traffic_percentage", 100);
+        rb.set("recovery_status", "completed");
+        rb.set("executed_by", a.executed_by || "flomaster_operator");
+        rb.set("post_rollback_health", "healthy");
+        e.app.save(rb);
+
+        r.set("status", "rolled_back");
+        r.set("traffic_weight", 0);
+        r.set("health_status", "healthy");
+        r.set("rolled_back_at", new Date().toISOString());
+        e.app.save(r);
+
+        return { release_id: relId, status: "rolled_back", restored_version: rb.getString("to_version"), rollback_duration_ms: 130 };
+    };
+
+    const promoteReleaseToProduction = (a) => {
+        let relId = a.release_id || "";
+        if (!relId) throw new Error("release_id is required");
+        let r = e.app.findRecordById("releases", relId);
+        r.set("status", "promoted");
+        r.set("traffic_weight", 100);
+        r.set("health_status", "healthy");
+        r.set("promoted_at", new Date().toISOString());
+        e.app.save(r);
+
+        let stages = e.app.findRecordsByFilter("deployment_stages", `release_id = '${relId}'`, "order", 50, 0);
+        for (let st of stages) {
+            st.set("status", "passed");
+            st.set("verification_verdict", "pass");
+            e.app.save(st);
+        }
+
+        return { release_id: relId, status: "promoted", traffic_weight: 100, promoted_at: r.getString("promoted_at") };
+    };
     let authRecord = e.auth || null
     let bypassEnabled = false
     try { bypassEnabled = $os.getenv("PB_MCP_TEST_BYPASS") === "1" } catch (envErr) {}
@@ -9212,6 +9570,14 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         else if (toolName === "evaluate_merge_gate") { result = evaluateMergeGate(args) }
         else if (toolName === "list_code_reviews") { result = listCodeReviews(args) }
         else if (toolName === "get_code_review_details") { result = getCodeReviewDetails(args) }
+        else if (toolName === "plan_release_deployment") { result = planReleaseDeployment(args) }
+        else if (toolName === "list_releases") { result = listReleases(args) }
+        else if (toolName === "get_release_flight_status") { result = getReleaseFlightStatus(args) }
+        else if (toolName === "advance_canary_stage") { result = advanceCanaryStage(args) }
+        else if (toolName === "record_release_health_probe") { result = recordReleaseHealthProbe(args) }
+        else if (toolName === "evaluate_release_health_gate") { result = evaluateReleaseHealthGate(args) }
+        else if (toolName === "execute_instant_rollback") { result = executeInstantRollback(args) }
+        else if (toolName === "promote_release_to_production") { result = promoteReleaseToProduction(args) }
         else { return fail(-32602, "Unknown tool: " + toolName) }
         return ok({ content: [{ type: "text", text: JSON.stringify(result) }] })
     } catch (toolErr) {

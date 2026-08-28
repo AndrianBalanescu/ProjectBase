@@ -27,3 +27,5 @@
 - [x] Autonomous Ephemeral Dev Sandboxes & Worktree Container Orchestrator (Milestone 9)
 - [x] Autonomous Multi-Agent Incident Response & War-Room Engine (Milestone 10)
 - [x] Autonomous Agent Knowledge Graph, Architectural Memory Index & Invariant Compliance Engine (Milestone 11)
+- [x] Autonomous Agent Multi-Persona Code Review Swarm, AST-Aware Critique & Patch Synthesis Engine (Milestone 12)
+- [x] Autonomous Agent Release Flight Control, Deployment Canary Gates, Production Health Probes & Self-Healing Rollback Engine (Milestone 13)

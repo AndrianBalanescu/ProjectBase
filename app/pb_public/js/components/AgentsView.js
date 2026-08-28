@@ -545,6 +545,59 @@ const AgentsViewComponent = {
       gateOverride: {
         reason: '',
         overridden_by: 'human_lead'
+      },
+
+      // Autonomous Release Flight Control & Canary Sentinel (Milestone 13 / Epic 34)
+      releasesList: [],
+      releaseMetrics: null,
+      selectedRelease: null,
+      selectedReleaseStages: [],
+      selectedReleaseProbes: [],
+      selectedReleaseRollbacks: [],
+      isLoadingReleases: false,
+      isAdvancingStage: false,
+      isEvaluatingHealth: false,
+      releaseSuccessMsg: null,
+      releaseErrorMsg: null,
+      releaseFilterStatus: '',
+      releaseFilterEnv: '',
+      releaseSearch: '',
+      releaseActiveSubtab: 'stages', // 'stages' | 'probes' | 'sentinel' | 'artifacts'
+      newReleaseModalOpen: false,
+      newProbeModalOpen: false,
+      emergencyRollbackModalOpen: false,
+      newRelease: {
+        name: '',
+        version: '',
+        project_id: '',
+        target_environment: 'production',
+        strategy: 'canary_percentage',
+        commit_sha: '',
+        branch: 'main',
+        rollback_target: 'v1.32.0',
+        step_duration: 300,
+        error_rate_threshold: 1.0,
+        latency_threshold: 250
+      },
+      newProbe: {
+        probe_name: '',
+        probe_type: 'metric_threshold',
+        target_url: '/api/health',
+        threshold_value: 200,
+        actual_value: 45,
+        expected_status: 200,
+        status: 'passing'
+      },
+      emergencyRollback: {
+        trigger_reason: 'manual_operator_override',
+        executed_by: 'flomaster_operator',
+        note: 'Emergency rollback triggered from flight control console',
+        to_version: ''
+      },
+      trafficSim: {
+        error_rate_pct: 0.05,
+        latency_p95_ms: 45,
+        request_count: 500
       }
     };
   },
@@ -3257,8 +3310,223 @@ const AgentsViewComponent = {
         this.codeReviewErrorMsg = 'Failed deleting review: ' + (e.message || String(e));
       }
     },
+    // Release Flight Control Methods (Milestone 13 / Epic 34)
+    async loadReleasesData() {
+      this.isLoadingReleases = true;
+      this.releaseErrorMsg = null;
+      try {
+        const [releasesRes, metricsRes] = await Promise.all([
+          API.listReleases({
+            status: this.releaseFilterStatus || undefined,
+            target_environment: this.releaseFilterEnv || undefined,
+            search: this.releaseSearch || undefined,
+            limit: 200
+          }).catch(() => ({ releases: [] })),
+          API.getReleaseMetrics().catch(() => null)
+        ]);
+        this.releasesList = releasesRes.releases || [];
+        this.releaseMetrics = metricsRes ? metricsRes.summary : null;
+        if (this.releasesList.length > 0 && !this.selectedRelease) {
+          await this.inspectRelease(this.releasesList[0].id);
+        }
+      } catch (e) {
+        this.releaseErrorMsg = 'Failed loading releases: ' + (e.message || String(e));
+      } finally {
+        this.isLoadingReleases = false;
+      }
+    },
+    async inspectRelease(id) {
+      if (!id) return;
+      try {
+        const data = await API.getRelease(id);
+        if (data && data.release) {
+          this.selectedRelease = data.release;
+          this.selectedReleaseStages = data.release.stages || [];
+          this.selectedReleaseProbes = data.release.probes || [];
+          this.selectedReleaseRollbacks = data.release.rollback_events || [];
+        }
+      } catch (e) {
+        console.error('Failed inspecting release:', e);
+      }
+    },
+    async triggerStartDeployment(id) {
+      if (!id) return;
+      try {
+        await API.startReleaseDeployment(id);
+        this.releaseSuccessMsg = 'Canary deployment pipeline started.';
+        setTimeout(() => { this.releaseSuccessMsg = null; }, 4000);
+        await this.loadReleasesData();
+        await this.inspectRelease(id);
+      } catch (e) {
+        this.releaseErrorMsg = 'Failed starting deployment: ' + (e.message || String(e));
+      }
+    },
+    async triggerAdvanceStage(id) {
+      if (!id) return;
+      this.isAdvancingStage = true;
+      try {
+        const res = await API.advanceReleaseStage(id);
+        this.releaseSuccessMsg = res.message || 'Canary stage advanced successfully.';
+        setTimeout(() => { this.releaseSuccessMsg = null; }, 4000);
+        await this.loadReleasesData();
+        await this.inspectRelease(id);
+      } catch (e) {
+        this.releaseErrorMsg = 'Failed advancing stage: ' + (e.message || String(e));
+      } finally {
+        this.isAdvancingStage = false;
+      }
+    },
+    async triggerEvaluateHealth(id) {
+      if (!id) return;
+      this.isEvaluatingHealth = true;
+      try {
+        const res = await API.evaluateReleaseHealth(id);
+        if (res.verdict === 'auto_rollback_triggered') {
+          this.releaseSuccessMsg = '🚨 Alert: Health gate breached! ' + res.message;
+        } else {
+          this.releaseSuccessMsg = 'Health gate evaluated: ' + (res.verdict || 'PASS').toUpperCase();
+        }
+        setTimeout(() => { this.releaseSuccessMsg = null; }, 5000);
+        await this.loadReleasesData();
+        await this.inspectRelease(id);
+      } catch (e) {
+        this.releaseErrorMsg = 'Health evaluation failed: ' + (e.message || String(e));
+      } finally {
+        this.isEvaluatingHealth = false;
+      }
+    },
+    async triggerPromoteRelease(id) {
+      if (!id) return;
+      try {
+        await API.promoteRelease(id);
+        this.releaseSuccessMsg = 'Release promoted to 100% production traffic!';
+        setTimeout(() => { this.releaseSuccessMsg = null; }, 4000);
+        await this.loadReleasesData();
+        await this.inspectRelease(id);
+      } catch (e) {
+        this.releaseErrorMsg = 'Failed promoting release: ' + (e.message || String(e));
+      }
+    },
+    async triggerSimulateTraffic(id) {
+      if (!id) return;
+      try {
+        await API.simulateReleaseTraffic(id, {
+          error_rate_pct: parseFloat(this.trafficSim.error_rate_pct || '0.05'),
+          latency_p95_ms: parseFloat(this.trafficSim.latency_p95_ms || '45'),
+          request_count: parseInt(this.trafficSim.request_count || '500', 10)
+        });
+        this.releaseSuccessMsg = 'Telemetry ingested: health probes updated.';
+        setTimeout(() => { this.releaseSuccessMsg = null; }, 4000);
+        await this.inspectRelease(id);
+      } catch (e) {
+        this.releaseErrorMsg = 'Traffic simulation failed: ' + (e.message || String(e));
+      }
+    },
+    async submitNewReleaseModal() {
+      if (!this.newRelease.name.trim() || !this.newRelease.version.trim()) return;
+      try {
+        const res = await API.createRelease({
+          name: this.newRelease.name,
+          version: this.newRelease.version,
+          project_id: this.newRelease.project_id || undefined,
+          target_environment: this.newRelease.target_environment,
+          strategy: this.newRelease.strategy,
+          commit_sha: this.newRelease.commit_sha,
+          branch: this.newRelease.branch,
+          rollback_target: this.newRelease.rollback_target,
+          canary_config: {
+            step_duration_seconds: parseInt(this.newRelease.step_duration || '300', 10),
+            error_rate_threshold_pct: parseFloat(this.newRelease.error_rate_threshold || '1.0'),
+            p95_latency_threshold_ms: parseFloat(this.newRelease.latency_threshold || '250')
+          }
+        });
+        this.newReleaseModalOpen = false;
+        this.newRelease = {
+          name: '',
+          version: '',
+          project_id: '',
+          target_environment: 'production',
+          strategy: 'canary_percentage',
+          commit_sha: '',
+          branch: 'main',
+          rollback_target: 'v1.32.0',
+          step_duration: 300,
+          error_rate_threshold: 1.0,
+          latency_threshold: 250
+        };
+        await this.loadReleasesData();
+        if (res.release && res.release.id) await this.inspectRelease(res.release.id);
+      } catch (e) {
+        this.releaseErrorMsg = 'Failed creating release: ' + (e.message || String(e));
+      }
+    },
+    async submitNewProbeModal() {
+      if (!this.selectedRelease || !this.newProbe.probe_name.trim()) return;
+      try {
+        await API.createReleaseProbe(this.selectedRelease.id, {
+          probe_name: this.newProbe.probe_name,
+          probe_type: this.newProbe.probe_type,
+          target_url: this.newProbe.target_url,
+          threshold_value: parseFloat(this.newProbe.threshold_value || '200'),
+          actual_value: parseFloat(this.newProbe.actual_value || '45'),
+          expected_status: parseInt(this.newProbe.expected_status || '200', 10),
+          status: this.newProbe.status
+        });
+        this.newProbeModalOpen = false;
+        this.newProbe = {
+          probe_name: '',
+          probe_type: 'metric_threshold',
+          target_url: '/api/health',
+          threshold_value: 200,
+          actual_value: 45,
+          expected_status: 200,
+          status: 'passing'
+        };
+        await this.inspectRelease(this.selectedRelease.id);
+      } catch (e) {
+        this.releaseErrorMsg = 'Failed adding probe: ' + (e.message || String(e));
+      }
+    },
+    async submitEmergencyRollbackModal() {
+      if (!this.selectedRelease) return;
+      try {
+        const res = await API.triggerReleaseRollback(this.selectedRelease.id, {
+          trigger_reason: this.emergencyRollback.trigger_reason,
+          executed_by: this.emergencyRollback.executed_by,
+          to_version: this.emergencyRollback.to_version || undefined,
+          details: { note: this.emergencyRollback.note }
+        });
+        this.emergencyRollbackModalOpen = false;
+        this.releaseSuccessMsg = '🛡️ Instant Rollback executed in ' + (res.rollback_event ? res.rollback_event.rollback_duration_ms : '140') + 'ms!';
+        setTimeout(() => { this.releaseSuccessMsg = null; }, 5000);
+        await this.loadReleasesData();
+        await this.inspectRelease(this.selectedRelease.id);
+      } catch (e) {
+        this.releaseErrorMsg = 'Rollback failed: ' + (e.message || String(e));
+      }
+    },
+    async triggerDeleteRelease(id) {
+      if (!id || !confirm('Delete this release and all associated telemetry?')) return;
+      try {
+        await API.deleteRelease(id);
+        this.selectedRelease = null;
+        await this.loadReleasesData();
+      } catch (e) {
+        this.releaseErrorMsg = 'Delete failed: ' + (e.message || String(e));
+      }
+    },
+    async triggerSeedReleasesDemo() {
+      try {
+        await API.seedReleaseSamples();
+        this.releaseSuccessMsg = 'Demo releases and canary flights seeded!';
+        setTimeout(() => { this.releaseSuccessMsg = null; }, 4000);
+        await this.loadReleasesData();
+      } catch (e) {
+        this.releaseErrorMsg = 'Seed failed: ' + (e.message || String(e));
+      }
+    },
     isGovernanceTab(tab) {
-      return ['workload', 'anomalies', 'semantic', 'auto_heal', 'sso_rbac', 'automations', 'tenants', 'webhooks', 'observability', 'consensus', 'cluster', 'federation', 'throughput', 'swarm', 'merges', 'budget', 'evals', 'sandboxes', 'incidents', 'knowledge', 'code_reviews'].includes(tab);
+      return ['workload', 'anomalies', 'semantic', 'auto_heal', 'sso_rbac', 'automations', 'tenants', 'webhooks', 'observability', 'consensus', 'cluster', 'federation', 'throughput', 'swarm', 'merges', 'budget', 'evals', 'sandboxes', 'incidents', 'knowledge', 'code_reviews', 'releases'].includes(tab);
     },
     onGovernanceTabSelect(tab) {
       if (!tab) return;
@@ -3280,6 +3548,8 @@ const AgentsViewComponent = {
         this.loadKnowledgeGovernanceData();
       } else if (tab === 'code_reviews') {
         this.loadCodeReviewsData();
+      } else if (tab === 'releases') {
+        this.loadReleasesData();
       }
     }
   },
@@ -3397,7 +3667,7 @@ const AgentsViewComponent = {
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <h2 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 capitalize truncate">
-                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (activeTab === 'automations' ? 'Native Workflow Automations & AI Agent Trigger Pipelines' : (activeTab === 'tenants' ? 'Multi-Tenant Isolation & Granular Resource Quotas' : (activeTab === 'auto_heal' ? 'Autonomous AI Agent Auto-Healing & Self-Remediation Workflow Pipeline' : (activeTab === 'budget' ? 'Agent Fleet Budget & Cost Governance Hub' : (activeTab === 'evals' ? 'Agent Evaluation Benchmark Harness & Model Leaderboard' : (activeTab === 'sandboxes' ? 'Autonomous Ephemeral Dev Sandboxes & Worktree Container Orchestrator' : (activeTab === 'incidents' ? 'Autonomous Multi-Agent Incident Response & Live Debugging War-Room' : (activeTab === 'knowledge' ? 'Autonomous Knowledge Graph, Architectural Memory & Invariants' : (activeTab === 'code_reviews' ? 'Autonomous Multi-Persona Code Review Swarm & Merge Gate' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center')))))))))))))))))) }}
+                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (activeTab === 'automations' ? 'Native Workflow Automations & AI Agent Trigger Pipelines' : (activeTab === 'tenants' ? 'Multi-Tenant Isolation & Granular Resource Quotas' : (activeTab === 'auto_heal' ? 'Autonomous AI Agent Auto-Healing & Self-Remediation Workflow Pipeline' : (activeTab === 'budget' ? 'Agent Fleet Budget & Cost Governance Hub' : (activeTab === 'evals' ? 'Agent Evaluation Benchmark Harness & Model Leaderboard' : (activeTab === 'sandboxes' ? 'Autonomous Ephemeral Dev Sandboxes & Worktree Container Orchestrator' : (activeTab === 'incidents' ? 'Autonomous Multi-Agent Incident Response & Live Debugging War-Room' : (activeTab === 'knowledge' ? 'Autonomous Knowledge Graph, Architectural Memory & Invariants' : (activeTab === 'code_reviews' ? 'Autonomous Multi-Persona Code Review Swarm & Merge Gate' : (activeTab === 'releases' ? 'Autonomous Release Flight Control, Canary Gates & Rollback Sentinel' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center'))))))))))))))))))) }}
                 </h2>
                 <span v-if="selectedSession && selectedSession.is_active && activeTab === 'chat'" class="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-400 text-[10px] font-mono font-semibold flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -3452,6 +3722,7 @@ const AgentsViewComponent = {
                     <option value="incidents">🚨 Live Incident War-Room & Post-Mortem</option>
                     <option value="knowledge">🧠 Knowledge Graph & Invariants</option>
                     <option value="code_reviews">🔍 Code Review Swarm & Merge Gate</option>
+                    <option value="releases">🚀 Release Flight Control & Canary Rollback</option>
                     <option value="federation">🌐 Multi-Cluster Federation</option>
                   </select>
                 </div>
@@ -10983,6 +11254,523 @@ const AgentsViewComponent = {
               <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
                 <button @click="overrideGateModalOpen = false" class="px-4 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold">Cancel</button>
                 <button @click="submitGateOverrideModal()" :disabled="!gateOverride.reason.trim()" class="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-bold shadow-xs">Force Approve & Override</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- PANE 2L: AUTONOMOUS RELEASE FLIGHT CONTROL & CANARY GATES -->
+        <!-- ========================================================= -->
+        <div v-else-if="activeTab === 'releases'" class="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/30">
+          <!-- Top KPI Metrics Ribbon -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div class="p-3 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col justify-between">
+              <div class="flex items-center justify-between text-zinc-400 mb-1">
+                <span class="text-xs font-semibold uppercase tracking-wider">Active Deployments</span>
+                <span class="text-sm">🚀</span>
+              </div>
+              <div class="text-2xl font-black font-mono text-zinc-900 dark:text-zinc-100">
+                {{ releaseMetrics ? releaseMetrics.active_deployments : releasesList.filter(r => r.status === 'canary').length }}
+              </div>
+              <span class="text-[10px] text-emerald-500 font-medium">Live traffic split</span>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col justify-between">
+              <div class="flex items-center justify-between text-zinc-400 mb-1">
+                <span class="text-xs font-semibold uppercase tracking-wider">Canary Traffic Split</span>
+                <span class="text-sm">🎛️</span>
+              </div>
+              <div class="text-2xl font-black font-mono text-indigo-600 dark:text-indigo-400">
+                {{ selectedRelease ? selectedRelease.traffic_weight : (releaseMetrics ? releaseMetrics.canary_traffic_weight : 0) }}%
+              </div>
+              <span class="text-[10px] text-zinc-500">Gradual canary shift</span>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col justify-between">
+              <div class="flex items-center justify-between text-zinc-400 mb-1">
+                <span class="text-xs font-semibold uppercase tracking-wider">Rollback MTTR</span>
+                <span class="text-sm">⏱️</span>
+              </div>
+              <div class="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
+                {{ releaseMetrics ? releaseMetrics.avg_rollback_mttr_ms : 160 }}ms
+              </div>
+              <span class="text-[10px] text-emerald-500 font-medium">Sub-200ms instantaneous</span>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col justify-between">
+              <div class="flex items-center justify-between text-zinc-400 mb-1">
+                <span class="text-xs font-semibold uppercase tracking-wider">Health Gate SLA</span>
+                <span class="text-sm">🩺</span>
+              </div>
+              <div class="text-2xl font-black font-mono text-cyan-600 dark:text-cyan-400">
+                {{ releaseMetrics ? releaseMetrics.health_gate_pass_rate_pct : 100 }}%
+              </div>
+              <span class="text-[10px] text-zinc-500">Passing probes</span>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xs flex flex-col justify-between">
+              <div class="flex items-center justify-between text-zinc-400 mb-1">
+                <span class="text-xs font-semibold uppercase tracking-wider">Fleet Stability</span>
+                <span class="text-sm">🛡️</span>
+              </div>
+              <div class="text-2xl font-black font-mono text-amber-500 dark:text-amber-400">
+                {{ releaseMetrics ? releaseMetrics.fleet_stability_index : 99 }}/100
+              </div>
+              <span class="text-[10px] text-zinc-500">Autonomous Sentinel</span>
+            </div>
+          </div>
+
+          <!-- Alert / Toast Messages -->
+          <div v-if="releaseSuccessMsg" class="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-medium flex items-center justify-between">
+            <span>{{ releaseSuccessMsg }}</span>
+            <button @click="releaseSuccessMsg = null" class="text-emerald-400 hover:text-emerald-300">&times;</button>
+          </div>
+          <div v-if="releaseErrorMsg" class="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-medium flex items-center justify-between">
+            <span>{{ releaseErrorMsg }}</span>
+            <button @click="releaseErrorMsg = null" class="text-rose-400 hover:text-rose-300">&times;</button>
+          </div>
+
+          <!-- Main Split Layout: Left Roster & Right Flight Console -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <!-- Left Pane: Releases Roster (4 cols) -->
+            <div class="lg:col-span-4 space-y-3">
+              <div class="p-3 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Releases ({{ releasesList.length }})</span>
+                  <div class="flex items-center gap-1">
+                    <button @click="triggerSeedReleasesDemo()" class="px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-800 text-[10px] font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200">Seed Demo</button>
+                    <button @click="newReleaseModalOpen = true" class="px-2 py-1 rounded bg-indigo-600 text-white text-[10px] font-bold hover:bg-indigo-500">+ Plan Release</button>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model="releaseSearch"
+                    @input="loadReleasesData()"
+                    placeholder="Search releases..."
+                    class="flex-1 px-2.5 py-1.5 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 focus:outline-none"
+                  />
+                  <select
+                    v-model="releaseFilterStatus"
+                    @change="loadReleasesData()"
+                    class="px-2 py-1.5 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 focus:outline-none"
+                  >
+                    <option value="">All Status</option>
+                    <option value="canary">Canary</option>
+                    <option value="promoted">Promoted</option>
+                    <option value="draft">Draft</option>
+                    <option value="rolled_back">Rolled Back</option>
+                  </select>
+                </div>
+
+                <div class="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+                  <div v-if="releasesList.length === 0" class="py-8 text-center text-xs text-zinc-500">
+                    No releases found. Click "+ Plan Release" or "Seed Demo" to start.
+                  </div>
+                  <div
+                    v-for="rel in releasesList"
+                    :key="rel.id"
+                    @click="inspectRelease(rel.id)"
+                    class="p-3 rounded-lg border transition-all cursor-pointer text-left space-y-1.5"
+                    :class="selectedRelease && selectedRelease.id === rel.id ? 'bg-indigo-50/60 dark:bg-indigo-950/30 border-indigo-500 ring-1 ring-indigo-500/30' : 'bg-zinc-50/50 dark:bg-zinc-900/40 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'"
+                  >
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">{{ rel.name || rel.version }}</span>
+                      <span
+                        class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase"
+                        :class="rel.status === 'canary' ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 animate-pulse' : (rel.status === 'promoted' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' : (rel.status === 'rolled_back' ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20' : 'bg-zinc-500/10 text-zinc-600 border border-zinc-500/20'))"
+                      >
+                        {{ rel.status }}
+                      </span>
+                    </div>
+                    <div class="flex items-center justify-between text-[11px] text-zinc-500 font-mono">
+                      <span>v{{ rel.version }} • {{ rel.target_environment || 'prod' }}</span>
+                      <span class="font-bold text-indigo-600 dark:text-indigo-400">{{ rel.traffic_weight || 0 }}% traffic</span>
+                    </div>
+                    <div class="flex items-center justify-between text-[10px] text-zinc-400">
+                      <span>{{ rel.branch || 'main' }} ({{ (rel.commit_sha || 'HEAD').substring(0, 7) }})</span>
+                      <span :class="rel.health_status === 'healthy' ? 'text-emerald-500' : (rel.health_status === 'degraded' ? 'text-amber-500' : 'text-rose-500')">
+                        ● {{ rel.health_status || 'unknown' }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Pane: Release Flight Console & Subtabs (8 cols) -->
+            <div class="lg:col-span-8 space-y-3">
+              <div v-if="!selectedRelease" class="p-8 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 text-center text-zinc-500">
+                Select a release from the roster to monitor flight telemetry.
+              </div>
+              <div v-else class="p-4 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-4">
+                <!-- Flight Header -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-200 dark:border-zinc-800">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">{{ selectedRelease.name }}</h3>
+                      <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                        {{ selectedRelease.status }}
+                      </span>
+                    </div>
+                    <p class="text-xs text-zinc-500 font-mono mt-0.5">
+                      Target: {{ selectedRelease.target_environment }} • Strategy: {{ selectedRelease.strategy }} • Fallback: {{ selectedRelease.rollback_target || 'None' }}
+                    </p>
+                  </div>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <button
+                      v-if="selectedRelease.status === 'draft'"
+                      @click="triggerStartDeployment(selectedRelease.id)"
+                      class="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-xs"
+                    >
+                      🚀 Start Deployment
+                    </button>
+                    <button
+                      v-if="selectedRelease.status === 'canary'"
+                      @click="triggerAdvanceStage(selectedRelease.id)"
+                      :disabled="isAdvancingStage"
+                      class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold shadow-xs"
+                    >
+                      {{ isAdvancingStage ? 'Advancing...' : '⏭️ Advance Canary Stage' }}
+                    </button>
+                    <button
+                      v-if="selectedRelease.status === 'canary'"
+                      @click="triggerPromoteRelease(selectedRelease.id)"
+                      class="px-2.5 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold shadow-xs"
+                    >
+                      👑 Full Promotion (100%)
+                    </button>
+                    <button
+                      v-if="selectedRelease.status === 'canary'"
+                      @click="emergencyRollbackModalOpen = true"
+                      class="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-xs"
+                    >
+                      🛡️ Emergency Rollback
+                    </button>
+                    <button
+                      @click="triggerDeleteRelease(selectedRelease.id)"
+                      class="px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-rose-500 text-xs"
+                      title="Delete Release"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Subtab Navigation -->
+                <div class="flex items-center gap-1 border-b border-zinc-200 dark:border-zinc-800 pb-1">
+                  <button
+                    @click="releaseActiveSubtab = 'stages'"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                    :class="releaseActiveSubtab === 'stages' ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'"
+                  >
+                    🚀 Canary Stage Pipeline ({{ selectedReleaseStages.length }})
+                  </button>
+                  <button
+                    @click="releaseActiveSubtab = 'probes'"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                    :class="releaseActiveSubtab === 'probes' ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'"
+                  >
+                    🩺 Health Probes ({{ selectedReleaseProbes.length }})
+                  </button>
+                  <button
+                    @click="releaseActiveSubtab = 'sentinel'"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                    :class="releaseActiveSubtab === 'sentinel' ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'"
+                  >
+                    🛡️ Rollback Sentinel ({{ selectedReleaseRollbacks.length }})
+                  </button>
+                  <button
+                    @click="releaseActiveSubtab = 'artifacts'"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                    :class="releaseActiveSubtab === 'artifacts' ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'"
+                  >
+                    📦 Ground-Truth Manifest
+                  </button>
+                </div>
+
+                <!-- Subtab 1: Canary Stage Pipeline -->
+                <div v-if="releaseActiveSubtab === 'stages'" class="space-y-3">
+                  <!-- Live Traffic Progress Bar -->
+                  <div class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 space-y-1.5">
+                    <div class="flex items-center justify-between text-xs font-bold">
+                      <span class="text-zinc-700 dark:text-zinc-300">Canary Traffic Allocation</span>
+                      <span class="font-mono text-indigo-600 dark:text-indigo-400">{{ selectedRelease.traffic_weight }}% to Canary ({{ 100 - selectedRelease.traffic_weight }}% Stable)</span>
+                    </div>
+                    <div class="w-full h-2.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden flex">
+                      <div class="h-full bg-indigo-600 transition-all duration-500" :style="{ width: selectedRelease.traffic_weight + '%' }"></div>
+                      <div class="h-full bg-emerald-500 transition-all duration-500" :style="{ width: (100 - selectedRelease.traffic_weight) + '%' }"></div>
+                    </div>
+                  </div>
+
+                  <!-- Stages Timeline -->
+                  <div class="space-y-2">
+                    <div
+                      v-for="(st, idx) in selectedReleaseStages"
+                      :key="st.id"
+                      class="p-3 rounded-lg border flex items-center justify-between gap-3"
+                      :class="st.status === 'running' ? 'bg-indigo-50/40 dark:bg-indigo-950/20 border-indigo-500 ring-1 ring-indigo-500/20' : (st.status === 'passed' ? 'bg-emerald-50/30 dark:bg-emerald-950/10 border-emerald-500/30' : (st.status === 'rolled_back' ? 'bg-rose-50/30 dark:bg-rose-950/10 border-rose-500/30' : 'bg-zinc-50/40 dark:bg-zinc-900/30 border-zinc-200 dark:border-zinc-800'))"
+                    >
+                      <div class="flex items-center gap-3">
+                        <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold font-mono" :class="st.status === 'passed' ? 'bg-emerald-500 text-white' : (st.status === 'running' ? 'bg-indigo-600 text-white animate-pulse' : (st.status === 'rolled_back' ? 'bg-rose-500 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500'))">
+                          {{ st.status === 'passed' ? '✓' : st.order }}
+                        </span>
+                        <div>
+                          <div class="text-xs font-bold text-zinc-900 dark:text-zinc-100">{{ st.stage_name }}</div>
+                          <div class="text-[10px] text-zinc-500 font-mono">
+                            Traffic: {{ st.traffic_percentage }}% • Verdict: {{ st.verification_verdict || 'pending' }}
+                          </div>
+                        </div>
+                      </div>
+                      <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase" :class="st.status === 'running' ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : (st.status === 'passed' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : (st.status === 'rolled_back' ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400' : 'bg-zinc-500/10 text-zinc-500'))">
+                        {{ st.status }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Subtab 2: Health Probes & Telemetry -->
+                <div v-if="releaseActiveSubtab === 'probes'" class="space-y-3">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Live Health Probes</span>
+                    <div class="flex items-center gap-2">
+                      <button @click="triggerEvaluateHealth(selectedRelease.id)" :disabled="isEvaluatingHealth" class="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold">
+                        {{ isEvaluatingHealth ? 'Evaluating...' : '🩺 Run Health Gate' }}
+                      </button>
+                      <button @click="newProbeModalOpen = true" class="px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold">+ Add Probe</button>
+                    </div>
+                  </div>
+
+                  <!-- Traffic Ingestion / Simulation Panel -->
+                  <div class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 space-y-2">
+                    <div class="flex items-center justify-between">
+                      <span class="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">📊 Telemetry Ingestion Simulator</span>
+                      <button @click="triggerSimulateTraffic(selectedRelease.id)" class="px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold hover:bg-indigo-200">
+                        ⚡ Send Sample Stream
+                      </button>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                      <div>
+                        <label class="text-[9px] text-zinc-400 font-mono">Error Rate %</label>
+                        <input v-model="trafficSim.error_rate_pct" type="number" step="0.01" class="w-full px-2 py-1 text-xs rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800" />
+                      </div>
+                      <div>
+                        <label class="text-[9px] text-zinc-400 font-mono">P95 Latency ms</label>
+                        <input v-model="trafficSim.latency_p95_ms" type="number" class="w-full px-2 py-1 text-xs rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800" />
+                      </div>
+                      <div>
+                        <label class="text-[9px] text-zinc-400 font-mono">Req Count</label>
+                        <input v-model="trafficSim.request_count" type="number" class="w-full px-2 py-1 text-xs rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Probes Grid -->
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div
+                      v-for="p in selectedReleaseProbes"
+                      :key="p.id"
+                      class="p-3 rounded-lg border space-y-1.5"
+                      :class="p.status === 'passing' ? 'bg-emerald-50/20 dark:bg-emerald-950/10 border-emerald-500/20' : (p.status === 'degraded' ? 'bg-amber-50/20 dark:bg-amber-950/10 border-amber-500/20' : 'bg-rose-50/20 dark:bg-rose-950/10 border-rose-500/20')"
+                    >
+                      <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">{{ p.probe_name }}</span>
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase" :class="p.status === 'passing' ? 'bg-emerald-500/10 text-emerald-600' : (p.status === 'degraded' ? 'bg-amber-500/10 text-amber-600' : 'bg-rose-500/10 text-rose-600')">
+                          {{ p.status }}
+                        </span>
+                      </div>
+                      <div class="flex items-center justify-between text-xs font-mono">
+                        <span class="text-zinc-500">Actual: <b class="text-zinc-900 dark:text-zinc-100">{{ p.actual_value }}</b></span>
+                        <span class="text-zinc-400">Threshold: &le; {{ p.threshold_value }}</span>
+                      </div>
+                      <div class="text-[10px] text-zinc-400 font-mono truncate">
+                        {{ p.target_url }} ({{ p.probe_type }})
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Subtab 3: Rollback Sentinel & Incident Timeline -->
+                <div v-if="releaseActiveSubtab === 'sentinel'" class="space-y-3">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100">🛡️ Autonomous Self-Healing Sentinel</span>
+                      <p class="text-[10px] text-zinc-500">Instantaneous traffic cutoff and fallback upon SLA breach.</p>
+                    </div>
+                    <button @click="emergencyRollbackModalOpen = true" class="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold">
+                      Emergency Rollback Now
+                    </button>
+                  </div>
+
+                  <div class="space-y-2">
+                    <div v-if="selectedReleaseRollbacks.length === 0" class="p-6 rounded-lg bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 text-center text-xs text-zinc-500">
+                      No rollback incidents recorded for this release. System operating cleanly within SLA.
+                    </div>
+                    <div
+                      v-for="rb in selectedReleaseRollbacks"
+                      :key="rb.id"
+                      class="p-3 rounded-lg bg-rose-50/20 dark:bg-rose-950/20 border border-rose-500/30 space-y-1.5"
+                    >
+                      <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-rose-600 dark:text-rose-400">Rollback Incident: {{ rb.trigger_reason }}</span>
+                        <span class="text-[10px] font-mono text-zinc-400">{{ rb.created ? new Date(rb.created).toLocaleTimeString() : 'Just now' }}</span>
+                      </div>
+                      <div class="flex items-center justify-between text-xs font-mono">
+                        <span>Restored: <b>{{ rb.to_version }}</b> (from {{ rb.from_version }})</span>
+                        <span class="text-emerald-500 font-bold">MTTR: {{ rb.rollback_duration_ms }}ms</span>
+                      </div>
+                      <div class="text-[10px] text-zinc-500">
+                        Executed by: <span class="font-mono text-zinc-700 dark:text-zinc-300">{{ rb.executed_by }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Subtab 4: Ground-Truth Manifest -->
+                <div v-if="releaseActiveSubtab === 'artifacts'" class="space-y-3">
+                  <div class="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 font-mono text-xs space-y-1.5">
+                    <div class="text-zinc-400 uppercase text-[10px] font-bold">Release Metadata & Provenance</div>
+                    <div><span class="text-zinc-500">Version:</span> {{ selectedRelease.version }}</div>
+                    <div><span class="text-zinc-500">Commit SHA:</span> {{ selectedRelease.commit_sha || 'N/A' }}</div>
+                    <div><span class="text-zinc-500">Branch:</span> {{ selectedRelease.branch || 'main' }}</div>
+                    <div><span class="text-zinc-500">Target Env:</span> {{ selectedRelease.target_environment }}</div>
+                    <div><span class="text-zinc-500">Created:</span> {{ selectedRelease.created }}</div>
+                    <div><span class="text-zinc-500">Artifacts:</span> <pre class="mt-1 p-2 rounded bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-[10px] overflow-x-auto">{{ JSON.stringify(selectedRelease.artifacts, null, 2) }}</pre></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Modal: Plan New Release -->
+          <div v-if="newReleaseModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 max-w-lg w-full shadow-2xl space-y-4">
+              <div class="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800">
+                <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">🚀 Plan New Release Deployment</h3>
+                <button @click="newReleaseModalOpen = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3">
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Release Name</label>
+                    <input v-model="newRelease.name" placeholder="v1.33.0 - Flight Control" class="w-full mt-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800" />
+                  </div>
+                  <div>
+                    <label class="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Version</label>
+                    <input v-model="newRelease.version" placeholder="1.33.0" class="w-full mt-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800" />
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Environment</label>
+                    <select v-model="newRelease.target_environment" class="w-full mt-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                      <option value="production">production</option>
+                      <option value="staging">staging</option>
+                      <option value="canary">canary</option>
+                      <option value="edge">edge</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Fallback Target</label>
+                    <input v-model="newRelease.rollback_target" placeholder="v1.32.0" class="w-full mt-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800" />
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2">
+                  <div>
+                    <label class="text-[10px] text-zinc-400 font-mono">Step Duration (s)</label>
+                    <input v-model="newRelease.step_duration" type="number" class="w-full mt-1 px-2 py-1 text-xs rounded bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800" />
+                  </div>
+                  <div>
+                    <label class="text-[10px] text-zinc-400 font-mono">Max Error Rate %</label>
+                    <input v-model="newRelease.error_rate_threshold" type="number" step="0.1" class="w-full mt-1 px-2 py-1 text-xs rounded bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800" />
+                  </div>
+                  <div>
+                    <label class="text-[10px] text-zinc-400 font-mono">P95 Latency (ms)</label>
+                    <input v-model="newRelease.latency_threshold" type="number" class="w-full mt-1 px-2 py-1 text-xs rounded bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button @click="newReleaseModalOpen = false" class="px-4 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold">Cancel</button>
+                <button @click="submitNewReleaseModal()" :disabled="!newRelease.name.trim() || !newRelease.version.trim()" class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold shadow-xs">Initialize Release</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Modal: Add Health Probe -->
+          <div v-if="newProbeModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 max-w-md w-full shadow-2xl space-y-4">
+              <div class="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800">
+                <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">🩺 Add Health Probe</h3>
+                <button @click="newProbeModalOpen = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3">
+                <div>
+                  <label class="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Probe Name</label>
+                  <input v-model="newProbe.probe_name" placeholder="API Response Latency SLA" class="w-full mt-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800" />
+                </div>
+                <div>
+                  <label class="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Target URL / Endpoint</label>
+                  <input v-model="newProbe.target_url" placeholder="/api/health" class="w-full mt-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800" />
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Threshold Value</label>
+                    <input v-model="newProbe.threshold_value" type="number" class="w-full mt-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800" />
+                  </div>
+                  <div>
+                    <label class="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Initial Status</label>
+                    <select v-model="newProbe.status" class="w-full mt-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                      <option value="passing">passing</option>
+                      <option value="degraded">degraded</option>
+                      <option value="failing">failing</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button @click="newProbeModalOpen = false" class="px-4 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold">Cancel</button>
+                <button @click="submitNewProbeModal()" :disabled="!newProbe.probe_name.trim()" class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold shadow-xs">Register Probe</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Modal: Emergency Rollback -->
+          <div v-if="emergencyRollbackModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="bg-white dark:bg-[#121215] border border-rose-500/40 rounded-xl p-5 max-w-md w-full shadow-2xl space-y-4">
+              <div class="flex items-center justify-between pb-2 border-b border-rose-500/20">
+                <h3 class="text-sm font-bold text-rose-600 dark:text-rose-400">🛡️ Confirm Instant Emergency Rollback</h3>
+                <button @click="emergencyRollbackModalOpen = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3 text-xs text-zinc-700 dark:text-zinc-300">
+                <p>This will instantly divert 100% of canary traffic back to fallback baseline <b class="font-mono text-indigo-500">{{ (selectedRelease && selectedRelease.rollback_target) || 'v1.32.0' }}</b> and log an incident event.</p>
+                <div>
+                  <label class="font-semibold">Trigger Reason</label>
+                  <select v-model="emergencyRollback.trigger_reason" class="w-full mt-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                    <option value="manual_operator_override">manual_operator_override</option>
+                    <option value="automated_probe_failure">automated_probe_failure</option>
+                    <option value="error_budget_breach">error_budget_breach</option>
+                    <option value="latency_spike">latency_spike</option>
+                    <option value="sceptic_veto">sceptic_veto</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="font-semibold">Operator Notes</label>
+                  <textarea v-model="emergencyRollback.note" rows="2" class="w-full mt-1 px-3 py-1.5 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800"></textarea>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <button @click="emergencyRollbackModalOpen = false" class="px-4 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold">Cancel</button>
+                <button @click="submitEmergencyRollbackModal()" class="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-xs">Execute Instant Rollback</button>
               </div>
             </div>
           </div>

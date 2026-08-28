@@ -8809,6 +8809,217 @@
           "200": { "description": "Metrics summary" }
         }
       }
+    },
+    "/projectbase/releases": {
+      "get": {
+        "tags": ["Autonomous Release Flight Control & Canary Sentinel"],
+        "summary": "List releases with status and environment filters",
+        "parameters": [
+          { "name": "project_id", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "target_environment", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "search", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer" } },
+          { "name": "offset", "in": "query", "required": false, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "List of release records" }
+        }
+      },
+      "post": {
+        "tags": ["Autonomous Release Flight Control & Canary Sentinel"],
+        "summary": "Plan and initialize a new release deployment pipeline",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "version"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "version": { "type": "string" },
+                  "target_environment": { "type": "string" },
+                  "strategy": { "type": "string" },
+                  "rollback_target": { "type": "string" },
+                  "canary_config": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Release planned" }
+        }
+      }
+    },
+    "/projectbase/releases/{id}": {
+      "get": {
+        "tags": ["Autonomous Release Flight Control & Canary Sentinel"],
+        "summary": "Get full flight telemetry and stages for a release",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Release flight telemetry" }
+        }
+      },
+      "patch": {
+        "tags": ["Autonomous Release Flight Control & Canary Sentinel"],
+        "summary": "Update release properties and configuration",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Release updated" }
+        }
+      },
+      "delete": {
+        "tags": ["Autonomous Release Flight Control & Canary Sentinel"],
+        "summary": "Delete release and cascading child telemetry",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Release deleted" }
+        }
+      }
+    },
+    "/projectbase/releases/{id}/start-deployment": {
+      "post": {
+        "tags": ["Autonomous Release Flight Control & Canary Sentinel"],
+        "summary": "Initiate multi-stage canary deployment pipeline",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Deployment started" }
+        }
+      }
+    },
+    "/projectbase/releases/{id}/advance-stage": {
+      "post": {
+        "tags": ["Autonomous Release Flight Control & Canary Sentinel"],
+        "summary": "Advance canary deployment to the next stage percentage",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Stage advanced" }
+        }
+      }
+    },
+    "/projectbase/releases/{id}/probes": {
+      "get": {
+        "tags": ["Autonomous Release Flight Control & Canary Sentinel"],
+        "summary": "List health probes and live metrics for a release",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "List of health probes" }
+        }
+      },
+      "post": {
+        "tags": ["Autonomous Release Flight Control & Canary Sentinel"],
+        "summary": "Register a custom health probe for a release",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "201": { "description": "Probe registered" }
+        }
+      }
+    },
+    "/projectbase/releases/{id}/simulate-traffic": {
+      "post": {
+        "tags": ["Autonomous Release Flight Control & Canary Sentinel"],
+        "summary": "Ingest simulated or live traffic telemetry and probe samples",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Telemetry ingested" }
+        }
+      }
+    },
+    "/projectbase/releases/{id}/evaluate-health": {
+      "post": {
+        "tags": ["Autonomous Release Flight Control & Canary Sentinel"],
+        "summary": "Evaluate active probes against canary thresholds and auto-rollback if breached",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Health evaluation verdict" }
+        }
+      }
+    },
+    "/projectbase/releases/{id}/trigger-rollback": {
+      "post": {
+        "tags": ["Autonomous Release Flight Control & Canary Sentinel"],
+        "summary": "Execute instantaneous emergency rollback and restore stable version",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Rollback executed" }
+        }
+      }
+    },
+    "/projectbase/releases/{id}/promote": {
+      "post": {
+        "tags": ["Autonomous Release Flight Control & Canary Sentinel"],
+        "summary": "Promote release to 100% production traffic",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Release promoted" }
+        }
+      }
+    },
+    "/projectbase/releases/{id}/abort": {
+      "post": {
+        "tags": ["Autonomous Release Flight Control & Canary Sentinel"],
+        "summary": "Abort a draft or canary release deployment",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Release aborted" }
+        }
+      }
+    },
+    "/projectbase/releases/{id}/rollback-events": {
+      "get": {
+        "tags": ["Autonomous Release Flight Control & Canary Sentinel"],
+        "summary": "List rollback incident events for a release",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "List of rollback events" }
+        }
+      }
+    },
+    "/projectbase/releases/metrics/summary": {
+      "get": {
+        "tags": ["Autonomous Release Flight Control & Canary Sentinel"],
+        "summary": "Get aggregate fleet deployment and rollback metrics",
+        "responses": {
+          "200": { "description": "Metrics summary" }
+        }
+      }
+    },
+    "/projectbase/releases/seed-samples": {
+      "post": {
+        "tags": ["Autonomous Release Flight Control & Canary Sentinel"],
+        "summary": "Seed realistic sample releases and flight telemetry",
+        "responses": {
+          "200": { "description": "Seed result" }
+        }
+      }
     }
   }
 }
