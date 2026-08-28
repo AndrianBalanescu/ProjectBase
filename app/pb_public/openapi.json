@@ -5826,6 +5826,199 @@
           }
         }
       }
+    },
+    "/projectbase/semantic/review": {
+      "post": {
+        "tags": [
+          "Semantic Brain & Admission Gate"
+        ],
+        "summary": "Review candidate issue against active board using neural embeddings & cross-encoder reranker",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "description": { "type": "string" },
+                  "project": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Semantic admission decision and reranker match details"
+          }
+        }
+      }
+    },
+    "/projectbase/semantic/rerank": {
+      "post": {
+        "tags": [
+          "Semantic Brain & Admission Gate"
+        ],
+        "summary": "Score and rerank candidate issues against query using hybrid cross-encoder",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["query"],
+                "properties": {
+                  "query": { "type": "string" },
+                  "project": { "type": "string" },
+                  "candidate_ids": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ranked candidates with similarity scores"
+          }
+        }
+      }
+    },
+    "/projectbase/semantic/cluster": {
+      "post": {
+        "tags": [
+          "Semantic Brain & Admission Gate"
+        ],
+        "summary": "Cluster project issues into semantic duplicate groups",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "project": { "type": "string" },
+                  "threshold": { "type": "number" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Identified semantic clusters and duplicates"
+          }
+        }
+      }
+    },
+    "/projectbase/semantic/consolidate": {
+      "post": {
+        "tags": [
+          "Semantic Brain & Admission Gate"
+        ],
+        "summary": "Consolidate duplicate tickets into canonical issue and migrate audit history",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["canonical_issue_id", "duplicate_issue_ids"],
+                "properties": {
+                  "canonical_issue_id": { "type": "string" },
+                  "duplicate_issue_ids": { "type": "array", "items": { "type": "string" } },
+                  "reason": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Consolidation summary and merged count"
+          }
+        }
+      }
+    },
+    "/projectbase/semantic/policies": {
+      "get": {
+        "tags": [
+          "Semantic Brain & Admission Gate"
+        ],
+        "summary": "List semantic admission policies",
+        "responses": {
+          "200": {
+            "description": "List of admission policies"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Semantic Brain & Admission Gate"
+        ],
+        "summary": "Create new semantic admission policy",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "project_id": { "type": "string" },
+                  "policy_name": { "type": "string" },
+                  "policy_mode": { "type": "string" },
+                  "duplicate_threshold": { "type": "number" },
+                  "related_threshold": { "type": "number" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created policy ID"
+          }
+        }
+      }
+    },
+    "/projectbase/semantic/audit": {
+      "get": {
+        "tags": [
+          "Semantic Brain & Admission Gate"
+        ],
+        "summary": "List semantic review audit logs of blocked duplicates and auto-links",
+        "responses": {
+          "200": {
+            "description": "Audit log entries"
+          }
+        }
+      }
+    },
+    "/projectbase/semantic/metrics": {
+      "get": {
+        "tags": [
+          "Semantic Brain & Admission Gate"
+        ],
+        "summary": "Aggregated clutter reduction metrics and reranker telemetry",
+        "responses": {
+          "200": {
+            "description": "Semantic brain metrics"
+          }
+        }
+      }
+    },
+    "/projectbase/semantic/embeddings/reindex": {
+      "post": {
+        "tags": [
+          "Semantic Brain & Admission Gate"
+        ],
+        "summary": "Batch generate and refresh neural embeddings for workspace issues",
+        "responses": {
+          "200": {
+            "description": "Reindexing summary and vector dimensions"
+          }
+        }
+      }
     }
   }
 }

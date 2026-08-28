@@ -72,6 +72,16 @@ def _first_project_id():
     return res["items"][0]["id"]
 
 
+def _clean_issue_and_children(parent_id):
+    token = _superuser_token()
+    # Delete child issues first
+    st, children = _authed_json("GET", f"/api/collections/issues/records?filter=(parent_issue='{parent_id}')&perPage=500")
+    if st == 200:
+        for c in children.get("items", []):
+            _request("DELETE", f"/api/collections/issues/records/{c['id']}", headers={"Authorization": token})
+    _request("DELETE", f"/api/collections/issues/records/{parent_id}", headers={"Authorization": token})
+
+
 def test_dag_decomposition_and_cycle_rejection():
     """Verify DAG decomposition creates child issues, wires relations, and rejects cycles."""
     pid = _first_project_id()
@@ -138,7 +148,7 @@ def test_dag_decomposition_and_cycle_rejection():
 
     finally:
         # Cleanup
-        _request("DELETE", f"/api/collections/issues/records/{parent_id}", headers={"Authorization": token})
+        _clean_issue_and_children(parent_id)
 
 
 def test_dag_status_and_topological_unblocking():
@@ -203,7 +213,7 @@ def test_dag_status_and_topological_unblocking():
         assert len(status3["blocked"]) == 0
 
     finally:
-        _request("DELETE", f"/api/collections/issues/records/{parent_id}", headers={"Authorization": token})
+        _clean_issue_and_children(parent_id)
 
 
 def test_dag_step_advancement_and_lease_claim():
@@ -267,7 +277,7 @@ def test_dag_step_advancement_and_lease_claim():
         assert step3["node"] is None
 
     finally:
-        _request("DELETE", f"/api/collections/issues/records/{parent_id}", headers={"Authorization": token})
+        _clean_issue_and_children(parent_id)
 
 
 def test_subtask_splitting_with_personas():
@@ -497,7 +507,7 @@ def test_fastmcp_swarm_dag_and_checkpoint_tools():
         assert get_cp_data.get("all_passed") is True
 
     finally:
-        _request("DELETE", f"/api/collections/issues/records/{parent_id}", headers=headers)
+        _clean_issue_and_children(parent_id)
 
 
 def test_mcp_server_python_swarm_dag_wrappers():
@@ -571,4 +581,4 @@ def test_mcp_server_python_swarm_dag_wrappers():
         assert cp_list.get("all_passed") is True
 
     finally:
-        _request("DELETE", f"/api/collections/issues/records/{parent_id}", headers={"Authorization": token})
+        _clean_issue_and_children(parent_id)

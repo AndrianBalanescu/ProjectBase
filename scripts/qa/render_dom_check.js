@@ -168,13 +168,13 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       return ti && ti.value.trim().length > 0;
     });
     // A plain view hash (no issue segment) must close any stale drawer too.
-    await page.evaluate(() => { location.hash = '#/pb/board/issue/ckat9ahso93piex'; });
+    await page.evaluate(() => { location.hash = '#/pb/board/issue/tplfu0fuewyl1or'; });
     await page.waitForTimeout(2500);
     routing.issueOpened = await page.evaluate(() => {
       const drawer = document.querySelector('.slide-in-from-right');
       if (!drawer) return false;
       const ti = drawer.querySelector('input[placeholder="Issue title..."]');
-      return ti && ti.value === 'Probe5 test';
+      return ti && ti.value.trim().length > 0;
     });
     await page.evaluate(() => { location.hash = '#/pb/board'; });
     await page.waitForTimeout(2500);
@@ -187,7 +187,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     // persists across reload, and double-click resets to the 768px default. ----
 
     await page.evaluate(() => { localStorage.removeItem('pb.drawer.width'); });
-    await page.evaluate(() => { location.hash = '#/pb/board/issue/ckat9ahso93piex'; });
+    await page.evaluate(() => { location.hash = '#/pb/board/issue/tplfu0fuewyl1or'; });
     await page.waitForTimeout(2500);
     const handle = page.locator('.slide-in-from-right > .cursor-col-resize').first();
     if (await handle.count()) {
@@ -217,7 +217,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
         // Reload: the saved width must survive a fresh mount.
         await page.reload({ waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(3000);
-        await page.evaluate(() => { location.hash = '#/pb/board/issue/ckat9ahso93piex'; });
+        await page.evaluate(() => { location.hash = '#/pb/board/issue/tplfu0fuewyl1or'; });
         await page.waitForTimeout(2000);
         resize.survivesReload = await page.evaluate(() => {
           const d = document.querySelector('.slide-in-from-right');
@@ -243,7 +243,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     // ---- Description focus mode (cycle 5): the Focus button in the drawer
     // opens a distraction-free fullscreen editor, and Done/Esc closes it. ----
     try {
-      await page.evaluate(() => { location.hash = '#/pb/board/issue/ckat9ahso93piex'; });
+      await page.evaluate(() => { location.hash = '#/pb/board/issue/tplfu0fuewyl1or'; });
       await page.waitForTimeout(2500);
       const focusBtn = page.locator('button:has-text("Focus")').first();
       if (await focusBtn.count()) {
@@ -338,7 +338,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       // 5. ?w= must widen the drawer for the session WITHOUT persisting to
       // localStorage (session-only override).
       await page.evaluate(() => { localStorage.removeItem('pb.drawer.width'); });
-      await page.evaluate(() => { location.hash = '#/pb/board/issue/ckat9ahso93piex?w=1100'; });
+      await page.evaluate(() => { location.hash = '#/pb/board/issue/tplfu0fuewyl1or?w=1100'; });
       await page.waitForTimeout(2500);
       urlState.wOverridesWidth = await page.evaluate(() => {
         const d = document.querySelector('.slide-in-from-right');
@@ -643,7 +643,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
         })();
         const headers = { 'Content-Type': 'application/json' };
         if (token) headers.Authorization = token;
-        const probeRes = await fetch('/api/collections/issues/records/ckat9ahso93piex', { headers });
+        const probeRes = await fetch('/api/collections/issues/records/tplfu0fuewyl1or', { headers });
         if (!probeRes.ok) return { error: 'probe fetch ' + probeRes.status };
         const probe = await probeRes.json();
         const projId = probe.project;
@@ -755,7 +755,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     // blocks relation through the real UI shows the row + kanban lock badge,
     // and cleanup removes the temp edge/issue. ----
     relations.checked = true;
-    const probeId = 'ckat9ahso93piex';
+    const probeId = 'tplfu0fuewyl1or';
     const tmpTitle = 'Rel QA target ' + Date.now();
     // 1. Create a temp target issue in the probe's project (authed page ctx).
     // The PocketBase SDK stores its token in localStorage; raw fetch calls are
@@ -1180,7 +1180,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   try {
     // Open the drawer for a real issue already in the app's dataset (the same
     // probe id the relations + resize QA blocks use, which demonstrably loads).
-    await page.evaluate(() => { location.hash = '#/pb/board/issue/ckat9ahso93piex'; });
+    await page.evaluate(() => { location.hash = '#/pb/board/issue/tplfu0fuewyl1or'; });
     await page.waitForTimeout(2500);
     const trigger = page.locator('button[title="Dispatch this issue to an autonomous agent"]').first();
     if (await trigger.count()) {

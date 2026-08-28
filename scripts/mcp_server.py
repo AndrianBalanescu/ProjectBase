@@ -69,7 +69,10 @@ def _request(endpoint: str, method: str = "GET", data: Optional[Dict] = None) ->
     req = urllib.request.Request(url, data=req_data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
-            data_res = json.loads(resp.read().decode("utf-8"))
+            raw = resp.read().decode("utf-8")
+            if not raw or not raw.strip():
+                return {"success": True}
+            data_res = json.loads(raw)
             # Warn if unauthenticated query returned empty list on a collection endpoint
             if not token and isinstance(data_res, dict) and data_res.get("items") == [] and "/records" in endpoint:
                 detail = _AUTH_HELP.format(base=BASE_URL)
@@ -203,14 +206,58 @@ def create_issue(
     estimate: int = 0,
     assignee: str = "Agent",
     labels: Optional[List[str]] = None,
-    custom_fields: Optional[Dict[str, Any]] = None
+    custom_fields: Optional[Dict[str, Any]] = None,
+    dedup: bool = True
 ) -> Dict[str, Any]:
     """Create a new issue/work item with automatic ID generation (e.g. PB-1).
 
+    If dedup is True and an open issue with the identical title already exists
+    in the project, returns the existing issue to prevent board clutter.
     Optionally pass custom_fields as a dict keyed by the project's custom field
     keys (e.g. {"client": "Acme", "gate": "P1"}). Define fields first via the
     project's custom-fields endpoint (see llms.txt / openapi.json)."""
     proj_id = _find_project_id(project)
+
+    if dedup:
+        # Check via semantic review engine first
+        try:
+            review_res = _request("/api/projectbase/semantic/review", method="POST", data={
+                "project": proj_id,
+                "title": title,
+                "description": description
+            })
+            if review_res and review_res.get("decision") == "REJECTED_DUPLICATE":
+                prim = review_res.get("primary_match") or {}
+                matched_id = prim.get("matched_issue_id")
+                if matched_id:
+                    ext = _find_issue(matched_id)
+                    return {
+                        **ext,
+                        "_deduplicated": True,
+                        "_dedup_note": f"Semantic Brain prevented duplicate: matched {prim.get('matched_identifier')} ('{prim.get('matched_title')}') with {round(prim.get('similarity_score', 0)*100)}% similarity.",
+                        "_similarity_score": prim.get("similarity_score")
+                    }
+        except Exception:
+            pass
+
+        # Fallback to exact title match
+        clean_title = (title or "").strip().replace("'", "\\'")
+        filter_str = f"project = '{proj_id}' && title = '{clean_title}'"
+        encoded = urllib.parse.quote(filter_str)
+        try:
+            existing = _request(f"/api/collections/issues/records?filter={encoded}&perPage=1")
+            items = existing.get("items", []) if isinstance(existing, dict) else []
+            if items:
+                ext = items[0]
+                if ext.get("status") in ("todo", "in_progress", "in_review", "backlog"):
+                    return {
+                        **ext,
+                        "_deduplicated": True,
+                        "_dedup_note": f"Active issue {ext.get('identifier')} with same title already exists; returned existing issue."
+                    }
+        except Exception:
+            pass
+
     data = {
         "project": proj_id,
         "title": title,
@@ -947,6 +994,150 @@ def run_crash_recovery_sweep() -> Dict[str, Any]:
 def get_auto_heal_metrics() -> Dict[str, Any]:
     """Retrieve aggregated auto-healing KPIs, MTTR (Mean Time to Remediation), and recovery success rate."""
     return _request("/api/projectbase/auto-heal/metrics", method="GET")
+
+@mcp.tool()
+def merge_issues(
+    source_issue: str,
+    target_issue: str,
+    reason: str = "Duplicate or consolidated work item"
+) -> Dict[str, Any]:
+    """Merge a duplicate or redundant issue into a canonical target issue, transferring comments and closing the source."""
+    src = _find_issue(source_issue)
+    tgt = _find_issue(target_issue)
+    src_id = src["id"]
+    tgt_id = tgt["id"]
+    src_ident = src.get("identifier", src_id)
+    tgt_ident = tgt.get("identifier", tgt_id)
+
+    # Transfer comments from source to target
+    try:
+        comments_res = _request(f"/api/collections/comments/records?filter=(issue='{src_id}')&sort=created")
+        comments = comments_res.get("items", []) if isinstance(comments_res, dict) else []
+        for c in comments:
+            content = f"*[Merged from {src_ident}]*\n\n" + c.get("content", "")
+            _request("/api/collections/comments/records", method="POST", data={
+                "issue": tgt_id,
+                "author": c.get("author", "Agent"),
+                "content": content
+            })
+    except Exception:
+        pass
+
+    # Add audit comment to target
+    try:
+        _request("/api/collections/comments/records", method="POST", data={
+            "issue": tgt_id,
+            "author": "Board Janitor",
+            "content": f"🔗 **Merged issue {src_ident}** (`{src.get('title')}`) into this ticket.\n**Reason:** {reason}"
+        })
+    except Exception:
+        pass
+
+    # Mark source issue as cancelled / closed with note
+    _request(f"/api/collections/issues/records/{src_id}", method="PATCH", data={
+        "status": "cancelled",
+        "description": (src.get("description") or "") + f"\n\n> ⚠️ **Merged into {tgt_ident}**: {reason}"
+    })
+
+    return {
+        "success": True,
+        "merged_into": tgt_ident,
+        "closed_issue": src_ident,
+        "reason": reason
+    }
+
+@mcp.tool()
+def sweep_board_pollution(
+    project: Optional[str] = None,
+    dry_run: bool = True
+) -> Dict[str, Any]:
+    """Audit the board for junk probe records, duplicate titles, and orphaned test artifacts. Optionally sweep them."""
+    filter_q = f"?filter=(project='{_find_project_id(project)}')&perPage=200" if project else "?perPage=200"
+    issues_res = _request(f"/api/collections/issues/records{filter_q}")
+    issues = issues_res.get("items", []) if isinstance(issues_res, dict) else []
+    junk_exact = {"123", "123123", "test", "Test issue", "Probe5 test", "SSE-A", "SSE-B"}
+    junk_prefixes = ("Live QA probe ", "Search Identifier Probe ", "Export CustomFields ", "Export Fixture ")
+    swept = []
+    for it in issues:
+        title = (it.get("title") or "").strip()
+        iid = it.get("id")
+        ident = it.get("identifier", iid)
+        if title in junk_exact or any(title.startswith(p) for p in junk_prefixes):
+            swept.append({"id": iid, "identifier": ident, "title": title, "action": "delete_junk"})
+            if not dry_run:
+                try:
+                    _request(f"/api/collections/issues/records/{iid}", method="DELETE")
+                except Exception:
+                    pass
+    return {"dry_run": dry_run, "scanned_issues": len(issues), "actions_count": len(swept), "actions": swept}
+
+@mcp.tool()
+def semantic_review_issue(
+    title: str,
+    description: str = "",
+    project: Optional[str] = None
+) -> Dict[str, Any]:
+    """Review a candidate issue against active board issues using neural embeddings & cross-encoder reranker.
+
+    Classifies the candidate as ALLOWED, REJECTED_DUPLICATE, ATTACHED_SUBTASK, AUTO_LINKED, or REJECTED_VAGUE.
+    """
+    proj_id = _find_project_id(project) if project else None
+    data = {"title": title, "description": description}
+    if proj_id:
+        data["project"] = proj_id
+    return _request("/api/projectbase/semantic/review", method="POST", data=data)
+
+@mcp.tool()
+def rerank_issues(
+    query: str,
+    project: Optional[str] = None,
+    candidate_ids: Optional[List[str]] = None
+) -> Dict[str, Any]:
+    """Score and rerank candidate issues against a query using hybrid dense + n-gram cross-encoder scoring."""
+    proj_id = _find_project_id(project) if project else None
+    data = {"query": query}
+    if proj_id:
+        data["project"] = proj_id
+    if candidate_ids:
+        data["candidate_ids"] = candidate_ids
+    return _request("/api/projectbase/semantic/rerank", method="POST", data=data)
+
+@mcp.tool()
+def cluster_duplicates(
+    project: Optional[str] = None,
+    threshold: float = 0.65
+) -> Dict[str, Any]:
+    """Cluster project issues by semantic similarity to identify duplicate groups and clutter."""
+    proj_id = _find_project_id(project) if project else None
+    data = {"threshold": threshold}
+    if proj_id:
+        data["project"] = proj_id
+    return _request("/api/projectbase/semantic/cluster", method="POST", data=data)
+
+@mcp.tool()
+def consolidate_duplicates(
+    canonical_issue: str,
+    duplicate_issues: List[str],
+    reason: str = "Consolidated by ProjectBase Semantic Brain"
+) -> Dict[str, Any]:
+    """Consolidate multiple duplicate issues into a single canonical issue, transferring comments and marking duplicates cancelled."""
+    can = _find_issue(canonical_issue)
+    dup_ids = [_find_issue(d)["id"] for d in duplicate_issues]
+    return _request("/api/projectbase/semantic/consolidate", method="POST", data={
+        "canonical_issue_id": can["id"],
+        "duplicate_issue_ids": dup_ids,
+        "reason": reason
+    })
+
+@mcp.tool()
+def get_semantic_metrics() -> Dict[str, Any]:
+    """Get real-time clutter reduction metrics, blocked duplicate counters, and reranker telemetry."""
+    return _request("/api/projectbase/semantic/metrics")
+
+@mcp.tool()
+def reindex_semantic_embeddings() -> Dict[str, Any]:
+    """Batch vectorize and index all workspace issues into dense embeddings."""
+    return _request("/api/projectbase/semantic/embeddings/reindex", method="POST")
 
 if __name__ == "__main__":
     mcp.run()
