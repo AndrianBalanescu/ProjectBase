@@ -226,3 +226,13 @@
 - [x] 8 FastMCP JSON-RPC 2.0 tools (`record_session_trajectory_step`, `get_session_trajectories`, `get_session_trajectory_summary`, `create_swarm_cluster`, `list_swarm_clusters`, `get_swarm_cluster_details`, `add_swarm_cluster_workers`, `update_swarm_cluster_status`)
 - [x] Frontend AgentsView **📈 Live Step Trajectory Stream** with real-time tool latency profiling, token consumption meters, cost tracking, input/output inspection, and dedicated **🐝 Autonomous Swarm Choreography & Cluster Hub** dashboard
 - [x] 423/423 automated tests passing across 31 test suites with 100% frontend guard, CSS sync, and zero console error headless browser E2E verification
+
+---
+
+## Milestone (Cycle 30)
+**Epic 27 – Multi-Agent Merge & Semantic Conflict Auto-Resolution Engine, 3-Way Diff Matrix & Deterministic Merge Barrier (✅ Done)**
+- [x] Schema migration (`1710000039_add_session_merges_and_conflict_engine.js`) adding multi-agent merge orchestration, `session_merges` and `merge_conflicts` collections, and `merge_status` tracking on `agent_sessions`
+- [x] Backend merge and conflict engine hook (`app/pb_hooks/111_session_merges_conflict_engine.pb.js`) with 10 REST API endpoints for merge proposal, 3-way diff hunk detection, granular manual conflict resolution, automated AST clean/union resolution heuristics, deterministic readiness verification, and commit generation
+- [x] 8 FastMCP JSON-RPC 2.0 tools (`propose_session_merge`, `list_session_merges`, `get_session_merge_details`, `auto_resolve_merge_conflicts`, `resolve_merge_conflict_hunk`, `verify_merge_readiness`, `execute_session_merge`, `get_session_merge_matrix`)
+- [x] Frontend AgentsView **🔀 Multi-Agent Merge Matrix & Conflicts Hub** dashboard with interactive 3-way split diff inspector, conflict hunk resolver, 1-click AST/Union auto-resolve, workspace file contention matrix, and 1-click Propose Merge modal
+- [x] 430/430 automated tests passing across 32 test suites with 100% frontend guard, CSS sync, and zero console error headless browser E2E verification

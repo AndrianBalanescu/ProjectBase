@@ -87,7 +87,22 @@ def main():
             page.click("button:has-text('Cancel')")
             time.sleep(0.5)
 
-        print("6. Verification Summary:")
+        print("6. Testing Multi-Agent Merge Matrix & Conflicts Hub...")
+        if select_elem.count() > 0:
+            select_elem.select_option(value="merges")
+            time.sleep(1.5)
+            print("  ✓ Merge Matrix & Conflicts tab selected")
+
+        # Check for Propose Merge button & modal
+        prop_btn = page.locator("button:has-text('Propose Merge')").first
+        if prop_btn.count() > 0:
+            prop_btn.click()
+            time.sleep(1)
+            print("  ✓ Propose Merge modal opened")
+            page.click("button:has-text('Cancel')")
+            time.sleep(0.5)
+
+        print("7. Verification Summary:")
         print(f"  Uncaught console errors: {len(console_errors)}")
         print(f"  Failed 4xx/5xx requests: {len(failed_requests)}")
 

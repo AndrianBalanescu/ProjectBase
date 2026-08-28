@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.26.0] - 2026-08-28 - Cycle 30
+### Added
+- **Multi-Agent Merge & Semantic Conflict Auto-Resolution Engine, 3-Way Diff Matrix & Deterministic Merge Barrier (Milestone 6 / Epic 27):**
+  - Schema migration (`1710000039_add_session_merges_and_conflict_engine.js`) adding `merge_status` and `active_merge_id` to `agent_sessions`, alongside new `session_merges` and `merge_conflicts` collections for multi-agent merge orchestration.
+  - Backend engine hook (`app/pb_hooks/111_session_merges_conflict_engine.pb.js`) with 10 high-performance REST API endpoints:
+    - `POST /api/projectbase/merges/propose` for 3-way conflict analysis between divergent agent branches and session forks.
+    - `GET /api/projectbase/merges` and `GET /api/projectbase/merges/{id}` for querying merge requests and inspecting individual conflict hunks.
+    - `POST /api/projectbase/merges/{id}/analyze` for on-demand conflict recalculation.
+    - `POST /api/projectbase/merges/{id}/conflicts/{conflictId}/resolve` for granular manual hunk resolution.
+    - `POST /api/projectbase/merges/{id}/auto-resolve` for automated 3-way AST and union resolution heuristics (`ast_clean`, `union_merge`, `priority_override`).
+    - `POST /api/projectbase/merges/{id}/verify` for deterministic merge readiness barrier enforcement (asserting zero unresolved conflicts).
+    - `POST /api/projectbase/merges/{id}/execute` for commit hash generation and session lifecycle state advance.
+    - `POST /api/projectbase/merges/{id}/reject` for graceful cancellation and lock release.
+    - `GET /api/projectbase/merges/matrix` for workspace-wide concurrent file contention and lock risk telemetry.
+  - 8 FastMCP JSON-RPC 2.0 tools: `propose_session_merge`, `list_session_merges`, `get_session_merge_details`, `auto_resolve_merge_conflicts`, `resolve_merge_conflict_hunk`, `verify_merge_readiness`, `execute_session_merge`, `get_session_merge_matrix`.
+  - Frontend AgentsView **🔀 Multi-Agent Merge Matrix & Conflicts Hub** dashboard with metric cards, active merge requests table, interactive 3-way split diff inspector (Base, Source Ours, Target Theirs), conflict hunk resolver, 1-click AST/Union auto-resolution, workspace file contention matrix, and 1-click Propose Merge modal.
+  - 7 automated end-to-end tests in `tests/test_session_merges_conflict_engine.py` (430/430 tests passing across 32 test suites with 100% frontend guard, CSS sync, and headless browser E2E verification).
+
 ## [1.25.0] - 2026-08-28 - Cycle 28
 ### Added
 - **Live Step-by-Step Trajectory Stream, Tool Execution Telemetry & Autonomous Swarm Choreography Hub (Milestone 5 / Epic 26):**

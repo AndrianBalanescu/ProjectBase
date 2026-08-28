@@ -21,3 +21,4 @@
 - [x] Visual in-browser Git Diff & Sceptic Audit Inspector (Milestone 3)
 - [x] One-click session branching, DAG continuation & Human Intervention Gate (Milestone 4)
 - [x] Live step-by-step trajectory stream, tool telemetry & autonomous swarm choreography hub (Milestone 5)
+- [x] Multi-Agent Merge & Semantic Conflict Auto-Resolution Engine, 3-Way Diff Matrix & Deterministic Merge Barrier (Milestone 6)

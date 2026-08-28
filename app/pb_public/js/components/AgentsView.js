@@ -270,7 +270,27 @@ const AgentsViewComponent = {
       clusterWorkerModelInput: 'gpt-5.5',
       isCreatingCluster: false,
       clusterSuccessMsg: null,
-      clusterErrorMsg: null
+      clusterErrorMsg: null,
+      // Multi-Agent Merge & Semantic Conflict Auto-Resolution Engine (Milestone 6 / Epic 27)
+      sessionMergesList: [],
+      selectedSessionMerge: null,
+      sessionMergeConflicts: [],
+      sessionMergeMatrix: null,
+      isLoadingMerges: false,
+      isProposingMerge: false,
+      isResolvingMerge: false,
+      isExecutingMerge: false,
+      mergeModalOpen: false,
+      mergeSourceSessionInput: '',
+      mergeTargetSessionInput: '',
+      mergeTitleInput: '',
+      mergeStrategyInput: 'ast_clean',
+      mergeAutoResolveInput: true,
+      mergeSuccessMsg: null,
+      mergeErrorMsg: null,
+      selectedConflictHunk: null,
+      customResolutionContent: '',
+      mergeStatusFilter: ''
     };
   },
   computed: {
@@ -1950,14 +1970,183 @@ const AgentsViewComponent = {
         this.clusterErrorMsg = 'Failed to add worker: ' + (e.message || String(e));
       }
     },
+    async loadSessionMerges() {
+      this.isLoadingMerges = true;
+      try {
+        const res = await API.listSessionMerges({
+          project_id: this.currentProject ? this.currentProject.id : '',
+          status: this.mergeStatusFilter || undefined
+        });
+        this.sessionMergesList = (res && res.merges) || [];
+        if (this.sessionMergesList.length > 0 && !this.selectedSessionMerge) {
+          await this.selectSessionMerge(this.sessionMergesList[0].merge_id || this.sessionMergesList[0].id);
+        }
+      } catch (e) {
+        console.error('Failed to load session merges:', e);
+      } finally {
+        this.isLoadingMerges = false;
+      }
+    },
+    async selectSessionMerge(mergeId) {
+      if (!mergeId) return;
+      try {
+        const res = await API.getSessionMerge(mergeId);
+        if (res && res.merge) {
+          this.selectedSessionMerge = res.merge;
+          this.sessionMergeConflicts = res.conflicts || [];
+          if (this.sessionMergeConflicts.length > 0) {
+            this.selectedConflictHunk = this.sessionMergeConflicts[0];
+            this.customResolutionContent = this.selectedConflictHunk.resolved_content || this.selectedConflictHunk.source_hunk || '';
+          } else {
+            this.selectedConflictHunk = null;
+            this.customResolutionContent = '';
+          }
+        }
+      } catch (e) {
+        console.error('Failed to select session merge:', e);
+      }
+    },
+    async loadMergeMatrix() {
+      try {
+        const res = await API.getSessionMergeMatrix();
+        this.sessionMergeMatrix = res;
+      } catch (e) {
+        console.error('Failed to load merge matrix:', e);
+      }
+    },
+    openMergeModal(session = null) {
+      if (session) {
+        this.mergeSourceSessionInput = session.session_id || session.id;
+        this.mergeTitleInput = `Merge ${this.mergeSourceSessionInput} into main`;
+      } else {
+        this.mergeSourceSessionInput = '';
+        this.mergeTitleInput = '';
+      }
+      this.mergeTargetSessionInput = '';
+      this.mergeStrategyInput = 'ast_clean';
+      this.mergeAutoResolveInput = true;
+      this.mergeSuccessMsg = null;
+      this.mergeErrorMsg = null;
+      this.mergeModalOpen = true;
+    },
+    async handleProposeMerge() {
+      if (!this.mergeSourceSessionInput) {
+        this.mergeErrorMsg = 'Source session is required';
+        return;
+      }
+      this.isProposingMerge = true;
+      this.mergeSuccessMsg = null;
+      this.mergeErrorMsg = null;
+      try {
+        const res = await API.proposeSessionMerge({
+          source_session_id: this.mergeSourceSessionInput,
+          target_session_id: this.mergeTargetSessionInput || undefined,
+          title: this.mergeTitleInput || undefined,
+          project_id: this.currentProject ? this.currentProject.id : undefined,
+          auto_resolve: this.mergeAutoResolveInput,
+          auto_resolution_strategy: this.mergeStrategyInput
+        });
+        this.mergeSuccessMsg = `Merge request ${res.merge.merge_id} proposed with status: ${res.merge.status}`;
+        this.mergeModalOpen = false;
+        await this.loadSessionMerges();
+        await this.loadMergeMatrix();
+        if (res.merge && res.merge.merge_id) {
+          await this.selectSessionMerge(res.merge.merge_id);
+        }
+      } catch (e) {
+        this.mergeErrorMsg = 'Failed to propose merge: ' + (e.message || String(e));
+      } finally {
+        this.isProposingMerge = false;
+      }
+    },
+    async handleAutoResolveCurrentMerge(strategy = 'ast_clean') {
+      if (!this.selectedSessionMerge) return;
+      this.isResolvingMerge = true;
+      try {
+        const mergeId = this.selectedSessionMerge.merge_id || this.selectedSessionMerge.id;
+        const res = await API.autoResolveSessionMerge(mergeId, { strategy });
+        this.mergeSuccessMsg = `Auto-resolved ${res.resolved_conflicts} conflicts using ${res.strategy} strategy`;
+        await this.selectSessionMerge(mergeId);
+        await this.loadSessionMerges();
+      } catch (e) {
+        this.mergeErrorMsg = 'Auto-resolve failed: ' + (e.message || String(e));
+      } finally {
+        this.isResolvingMerge = false;
+      }
+    },
+    async handleResolveConflictHunk(conflict, resolutionStatus = 'manual_resolved', content = null) {
+      if (!this.selectedSessionMerge || !conflict) return;
+      try {
+        const mergeId = this.selectedSessionMerge.merge_id || this.selectedSessionMerge.id;
+        const resolvedContent = content !== null ? content : (this.customResolutionContent || conflict.source_hunk);
+        await API.resolveMergeConflictHunk(mergeId, conflict.id, {
+          resolution_status: resolutionStatus,
+          resolved_content: resolvedContent,
+          resolution_notes: `Resolved via UI (${resolutionStatus})`
+        });
+        this.mergeSuccessMsg = `Conflict in ${conflict.file_path} marked as ${resolutionStatus}`;
+        await this.selectSessionMerge(mergeId);
+        await this.loadSessionMerges();
+      } catch (e) {
+        this.mergeErrorMsg = 'Failed to resolve hunk: ' + (e.message || String(e));
+      }
+    },
+    async handleVerifyCurrentMerge() {
+      if (!this.selectedSessionMerge) return;
+      try {
+        const mergeId = this.selectedSessionMerge.merge_id || this.selectedSessionMerge.id;
+        const res = await API.verifySessionMerge(mergeId);
+        if (res.ready_to_merge) {
+          this.mergeSuccessMsg = 'Deterministic merge barrier verified: 100% conflicts resolved and syntax verified';
+        } else {
+          this.mergeErrorMsg = `Merge blocked: ${res.unresolved_conflicts || 'unresolved'} conflicts remain`;
+        }
+        await this.selectSessionMerge(mergeId);
+        await this.loadSessionMerges();
+      } catch (e) {
+        this.mergeErrorMsg = 'Verification failed: ' + (e.message || String(e));
+      }
+    },
+    async handleExecuteCurrentMerge() {
+      if (!this.selectedSessionMerge) return;
+      this.isExecutingMerge = true;
+      try {
+        const mergeId = this.selectedSessionMerge.merge_id || this.selectedSessionMerge.id;
+        const res = await API.executeSessionMerge(mergeId);
+        this.mergeSuccessMsg = `Merge executed successfully! Commit: ${res.merge_commit}`;
+        await this.selectSessionMerge(mergeId);
+        await this.loadSessionMerges();
+        await this.loadMergeMatrix();
+        await this.loadAgentSessions();
+      } catch (e) {
+        this.mergeErrorMsg = 'Merge execution failed: ' + (e.message || String(e));
+      } finally {
+        this.isExecutingMerge = false;
+      }
+    },
+    async handleRejectCurrentMerge(reason = 'Manual rejection') {
+      if (!this.selectedSessionMerge) return;
+      try {
+        const mergeId = this.selectedSessionMerge.merge_id || this.selectedSessionMerge.id;
+        await API.rejectSessionMerge(mergeId, { reason });
+        this.mergeSuccessMsg = 'Merge request rejected';
+        await this.selectSessionMerge(mergeId);
+        await this.loadSessionMerges();
+      } catch (e) {
+        this.mergeErrorMsg = 'Rejection failed: ' + (e.message || String(e));
+      }
+    },
     isGovernanceTab(tab) {
-      return ['workload', 'anomalies', 'semantic', 'auto_heal', 'sso_rbac', 'automations', 'tenants', 'webhooks', 'observability', 'consensus', 'cluster', 'federation', 'throughput', 'swarm'].includes(tab);
+      return ['workload', 'anomalies', 'semantic', 'auto_heal', 'sso_rbac', 'automations', 'tenants', 'webhooks', 'observability', 'consensus', 'cluster', 'federation', 'throughput', 'swarm', 'merges'].includes(tab);
     },
     onGovernanceTabSelect(tab) {
       if (!tab) return;
       this.activeTab = tab;
       if (tab === 'swarm') {
         this.loadSwarmClusters();
+      } else if (tab === 'merges') {
+        this.loadSessionMerges();
+        this.loadMergeMatrix();
       }
     }
   },
@@ -2123,6 +2312,7 @@ const AgentsViewComponent = {
                     <option value="throughput">📊 MTTC Analytics</option>
                     <option value="observability">📚 SDK & Observability</option>
                     <option value="swarm">🐝 Swarm Clusters & Topologies</option>
+                    <option value="merges">🔀 Merge Matrix & Conflicts</option>
                     <option value="federation">🌐 Multi-Cluster Federation</option>
                   </select>
                 </div>
@@ -5551,6 +5741,406 @@ const AgentsViewComponent = {
         </div>
 
         <!-- ========================================================= -->
+        <!-- TAB VIEW: MULTI-AGENT MERGE MATRIX & CONFLICTS (EPIC 27)  -->
+        <!-- ========================================================= -->
+        <div v-else-if="activeTab === 'merges'" class="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/30">
+          <div class="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs flex-wrap gap-2">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-lg">🔀</span>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">Multi-Agent Merge & Conflict Auto-Resolution Hub</h3>
+                <span class="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-[10px] font-mono font-bold">3-WAY AST BARRIER</span>
+              </div>
+              <p class="text-[11px] text-zinc-500">Autonomous 3-way semantic diff reconciliation, AST import/block union heuristics & deterministic merge barrier</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                @click="loadSessionMerges(); loadMergeMatrix();"
+                class="px-2.5 py-1 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >🔄 Refresh</button>
+              <button
+                @click="openMergeModal()"
+                class="px-3 py-1 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-xs transition-colors flex items-center gap-1"
+              >+ Propose Merge</button>
+            </div>
+          </div>
+
+          <!-- Alert / Success Messages -->
+          <div v-if="mergeSuccessMsg" class="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-xs flex items-center justify-between">
+            <span>✓ {{ mergeSuccessMsg }}</span>
+            <button @click="mergeSuccessMsg = null" class="text-emerald-600 hover:text-emerald-800">&times;</button>
+          </div>
+          <div v-if="mergeErrorMsg" class="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800/60 text-rose-800 dark:text-rose-300 text-xs flex items-center justify-between">
+            <span>🚨 {{ mergeErrorMsg }}</span>
+            <button @click="mergeErrorMsg = null" class="text-rose-600 hover:text-rose-800">&times;</button>
+          </div>
+
+          <!-- Summary Metric Cards -->
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] uppercase font-mono text-zinc-400">Total Merges</div>
+              <div class="text-lg font-bold text-zinc-900 dark:text-zinc-100">{{ sessionMergesList.length }}</div>
+            </div>
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] uppercase font-mono text-amber-500 font-bold">Conflicted</div>
+              <div class="text-lg font-bold text-amber-600">{{ sessionMergesList.filter(m => m.status === 'conflicted').length }}</div>
+            </div>
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] uppercase font-mono text-blue-500 font-bold">Resolved</div>
+              <div class="text-lg font-bold text-blue-600">{{ sessionMergesList.filter(m => m.status === 'resolved' || m.status === 'clean').length }}</div>
+            </div>
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] uppercase font-mono text-emerald-500 font-bold">Merged Commits</div>
+              <div class="text-lg font-bold text-emerald-600">{{ sessionMergesList.filter(m => m.status === 'merged').length }}</div>
+            </div>
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+              <div class="text-[10px] uppercase font-mono text-purple-500 font-bold">Contention Risk</div>
+              <div class="text-lg font-bold" :class="(sessionMergeMatrix && sessionMergeMatrix.contention_risk_score > 40) ? 'text-rose-500' : 'text-purple-600'">
+                {{ (sessionMergeMatrix && sessionMergeMatrix.contention_risk_score) || 0 }}%
+              </div>
+            </div>
+          </div>
+
+          <!-- Main 2-Column Split: Merges List & 3-Way Diff Inspector -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <!-- Column 1: Merges Requests List -->
+            <div class="lg:col-span-4 space-y-3">
+              <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-2">
+                <div class="flex items-center justify-between">
+                  <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">Merge Requests</h4>
+                  <select v-model="mergeStatusFilter" @change="loadSessionMerges" class="px-2 py-0.5 text-[11px] rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                    <option value="">All Statuses</option>
+                    <option value="conflicted">Conflicted</option>
+                    <option value="resolved">Resolved</option>
+                    <option value="clean">Clean</option>
+                    <option value="merged">Merged</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </div>
+
+                <div v-if="isLoadingMerges" class="text-center py-6 text-xs text-zinc-400">Loading merge requests...</div>
+                <div v-else-if="sessionMergesList.length === 0" class="text-center py-6 text-xs text-zinc-400">
+                  No merge requests found. Click "+ Propose Merge" to start a multi-agent merge.
+                </div>
+                <div v-else class="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+                  <div
+                    v-for="m in sessionMergesList"
+                    :key="m.id"
+                    @click="selectSessionMerge(m.merge_id || m.id)"
+                    class="p-3 rounded-xl border cursor-pointer transition-all text-xs space-y-1.5"
+                    :class="selectedSessionMerge && (selectedSessionMerge.merge_id === m.merge_id || selectedSessionMerge.id === m.id) ? 'bg-indigo-50/60 dark:bg-indigo-950/30 border-indigo-400 dark:border-indigo-700 shadow-xs' : 'bg-zinc-50/40 dark:bg-zinc-900/40 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300'"
+                  >
+                    <div class="flex items-center justify-between">
+                      <span class="font-bold text-zinc-900 dark:text-zinc-100 truncate flex items-center gap-1">
+                        <span>🔀</span>
+                        <span>{{ m.title || m.merge_id }}</span>
+                      </span>
+                      <span
+                        class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
+                        :class="m.status === 'merged' ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' : (m.status === 'conflicted' ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300' : (m.status === 'resolved' || m.status === 'clean' ? 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600'))"
+                      >
+                        {{ m.status }}
+                      </span>
+                    </div>
+
+                    <div class="flex items-center gap-2 text-[10px] font-mono text-zinc-500">
+                      <span>{{ m.source_session_id }}</span>
+                      <span>→</span>
+                      <span>{{ m.target_session_id || 'main' }}</span>
+                    </div>
+
+                    <div class="flex items-center justify-between text-[10px] font-mono text-zinc-400 pt-1 border-t border-zinc-100 dark:border-zinc-800/60">
+                      <span>Files: {{ (m.files_changed && m.files_changed.length) || 0 }}</span>
+                      <span v-if="m.conflict_count > 0" :class="m.resolved_count >= m.conflict_count ? 'text-emerald-500' : 'text-rose-500'">
+                        Conflicts: {{ m.resolved_count }}/{{ m.conflict_count }}
+                      </span>
+                      <span v-else class="text-emerald-500">Zero Conflicts</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Workspace File Contention Matrix Mini-Widget -->
+              <div v-if="sessionMergeMatrix && sessionMergeMatrix.matrix && sessionMergeMatrix.matrix.length > 0" class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-2">
+                <div class="flex items-center justify-between">
+                  <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">File Contention Matrix</h4>
+                  <span class="text-[10px] font-mono text-zinc-400">{{ sessionMergeMatrix.contention_file_count || 0 }} overlaps</span>
+                </div>
+                <div class="space-y-1.5 max-h-48 overflow-y-auto text-[11px] font-mono">
+                  <div
+                    v-for="(fm, fmi) in sessionMergeMatrix.matrix"
+                    :key="fmi"
+                    class="p-2 rounded bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between"
+                  >
+                    <span class="truncate text-zinc-800 dark:text-zinc-200">{{ fm.file_path }}</span>
+                    <span
+                      class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase shrink-0"
+                      :class="fm.contention_level === 'high' ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'"
+                    >
+                      {{ (fm.active_sessions && fm.active_sessions.length) || 1 }} sessions
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Column 2: 3-Way Split Diff & Conflict Resolution Inspector -->
+            <div class="lg:col-span-8 space-y-3">
+              <div v-if="!selectedSessionMerge" class="p-12 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-center text-xs text-zinc-400">
+                Select a merge request from the list to inspect 3-way hunks and resolve conflicts.
+              </div>
+
+              <div v-else class="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-4">
+                <!-- Merge Header & Action Toolbar -->
+                <div class="flex items-center justify-between flex-wrap gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">{{ selectedSessionMerge.title }}</h3>
+                      <span
+                        class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                        :class="selectedSessionMerge.status === 'merged' ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' : (selectedSessionMerge.status === 'conflicted' ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300' : 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300')"
+                      >
+                        {{ selectedSessionMerge.status }}
+                      </span>
+                    </div>
+                    <p class="text-[11px] font-mono text-zinc-500 mt-0.5">
+                      {{ selectedSessionMerge.source_session_id }} ({{ selectedSessionMerge.source_branch || 'feature' }}) → {{ selectedSessionMerge.target_session_id || 'main' }}
+                    </p>
+                  </div>
+
+                  <!-- Resolution & Execution Toolbar -->
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <button
+                      v-if="selectedSessionMerge.status === 'conflicted' || selectedSessionMerge.status === 'pending'"
+                      @click="handleAutoResolveCurrentMerge('ast_clean')"
+                      :disabled="isResolvingMerge"
+                      class="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors flex items-center gap-1 shadow-xs"
+                    >
+                      <span>⚡ Auto-Resolve (AST)</span>
+                    </button>
+                    <button
+                      v-if="selectedSessionMerge.status === 'conflicted' || selectedSessionMerge.status === 'pending'"
+                      @click="handleAutoResolveCurrentMerge('union_merge')"
+                      :disabled="isResolvingMerge"
+                      class="px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition-colors"
+                    >
+                      <span>Union Merge</span>
+                    </button>
+                    <button
+                      v-if="selectedSessionMerge.status !== 'merged' && selectedSessionMerge.status !== 'rejected'"
+                      @click="handleVerifyCurrentMerge()"
+                      class="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors"
+                    >
+                      <span>🛡️ Verify Readiness</span>
+                    </button>
+                    <button
+                      v-if="selectedSessionMerge.status !== 'merged' && selectedSessionMerge.status !== 'rejected'"
+                      @click="handleExecuteCurrentMerge()"
+                      :disabled="isExecutingMerge || selectedSessionMerge.status === 'conflicted'"
+                      class="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold transition-colors flex items-center gap-1 shadow-xs"
+                    >
+                      <span>{{ isExecutingMerge ? 'Merging...' : '🚀 Execute Merge Barrier' }}</span>
+                    </button>
+                    <button
+                      v-if="selectedSessionMerge.status !== 'merged' && selectedSessionMerge.status !== 'rejected'"
+                      @click="handleRejectCurrentMerge('Rejected by reviewer')"
+                      class="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 text-rose-700 dark:text-rose-300 text-xs font-semibold transition-colors"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Merge Commit Banner if Merged -->
+                <div v-if="selectedSessionMerge.merge_commit" class="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60 text-xs font-mono text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
+                  <div>
+                    <span class="font-bold">✓ MERGED COMMIT:</span> {{ selectedSessionMerge.merge_commit }}
+                  </div>
+                  <span v-if="selectedSessionMerge.verified_at" class="text-[10px] opacity-80">{{ selectedSessionMerge.verified_at }}</span>
+                </div>
+
+                <!-- Conflicted File Hunks Selector -->
+                <div v-if="sessionMergeConflicts.length > 0" class="space-y-3">
+                  <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                      Conflict Hunks ({{ sessionMergeConflicts.length }})
+                    </h4>
+                    <div class="flex items-center gap-1 text-[11px] font-mono">
+                      <span class="text-emerald-600">{{ sessionMergeConflicts.filter(c => c.resolution_status !== 'unresolved').length }} resolved</span>
+                      <span class="text-zinc-400">/</span>
+                      <span class="text-rose-600">{{ sessionMergeConflicts.filter(c => c.resolution_status === 'unresolved').length }} unresolved</span>
+                    </div>
+                  </div>
+
+                  <!-- File tabs -->
+                  <div class="flex items-center gap-1.5 overflow-x-auto pb-1">
+                    <button
+                      v-for="c in sessionMergeConflicts"
+                      :key="c.id"
+                      @click="selectedConflictHunk = c; customResolutionContent = c.resolved_content || c.source_hunk || '';"
+                      class="px-3 py-1.5 rounded-lg text-xs font-mono transition-colors flex items-center gap-1.5 shrink-0"
+                      :class="selectedConflictHunk && selectedConflictHunk.id === c.id ? 'bg-indigo-600 text-white font-bold' : (c.resolution_status !== 'unresolved' ? 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300' : 'bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800/60 text-rose-800 dark:text-rose-300')"
+                    >
+                      <span>{{ c.resolution_status !== 'unresolved' ? '✓' : '⚠️' }}</span>
+                      <span>{{ c.file_path }}</span>
+                    </button>
+                  </div>
+
+                  <!-- 3-Way Split Diff View -->
+                  <div v-if="selectedConflictHunk" class="space-y-3 pt-2">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <!-- Base Column -->
+                      <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 space-y-1.5">
+                        <div class="text-[10px] font-bold font-mono text-zinc-500 uppercase flex items-center justify-between">
+                          <span>📦 Base Version (Ancestor)</span>
+                        </div>
+                        <pre class="p-2 rounded bg-zinc-900 text-zinc-300 text-[10px] font-mono overflow-x-auto whitespace-pre-wrap max-h-48 select-text">{{ selectedConflictHunk.base_hunk || '(empty)' }}</pre>
+                      </div>
+
+                      <!-- Source Column -->
+                      <div class="p-3 rounded-xl bg-blue-50/50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/60 space-y-1.5">
+                        <div class="text-[10px] font-bold font-mono text-blue-600 dark:text-blue-400 uppercase flex items-center justify-between">
+                          <span>🌿 Source (Ours)</span>
+                          <button
+                            @click="handleResolveConflictHunk(selectedConflictHunk, 'manual_resolved', selectedConflictHunk.source_hunk)"
+                            class="px-1.5 py-0.5 rounded bg-blue-600 text-white text-[9px] hover:bg-blue-500"
+                          >Accept Ours</button>
+                        </div>
+                        <pre class="p-2 rounded bg-zinc-900 text-blue-200 text-[10px] font-mono overflow-x-auto whitespace-pre-wrap max-h-48 select-text">{{ selectedConflictHunk.source_hunk || '(empty)' }}</pre>
+                      </div>
+
+                      <!-- Target Column -->
+                      <div class="p-3 rounded-xl bg-purple-50/50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/60 space-y-1.5">
+                        <div class="text-[10px] font-bold font-mono text-purple-600 dark:text-purple-400 uppercase flex items-center justify-between">
+                          <span>🎯 Target (Theirs)</span>
+                          <button
+                            @click="handleResolveConflictHunk(selectedConflictHunk, 'manual_resolved', selectedConflictHunk.target_hunk)"
+                            class="px-1.5 py-0.5 rounded bg-purple-600 text-white text-[9px] hover:bg-purple-500"
+                          >Accept Theirs</button>
+                        </div>
+                        <pre class="p-2 rounded bg-zinc-900 text-purple-200 text-[10px] font-mono overflow-x-auto whitespace-pre-wrap max-h-48 select-text">{{ selectedConflictHunk.target_hunk || '(empty)' }}</pre>
+                      </div>
+                    </div>
+
+                    <!-- Resolved Output Editor -->
+                    <div class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 space-y-2">
+                      <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                          <span class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Reconciled Content for {{ selectedConflictHunk.file_path }}</span>
+                          <span
+                            class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
+                            :class="selectedConflictHunk.resolution_status !== 'unresolved' ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' : 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300'"
+                          >
+                            {{ selectedConflictHunk.resolution_status }}
+                          </span>
+                        </div>
+                        <button
+                          @click="handleResolveConflictHunk(selectedConflictHunk, 'manual_resolved', customResolutionContent)"
+                          class="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors"
+                        >
+                          Save Reconciled Hunk
+                        </button>
+                      </div>
+                      <textarea
+                        v-model="customResolutionContent"
+                        rows="5"
+                        class="w-full p-2.5 rounded-lg bg-zinc-900 text-emerald-300 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        placeholder="Edit or review reconciled code content..."
+                      ></textarea>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-else class="py-8 text-center text-xs text-emerald-600 dark:text-emerald-400 font-mono">
+                  ✓ Clean 3-way diff: zero conflict hunks detected. Ready for instantaneous barrier execution.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Propose Merge Modal -->
+          <div v-if="mergeModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="w-full max-w-lg rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-2xl space-y-4">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🔀</span>
+                  <div>
+                    <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Propose Multi-Agent Merge</h3>
+                    <p class="text-[11px] text-zinc-500">Reconcile divergent agent session branches into target branch</p>
+                  </div>
+                </div>
+                <button @click="mergeModalOpen = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3 text-xs">
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Source Agent Session ID *</label>
+                  <input
+                    v-model="mergeSourceSessionInput"
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 font-mono text-xs focus:outline-none focus:border-indigo-500"
+                    placeholder="e.g. sess_abc123"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Target Agent Session ID (Optional, defaults to main)</label>
+                  <input
+                    v-model="mergeTargetSessionInput"
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 font-mono text-xs focus:outline-none focus:border-indigo-500"
+                    placeholder="e.g. sess_root456 or leave blank for main"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Merge Title</label>
+                  <input
+                    v-model="mergeTitleInput"
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-indigo-500"
+                    placeholder="e.g. Merge feature branch into main"
+                  />
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Resolution Heuristic</label>
+                    <select
+                      v-model="mergeStrategyInput"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                    >
+                      <option value="ast_clean">⚡ AST Clean (Imports & Functions)</option>
+                      <option value="union_merge">🔗 Union Non-Overlapping</option>
+                      <option value="priority_override">👑 Source Priority Override</option>
+                    </select>
+                  </div>
+                  <div class="flex items-center pt-5">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" v-model="mergeAutoResolveInput" class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500" />
+                      <span class="text-[11px] font-medium text-zinc-700 dark:text-zinc-300">Auto-resolve on propose</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  @click="mergeModalOpen = false"
+                  class="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 text-zinc-700 dark:text-zinc-300 text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  @click="handleProposeMerge"
+                  :disabled="isProposingMerge || !mergeSourceSessionInput.trim()"
+                  class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold transition-colors flex items-center gap-1 shadow-xs"
+                >
+                  <span>{{ isProposingMerge ? 'Proposing...' : '🔀 Propose Merge' }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================================= -->
         <!-- PANE 2J: EXECUTION PLANE & LIVE RUNS STREAM (EPIC 24)     -->
         <!-- ========================================================= -->
         <div
@@ -5763,6 +6353,13 @@ const AgentsViewComponent = {
                           class="px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-[10px] font-semibold hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
                         >
                           Fork
+                        </button>
+                        <button
+                          @click="openMergeModal(s)"
+                          title="Propose merge into target branch/session"
+                          class="px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-[10px] font-semibold hover:bg-indigo-200 dark:hover:bg-indigo-900 transition-colors"
+                        >
+                          Merge
                         </button>
                         <button
                           v-if="s.status === 'running' || s.status === 'verifying'"

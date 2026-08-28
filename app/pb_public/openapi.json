@@ -6897,6 +6897,199 @@
           "404": { "description": "Cluster not found" }
         }
       }
+    },
+    "/projectbase/merges/propose": {
+      "post": {
+        "tags": ["Agent Merges & Conflict Auto-Resolution"],
+        "summary": "Propose a multi-agent branch or session merge with 3-way conflict analysis",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "source_session_id": { "type": "string" },
+                  "target_session_id": { "type": "string" },
+                  "title": { "type": "string" },
+                  "project_id": { "type": "string" },
+                  "auto_resolve": { "type": "boolean" },
+                  "auto_resolution_strategy": { "type": "string", "enum": ["ast_clean", "union_merge", "priority_override"] },
+                  "files": { "type": "array" }
+                },
+                "required": ["source_session_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Merge proposed successfully" },
+          "400": { "description": "source_session_id is required" },
+          "500": { "description": "Internal server error" }
+        }
+      }
+    },
+    "/projectbase/merges": {
+      "get": {
+        "tags": ["Agent Merges & Conflict Auto-Resolution"],
+        "summary": "List multi-agent merge requests with filtering by project, session, and status",
+        "parameters": [
+          { "name": "status", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "project_id", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "session_id", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "search", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer" } },
+          { "name": "offset", "in": "query", "required": false, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "List of merge requests" }
+        }
+      }
+    },
+    "/projectbase/merges/{id}": {
+      "get": {
+        "tags": ["Agent Merges & Conflict Auto-Resolution"],
+        "summary": "Get single merge request details with expanded conflict hunks and diff stats",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Merge request details and conflict hunks" },
+          "404": { "description": "Merge request not found" }
+        }
+      }
+    },
+    "/projectbase/merges/{id}/analyze": {
+      "post": {
+        "tags": ["Agent Merges & Conflict Auto-Resolution"],
+        "summary": "Re-analyze diff hunks and update conflict state",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Analysis result" },
+          "404": { "description": "Merge request not found" }
+        }
+      }
+    },
+    "/projectbase/merges/{id}/conflicts/{conflictId}/resolve": {
+      "post": {
+        "tags": ["Agent Merges & Conflict Auto-Resolution"],
+        "summary": "Resolve a specific conflict hunk with custom or chosen content",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "conflictId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "resolution_status": { "type": "string" },
+                  "resolved_content": { "type": "string" },
+                  "resolution_notes": { "type": "string" },
+                  "resolved_by": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Conflict resolved" },
+          "404": { "description": "Conflict or merge not found" }
+        }
+      }
+    },
+    "/projectbase/merges/{id}/auto-resolve": {
+      "post": {
+        "tags": ["Agent Merges & Conflict Auto-Resolution"],
+        "summary": "Run automated 3-way semantic conflict resolution engine",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "strategy": { "type": "string", "enum": ["ast_clean", "union_merge", "priority_override", "source_wins", "target_wins"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Conflicts auto-resolved" },
+          "404": { "description": "Merge request not found" }
+        }
+      }
+    },
+    "/projectbase/merges/{id}/verify": {
+      "post": {
+        "tags": ["Agent Merges & Conflict Auto-Resolution"],
+        "summary": "Verify merge readiness barrier (validates zero unresolved conflicts)",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Merge readiness verified" },
+          "400": { "description": "Merge has unresolved conflicts" },
+          "404": { "description": "Merge request not found" }
+        }
+      }
+    },
+    "/projectbase/merges/{id}/execute": {
+      "post": {
+        "tags": ["Agent Merges & Conflict Auto-Resolution"],
+        "summary": "Execute merge request, generate deterministic commit hash, and update sessions",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Merge executed" },
+          "400": { "description": "Execution blocked by conflict barrier" },
+          "404": { "description": "Merge request not found" }
+        }
+      }
+    },
+    "/projectbase/merges/{id}/reject": {
+      "post": {
+        "tags": ["Agent Merges & Conflict Auto-Resolution"],
+        "summary": "Reject a merge request and clean up session lock",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Merge rejected" },
+          "404": { "description": "Merge request not found" }
+        }
+      }
+    },
+    "/projectbase/merges/matrix": {
+      "get": {
+        "tags": ["Agent Merges & Conflict Auto-Resolution"],
+        "summary": "Retrieve workspace-wide multi-agent merge matrix and file contention metrics",
+        "responses": {
+          "200": { "description": "Merge matrix telemetry" }
+        }
+      }
     }
   }
 }

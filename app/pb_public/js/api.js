@@ -1995,5 +1995,116 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to fetch swarm cluster metrics');
     return data;
+  },
+
+  // Multi-Agent Merge & Semantic Conflict Auto-Resolution Engine (Milestone 6 / Epic 27)
+  async proposeSessionMerge(payload = {}) {
+    const res = await fetch('/api/projectbase/merges/propose', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to propose session merge');
+    return data;
+  },
+
+  async listSessionMerges(params = {}) {
+    const qp = new URLSearchParams();
+    if (params.status) qp.append('status', params.status);
+    if (params.project_id) qp.append('project_id', params.project_id);
+    if (params.session_id) qp.append('session_id', params.session_id);
+    if (params.search) qp.append('search', params.search);
+    const qs = qp.toString() ? `?${qp.toString()}` : '';
+    const res = await fetch(`/api/projectbase/merges${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list session merges');
+    return data;
+  },
+
+  async getSessionMerge(id) {
+    const res = await fetch(`/api/projectbase/merges/${encodeURIComponent(id)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch session merge');
+    return data;
+  },
+
+  async analyzeSessionMerge(id) {
+    const res = await fetch(`/api/projectbase/merges/${encodeURIComponent(id)}/analyze`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to analyze session merge');
+    return data;
+  },
+
+  async resolveMergeConflictHunk(mergeId, conflictId, payload = {}) {
+    const res = await fetch(`/api/projectbase/merges/${encodeURIComponent(mergeId)}/conflicts/${encodeURIComponent(conflictId)}/resolve`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to resolve conflict hunk');
+    return data;
+  },
+
+  async autoResolveSessionMerge(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/merges/${encodeURIComponent(id)}/auto-resolve`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to auto-resolve merge conflicts');
+    return data;
+  },
+
+  async verifySessionMerge(id) {
+    const res = await fetch(`/api/projectbase/merges/${encodeURIComponent(id)}/verify`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to verify session merge');
+    return data;
+  },
+
+  async executeSessionMerge(id) {
+    const res = await fetch(`/api/projectbase/merges/${encodeURIComponent(id)}/execute`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to execute session merge');
+    return data;
+  },
+
+  async rejectSessionMerge(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/merges/${encodeURIComponent(id)}/reject`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to reject session merge');
+    return data;
+  },
+
+  async getSessionMergeMatrix() {
+    const res = await fetch('/api/projectbase/merges/matrix', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch merge matrix');
+    return data;
   }
 };
