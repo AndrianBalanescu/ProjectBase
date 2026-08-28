@@ -1752,6 +1752,119 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
                 type: "object",
                 properties: {}
             }
+        },
+        {
+            name: "get_agent_budget_status",
+            description: "Retrieve active budget policies, token quotas, and circuit breaker health for an agent, project, or session.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    session_id: { type: "string", description: "Optional session ID" },
+                    project_id: { type: "string", description: "Optional project ID" },
+                    persona: { type: "string", description: "Optional agent persona (e.g. coder, reviewer)" }
+                }
+            }
+        },
+        {
+            name: "set_agent_budget_policy",
+            description: "Create or update an agent fleet budget and token quota policy.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    name: { type: "string", description: "Policy name" },
+                    scope_type: { type: "string", description: "global|project|persona|session|tenant" },
+                    scope_id: { type: "string", description: "Target ID (project ID, persona name, session ID, tenant ID)" },
+                    max_budget_usd: { type: "number", description: "Maximum budget in USD" },
+                    max_tokens: { type: "number", description: "Maximum token allowance" },
+                    period: { type: "string", description: "hourly|daily|weekly|monthly|per_cycle|total" },
+                    soft_limit_pct: { type: "number", description: "Soft limit alert threshold percentage (default 80)" },
+                    hard_limit_action: { type: "string", description: "block|throttle|notify_only|require_human_gate" }
+                },
+                required: ["name"]
+            }
+        },
+        {
+            name: "record_agent_token_usage",
+            description: "Record actual token usage, calculate USD cost via model pricing table, and append to transaction ledger.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    session_id: { type: "string", description: "Optional agent session ID" },
+                    issue_id: { type: "string", description: "Optional issue identifier" },
+                    project_id: { type: "string", description: "Optional project identifier" },
+                    persona: { type: "string", description: "Agent persona (coder, reviewer, architect, etc.)" },
+                    model: { type: "string", description: "Model name (e.g. claude-3-5-sonnet, gpt-4o, deepseek-r1)" },
+                    provider: { type: "string", description: "Model provider (anthropic, openai, deepseek, omniroute, local)" },
+                    prompt_tokens: { type: "number", description: "Prompt input tokens" },
+                    completion_tokens: { type: "number", description: "Completion output tokens" },
+                    cached_tokens: { type: "number", description: "Cached tokens" },
+                    reasoning_tokens: { type: "number", description: "Reasoning / thinking tokens" },
+                    latency_ms: { type: "number", description: "Inference latency in milliseconds" },
+                    request_kind: { type: "string", description: "inference|tool_call|embedding|eval|debate" }
+                },
+                required: ["prompt_tokens", "completion_tokens"]
+            }
+        },
+        {
+            name: "check_token_quota_availability",
+            description: "Pre-flight token and budget availability check before executing expensive model inference or swarm runs.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    session_id: { type: "string", description: "Optional session ID" },
+                    project_id: { type: "string", description: "Optional project ID" },
+                    persona: { type: "string", description: "Optional agent persona" },
+                    model: { type: "string", description: "Target model name" },
+                    estimated_prompt_tokens: { type: "number", description: "Estimated input tokens" },
+                    estimated_completion_tokens: { type: "number", description: "Estimated output tokens" }
+                }
+            }
+        },
+        {
+            name: "grant_emergency_budget_override",
+            description: "Grant a temporary emergency budget or token quota override to unblock throttled agent sessions.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    policy_id: { type: "string", description: "Target budget policy ID" },
+                    additional_budget: { type: "number", description: "Extra USD budget" },
+                    additional_tokens: { type: "number", description: "Extra token quota" },
+                    expires_in_minutes: { type: "number", description: "Duration in minutes (default 120)" },
+                    reason: { type: "string", description: "Justification rationale" },
+                    granted_by: { type: "string", description: "Granting administrator" }
+                },
+                required: ["policy_id"]
+            }
+        },
+        {
+            name: "get_fleet_cost_analytics",
+            description: "Retrieve aggregated fleet-wide spending analytics broken down by provider, model, persona, and project.",
+            inputSchema: {
+                type: "object",
+                properties: {}
+            }
+        },
+        {
+            name: "list_cost_ledger_entries",
+            description: "Query cost ledger transaction history with optional filters on session, project, model, or persona.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    session_id: { type: "string", description: "Optional session ID filter" },
+                    project_id: { type: "string", description: "Optional project ID filter" },
+                    persona: { type: "string", description: "Optional persona filter" },
+                    model: { type: "string", description: "Optional model filter" },
+                    limit: { type: "number", description: "Max results to return (default 50)" }
+                }
+            }
+        },
+        {
+            name: "get_model_pricing_matrix",
+            description: "Retrieve standard pricing matrix per 1M tokens across all supported LLM providers and models.",
+            inputSchema: {
+                type: "object",
+                properties: {}
+            }
         }
     ]
 
@@ -6903,6 +7016,247 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         };
     };
 
+    const MODEL_PRICING_TABLE = {
+        "claude-3-5-sonnet": { prompt: 3.00, completion: 15.00, cached: 0.30, reasoning: 15.00, provider: "anthropic" },
+        "claude-3-opus": { prompt: 15.00, completion: 75.00, cached: 1.50, reasoning: 75.00, provider: "anthropic" },
+        "claude-3-5-haiku": { prompt: 0.80, completion: 4.00, cached: 0.08, reasoning: 4.00, provider: "anthropic" },
+        "gpt-4o": { prompt: 2.50, completion: 10.00, cached: 1.25, reasoning: 10.00, provider: "openai" },
+        "gpt-4o-mini": { prompt: 0.15, completion: 0.60, cached: 0.075, reasoning: 0.60, provider: "openai" },
+        "o1": { prompt: 15.00, completion: 60.00, cached: 7.50, reasoning: 60.00, provider: "openai" },
+        "o3-mini": { prompt: 1.10, completion: 4.40, cached: 0.55, reasoning: 4.40, provider: "openai" },
+        "deepseek-v3": { prompt: 0.14, completion: 0.28, cached: 0.014, reasoning: 0.28, provider: "deepseek" },
+        "deepseek-r1": { prompt: 0.55, completion: 2.19, cached: 0.14, reasoning: 2.19, provider: "deepseek" },
+        "gemini-2.0-flash": { prompt: 0.10, completion: 0.40, cached: 0.025, reasoning: 0.40, provider: "google" },
+        "gemini-1.5-pro": { prompt: 1.25, completion: 5.00, cached: 0.3125, reasoning: 5.00, provider: "google" },
+        "omniroute/premium": { prompt: 0.00, completion: 0.00, cached: 0.00, reasoning: 0.00, provider: "omniroute" },
+        "omniroute/vision": { prompt: 0.00, completion: 0.00, cached: 0.00, reasoning: 0.00, provider: "omniroute" },
+        "premium": { prompt: 0.00, completion: 0.00, cached: 0.00, reasoning: 0.00, provider: "omniroute" },
+        "vision": { prompt: 0.00, completion: 0.00, cached: 0.00, reasoning: 0.00, provider: "omniroute" },
+        "local": { prompt: 0.00, completion: 0.00, cached: 0.00, reasoning: 0.00, provider: "local" }
+    };
+
+    const calculateMcpCost = (model, pTokens, cTokens, kTokens, rTokens) => {
+        const normalized = String(model || "").toLowerCase().trim();
+        let rates = { prompt: 1.00, completion: 3.00, cached: 0.20, reasoning: 3.00, provider: "custom" };
+        for (const [key, r] of Object.entries(MODEL_PRICING_TABLE)) {
+            if (normalized === key || normalized.includes(key) || key.includes(normalized)) {
+                rates = r;
+                break;
+            }
+        }
+        const pCost = (Number(pTokens || 0) / 1000000) * rates.prompt;
+        const cCost = (Number(cTokens || 0) / 1000000) * rates.completion;
+        const kCost = (Number(kTokens || 0) / 1000000) * rates.cached;
+        const rCost = (Number(rTokens || 0) / 1000000) * rates.reasoning;
+        return { cost_usd: Number((pCost + cCost + kCost + rCost).toFixed(6)), rates: rates };
+    };
+
+    const getAgentBudgetStatus = (a) => {
+        let policies = [];
+        try {
+            policies = e.app.findRecordsByFilter("budget_policies", "1 = 1", "-created", 50, 0);
+        } catch (x) {}
+        let quotas = [];
+        try {
+            quotas = e.app.findRecordsByFilter("token_quotas", "1 = 1", "-created", 50, 0);
+        } catch (x) {}
+        return {
+            policies: policies.map(p => ({
+                id: p.id,
+                name: p.get("name"),
+                scope_type: p.get("scope_type"),
+                scope_id: p.get("scope_id"),
+                max_budget_usd: p.get("max_budget_usd"),
+                current_spend_usd: p.get("current_spend_usd"),
+                max_tokens: p.get("max_tokens"),
+                current_tokens: p.get("current_tokens"),
+                status: p.get("status")
+            })),
+            quotas: quotas.map(q => ({
+                id: q.id,
+                scope_type: q.get("scope_type"),
+                scope_id: q.get("scope_id"),
+                consumed_prompt: q.get("consumed_prompt"),
+                consumed_completion: q.get("consumed_completion"),
+                total_cost_usd: q.get("total_cost_usd"),
+                circuit_breaker: q.get("circuit_breaker")
+            }))
+        };
+    };
+
+    const setAgentBudgetPolicy = (a) => {
+        const name = String(a.name || "").trim();
+        if (!name) throw new Error("name is required");
+        const col = e.app.findCollectionByNameOrId("budget_policies");
+        const rec = new Record(col);
+        rec.set("name", name);
+        rec.set("scope_type", a.scope_type || "global");
+        rec.set("scope_id", a.scope_id || "");
+        rec.set("max_budget_usd", Number(a.max_budget_usd) || 50.0);
+        rec.set("max_tokens", Number(a.max_tokens) || 10000000);
+        rec.set("period", a.period || "daily");
+        rec.set("soft_limit_pct", Number(a.soft_limit_pct) || 80);
+        rec.set("hard_limit_action", a.hard_limit_action || "block");
+        rec.set("current_spend_usd", 0);
+        rec.set("current_tokens", 0);
+        rec.set("status", "active");
+        rec.set("last_reset_at", new Date().toISOString());
+        e.app.save(rec);
+        return { success: true, policy_id: rec.id, name: name };
+    };
+
+    const recordAgentTokenUsage = (a) => {
+        const pTok = Number(a.prompt_tokens) || 0;
+        const cTok = Number(a.completion_tokens) || 0;
+        const kTok = Number(a.cached_tokens) || 0;
+        const rTok = Number(a.reasoning_tokens) || 0;
+        const tot = pTok + cTok + kTok + rTok;
+        const model = a.model || "claude-3-5-sonnet";
+        const calc = calculateMcpCost(model, pTok, cTok, kTok, rTok);
+
+        const col = e.app.findCollectionByNameOrId("cost_ledger_entries");
+        const rec = new Record(col);
+        rec.set("session_id", a.session_id || "");
+        rec.set("issue_id", a.issue_id || "");
+        rec.set("project_id", a.project_id || "");
+        rec.set("persona", a.persona || "coder");
+        rec.set("model", model);
+        rec.set("provider", a.provider || calc.rates.provider);
+        rec.set("prompt_tokens", pTok);
+        rec.set("completion_tokens", cTok);
+        rec.set("cached_tokens", kTok);
+        rec.set("reasoning_tokens", rTok);
+        rec.set("total_tokens", tot);
+        rec.set("cost_usd", calc.cost_usd);
+        rec.set("latency_ms", Number(a.latency_ms) || 0);
+        rec.set("request_kind", a.request_kind || "inference");
+        rec.set("metadata", JSON.stringify(a.metadata || {}));
+        e.app.save(rec);
+
+        return { success: true, ledger_id: rec.id, total_tokens: tot, cost_usd: calc.cost_usd };
+    };
+
+    const checkTokenQuotaAvailability = (a) => {
+        const model = a.model || "claude-3-5-sonnet";
+        const pTok = Number(a.estimated_prompt_tokens) || 2000;
+        const cTok = Number(a.estimated_completion_tokens) || 1000;
+        const calc = calculateMcpCost(model, pTok, cTok, 0, 0);
+
+        let policies = [];
+        try {
+            policies = e.app.findRecordsByFilter("budget_policies", "status != 'paused'", "-created", 50, 0);
+        } catch (x) {}
+
+        let allowed = true;
+        let action = "allow";
+        const warnings = [];
+
+        for (const p of policies) {
+            const maxB = Number(p.get("max_budget_usd")) || 0;
+            const curB = Number(p.get("current_spend_usd")) || 0;
+            if (maxB > 0 && curB + calc.cost_usd > maxB) {
+                allowed = false;
+                action = p.get("hard_limit_action") || "block";
+                warnings.push("Budget policy '" + p.get("name") + "' exceeded limit");
+                break;
+            }
+        }
+
+        return {
+            allowed: allowed,
+            action: action,
+            model: model,
+            estimated_cost_usd: calc.cost_usd,
+            estimated_tokens: pTok + cTok,
+            warnings: warnings
+        };
+    };
+
+    const grantEmergencyBudgetOverride = (a) => {
+        const policyId = String(a.policy_id || "").trim();
+        if (!policyId) throw new Error("policy_id is required");
+        const policyRec = e.app.findRecordById("budget_policies", policyId);
+
+        const addBudget = Number(a.additional_budget) || 25.0;
+        const addTokens = Number(a.additional_tokens) || 5000000;
+        const mins = Number(a.expires_in_minutes) || 120;
+        const expiresAt = new Date(Date.now() + mins * 60 * 1000).toISOString();
+
+        const col = e.app.findCollectionByNameOrId("budget_overrides");
+        const rec = new Record(col);
+        rec.set("policy_id", policyId);
+        rec.set("granted_by", a.granted_by || "mcp_admin");
+        rec.set("additional_budget", addBudget);
+        rec.set("additional_tokens", addTokens);
+        rec.set("expires_at", expiresAt);
+        rec.set("reason", a.reason || "Emergency MCP override");
+        rec.set("status", "active");
+        e.app.save(rec);
+
+        if (policyRec.get("status") === "exceeded") {
+            policyRec.set("status", "overridden");
+            e.app.save(policyRec);
+        }
+
+        return { success: true, override_id: rec.id, additional_budget: addBudget, expires_at: expiresAt };
+    };
+
+    const getFleetCostAnalytics = () => {
+        let entries = [];
+        try {
+            entries = e.app.findRecordsByFilter("cost_ledger_entries", "1 = 1", "-created", 1000, 0);
+        } catch (x) {}
+
+        let totalSpend = 0;
+        let totalTokens = 0;
+        const spendByModel = {};
+        const spendByPersona = {};
+
+        entries.forEach(r => {
+            const cost = Number(r.get("cost_usd")) || 0;
+            const tot = Number(r.get("total_tokens")) || 0;
+            const model = r.get("model") || "unknown";
+            const persona = r.get("persona") || "general";
+            totalSpend += cost;
+            totalTokens += tot;
+            spendByModel[model] = Number(((spendByModel[model] || 0) + cost).toFixed(4));
+            spendByPersona[persona] = Number(((spendByPersona[persona] || 0) + cost).toFixed(4));
+        });
+
+        return {
+            total_spend_usd: Number(totalSpend.toFixed(4)),
+            total_tokens: totalTokens,
+            spend_by_model: spendByModel,
+            spend_by_persona: spendByPersona,
+            ledger_count: entries.length
+        };
+    };
+
+    const listCostLedgerEntries = (a) => {
+        const limit = Number(a.limit) || 50;
+        let entries = [];
+        try {
+            entries = e.app.findRecordsByFilter("cost_ledger_entries", "1 = 1", "-created", limit, 0);
+        } catch (x) {}
+        return {
+            entries: entries.map(r => ({
+                id: r.id,
+                session_id: r.get("session_id"),
+                persona: r.get("persona"),
+                model: r.get("model"),
+                total_tokens: r.get("total_tokens"),
+                cost_usd: r.get("cost_usd"),
+                latency_ms: r.get("latency_ms"),
+                created: r.get("created")
+            })),
+            count: entries.length
+        };
+    };
+
+    const getModelPricingMatrix = () => {
+        return { pricing: MODEL_PRICING_TABLE };
+    };
+
     // ---------- 1. Authentication ----------
     let authRecord = e.auth || null
     let bypassEnabled = false
@@ -7091,6 +7445,14 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         else if (toolName === "verify_merge_readiness") { result = verifyMergeReadiness(args) }
         else if (toolName === "execute_session_merge") { result = executeSessionMerge(args) }
         else if (toolName === "get_session_merge_matrix") { result = getSessionMergeMatrix() }
+        else if (toolName === "get_agent_budget_status") { result = getAgentBudgetStatus(args) }
+        else if (toolName === "set_agent_budget_policy") { result = setAgentBudgetPolicy(args) }
+        else if (toolName === "record_agent_token_usage") { result = recordAgentTokenUsage(args) }
+        else if (toolName === "check_token_quota_availability") { result = checkTokenQuotaAvailability(args) }
+        else if (toolName === "grant_emergency_budget_override") { result = grantEmergencyBudgetOverride(args) }
+        else if (toolName === "get_fleet_cost_analytics") { result = getFleetCostAnalytics() }
+        else if (toolName === "list_cost_ledger_entries") { result = listCostLedgerEntries(args) }
+        else if (toolName === "get_model_pricing_matrix") { result = getModelPricingMatrix() }
         else { return fail(-32602, "Unknown tool: " + toolName) }
         return ok({ content: [{ type: "text", text: JSON.stringify(result) }] })
     } catch (toolErr) {

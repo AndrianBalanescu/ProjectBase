@@ -2106,5 +2106,150 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to fetch merge matrix');
     return data;
+  },
+
+  // Agent Fleet Budget, Cost Attribution & Token Quota Engine (Milestone 7 / Epic 28)
+  async listBudgetPolicies(params = {}) {
+    const qp = new URLSearchParams();
+    if (params.scope_type) qp.append('scope_type', params.scope_type);
+    if (params.scope_id) qp.append('scope_id', params.scope_id);
+    if (params.status) qp.append('status', params.status);
+    const qs = qp.toString() ? `?${qp.toString()}` : '';
+    const res = await fetch(`/api/projectbase/billing/policies${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list budget policies');
+    return data;
+  },
+
+  async getBudgetPolicy(id) {
+    const res = await fetch(`/api/projectbase/billing/policies/${encodeURIComponent(id)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch budget policy');
+    return data;
+  },
+
+  async createBudgetPolicy(payload = {}) {
+    const res = await fetch('/api/projectbase/billing/policies', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to save budget policy');
+    return data;
+  },
+
+  async deleteBudgetPolicy(id) {
+    const res = await fetch(`/api/projectbase/billing/policies/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete budget policy');
+    return data;
+  },
+
+  async checkTokenQuota(payload = {}) {
+    const res = await fetch('/api/projectbase/billing/quotas/check', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to check token quota');
+    return data;
+  },
+
+  async reserveTokenQuota(payload = {}) {
+    const res = await fetch('/api/projectbase/billing/quotas/reserve', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to reserve token quota');
+    return data;
+  },
+
+  async releaseTokenQuota(payload = {}) {
+    const res = await fetch('/api/projectbase/billing/quotas/release', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to release token quota');
+    return data;
+  },
+
+  async recordTokenUsage(payload = {}) {
+    const res = await fetch('/api/projectbase/billing/usage/record', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to record token usage');
+    return data;
+  },
+
+  async grantBudgetOverride(payload = {}) {
+    const res = await fetch('/api/projectbase/billing/overrides/grant', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to grant budget override');
+    return data;
+  },
+
+  async getFleetBillingAnalytics() {
+    const res = await fetch('/api/projectbase/billing/analytics', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch billing analytics');
+    return data;
+  },
+
+  async listCostLedger(params = {}) {
+    const qp = new URLSearchParams();
+    if (params.session_id) qp.append('session_id', params.session_id);
+    if (params.project_id) qp.append('project_id', params.project_id);
+    if (params.persona) qp.append('persona', params.persona);
+    if (params.model) qp.append('model', params.model);
+    if (params.limit) qp.append('limit', params.limit);
+    const qs = qp.toString() ? `?${qp.toString()}` : '';
+    const res = await fetch(`/api/projectbase/billing/ledger${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list cost ledger');
+    return data;
+  },
+
+  async getFleetPricing() {
+    const res = await fetch('/api/projectbase/billing/pricing', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch model pricing');
+    return data;
+  },
+
+  async resetCircuitBreaker(payload = {}) {
+    const res = await fetch('/api/projectbase/billing/circuit-breaker/reset', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to reset circuit breaker');
+    return data;
   }
 };

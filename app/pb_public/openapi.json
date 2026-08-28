@@ -7090,6 +7090,267 @@
           "200": { "description": "Merge matrix telemetry" }
         }
       }
+    },
+    "/projectbase/billing/policies": {
+      "post": {
+        "tags": ["Agent Fleet Budget & Token Quotas"],
+        "summary": "Create or update an agent fleet budget and token quota policy",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "scope_type": { "type": "string", "enum": ["global", "project", "persona", "session", "tenant"] },
+                  "scope_id": { "type": "string" },
+                  "max_budget_usd": { "type": "number" },
+                  "max_tokens": { "type": "number" },
+                  "period": { "type": "string", "enum": ["hourly", "daily", "weekly", "monthly", "per_cycle", "total"] },
+                  "soft_limit_pct": { "type": "number" },
+                  "hard_limit_action": { "type": "string", "enum": ["block", "throttle", "notify_only", "require_human_gate"] }
+                },
+                "required": ["name"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Budget policy created or updated successfully" },
+          "400": { "description": "Missing required fields" },
+          "500": { "description": "Internal server error" }
+        }
+      },
+      "get": {
+        "tags": ["Agent Fleet Budget & Token Quotas"],
+        "summary": "List all active budget policies with current spend and token metrics",
+        "parameters": [
+          { "name": "scope_type", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "scope_id", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "List of budget policies" }
+        }
+      }
+    },
+    "/projectbase/billing/policies/{id}": {
+      "get": {
+        "tags": ["Agent Fleet Budget & Token Quotas"],
+        "summary": "Get budget policy details, remaining allowances, and active overrides",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Policy details" },
+          "404": { "description": "Policy not found" }
+        }
+      },
+      "delete": {
+        "tags": ["Agent Fleet Budget & Token Quotas"],
+        "summary": "Delete a budget policy",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Policy deleted successfully" },
+          "404": { "description": "Policy not found" }
+        }
+      }
+    },
+    "/projectbase/billing/quotas/check": {
+      "post": {
+        "tags": ["Agent Fleet Budget & Token Quotas"],
+        "summary": "Pre-flight token and budget availability check before executing expensive model inference",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "session_id": { "type": "string" },
+                  "project_id": { "type": "string" },
+                  "persona": { "type": "string" },
+                  "model": { "type": "string" },
+                  "estimated_prompt_tokens": { "type": "number" },
+                  "estimated_completion_tokens": { "type": "number" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Quota availability check result" }
+        }
+      }
+    },
+    "/projectbase/billing/quotas/reserve": {
+      "post": {
+        "tags": ["Agent Fleet Budget & Token Quotas"],
+        "summary": "Reserve in-flight token capacity for an agent session or workflow",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "scope_type": { "type": "string" },
+                  "scope_id": { "type": "string" },
+                  "tokens": { "type": "number" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Tokens reserved successfully" }
+        }
+      }
+    },
+    "/projectbase/billing/quotas/release": {
+      "post": {
+        "tags": ["Agent Fleet Budget & Token Quotas"],
+        "summary": "Release reserved in-flight token capacity",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "scope_type": { "type": "string" },
+                  "scope_id": { "type": "string" },
+                  "tokens": { "type": "number" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Tokens released successfully" }
+        }
+      }
+    },
+    "/projectbase/billing/usage/record": {
+      "post": {
+        "tags": ["Agent Fleet Budget & Token Quotas"],
+        "summary": "Ingest actual token usage, calculate cost via pricing table, update quotas, and append to ledger",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "session_id": { "type": "string" },
+                  "issue_id": { "type": "string" },
+                  "project_id": { "type": "string" },
+                  "persona": { "type": "string" },
+                  "model": { "type": "string" },
+                  "provider": { "type": "string" },
+                  "prompt_tokens": { "type": "number" },
+                  "completion_tokens": { "type": "number" },
+                  "cached_tokens": { "type": "number" },
+                  "reasoning_tokens": { "type": "number" },
+                  "latency_ms": { "type": "number" },
+                  "request_kind": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Token usage recorded and cost computed" }
+        }
+      }
+    },
+    "/projectbase/billing/overrides/grant": {
+      "post": {
+        "tags": ["Agent Fleet Budget & Token Quotas"],
+        "summary": "Grant a temporary emergency budget or token quota override",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "policy_id": { "type": "string" },
+                  "additional_budget": { "type": "number" },
+                  "additional_tokens": { "type": "number" },
+                  "expires_in_minutes": { "type": "number" },
+                  "reason": { "type": "string" },
+                  "granted_by": { "type": "string" }
+                },
+                "required": ["policy_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Override granted successfully" },
+          "404": { "description": "Target policy not found" }
+        }
+      }
+    },
+    "/projectbase/billing/analytics": {
+      "get": {
+        "tags": ["Agent Fleet Budget & Token Quotas"],
+        "summary": "Retrieve fleet-wide spending analytics broken down by provider, model, persona, and project",
+        "responses": {
+          "200": { "description": "Fleet billing analytics" }
+        }
+      }
+    },
+    "/projectbase/billing/ledger": {
+      "get": {
+        "tags": ["Agent Fleet Budget & Token Quotas"],
+        "summary": "Query cost ledger transaction history with optional filters",
+        "parameters": [
+          { "name": "session_id", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "project_id", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "persona", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "model", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Cost ledger transaction entries" }
+        }
+      }
+    },
+    "/projectbase/billing/pricing": {
+      "get": {
+        "tags": ["Agent Fleet Budget & Token Quotas"],
+        "summary": "Retrieve standard pricing matrix per 1M tokens across supported LLM providers and models",
+        "responses": {
+          "200": { "description": "Model pricing matrix" }
+        }
+      }
+    },
+    "/projectbase/billing/circuit-breaker/reset": {
+      "post": {
+        "tags": ["Agent Fleet Budget & Token Quotas"],
+        "summary": "Reset tripped circuit breaker status on budget policies",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "policy_id": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Circuit breakers reset" }
+        }
+      }
     }
   }
 }

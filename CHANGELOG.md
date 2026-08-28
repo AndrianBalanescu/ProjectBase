@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.27.0] - 2026-08-28 - Cycle 31
+### Added
+- **Agent Fleet Budget & Cost Attribution, Token Quota Enforcement & Financial Governance Hub (Milestone 7 / Epic 28):**
+  - Schema migration (`1710000040_add_fleet_budgets_and_token_quotas.js`) adding 4 dedicated collections: `budget_policies`, `token_quotas`, `cost_ledger_entries`, and `budget_overrides`.
+  - Backend engine hook (`app/pb_hooks/112_fleet_budget_quota_engine.pb.js`) with 13 high-performance REST API endpoints:
+    - `POST /api/projectbase/billing/policies` and `GET /api/projectbase/billing/policies` for creating, updating, and listing budget policies across global, project, persona, session, and tenant scopes.
+    - `GET /api/projectbase/billing/policies/{id}` and `DELETE /api/projectbase/billing/policies/{id}` for retrieving single policy details, remaining allowances, and active emergency overrides.
+    - `POST /api/projectbase/billing/quotas/check` for pre-flight token quota and budget availability validation before expensive model inference or swarm runs.
+    - `POST /api/projectbase/billing/quotas/reserve` and `POST /api/projectbase/billing/quotas/release` for managing in-flight capacity reservations with atomic tracking.
+    - `POST /api/projectbase/billing/usage/record` for ingesting prompt, completion, cached, and reasoning tokens with automatic multi-model cost calculation, policy status threshold evaluation, and circuit breaker tripping.
+    - `POST /api/projectbase/billing/overrides/grant` for granting temporary emergency budget or token quota overrides.
+    - `GET /api/projectbase/billing/analytics` for workspace-wide spend analytics broken down by provider, model, persona, and project.
+    - `GET /api/projectbase/billing/ledger` for querying transaction cost ledgers with granular multi-field filtering.
+    - `GET /api/projectbase/billing/pricing` for accessing live token pricing tables across Claude, GPT-4o/o1/o3, DeepSeek V3/R1, Gemini 2.0/1.5, and local OmniRoute free-tier models.
+    - `POST /api/projectbase/billing/circuit-breaker/reset` for resetting tripped circuit breakers.
+  - 8 FastMCP JSON-RPC 2.0 tools: `get_agent_budget_status`, `set_agent_budget_policy`, `record_agent_token_usage`, `check_token_quota_availability`, `grant_emergency_budget_override`, `get_fleet_cost_analytics`, `list_cost_ledger_entries`, and `get_model_pricing_matrix`.
+  - Frontend AgentsView **💰 Fleet Budget & Quotas** dashboard with 5 primary KPI cards, real-time model and persona spend distribution meters, interactive budget policy management, pre-flight in-flight token quota simulator, live cost ledger transaction stream, and emergency override modals.
+  - 438/438 automated tests passing across 33 test suites with 100% frontend guard and CSS sync verification.
+
 ## [1.26.0] - 2026-08-28 - Cycle 30
 ### Added
 - **Multi-Agent Merge & Semantic Conflict Auto-Resolution Engine, 3-Way Diff Matrix & Deterministic Merge Barrier (Milestone 6 / Epic 27):**

@@ -290,7 +290,50 @@ const AgentsViewComponent = {
       mergeErrorMsg: null,
       selectedConflictHunk: null,
       customResolutionContent: '',
-      mergeStatusFilter: ''
+      mergeStatusFilter: '',
+      // Agent Fleet Budget, Cost Attribution & Token Quota Engine (Milestone 7 / Epic 28)
+      budgetMetrics: null,
+      budgetPolicies: [],
+      costLedger: [],
+      pricingMatrix: {},
+      isLoadingBudget: false,
+      isSavingBudgetPolicy: false,
+      isGrantingOverride: false,
+      budgetSuccessMsg: null,
+      budgetErrorMsg: null,
+      budgetPolicyModalOpen: false,
+      budgetOverrideModalOpen: false,
+      selectedPolicyForOverride: null,
+      newBudgetPolicy: {
+        name: '',
+        scope_type: 'global',
+        scope_id: '',
+        max_budget_usd: 50,
+        max_tokens: 10000000,
+        period: 'daily',
+        soft_limit_pct: 80,
+        hard_limit_action: 'block'
+      },
+      newBudgetOverride: {
+        policy_id: '',
+        additional_budget: 25,
+        additional_tokens: 5000000,
+        expires_in_minutes: 120,
+        reason: '',
+        granted_by: 'admin'
+      },
+      quotaSimulator: {
+        session_id: '',
+        project_id: '',
+        persona: 'coder',
+        model: 'claude-3-5-sonnet',
+        estimated_prompt_tokens: 5000,
+        estimated_completion_tokens: 2000,
+        result: null,
+        isSimulating: false
+      },
+      ledgerFilterPersona: '',
+      ledgerFilterModel: ''
     };
   },
   computed: {
@@ -2136,8 +2179,127 @@ const AgentsViewComponent = {
         this.mergeErrorMsg = 'Rejection failed: ' + (e.message || String(e));
       }
     },
+    // Agent Fleet Budget, Cost Attribution & Token Quota Engine (Milestone 7 / Epic 28)
+    async loadBudgetGovernanceData() {
+      this.isLoadingBudget = true;
+      this.budgetErrorMsg = null;
+      try {
+        const [metricsRes, policiesRes, ledgerRes, pricingRes] = await Promise.all([
+          API.getFleetBillingAnalytics().catch(() => null),
+          API.listBudgetPolicies().catch(() => ({ policies: [] })),
+          API.listCostLedger({
+            persona: this.ledgerFilterPersona || undefined,
+            model: this.ledgerFilterModel || undefined,
+            limit: 50
+          }).catch(() => ({ entries: [] })),
+          API.getFleetPricing().catch(() => ({ pricing: {} }))
+        ]);
+
+        if (metricsRes) this.budgetMetrics = metricsRes;
+        if (policiesRes && policiesRes.policies) this.budgetPolicies = policiesRes.policies;
+        if (ledgerRes && ledgerRes.entries) this.costLedger = ledgerRes.entries;
+        if (pricingRes && pricingRes.pricing) this.pricingMatrix = pricingRes.pricing;
+      } catch (e) {
+        this.budgetErrorMsg = 'Failed to load budget governance data: ' + (e.message || String(e));
+      } finally {
+        this.isLoadingBudget = false;
+      }
+    },
+    openNewBudgetPolicyModal() {
+      this.newBudgetPolicy = {
+        name: '',
+        scope_type: 'global',
+        scope_id: '',
+        max_budget_usd: 50,
+        max_tokens: 10000000,
+        period: 'daily',
+        soft_limit_pct: 80,
+        hard_limit_action: 'block'
+      };
+      this.budgetPolicyModalOpen = true;
+    },
+    async createBudgetPolicy() {
+      if (!this.newBudgetPolicy.name.trim()) return;
+      this.isSavingBudgetPolicy = true;
+      this.budgetErrorMsg = null;
+      try {
+        await API.createBudgetPolicy(this.newBudgetPolicy);
+        this.budgetSuccessMsg = 'Budget policy saved successfully';
+        this.budgetPolicyModalOpen = false;
+        await this.loadBudgetGovernanceData();
+      } catch (e) {
+        this.budgetErrorMsg = 'Failed to create budget policy: ' + (e.message || String(e));
+      } finally {
+        this.isSavingBudgetPolicy = false;
+      }
+    },
+    async deleteBudgetPolicy(id) {
+      if (!confirm('Are you sure you want to delete this budget policy?')) return;
+      try {
+        await API.deleteBudgetPolicy(id);
+        this.budgetSuccessMsg = 'Budget policy deleted';
+        await this.loadBudgetGovernanceData();
+      } catch (e) {
+        this.budgetErrorMsg = 'Failed to delete budget policy: ' + (e.message || String(e));
+      }
+    },
+    openBudgetOverrideModal(policy) {
+      this.selectedPolicyForOverride = policy;
+      this.newBudgetOverride = {
+        policy_id: policy.id,
+        additional_budget: 25,
+        additional_tokens: 5000000,
+        expires_in_minutes: 120,
+        reason: 'Emergency session execution unblock',
+        granted_by: 'admin'
+      };
+      this.budgetOverrideModalOpen = true;
+    },
+    async submitBudgetOverride() {
+      if (!this.newBudgetOverride.policy_id) return;
+      this.isGrantingOverride = true;
+      this.budgetErrorMsg = null;
+      try {
+        await API.grantBudgetOverride(this.newBudgetOverride);
+        this.budgetSuccessMsg = 'Emergency budget override granted';
+        this.budgetOverrideModalOpen = false;
+        await this.loadBudgetGovernanceData();
+      } catch (e) {
+        this.budgetErrorMsg = 'Failed to grant override: ' + (e.message || String(e));
+      } finally {
+        this.isGrantingOverride = false;
+      }
+    },
+    async runQuotaSimulation() {
+      this.quotaSimulator.isSimulating = true;
+      this.budgetErrorMsg = null;
+      try {
+        const res = await API.checkTokenQuota({
+          session_id: this.quotaSimulator.session_id || undefined,
+          project_id: this.quotaSimulator.project_id || undefined,
+          persona: this.quotaSimulator.persona || undefined,
+          model: this.quotaSimulator.model || 'claude-3-5-sonnet',
+          estimated_prompt_tokens: this.quotaSimulator.estimated_prompt_tokens || 5000,
+          estimated_completion_tokens: this.quotaSimulator.estimated_completion_tokens || 2000
+        });
+        this.quotaSimulator.result = res;
+      } catch (e) {
+        this.budgetErrorMsg = 'Quota simulation failed: ' + (e.message || String(e));
+      } finally {
+        this.quotaSimulator.isSimulating = false;
+      }
+    },
+    async resetBudgetCircuitBreakers(policyId = null) {
+      try {
+        await API.resetCircuitBreaker(policyId ? { policy_id: policyId } : {});
+        this.budgetSuccessMsg = 'Circuit breaker(s) reset successfully';
+        await this.loadBudgetGovernanceData();
+      } catch (e) {
+        this.budgetErrorMsg = 'Failed to reset circuit breaker: ' + (e.message || String(e));
+      }
+    },
     isGovernanceTab(tab) {
-      return ['workload', 'anomalies', 'semantic', 'auto_heal', 'sso_rbac', 'automations', 'tenants', 'webhooks', 'observability', 'consensus', 'cluster', 'federation', 'throughput', 'swarm', 'merges'].includes(tab);
+      return ['workload', 'anomalies', 'semantic', 'auto_heal', 'sso_rbac', 'automations', 'tenants', 'webhooks', 'observability', 'consensus', 'cluster', 'federation', 'throughput', 'swarm', 'merges', 'budget'].includes(tab);
     },
     onGovernanceTabSelect(tab) {
       if (!tab) return;
@@ -2147,6 +2309,8 @@ const AgentsViewComponent = {
       } else if (tab === 'merges') {
         this.loadSessionMerges();
         this.loadMergeMatrix();
+      } else if (tab === 'budget') {
+        this.loadBudgetGovernanceData();
       }
     }
   },
@@ -2264,7 +2428,7 @@ const AgentsViewComponent = {
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <h2 class="text-sm font-bold text-zinc-900 dark:text-zinc-100 capitalize truncate">
-                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (activeTab === 'automations' ? 'Native Workflow Automations & AI Agent Trigger Pipelines' : (activeTab === 'tenants' ? 'Multi-Tenant Isolation & Granular Resource Quotas' : (activeTab === 'auto_heal' ? 'Autonomous AI Agent Auto-Healing & Self-Remediation Workflow Pipeline' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center')))))))))))) }}
+                  {{ activeTab === 'workload' ? 'Workload & Dynamic Autoscaler' : (activeTab === 'anomalies' ? 'Workflow Health & Auto-Heal' : (activeTab === 'throughput' ? 'Persona Throughput & MTTC' : (activeTab === 'federation' ? 'Multi-Host Federation Sync' : (activeTab === 'cluster' ? 'Distributed Cluster & Edge Sync' : (activeTab === 'webhooks' ? 'Outbound Webhook Security Gateway & DLQ' : (activeTab === 'observability' ? 'OpenAPI SDK Generator & Webhook Observability' : (activeTab === 'consensus' ? 'Autonomous Multi-Model Consensus & Peer Review Gate Engine' : (activeTab === 'sso_rbac' ? 'Enterprise SSO Federation & Granular RBAC Matrix' : (activeTab === 'automations' ? 'Native Workflow Automations & AI Agent Trigger Pipelines' : (activeTab === 'tenants' ? 'Multi-Tenant Isolation & Granular Resource Quotas' : (activeTab === 'auto_heal' ? 'Autonomous AI Agent Auto-Healing & Self-Remediation Workflow Pipeline' : (activeTab === 'budget' ? 'Agent Fleet Budget & Cost Governance Hub' : (selectedSession ? (selectedSession.short_name || 'Session') : 'Agent Command Center'))))))))))))) }}
                 </h2>
                 <span v-if="selectedSession && selectedSession.is_active && activeTab === 'chat'" class="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-400 text-[10px] font-mono font-semibold flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -2313,6 +2477,7 @@ const AgentsViewComponent = {
                     <option value="observability">📚 SDK & Observability</option>
                     <option value="swarm">🐝 Swarm Clusters & Topologies</option>
                     <option value="merges">🔀 Merge Matrix & Conflicts</option>
+                    <option value="budget">💰 Fleet Budget & Quotas</option>
                     <option value="federation">🌐 Multi-Cluster Federation</option>
                   </select>
                 </div>
@@ -6134,6 +6299,594 @@ const AgentsViewComponent = {
                   class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold transition-colors flex items-center gap-1 shadow-xs"
                 >
                   <span>{{ isProposingMerge ? 'Proposing...' : '🔀 Propose Merge' }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- TAB VIEW: AGENT FLEET BUDGET & TOKEN QUOTAS (EPIC 28)     -->
+        <!-- ========================================================= -->
+        <div v-else-if="activeTab === 'budget'" class="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/30">
+          <!-- Top Header Banner -->
+          <div class="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs flex-wrap gap-2">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-lg">💰</span>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">Agent Fleet Budget, Cost Attribution & Quotas</h3>
+                <span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold">FINANCIAL GOVERNANCE</span>
+              </div>
+              <p class="text-[11px] text-zinc-500">Real-time token metering, per-persona budget hard caps, pre-flight reservation engine & multi-model cost ledger</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                @click="loadBudgetGovernanceData()"
+                class="px-2.5 py-1 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >🔄 Refresh</button>
+              <button
+                @click="resetBudgetCircuitBreakers()"
+                class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-600/20 hover:bg-amber-600/30 text-amber-600 dark:text-amber-400 border border-amber-500/30 transition-colors flex items-center gap-1"
+              >
+                <span>⚡ Reset Circuit Breakers</span>
+              </button>
+              <button
+                @click="openNewBudgetPolicyModal()"
+                class="px-3 py-1 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-xs transition-colors flex items-center gap-1"
+              >
+                <span>➕ New Policy</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Alert Messages -->
+          <div v-if="budgetSuccessMsg" class="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs flex items-center justify-between">
+            <span>✓ {{ budgetSuccessMsg }}</span>
+            <button @click="budgetSuccessMsg = null" class="text-emerald-400 hover:text-emerald-600 text-sm font-bold">&times;</button>
+          </div>
+          <div v-if="budgetErrorMsg" class="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-xs flex items-center justify-between">
+            <span>⚠ {{ budgetErrorMsg }}</span>
+            <button @click="budgetErrorMsg = null" class="text-red-400 hover:text-red-600 text-sm font-bold">&times;</button>
+          </div>
+
+          <!-- 5 Primary KPI Cards -->
+          <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+              <div class="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Total Fleet Spend</div>
+              <div class="text-lg font-black font-mono text-emerald-600 dark:text-emerald-400 mt-0.5">
+                \${{ (budgetMetrics && budgetMetrics.total_spend_usd != null) ? budgetMetrics.total_spend_usd.toFixed(2) : '0.00' }}
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">Across all models</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+              <div class="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Tokens Consumed</div>
+              <div class="text-lg font-black font-mono text-indigo-600 dark:text-indigo-400 mt-0.5">
+                {{ (budgetMetrics && budgetMetrics.total_tokens) ? (budgetMetrics.total_tokens >= 1000000 ? (budgetMetrics.total_tokens / 1000000).toFixed(2) + 'M' : (budgetMetrics.total_tokens / 1000).toFixed(1) + 'k') : '0' }}
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">Prompt + Completion + Cache</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+              <div class="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Active Policies</div>
+              <div class="text-lg font-black font-mono text-zinc-900 dark:text-zinc-100 mt-0.5">
+                {{ (budgetPolicies || []).length }}
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">Enforcing budget caps</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
+              <div class="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Circuit Breakers</div>
+              <div
+                class="text-lg font-black font-mono mt-0.5"
+                :class="((budgetMetrics && budgetMetrics.circuit_breakers_active_count) > 0) ? 'text-red-500' : 'text-emerald-500'"
+              >
+                {{ (budgetMetrics && budgetMetrics.circuit_breakers_active_count) || 0 }} Tripped
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">Hard limit protections</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs col-span-2 md:col-span-1">
+              <div class="text-[10px] uppercase font-bold tracking-wider text-zinc-400">Cost Transactions</div>
+              <div class="text-lg font-black font-mono text-cyan-600 dark:text-cyan-400 mt-0.5">
+                {{ (budgetMetrics && budgetMetrics.ledger_transactions_count) || (costLedger || []).length }}
+              </div>
+              <div class="text-[10px] text-zinc-500 mt-0.5">Audited in ledger</div>
+            </div>
+          </div>
+
+          <!-- Spending Analytics & Persona Distribution -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <!-- Provider & Model Breakdown -->
+            <div class="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-sm">📊</span>
+                  <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Spend by Model & Provider</h4>
+                </div>
+                <span class="text-[10px] font-mono text-zinc-500">Real-time USD</span>
+              </div>
+
+              <div v-if="budgetMetrics && Object.keys(budgetMetrics.spend_by_model || {}).length" class="space-y-2">
+                <div v-for="(amt, model) in budgetMetrics.spend_by_model" :key="model" class="space-y-1">
+                  <div class="flex items-center justify-between text-[11px]">
+                    <span class="font-mono font-medium text-zinc-700 dark:text-zinc-300">{{ model }}</span>
+                    <span class="font-mono font-bold text-emerald-600 dark:text-emerald-400">\${{ amt.toFixed(4) }}</span>
+                  </div>
+                  <div class="w-full h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                    <div
+                      class="h-full bg-indigo-500 rounded-full"
+                      :style="{ width: Math.min(100, (budgetMetrics.total_spend_usd > 0 ? (amt / budgetMetrics.total_spend_usd) * 100 : 0)) + '%' }"
+                    ></div>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="py-6 text-center text-xs text-zinc-400">
+                No model spend recorded yet. Ingest usage via FastMCP or REST API to populate.
+              </div>
+            </div>
+
+            <!-- Spend by Persona -->
+            <div class="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-sm">🤖</span>
+                  <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Spend by Agent Persona</h4>
+                </div>
+                <span class="text-[10px] font-mono text-zinc-500">Persona Allocation</span>
+              </div>
+
+              <div v-if="budgetMetrics && Object.keys(budgetMetrics.spend_by_persona || {}).length" class="space-y-2">
+                <div v-for="(amt, persona) in budgetMetrics.spend_by_persona" :key="persona" class="space-y-1">
+                  <div class="flex items-center justify-between text-[11px]">
+                    <span class="font-semibold text-zinc-700 dark:text-zinc-300 capitalize">{{ persona }}</span>
+                    <span class="font-mono font-bold text-emerald-600 dark:text-emerald-400">\${{ amt.toFixed(4) }}</span>
+                  </div>
+                  <div class="w-full h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                    <div
+                      class="h-full bg-emerald-500 rounded-full"
+                      :style="{ width: Math.min(100, (budgetMetrics.total_spend_usd > 0 ? (amt / budgetMetrics.total_spend_usd) * 100 : 0)) + '%' }"
+                    ></div>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="py-6 text-center text-xs text-zinc-400">
+                No persona transactions recorded yet.
+              </div>
+            </div>
+          </div>
+
+          <!-- Active Budget Policies Table -->
+          <div class="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <div class="flex items-center gap-1.5">
+                <span class="text-sm">🛡️</span>
+                <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Active Budget Policies & Enforcement Caps</h4>
+                <span class="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[10px] font-mono">{{ budgetPolicies.length }}</span>
+              </div>
+              <button
+                @click="openNewBudgetPolicyModal()"
+                class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-colors"
+              >
+                + Add Policy
+              </button>
+            </div>
+
+            <div v-if="budgetPolicies.length" class="overflow-x-auto">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr class="border-b border-zinc-200 dark:border-zinc-800 text-[10px] uppercase font-bold text-zinc-400">
+                    <th class="py-2 px-2">Policy Name</th>
+                    <th class="py-2 px-2">Scope</th>
+                    <th class="py-2 px-2">Budget Cap (USD)</th>
+                    <th class="py-2 px-2">Spend / Utilization</th>
+                    <th class="py-2 px-2">Hard Action</th>
+                    <th class="py-2 px-2">Status</th>
+                    <th class="py-2 px-2 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60 font-mono">
+                  <tr v-for="p in budgetPolicies" :key="p.id" class="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
+                    <td class="py-2.5 px-2 font-sans font-semibold text-zinc-900 dark:text-zinc-100">
+                      {{ p.name }}
+                    </td>
+                    <td class="py-2.5 px-2">
+                      <span class="px-2 py-0.5 rounded text-[10px] font-sans font-semibold uppercase"
+                        :class="p.scope_type === 'global' ? 'bg-purple-500/20 text-purple-400' : (p.scope_type === 'persona' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400')"
+                      >
+                        {{ p.scope_type }}{{ p.scope_id ? ': ' + p.scope_id : '' }}
+                      </span>
+                    </td>
+                    <td class="py-2.5 px-2 font-bold text-zinc-800 dark:text-zinc-200">
+                      \${{ (p.max_budget_usd || 0).toFixed(2) }} <span class="text-[10px] text-zinc-400 font-sans">({{ p.period }})</span>
+                    </td>
+                    <td class="py-2.5 px-2 min-w-[140px]">
+                      <div class="flex items-center justify-between text-[10px] mb-1">
+                        <span class="text-emerald-600 dark:text-emerald-400 font-bold">\${{ (p.current_spend_usd || 0).toFixed(2) }}</span>
+                        <span class="text-zinc-400">{{ (p.spend_pct || 0).toFixed(1) }}%</span>
+                      </div>
+                      <div class="w-full h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                        <div
+                          class="h-full rounded-full"
+                          :class="(p.spend_pct >= 100) ? 'bg-red-500' : ((p.spend_pct >= (p.soft_limit_pct || 80)) ? 'bg-amber-500' : 'bg-emerald-500')"
+                          :style="{ width: Math.min(100, p.spend_pct || 0) + '%' }"
+                        ></div>
+                      </div>
+                    </td>
+                    <td class="py-2.5 px-2">
+                      <span class="px-2 py-0.5 rounded text-[10px] font-sans font-bold uppercase"
+                        :class="p.hard_limit_action === 'block' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'"
+                      >
+                        {{ p.hard_limit_action }}
+                      </span>
+                    </td>
+                    <td class="py-2.5 px-2">
+                      <span class="px-2 py-0.5 rounded text-[10px] font-sans font-bold uppercase"
+                        :class="p.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : (p.status === 'exceeded' ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-indigo-500/20 text-indigo-400')"
+                      >
+                        {{ p.status }}
+                      </span>
+                    </td>
+                    <td class="py-2.5 px-2 text-right space-x-1 font-sans">
+                      <button
+                        @click="openBudgetOverrideModal(p)"
+                        class="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-500 transition-colors"
+                        title="Grant temporary emergency override"
+                      >
+                        🔓 Override
+                      </button>
+                      <button
+                        @click="deleteBudgetPolicy(p.id)"
+                        class="px-2 py-0.5 text-[10px] font-bold rounded bg-red-500/10 hover:bg-red-500/20 text-red-500 transition-colors"
+                        title="Delete policy"
+                      >
+                        🗑️
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else class="py-6 text-center text-xs text-zinc-400">
+              No budget policies configured. Click "+ Add Policy" to create your first spending cap.
+            </div>
+          </div>
+
+          <!-- Pre-Flight Token Quota & Cost Simulator -->
+          <div class="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-1.5">
+                <span class="text-sm">🎯</span>
+                <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Pre-Flight Token Quota & Cost Simulator</h4>
+              </div>
+              <span class="text-[10px] font-mono text-zinc-500">In-Flight Pre-Check</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-2.5 text-xs">
+              <div>
+                <label class="block text-[10px] uppercase font-bold text-zinc-400 mb-1">Target Model</label>
+                <select
+                  v-model="quotaSimulator.model"
+                  class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs focus:outline-none"
+                >
+                  <option value="claude-3-5-sonnet">Claude 3.5 Sonnet ($3 / $15)</option>
+                  <option value="claude-3-opus">Claude 3 Opus ($15 / $75)</option>
+                  <option value="claude-3-5-haiku">Claude 3.5 Haiku ($0.80 / $4)</option>
+                  <option value="gpt-4o">GPT-4o ($2.50 / $10)</option>
+                  <option value="gpt-4o-mini">GPT-4o Mini ($0.15 / $0.60)</option>
+                  <option value="deepseek-v3">DeepSeek V3 ($0.14 / $0.28)</option>
+                  <option value="deepseek-r1">DeepSeek R1 ($0.55 / $2.19)</option>
+                  <option value="gemini-2.0-flash">Gemini 2.0 Flash ($0.10 / $0.40)</option>
+                  <option value="omniroute/premium">OmniRoute Local (Free Tier)</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[10px] uppercase font-bold text-zinc-400 mb-1">Agent Persona</label>
+                <select
+                  v-model="quotaSimulator.persona"
+                  class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs focus:outline-none"
+                >
+                  <option value="coder">Coder</option>
+                  <option value="reviewer">Reviewer</option>
+                  <option value="architect">Architect</option>
+                  <option value="security">Security SRE</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[10px] uppercase font-bold text-zinc-400 mb-1">Est. Prompt Tokens</label>
+                <input
+                  type="number"
+                  v-model.number="quotaSimulator.estimated_prompt_tokens"
+                  class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-mono focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label class="block text-[10px] uppercase font-bold text-zinc-400 mb-1">Est. Output Tokens</label>
+                <div class="flex items-center gap-2">
+                  <input
+                    type="number"
+                    v-model.number="quotaSimulator.estimated_completion_tokens"
+                    class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-mono focus:outline-none"
+                  />
+                  <button
+                    @click="runQuotaSimulation()"
+                    :disabled="quotaSimulator.isSimulating"
+                    class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs whitespace-nowrap shadow-xs transition-colors"
+                  >
+                    {{ quotaSimulator.isSimulating ? '...' : 'Check' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Simulation Result Card -->
+            <div v-if="quotaSimulator.result" class="p-3 rounded-xl border text-xs font-mono"
+              :class="quotaSimulator.result.allowed ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'"
+            >
+              <div class="flex items-center justify-between flex-wrap gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="text-base">{{ quotaSimulator.result.allowed ? '✓' : '🛑' }}</span>
+                  <span class="font-bold uppercase tracking-wider">
+                    {{ quotaSimulator.result.allowed ? 'Quota Verification Passed (Allowed)' : 'Execution Blocked (Action: ' + quotaSimulator.result.action + ')' }}
+                  </span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span>Est. Cost: <strong>\${{ quotaSimulator.result.estimated_cost_usd }}</strong></span>
+                  <span>Est. Tokens: <strong>{{ quotaSimulator.result.estimated_tokens }}</strong></span>
+                </div>
+              </div>
+              <div v-if="quotaSimulator.result.warnings && quotaSimulator.result.warnings.length" class="mt-2 text-[11px] text-amber-400 space-y-0.5">
+                <div v-for="(w, idx) in quotaSimulator.result.warnings" :key="idx">⚠ {{ w }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Cost Ledger Transaction Stream -->
+          <div class="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <div class="flex items-center gap-1.5">
+                <span class="text-sm">📜</span>
+                <h4 class="text-xs font-bold text-zinc-900 dark:text-zinc-100">Live Transaction Cost Ledger</h4>
+                <span class="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[10px] font-mono">{{ costLedger.length }}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <input
+                  v-model="ledgerFilterPersona"
+                  @input="loadBudgetGovernanceData()"
+                  placeholder="Filter persona..."
+                  class="px-2.5 py-1 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:outline-none"
+                />
+                <input
+                  v-model="ledgerFilterModel"
+                  @input="loadBudgetGovernanceData()"
+                  placeholder="Filter model..."
+                  class="px-2.5 py-1 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div v-if="costLedger.length" class="overflow-x-auto max-h-72">
+              <table class="w-full text-left text-xs border-collapse font-mono">
+                <thead class="sticky top-0 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 text-[10px] uppercase font-bold text-zinc-400 z-10">
+                  <tr>
+                    <th class="py-2 px-2">Session ID</th>
+                    <th class="py-2 px-2">Persona</th>
+                    <th class="py-2 px-2">Model</th>
+                    <th class="py-2 px-2">Tokens (In / Out / Cache)</th>
+                    <th class="py-2 px-2">Latency</th>
+                    <th class="py-2 px-2">Cost (USD)</th>
+                    <th class="py-2 px-2 text-right">Timestamp</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800/60 text-[11px]">
+                  <tr v-for="entry in costLedger" :key="entry.id" class="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
+                    <td class="py-2 px-2 text-indigo-400 font-bold truncate max-w-[120px]">
+                      {{ entry.session_id || entry.id }}
+                    </td>
+                    <td class="py-2 px-2 capitalize font-sans text-zinc-700 dark:text-zinc-300">
+                      {{ entry.persona || 'coder' }}
+                    </td>
+                    <td class="py-2 px-2 text-zinc-800 dark:text-zinc-200">
+                      {{ entry.model }}
+                    </td>
+                    <td class="py-2 px-2 text-zinc-400">
+                      <span class="text-zinc-300">{{ entry.prompt_tokens }}</span> / <span class="text-zinc-300">{{ entry.completion_tokens }}</span> / <span class="text-zinc-500">{{ entry.cached_tokens }}</span>
+                    </td>
+                    <td class="py-2 px-2 text-zinc-400">
+                      {{ entry.latency_ms ? entry.latency_ms + 'ms' : '-' }}
+                    </td>
+                    <td class="py-2 px-2 font-bold text-emerald-600 dark:text-emerald-400">
+                      \${{ entry.cost_usd ? entry.cost_usd.toFixed(4) : '0.0000' }}
+                    </td>
+                    <td class="py-2 px-2 text-right text-zinc-500 text-[10px]">
+                      {{ entry.created ? new Date(entry.created).toLocaleTimeString() : '-' }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else class="py-6 text-center text-xs text-zinc-400">
+              No cost ledger entries match the current filter criteria.
+            </div>
+          </div>
+
+          <!-- New Budget Policy Modal -->
+          <div v-if="budgetPolicyModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-2xl space-y-4">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🛡️</span>
+                  <div>
+                    <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Create Budget Policy</h3>
+                    <p class="text-[11px] text-zinc-500">Configure financial spending caps & hard circuit breakers</p>
+                  </div>
+                </div>
+                <button @click="budgetPolicyModalOpen = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3 text-xs">
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Policy Title *</label>
+                  <input
+                    v-model="newBudgetPolicy.name"
+                    placeholder="e.g. Daily Swarm Cap, Coder Persona Limit"
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:outline-none"
+                  />
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Scope Type</label>
+                    <select
+                      v-model="newBudgetPolicy.scope_type"
+                      class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:outline-none"
+                    >
+                      <option value="global">Global (Workspace)</option>
+                      <option value="persona">Agent Persona</option>
+                      <option value="project">Project</option>
+                      <option value="session">Session</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Scope ID / Persona</label>
+                    <input
+                      v-model="newBudgetPolicy.scope_id"
+                      placeholder="e.g. coder, PB-101"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Max Budget (USD)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      v-model.number="newBudgetPolicy.max_budget_usd"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 font-mono focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Period</label>
+                    <select
+                      v-model="newBudgetPolicy.period"
+                      class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:outline-none"
+                    >
+                      <option value="daily">Daily</option>
+                      <option value="hourly">Hourly</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="per_cycle">Per Cycle</option>
+                      <option value="total">Total Lifetime</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Soft Limit Warning (%)</label>
+                    <input
+                      type="number"
+                      v-model.number="newBudgetPolicy.soft_limit_pct"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 font-mono focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Hard Limit Action</label>
+                    <select
+                      v-model="newBudgetPolicy.hard_limit_action"
+                      class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:outline-none"
+                    >
+                      <option value="block">Block Execution</option>
+                      <option value="throttle">Throttle</option>
+                      <option value="notify_only">Notify Only</option>
+                      <option value="require_human_gate">Require Human Gate</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  @click="budgetPolicyModalOpen = false"
+                  class="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 text-zinc-700 dark:text-zinc-300 text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  @click="createBudgetPolicy"
+                  :disabled="isSavingBudgetPolicy || !newBudgetPolicy.name.trim()"
+                  class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold transition-colors flex items-center gap-1 shadow-xs"
+                >
+                  <span>{{ isSavingBudgetPolicy ? 'Saving...' : 'Save Policy' }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Emergency Override Modal -->
+          <div v-if="budgetOverrideModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div class="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-2xl space-y-4">
+              <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🔓</span>
+                  <div>
+                    <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Grant Emergency Budget Override</h3>
+                    <p class="text-[11px] text-zinc-500">Temporarily unblock throttled policy: {{ selectedPolicyForOverride ? selectedPolicyForOverride.name : '' }}</p>
+                  </div>
+                </div>
+                <button @click="budgetOverrideModalOpen = false" class="text-zinc-400 hover:text-zinc-600 text-lg">&times;</button>
+              </div>
+
+              <div class="space-y-3 text-xs">
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Additional Budget (USD)</label>
+                    <input
+                      type="number"
+                      step="1"
+                      v-model.number="newBudgetOverride.additional_budget"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 font-mono focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Duration (Minutes)</label>
+                    <input
+                      type="number"
+                      step="15"
+                      v-model.number="newBudgetOverride.expires_in_minutes"
+                      class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 font-mono focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Reason / Justification *</label>
+                  <input
+                    v-model="newBudgetOverride.reason"
+                    placeholder="e.g. Critical production hotfix run"
+                    class="w-full px-3 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div class="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  @click="budgetOverrideModalOpen = false"
+                  class="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 text-zinc-700 dark:text-zinc-300 text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  @click="submitBudgetOverride"
+                  :disabled="isGrantingOverride"
+                  class="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-bold transition-colors flex items-center gap-1 shadow-xs"
+                >
+                  <span>{{ isGrantingOverride ? 'Granting...' : '🔓 Grant Override' }}</span>
                 </button>
               </div>
             </div>

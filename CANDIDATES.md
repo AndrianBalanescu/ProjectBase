@@ -236,3 +236,13 @@
 - [x] 8 FastMCP JSON-RPC 2.0 tools (`propose_session_merge`, `list_session_merges`, `get_session_merge_details`, `auto_resolve_merge_conflicts`, `resolve_merge_conflict_hunk`, `verify_merge_readiness`, `execute_session_merge`, `get_session_merge_matrix`)
 - [x] Frontend AgentsView **🔀 Multi-Agent Merge Matrix & Conflicts Hub** dashboard with interactive 3-way split diff inspector, conflict hunk resolver, 1-click AST/Union auto-resolve, workspace file contention matrix, and 1-click Propose Merge modal
 - [x] 430/430 automated tests passing across 32 test suites with 100% frontend guard, CSS sync, and zero console error headless browser E2E verification
+
+---
+
+## Milestone (Cycle 31)
+**Epic 28 – Agent Fleet Budget & Cost Attribution, Token Quota Enforcement & Financial Governance Hub (✅ Done)**
+- [x] Schema migration (`1710000040_add_fleet_budgets_and_token_quotas.js`) adding `budget_policies`, `token_quotas`, `cost_ledger_entries`, and `budget_overrides` collections
+- [x] Backend fleet budget and quota engine hook (`app/pb_hooks/112_fleet_budget_quota_engine.pb.js`) with 13 REST API endpoints for policy lifecycle, pre-flight checks, reservations, usage ingestion, multi-model cost calculation, emergency overrides, analytics breakdown, and transaction ledger querying
+- [x] 8 FastMCP JSON-RPC 2.0 tools (`get_agent_budget_status`, `set_agent_budget_policy`, `record_agent_token_usage`, `check_token_quota_availability`, `grant_emergency_budget_override`, `get_fleet_cost_analytics`, `list_cost_ledger_entries`, `get_model_pricing_matrix`)
+- [x] Frontend AgentsView **💰 Fleet Budget & Quotas** dashboard with 5 primary KPI cards, real-time model/persona spend meters, interactive budget policy manager, pre-flight in-flight quota simulator, live cost transaction ledger, and emergency override modals
+- [x] 438/438 automated tests passing across 33 test suites with 100% frontend guard, CSS sync, and zero console error verification
