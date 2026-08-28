@@ -1,6 +1,10 @@
 # ProjectBase — Agent Rules & Technical Map
 
-ProjectBase = execution-native AI agent orchestration and software engineering workspace. Ultra-lightweight open-source Plane/Linear alternative. **MIT, 100% FOSS, self-hostable. Never add monetization, subscriptions, Stripe, or paid tiers.** ~50 MB RAM, single binary, zero-build frontend, real-time SSE, SQLite. Live app: `http://127.0.0.1:8120` (v1.0.0).
+ProjectBase = ultra-lightweight open-source Plane/Linear alternative. High-performance task manager & workspace for humans and autonomous AI agents. **MIT, 100% FOSS, self-hostable. Never add monetization, subscriptions, Stripe, or paid tiers.** ~50 MB RAM, single binary, zero-build frontend, real-time SSE, SQLite. Live app: `http://127.0.0.1:8120` (v1.0.0).
+
+## 🛑 STRICT PRODUCT BOUNDARIES (NO FEATURE CREEP)
+- **What ProjectBase IS:** A clean, fast, beautiful Linear/Plane alternative — Kanban Board, List View, Cycles (sprints), Milestones (roadmap), Projects, and resizable Markdown Issue Drawer. Real local agent sessions are ingested cleanly as execution runs without forcing agents into secretarial ticket updates.
+- **What ProjectBase is NOT:** No fake cloud billing (no USD calculators), no AST security red-team scanners, no incident 5-Whys war rooms, no benchmark leaderboards. Keep the codebase clean, lean, and grounded in real homelab infrastructure.
 
 ## Technical stack & how to run
 
