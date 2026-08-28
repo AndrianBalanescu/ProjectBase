@@ -2873,7 +2873,7 @@ def test_fastmcp_jsonrpc_endpoint_suite():
     st, res = _request("POST", "/api/projectbase/mcp", {"jsonrpc": "2.0", "method": "tools/list", "id": 2}, headers=headers)
     assert st == 200
     tools = [t["name"] for t in res.get("result", {}).get("tools", [])]
-    for required in ["list_projects", "list_issues", "get_issue", "create_issue", "update_issue", "move_issue", "add_comment", "list_cycles", "list_milestones", "get_stats"]:
+    for required in ["list_projects", "list_issues", "get_issue", "create_issue", "update_issue", "move_issue", "add_comment", "list_cycles", "list_milestones", "search_issues", "dispatch_agent", "get_stats"]:
         assert required in tools, f"missing tool {required} in tools/list"
 
     # 3. list_projects
@@ -2952,9 +2952,27 @@ def test_fastmcp_jsonrpc_endpoint_suite():
         milestones = json.loads(res["result"]["content"][0]["text"])
         assert isinstance(milestones, list)
 
-        # 11. get_stats
+        # 11. search_issues
         st, res = _request("POST", "/api/projectbase/mcp", {
-            "jsonrpc": "2.0", "method": "tools/call", "params": {"name": "get_stats", "arguments": {}}, "id": 11
+            "jsonrpc": "2.0", "method": "tools/call", "params": {"name": "search_issues", "arguments": {"query": "Cycle 6 FastMCP"}}, "id": 11
+        }, headers=headers)
+        assert st == 200
+        search_res = json.loads(res["result"]["content"][0]["text"])
+        assert isinstance(search_res, list) and len(search_res) > 0
+        assert any(item["id"] == issue_id for item in search_res)
+
+        # 12. dispatch_agent
+        st, res = _request("POST", "/api/projectbase/mcp", {
+            "jsonrpc": "2.0", "method": "tools/call", "params": {"name": "dispatch_agent", "arguments": {"issue_id": identifier, "agent_target": "flomaster", "prompt": "Process cycle 6 task"}}, "id": 12
+        }, headers=headers)
+        assert st == 200
+        dispatch_res = json.loads(res["result"]["content"][0]["text"])
+        assert dispatch_res["success"] is True
+        assert dispatch_res["agent"] == "flomaster"
+
+        # 13. get_stats
+        st, res = _request("POST", "/api/projectbase/mcp", {
+            "jsonrpc": "2.0", "method": "tools/call", "params": {"name": "get_stats", "arguments": {}}, "id": 13
         }, headers=headers)
         assert st == 200
         stats = json.loads(res["result"]["content"][0]["text"])

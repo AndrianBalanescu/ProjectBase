@@ -128,6 +128,31 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
             }
         },
         {
+            name: "search_issues",
+            description: "Search issues across all projects by title, identifier, status, or priority.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    query: { type: "string", description: "Search query string" },
+                    limit: { type: "integer", description: "Max results (default: 20, max: 50)" }
+                },
+                required: ["query"]
+            }
+        },
+        {
+            name: "dispatch_agent",
+            description: "Dispatch an autonomous agent to claim and execute an issue.",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    issue_id: { type: "string", description: "Issue record ID or identifier (e.g. PB-42)" },
+                    agent_target: { type: "string", description: "Target agent harness: flomaster|hermes|windmill|custom (default: flomaster)" },
+                    prompt: { type: "string", description: "Custom instructions/prompt for the agent" }
+                },
+                required: ["issue_id"]
+            }
+        },
+        {
             name: "get_stats",
             description: "Get high-level workspace statistics, counts, and completion rates.",
             inputSchema: {
@@ -407,6 +432,91 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         }
     }
 
+    const searchIssues = (args) => {
+        let q = String(args.query || "").trim()
+        if (!q) { return [] }
+        if (q.length > 128) { q = q.substring(0, 128) }
+        let limit = Math.min(Number(args.limit) || 20, 50)
+        let safe = q.replace(/'/g, "\\'")
+        let filter = "(title ~ '" + safe + "' || identifier ~ '" + safe + "' || status ~ '" + safe + "' || priority ~ '" + safe + "')"
+        let issues = e.app.findRecordsByFilter("issues", filter, "-created", limit, 0)
+        let results = []
+        let projectCache = {}
+        for (let i = 0; i < issues.length; i++) {
+            let rec = issues[i]
+            let projectId = rec.getString("project")
+            let projectName = ""
+            let projectIdentifier = ""
+            let projectColor = ""
+            if (projectId) {
+                if (projectCache[projectId]) {
+                    projectName = projectCache[projectId].name
+                    projectIdentifier = projectCache[projectId].identifier
+                    projectColor = projectCache[projectId].color
+                } else {
+                    try {
+                        let proj = e.app.findRecordById("projects", projectId)
+                        projectName = proj.getString("name")
+                        projectIdentifier = proj.getString("identifier")
+                        projectColor = proj.getString("color")
+                        projectCache[projectId] = { name: projectName, identifier: projectIdentifier, color: projectColor }
+                    } catch (pErr) {}
+                }
+            }
+            results.push({
+                id: rec.id,
+                identifier: rec.getString("identifier"),
+                title: rec.getString("title"),
+                status: rec.getString("status"),
+                priority: rec.getString("priority"),
+                project_id: projectId,
+                project_name: projectName,
+                project_identifier: projectIdentifier,
+                project_color: projectColor
+            })
+        }
+        return results
+    }
+
+    const dispatchAgent = (args) => {
+        let issue = resolveIssueRecord(args.issue_id)
+        let agentTarget = args.agent_target || "flomaster"
+        let customPrompt = args.prompt || ""
+        let allowedTargets = ["flomaster", "hermes", "windmill", "custom"]
+        if (allowedTargets.indexOf(agentTarget) === -1) { agentTarget = "flomaster" }
+
+        let identifier = issue.getString("identifier")
+        let title = issue.getString("title") || ""
+        let desc = issue.getString("description") || ""
+
+        issue.set("status", "in_progress")
+        let agentName = {
+            flomaster: "Flomaster Agent",
+            hermes: "Hermes Agent",
+            windmill: "Windmill Agent",
+            custom: "Custom Agent"
+        }[agentTarget] || "Flomaster Agent"
+        issue.set("assignee", agentName)
+        e.app.save(issue)
+
+        let commentsCol = e.app.findCollectionByNameOrId("comments")
+        let comment = new Record(commentsCol)
+        comment.set("issue", issue.id)
+        comment.set("author", agentName)
+        comment.set("author_type", "agent")
+        comment.set("content", "🤖 **Autonomous Task Claimed**\nAgent **" + agentName + "** has claimed task `" + identifier + "` for execution." + (customPrompt ? "\n> Instructions: " + customPrompt : ""))
+        e.app.save(comment)
+
+        return {
+            success: true,
+            issue_id: issue.id,
+            identifier: identifier,
+            status: "in_progress",
+            agent: agentTarget,
+            assigned_to: agentName
+        }
+    }
+
     // ---------- 1. Authentication ----------
     let authRecord = e.auth || null
     let bypassEnabled = false
@@ -467,6 +577,8 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
         else if (toolName === "add_comment") { result = addComment(args) }
         else if (toolName === "list_cycles") { result = listCycles(args) }
         else if (toolName === "list_milestones") { result = listMilestones(args) }
+        else if (toolName === "search_issues") { result = searchIssues(args) }
+        else if (toolName === "dispatch_agent") { result = dispatchAgent(args) }
         else if (toolName === "get_stats") { result = getStats() }
         else { return fail(-32602, "Unknown tool: " + toolName) }
         return ok({ content: [{ type: "text", text: JSON.stringify(result) }] })
