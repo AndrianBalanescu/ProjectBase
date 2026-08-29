@@ -336,3 +336,13 @@
 - [x] 8 FastMCP JSON-RPC 2.0 tools (`start_debug_session`, `record_debug_trace_frame`, `list_debug_sessions`, `get_debug_session_trace`, `step_debug_session`, `set_debug_breakpoint`, `capture_debug_state_snapshot`, `get_debug_workspace_metrics`)
 - [x] Frontend AgentsView **⏱️ Time-Travel Debugger** dashboard (`activeTab === 'debugger'`) with 5 KPI summary cards (Debug Sessions, Trace Frames, Breakpoint Hit Rate, Intercepted Errors, Avg Latency & RAM), split-pane session explorer, 4 interactive subtabs (🧵 Trace Frames & Call Stack, 🔍 State & Variable Inspector, 🛑 Breakpoints & Watchpoints, 📸 State Snapshots), time-travel scrubber controls (⏮️ First, ◀️ Prev, ⏸️ Pause / ▶️ Resume, ▶️ Next, ⏭️ Last, 🔄 Replay, 📸 Snapshot), and 3 interactive modals (+ New Debug Session, + Add Breakpoint, Time-Travel Replay Simulation)
 - [x] Comprehensive automated test suite `tests/test_agent_time_travel_debugger.py` with 8/8 passing assertions, 528 total passing tests across 42 files, OpenAPI static drift validation, and 100% headless Playwright browser E2E verification
+
+---
+
+## Milestone (Cycle 41)
+**Epic 38 – Autonomous Agent Dynamic Architecture Graph, AST Blast-Radius Impact Simulator & Breaking Change Sentinel Engine (✅ Done)**
+- [x] Schema migration (`1710000051_add_architecture_graph_and_blast_radius_engine.js`) introducing `arch_graphs`, `arch_nodes`, `arch_edges`, and `blast_simulations` collections
+- [x] Backend engine hook (`app/pb_hooks/122_architecture_blast_radius_engine.pb.js`) with 13 high-performance REST API endpoints for dynamic dependency graph mapping, automated codebase topology scanning, transitive blast-radius calculation, breaking change risk analysis, and targeted test suite planning
+- [x] 8 FastMCP JSON-RPC 2.0 tools (`analyze_architecture_graph`, `register_architecture_node`, `link_architecture_dependency`, `simulate_change_blast_radius`, `list_blast_simulations`, `get_blast_simulation_details`, `generate_targeted_test_plan`, `get_architecture_metrics`)
+- [x] Frontend AgentsView **🌐 Architecture & Blast Radius** dashboard (`activeTab === 'blast_radius'`) with 5 KPI summary cards (Arch Graphs & Nodes, Simulations Executed, Avg Risk Score %, Targeted Test Reduction %, Breaking Changes Caught), 4 interactive subtabs (🗺️ Graph & Topology, 💥 Blast Simulator, 🎯 Targeted Test Planner, 📊 Modularity & Metrics), interactive node dependency inspector, and new graph creation modal
+- [x] Comprehensive automated test suite `tests/test_architecture_blast_radius_engine.py` with 7/7 passing assertions, 535 total passing tests across 43 files, OpenAPI static drift validation, and 100% static CSS compilation verification

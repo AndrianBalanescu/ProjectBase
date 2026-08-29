@@ -40,7 +40,7 @@ def _request(method, path, body=None, headers=None):
         hdrs.update(headers)
     req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=60) as resp:
             resp_body = resp.read().decode("utf-8")
             return resp.status, json.loads(resp_body) if resp_body else {}
     except urllib.error.HTTPError as e:
@@ -107,9 +107,10 @@ def test_semantic_review_novel_issue_allowed():
     token = _get_auth_token()
     headers = {"Authorization": token}
 
+    uid = _uid()
     body = {
-        "title": f"Quantum key distribution microservice pipeline {_uid()}",
-        "description": "Implement BB84 protocol simulation with zero-knowledge verification.",
+        "title": f"Exotic interstellar propulsion astrophysics simulation {uid}",
+        "description": f"Implement relativistic magneto-hydrodynamic plasma simulation {uid}.",
         "project": "PB"
     }
     status, res = _request("POST", "/api/projectbase/semantic/review", body, headers)

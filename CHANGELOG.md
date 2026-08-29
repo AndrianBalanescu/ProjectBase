@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.37.0] - 2026-08-28 - Cycle 41
+### Added
+- **Autonomous Agent Dynamic Architecture Graph, AST Blast-Radius Impact Simulator & Breaking Change Sentinel Engine (Milestone 17 / Epic 38):**
+  - Schema migration (`1710000051_add_architecture_graph_and_blast_radius_engine.js`) introducing 4 high-performance collections: `arch_graphs`, `arch_nodes`, `arch_edges`, and `blast_simulations`.
+  - Backend engine hook (`app/pb_hooks/122_architecture_blast_radius_engine.pb.js`) with 13 high-performance REST API endpoints:
+    - `GET /api/projectbase/arch/graphs` & `POST /api/projectbase/arch/graphs` for architecture dependency graph CRUD and indexing.
+    - `GET /api/projectbase/arch/graphs/{id}` & `DELETE /api/projectbase/arch/graphs/{id}` for graph details and deletion.
+    - `POST /api/projectbase/arch/graphs/{id}/scan` for automated codebase topology scanning and dependency graph population.
+    - `GET /api/projectbase/arch/graphs/{id}/nodes` & `POST /api/projectbase/arch/graphs/{id}/nodes` for registering architecture nodes (files, modules, components, endpoints, models, test suites, services).
+    - `GET /api/projectbase/arch/graphs/{id}/edges` & `POST /api/projectbase/arch/graphs/{id}/edges` for recording directional dependency relationships (imports, calls, renders, reads_schema, mutates_schema, tests).
+    - `POST /api/projectbase/arch/simulate-blast` for transitive blast-radius calculation, 0-100 risk scoring, breaking change detection, and targeted test suite identification.
+    - `GET /api/projectbase/arch/simulations` & `GET /api/projectbase/arch/simulations/{id}` for simulation history and impact reports.
+    - `GET /api/projectbase/arch/metrics` for workspace architecture coupling factor, modularity index, and blast-radius health metrics.
+  - 8 FastMCP JSON-RPC 2.0 tools in `app/pb_hooks/91_mcp_server.pb.js`:
+    - `analyze_architecture_graph`, `register_architecture_node`, `link_architecture_dependency`, `simulate_change_blast_radius`, `list_blast_simulations`, `get_blast_simulation_details`, `generate_targeted_test_plan`, `get_architecture_metrics`.
+  - Frontend AgentsView **🌐 Architecture & Blast Radius** dashboard (`activeTab === 'blast_radius'`) in `app/pb_public/js/components/AgentsView.js`:
+    - 5 KPI summary cards: Arch Graphs & Nodes, Simulations Executed, Avg Risk Score %, Targeted Test Reduction %, Breaking Changes Caught.
+    - 4 Interactive subtabs: 🗺️ Graph & Topology, 💥 Blast Simulator, 🎯 Targeted Test Planner, 📊 Modularity & Metrics.
+    - Interactive node inspector and New Architecture Graph creation modal.
+  - Comprehensive automated test suite `tests/test_architecture_blast_radius_engine.py` with 7/7 passing assertions, 100% OpenAPI documentation, and CSS sync.
+
 ## [1.36.0] - 2026-08-28 - Cycle 40
 ### Added
 - **Autonomous Agent Time-Travel Debugger, Execution Trace Replay, Breakpoint Watchpoints & State Snapshot Engine (Milestone 16 / Epic 37):**

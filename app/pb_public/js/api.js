@@ -3746,5 +3746,137 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to get debug metrics');
     return data;
+  },
+
+  async listArchGraphs(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/arch/graphs${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list architecture graphs');
+    return data;
+  },
+
+  async createArchGraph(payload = {}) {
+    const res = await fetch(`/api/projectbase/arch/graphs`, {
+      method: 'POST',
+      headers: { ...this._authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create architecture graph');
+    return data;
+  },
+
+  async getArchGraph(id) {
+    const res = await fetch(`/api/projectbase/arch/graphs/${encodeURIComponent(id)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get architecture graph');
+    return data;
+  },
+
+  async deleteArchGraph(id) {
+    const res = await fetch(`/api/projectbase/arch/graphs/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete architecture graph');
+    return data;
+  },
+
+  async listArchNodes(graphId, params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/arch/graphs/${encodeURIComponent(graphId)}/nodes${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list architecture nodes');
+    return data;
+  },
+
+  async createArchNode(graphId, payload = {}) {
+    const res = await fetch(`/api/projectbase/arch/graphs/${encodeURIComponent(graphId)}/nodes`, {
+      method: 'POST',
+      headers: { ...this._authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create architecture node');
+    return data;
+  },
+
+  async listArchEdges(graphId, params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/arch/graphs/${encodeURIComponent(graphId)}/edges${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list architecture edges');
+    return data;
+  },
+
+  async createArchEdge(graphId, payload = {}) {
+    const res = await fetch(`/api/projectbase/arch/graphs/${encodeURIComponent(graphId)}/edges`, {
+      method: 'POST',
+      headers: { ...this._authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create architecture edge');
+    return data;
+  },
+
+  async simulateBlastRadius(payload = {}) {
+    const res = await fetch(`/api/projectbase/arch/simulate-blast`, {
+      method: 'POST',
+      headers: { ...this._authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to simulate blast radius');
+    return data;
+  },
+
+  async listBlastSimulations(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/arch/simulations${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list blast simulations');
+    return data;
+  },
+
+  async getBlastSimulation(id) {
+    const res = await fetch(`/api/projectbase/arch/simulations/${encodeURIComponent(id)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get blast simulation');
+    return data;
+  },
+
+  async scanGraphTopology(graphId) {
+    const res = await fetch(`/api/projectbase/arch/graphs/${encodeURIComponent(graphId)}/scan`, {
+      method: 'POST',
+      headers: { ...this._authHeaders(), 'Content-Type': 'application/json' }
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to scan graph topology');
+    return data;
+  },
+
+  async getArchMetrics(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/arch/metrics${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get architecture metrics');
+    return data;
   }
 };

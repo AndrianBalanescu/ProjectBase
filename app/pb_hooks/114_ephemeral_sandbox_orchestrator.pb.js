@@ -565,7 +565,7 @@ routerAdd("POST", "/api/projectbase/sandboxes/{id}/health", (e) => {
 // 11. GET /api/projectbase/sandboxes/templates - List templates
 routerAdd("GET", "/api/projectbase/sandboxes/templates", (e) => {
     try {
-        const records = e.app.findRecordsByFilter("sandbox_templates", "", "-created", 100, 0);
+        const records = e.app.findRecordsByFilter("sandbox_templates", "", "-is_default,-created", 200, 0);
         const templates = records.map(t => ({
             id: t.id,
             name: t.getString("name"),

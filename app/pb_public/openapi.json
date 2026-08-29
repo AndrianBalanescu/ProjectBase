@@ -13192,6 +13192,447 @@
           }
         }
       }
+    },
+    "/projectbase/arch/graphs": {
+      "get": {
+        "tags": [
+          "Autonomous Agent Dynamic Architecture Graph & Blast Radius"
+        ],
+        "summary": "List architecture dependency graphs",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of architecture graphs"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Autonomous Agent Dynamic Architecture Graph & Blast Radius"
+        ],
+        "summary": "Create and initialize an architecture dependency graph",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "project_id": {
+                    "type": "string"
+                  },
+                  "root_path": {
+                    "type": "string"
+                  },
+                  "language": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Architecture graph created"
+          }
+        }
+      }
+    },
+    "/projectbase/arch/graphs/{id}": {
+      "get": {
+        "tags": [
+          "Autonomous Agent Dynamic Architecture Graph & Blast Radius"
+        ],
+        "summary": "Get architecture dependency graph details and node/edge summaries",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Graph details"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Autonomous Agent Dynamic Architecture Graph & Blast Radius"
+        ],
+        "summary": "Delete architecture dependency graph and connected nodes/edges",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Graph deleted"
+          }
+        }
+      }
+    },
+    "/projectbase/arch/graphs/{id}/nodes": {
+      "get": {
+        "tags": [
+          "Autonomous Agent Dynamic Architecture Graph & Blast Radius"
+        ],
+        "summary": "List architecture nodes in a graph",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "node_type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of architecture nodes"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Autonomous Agent Dynamic Architecture Graph & Blast Radius"
+        ],
+        "summary": "Register an architecture node in a graph",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "node_type": {
+                    "type": "string"
+                  },
+                  "symbol_name": {
+                    "type": "string"
+                  },
+                  "exported": {
+                    "type": "boolean"
+                  },
+                  "loc": {
+                    "type": "number"
+                  },
+                  "complexity_score": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Node registered"
+          }
+        }
+      }
+    },
+    "/projectbase/arch/graphs/{id}/edges": {
+      "get": {
+        "tags": [
+          "Autonomous Agent Dynamic Architecture Graph & Blast Radius"
+        ],
+        "summary": "List architecture dependency edges in a graph",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "relation_type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of edges"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Autonomous Agent Dynamic Architecture Graph & Blast Radius"
+        ],
+        "summary": "Record a directional dependency relation edge",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "source_node_id",
+                  "target_node_id"
+                ],
+                "properties": {
+                  "source_node_id": {
+                    "type": "string"
+                  },
+                  "target_node_id": {
+                    "type": "string"
+                  },
+                  "relation_type": {
+                    "type": "string"
+                  },
+                  "weight": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Edge recorded"
+          }
+        }
+      }
+    },
+    "/projectbase/arch/graphs/{id}/scan": {
+      "post": {
+        "tags": [
+          "Autonomous Agent Dynamic Architecture Graph & Blast Radius"
+        ],
+        "summary": "Scan and construct repository architecture topology and dependency graph",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Topology scanned and indexed"
+          }
+        }
+      }
+    },
+    "/projectbase/arch/simulate-blast": {
+      "post": {
+        "tags": [
+          "Autonomous Agent Dynamic Architecture Graph & Blast Radius"
+        ],
+        "summary": "Simulate transitive blast radius, breaking changes, and affected test suites",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "changed_paths"
+                ],
+                "properties": {
+                  "graph_id": {
+                    "type": "string"
+                  },
+                  "project_id": {
+                    "type": "string"
+                  },
+                  "changed_paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "trigger_source": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Blast radius simulation results"
+          }
+        }
+      }
+    },
+    "/projectbase/arch/simulations": {
+      "get": {
+        "tags": [
+          "Autonomous Agent Dynamic Architecture Graph & Blast Radius"
+        ],
+        "summary": "List past blast radius simulations",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "graph_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "risk_level",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of blast simulations"
+          }
+        }
+      }
+    },
+    "/projectbase/arch/simulations/{id}": {
+      "get": {
+        "tags": [
+          "Autonomous Agent Dynamic Architecture Graph & Blast Radius"
+        ],
+        "summary": "Get blast simulation impact details and breaking change analysis",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Simulation details"
+          }
+        }
+      }
+    },
+    "/projectbase/arch/metrics": {
+      "get": {
+        "tags": [
+          "Autonomous Agent Dynamic Architecture Graph & Blast Radius"
+        ],
+        "summary": "Get workspace architecture coupling factor, modularity index, and blast-radius health metrics",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Architecture metrics"
+          }
+        }
+      }
     }
   }
 }
