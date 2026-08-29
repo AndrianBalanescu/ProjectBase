@@ -757,6 +757,11 @@ const App = {
       this.syncRoute();
     },
 
+    openAgentSession(session) {
+      this.currentView = 'agents';
+      window.location.hash = '#/pb/agents';
+    },
+
     // A global search result may live in a different project than the one
     // currently selected. Switch to that project, load its issues, then open
     // the issue so the drawer has the full record (relations, comments, etc.).
