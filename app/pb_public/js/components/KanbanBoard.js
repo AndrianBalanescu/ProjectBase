@@ -387,7 +387,7 @@ const KanbanBoardComponent = {
             <div class="flex items-center space-x-2">
               <span class="w-2 h-2 rounded-full" :style="{ backgroundColor: col.color }"></span>
               <span class="text-xs font-semibold text-zinc-800 dark:text-zinc-200 tracking-tight">{{ col.name }}</span>
-              <span class="px-1.5 py-0.2 rounded-full bg-zinc-200/80 dark:bg-zinc-800 text-[10px] font-mono text-zinc-600 dark:text-zinc-400">
+              <span class="px-1.5 py-0.5 rounded-full bg-zinc-200/80 dark:bg-zinc-800 text-[10px] font-mono text-zinc-600 dark:text-zinc-400">
                 {{ getColumnTotalCount(col.key) }}
               </span>
             </div>

@@ -207,6 +207,17 @@ const AgentsViewComponent = {
         title: session.title || session.last_prompt || `Task from session ${session.short_name || session.id}`,
         description: `Created from agent session \`${session.session_id || session.id}\` (${session.agent_name || 'agent'}).\n\n${session.last_prompt ? '> ' + session.last_prompt : ''}`
       });
+    },
+    loadAgentSessions() {
+      this.$emit('sync-agents');
+    },
+    loadSessionMetrics() {},
+    loadSandboxesGovernanceData() {},
+    triggerProvisionSandbox() {},
+    handleSandboxAction() {},
+    executeInSandbox() {},
+    handleCreateBranch() {
+      this.branchModalOpen = false;
     }
   },
   template: `
@@ -317,7 +328,7 @@ const AgentsViewComponent = {
                 <span class="truncate">{{ s.working_dir ? s.working_dir.split('/').slice(-2).join('/') : 'workspace' }}</span>
               </div>
               <span
-                class="px-1 py-0.2 rounded font-semibold text-[9px]"
+                class="px-1 py-0.5 rounded font-semibold text-[9px]"
                 :class="s.status === 'running' || s.is_active ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 font-bold animate-pulse' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'"
               >
                 {{ s.status || 'completed' }}
@@ -339,7 +350,7 @@ const AgentsViewComponent = {
                 <h2 class="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
                   {{ selectedSession ? (selectedSession.agent_name || selectedSession.short_name || selectedSession.id) : 'Agent Stream Console' }}
                 </h2>
-                <span v-if="selectedSession && (selectedSession.status === 'running' || selectedSession.is_active)" class="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold flex items-center gap-1 font-mono">
+                <span v-if="selectedSession && (selectedSession.status === 'running' || selectedSession.is_active)" class="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold flex items-center gap-1 font-mono">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                   LIVE RUNNING
                 </span>
@@ -373,6 +384,13 @@ const AgentsViewComponent = {
                 :class="activeTab === 'diff' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs font-semibold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
               >
                 🌿 Git Diff
+              </button>
+              <button
+                @click="activeTab = 'runs'"
+                class="px-2 py-0.5 rounded-md font-medium transition-colors"
+                :class="activeTab === 'runs' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs font-semibold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+              >
+                📊 Telemetry
               </button>
             </div>
 
@@ -460,6 +478,44 @@ const AgentsViewComponent = {
               </ul>
             </div>
             <pre v-if="selectedSession.git_diff_raw" class="p-3 rounded bg-zinc-900 text-emerald-400 whitespace-pre-wrap overflow-x-auto text-[11px]">{{ selectedSession.git_diff_raw }}</pre>
+          </div>
+        </div>
+
+        <!-- TAB 4: Telemetry & Ephemeral Sandboxes -->
+        <div v-else-if="activeTab === 'runs'" class="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/30 text-xs">
+          <!-- Autonomous Ephemeral Sandboxes & Dev Environments -->
+          <div v-if="selectedSession" class="space-y-4">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div class="p-3 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800">
+                <div class="text-[10px] text-zinc-400 font-semibold uppercase">PID</div>
+                <div class="text-sm font-mono font-bold text-zinc-800 dark:text-zinc-200 mt-0.5">{{ selectedSession.pid || '—' }}</div>
+              </div>
+              <div class="p-3 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800">
+                <div class="text-[10px] text-zinc-400 font-semibold uppercase">Model</div>
+                <div class="text-sm font-mono font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 truncate">{{ selectedSession.model || '—' }}</div>
+              </div>
+              <div class="p-3 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800">
+                <div class="text-[10px] text-zinc-400 font-semibold uppercase">Tokens</div>
+                <div class="text-sm font-mono font-bold text-zinc-800 dark:text-zinc-200 mt-0.5">{{ fmtTokens(selectedSession.tokens_spent || 0) }}</div>
+              </div>
+              <div class="p-3 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800">
+                <div class="text-[10px] text-zinc-400 font-semibold uppercase">Duration</div>
+                <div class="text-sm font-mono font-bold text-zinc-800 dark:text-zinc-200 mt-0.5">{{ selectedSession.duration_seconds ? selectedSession.duration_seconds + 's' : '—' }}</div>
+              </div>
+            </div>
+
+            <div class="p-4 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 space-y-2">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">Files Touched</h3>
+              <div v-if="selectedSession.files_touched && selectedSession.files_touched.length > 0" class="flex flex-wrap gap-1.5">
+                <span v-for="f in selectedSession.files_touched" :key="f" class="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[11px] font-mono text-zinc-700 dark:text-zinc-300">
+                  {{ f }}
+                </span>
+              </div>
+              <p v-else class="text-zinc-400 italic">No modified files recorded.</p>
+            </div>
+          </div>
+          <div v-else class="py-16 text-center text-zinc-400 italic">
+            Select a session run to inspect telemetry and dev sandboxes.
           </div>
         </div>
 
