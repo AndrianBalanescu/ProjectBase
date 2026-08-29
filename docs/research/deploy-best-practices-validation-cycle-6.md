@@ -1,6 +1,6 @@
 # Cycle 6 — Demo deployment best practices: validation record (2026-08-23)
 
-Scout engines for this cycle were degraded (`ask-llm` / `sonar` / `multi-source-research`
+Scout engines for this cycle were degraded (`sonar` / `multi-source-research`
 binaries missing from the job PATH — raw outputs show `SCOUT_SKIPPED`). The cycle-6 deploy
 design was therefore validated directly against primary sources and live execution instead:
 

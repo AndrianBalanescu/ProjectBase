@@ -369,9 +369,7 @@ HN window: Show HN with points≥20 created in the last **90 days** (not all-tim
 - **url:** https://www.producthunt.com/products/shogunai
 - **angle:** Who pays? Pricing page? Vertical copycat?
 
-## Boring SaaS / revenue references (use with ask-llm q3)
 
-Also run / read ask-llm results for: *successful boring SaaS indie hacker MRR pricing 2026*
 Prefer copycat candidates with a live pricing URL (Jobber-class, not only host-OSS).
 
 ## How to use this file
