@@ -20,6 +20,7 @@ import os
 import time
 import urllib.error
 import urllib.request
+import uuid
 import pytest
 
 BASE_URL = os.environ.get("PROJECTBASE_URL", "http://127.0.0.1:8120")
@@ -28,7 +29,7 @@ SUPERUSER_PASSWORD = os.environ.get("PROJECTBASE_PASSWORD", "superdev123")
 
 
 def _uid():
-    return f"semantic_{int(time.time() * 1000) % 10000000}"
+    return f"semantic_{uuid.uuid4().hex[:8]}"
 
 
 def _request(method, path, body=None, headers=None):

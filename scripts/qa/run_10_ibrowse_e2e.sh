@@ -3,7 +3,10 @@
 # Runs each test via iBrowse API, waits for completion, and collects findings.
 
 KEY="${IBROWSE_API_KEY:?Set IBROWSE_API_KEY env}"
-HOST="http://127.0.0.1:3000"
+HOST="${IBROWSE_HOST:-http://127.0.0.1:3007}"
+if [[ "$HOST" == *":3000"* ]]; then
+  HOST="${HOST//:3000/:3007}"
+fi
 BASE="http://127.0.0.1:8120"
 LOGIN="Log in to ProjectBase at $BASE with email f@flow.com and password superdev123 first if the login screen is visible."
 
