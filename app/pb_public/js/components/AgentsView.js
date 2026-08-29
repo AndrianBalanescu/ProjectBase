@@ -49,7 +49,34 @@ const AgentsViewComponent = {
       quarantineModalOpen: false,
       quarantineTestName: '',
       quarantineReason: '',
-      isQuarantining: false
+      isQuarantining: false,
+      // Time-Travel Debugger State (Milestone 16 / Epic 37)
+      debugSessions: [],
+      selectedDebugSessionId: null,
+      selectedDebugSessionData: null,
+      debugFrames: [],
+      selectedDebugFrameId: null,
+      selectedDebugFrameData: null,
+      debugBreakpoints: [],
+      debugSnapshots: [],
+      debugMetrics: null,
+      activeDebugSubtab: 'trace', // 'trace' | 'state' | 'breakpoints' | 'snapshots'
+      newDebugModalOpen: false,
+      newDebugName: '',
+      newDebugTargetModel: 'claude-fable-5',
+      newDebugEntrypoint: 'main',
+      newDebugTags: '',
+      isCreatingDebugSession: false,
+      newBreakpointModalOpen: false,
+      newBpName: '',
+      newBpConditionType: 'always',
+      newBpConditionExpr: '',
+      newBpAction: 'pause',
+      isCreatingBreakpoint: false,
+      replayModalOpen: false,
+      replayResult: null,
+      isReplayingSession: false,
+      isSteppingDebug: false
     };
   },
   computed: {
@@ -367,6 +394,211 @@ const AgentsViewComponent = {
       } catch (e) {
         alert(e.message || 'Resolve quarantine failed');
       }
+    },
+    // Debugger Methods (Milestone 16 / Epic 37)
+    async loadDebugData() {
+      try {
+        if (window.API) {
+          const [sessRes, metricsRes] = await Promise.all([
+            API.listDebugSessions().catch(() => ({ items: [] })),
+            API.getDebugMetrics().catch(() => null)
+          ]);
+          this.debugSessions = sessRes.items || [];
+          this.debugMetrics = metricsRes;
+
+          if (this.debugSessions.length > 0 && !this.selectedDebugSessionId) {
+            await this.selectDebugSession(this.debugSessions[0]);
+          } else if (this.selectedDebugSessionId) {
+            const current = this.debugSessions.find(s => s.id === this.selectedDebugSessionId);
+            if (current) await this.selectDebugSession(current);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load debug data', err);
+      }
+    },
+    async selectDebugSession(s) {
+      if (!s) return;
+      this.selectedDebugSessionId = s.id;
+      try {
+        if (window.API) {
+          const [detailRes, framesRes, bpRes, snapRes] = await Promise.all([
+            API.getDebugSession(s.id).catch(() => ({ session: s })),
+            API.listDebugFrames(s.id).catch(() => ({ items: [] })),
+            API.listDebugBreakpoints(s.id).catch(() => ({ items: [] })),
+            API.listDebugSnapshots(s.id).catch(() => ({ items: [] }))
+          ]);
+          this.selectedDebugSessionData = detailRes.session || s;
+          this.debugFrames = framesRes.items || [];
+          this.debugBreakpoints = bpRes.items || [];
+          this.debugSnapshots = snapRes.items || [];
+
+          if (this.debugFrames.length > 0) {
+            this.selectDebugFrame(this.debugFrames[0]);
+          } else {
+            this.selectedDebugFrameId = null;
+            this.selectedDebugFrameData = null;
+          }
+        } else {
+          this.selectedDebugSessionData = s;
+        }
+      } catch (_) {
+        this.selectedDebugSessionData = s;
+      }
+    },
+    selectDebugFrame(f) {
+      if (!f) return;
+      this.selectedDebugFrameId = f.id;
+      this.selectedDebugFrameData = f;
+    },
+    async createDebugSessionAction() {
+      if (!this.newDebugName.trim()) return;
+      this.isCreatingDebugSession = true;
+      try {
+        if (window.API) {
+          const res = await API.createDebugSession({
+            name: this.newDebugName.trim(),
+            target_model: this.newDebugTargetModel,
+            entrypoint: this.newDebugEntrypoint,
+            tags: this.newDebugTags
+          });
+          this.newDebugModalOpen = false;
+          this.newDebugName = '';
+          await this.loadDebugData();
+          if (res.session) {
+            await this.selectDebugSession(res.session);
+          }
+        }
+      } catch (err) {
+        alert(err.message || 'Failed to create debug session');
+      } finally {
+        this.isCreatingDebugSession = false;
+      }
+    },
+    async stepDebugAction(direction, steps = 1, targetStep = null) {
+      if (!this.selectedDebugSessionId) return;
+      this.isSteppingDebug = true;
+      try {
+        if (window.API) {
+          const res = await API.stepDebugSession(this.selectedDebugSessionId, {
+            direction,
+            steps,
+            target_step: targetStep
+          });
+          if (res.session) {
+            this.selectedDebugSessionData = res.session;
+          }
+          if (res.current_frame) {
+            this.selectDebugFrame(res.current_frame);
+          }
+          await this.loadDebugData();
+        }
+      } catch (err) {
+        alert(err.message || 'Step failed');
+      } finally {
+        this.isSteppingDebug = false;
+      }
+    },
+    async pauseDebugAction() {
+      if (!this.selectedDebugSessionId) return;
+      try {
+        if (window.API) {
+          await API.pauseDebugSession(this.selectedDebugSessionId);
+          await this.loadDebugData();
+        }
+      } catch (err) {
+        alert(err.message || 'Pause failed');
+      }
+    },
+    async resumeDebugAction() {
+      if (!this.selectedDebugSessionId) return;
+      try {
+        if (window.API) {
+          await API.resumeDebugSession(this.selectedDebugSessionId);
+          await this.loadDebugData();
+        }
+      } catch (err) {
+        alert(err.message || 'Resume failed');
+      }
+    },
+    async createBreakpointAction() {
+      if (!this.selectedDebugSessionId || !this.newBpName.trim()) return;
+      this.isCreatingBreakpoint = true;
+      try {
+        if (window.API) {
+          await API.createDebugBreakpoint(this.selectedDebugSessionId, {
+            name: this.newBpName.trim(),
+            condition_type: this.newBpConditionType,
+            condition_expr: this.newBpConditionExpr,
+            action: this.newBpAction
+          });
+          this.newBreakpointModalOpen = false;
+          this.newBpName = '';
+          this.newBpConditionExpr = '';
+          await this.loadDebugData();
+        }
+      } catch (err) {
+        alert(err.message || 'Failed to create breakpoint');
+      } finally {
+        this.isCreatingBreakpoint = false;
+      }
+    },
+    async toggleBreakpointAction(bp) {
+      if (!bp) return;
+      try {
+        if (window.API) {
+          await API.updateDebugBreakpoint(bp.id, { enabled: !bp.enabled });
+          await this.loadDebugData();
+        }
+      } catch (err) {
+        alert(err.message || 'Toggle failed');
+      }
+    },
+    async deleteBreakpointAction(bpId) {
+      if (!bpId) return;
+      try {
+        if (window.API) {
+          await API.deleteDebugBreakpoint(bpId);
+          await this.loadDebugData();
+        }
+      } catch (err) {
+        alert(err.message || 'Delete breakpoint failed');
+      }
+    },
+    async captureSnapshotAction() {
+      if (!this.selectedDebugSessionId) return;
+      try {
+        if (window.API) {
+          const currentStep = this.selectedDebugSessionData ? this.selectedDebugSessionData.current_step_index : 0;
+          await API.createDebugSnapshot(this.selectedDebugSessionId, {
+            label: `Snapshot at step ${currentStep}`,
+            snapshot_type: 'manual',
+            memory_snapshot_json: { heap_used_mb: 42.5, objects_count: 1280 },
+            env_snapshot_json: { NODE_ENV: 'development', RUNTIME: 'pocketbase' }
+          });
+          await this.loadDebugData();
+        }
+      } catch (err) {
+        alert(err.message || 'Snapshot failed');
+      }
+    },
+    async runReplaySimulation() {
+      if (!this.selectedDebugSessionId) return;
+      this.isReplayingSession = true;
+      try {
+        if (window.API) {
+          const res = await API.replayDebugSession(this.selectedDebugSessionId, {
+            from_step: 0,
+            to_step: this.selectedDebugSessionData ? this.selectedDebugSessionData.total_steps : 100
+          });
+          this.replayResult = res;
+          this.replayModalOpen = true;
+        }
+      } catch (err) {
+        alert(err.message || 'Replay simulation failed');
+      } finally {
+        this.isReplayingSession = false;
+      }
     }
   },
   template: `
@@ -547,6 +779,13 @@ const AgentsViewComponent = {
                 :class="activeTab === 'tdd' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs font-semibold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
               >
                 🧪 TDD & Mutation
+              </button>
+              <button
+                @click="activeTab = 'debugger'; loadDebugData()"
+                class="px-2 py-0.5 rounded-md font-medium transition-colors"
+                :class="activeTab === 'debugger' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs font-semibold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+              >
+                ⏱️ Debugger
               </button>
             </div>
 
@@ -928,6 +1167,245 @@ const AgentsViewComponent = {
           </div>
         </div>
 
+        <!-- TAB 6: Agent Time-Travel Debugger (Milestone 16 / Epic 37) -->
+        <div v-else-if="activeTab === 'debugger'" class="flex-1 flex flex-col min-h-0 bg-zinc-50/50 dark:bg-zinc-950/30 overflow-y-auto p-3 space-y-3 text-xs">
+          <!-- KPI Summary Cards -->
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <div class="p-2.5 bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Debug Sessions</div>
+              <div class="text-base font-mono font-bold text-zinc-800 dark:text-zinc-200 mt-0.5">{{ debugMetrics ? debugMetrics.total_sessions : debugSessions.length }}</div>
+              <div class="text-[10px] text-zinc-500">{{ debugMetrics ? debugMetrics.active_sessions : 0 }} active • {{ debugMetrics ? debugMetrics.paused_sessions : 0 }} paused</div>
+            </div>
+            <div class="p-2.5 bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Trace Frames</div>
+              <div class="text-base font-mono font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">{{ debugMetrics ? debugMetrics.total_trace_frames : debugFrames.length }}</div>
+              <div class="text-[10px] text-zinc-500">Fine-grained tool calls</div>
+            </div>
+            <div class="p-2.5 bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Breakpoints / Hits</div>
+              <div class="text-base font-mono font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">{{ debugMetrics ? debugMetrics.total_breakpoint_hits : 0 }}</div>
+              <div class="text-[10px] text-zinc-500">{{ debugMetrics ? debugMetrics.active_breakpoints : debugBreakpoints.length }} watchpoints active</div>
+            </div>
+            <div class="p-2.5 bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Error Interception</div>
+              <div class="text-base font-mono font-bold text-amber-600 dark:text-amber-400 mt-0.5">{{ debugMetrics ? debugMetrics.error_interception_rate_pct : 0 }}%</div>
+              <div class="text-[10px] text-zinc-500">{{ debugMetrics ? debugMetrics.error_frames_count : 0 }} errors caught</div>
+            </div>
+            <div class="p-2.5 bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Avg Latency & RAM</div>
+              <div class="text-base font-mono font-bold text-zinc-800 dark:text-zinc-200 mt-0.5">{{ debugMetrics ? debugMetrics.avg_step_duration_ms : 0 }}ms</div>
+              <div class="text-[10px] text-zinc-500">{{ debugMetrics ? debugMetrics.avg_memory_usage_mb : 0 }} MB / step</div>
+            </div>
+          </div>
+
+          <!-- Time-Travel Controls & Action Bar -->
+          <div class="flex items-center justify-between p-2.5 bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl flex-wrap gap-2">
+            <div class="flex items-center space-x-1.5">
+              <button @click="newDebugModalOpen = true" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center space-x-1 shadow-xs">
+                <span>+ New Session</span>
+              </button>
+              <button @click="newBreakpointModalOpen = true" :disabled="!selectedDebugSessionId" class="px-2.5 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50 text-zinc-800 dark:text-zinc-200 text-xs font-medium">
+                🛑 Add Breakpoint
+              </button>
+              <button @click="captureSnapshotAction" :disabled="!selectedDebugSessionId" class="px-2.5 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50 text-zinc-800 dark:text-zinc-200 text-xs font-medium">
+                📸 Snapshot
+              </button>
+            </div>
+
+            <!-- Time-Travel Step Navigation Scrubber -->
+            <div class="flex items-center space-x-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800">
+              <button @click="stepDebugAction('first')" :disabled="!selectedDebugSessionId || isSteppingDebug" title="First Step" class="p-1 rounded hover:bg-white dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 disabled:opacity-40">⏮️</button>
+              <button @click="stepDebugAction('prev')" :disabled="!selectedDebugSessionId || isSteppingDebug" title="Step Back" class="p-1 rounded hover:bg-white dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 disabled:opacity-40">◀️</button>
+              
+              <button v-if="selectedDebugSessionData && selectedDebugSessionData.status === 'paused'" @click="resumeDebugAction" title="Resume" class="px-2 py-0.5 rounded bg-emerald-600 text-white font-bold text-[10px]">▶️ Resume</button>
+              <button v-else @click="pauseDebugAction" :disabled="!selectedDebugSessionId" title="Pause" class="px-2 py-0.5 rounded bg-amber-600 text-white font-bold text-[10px]">⏸️ Pause</button>
+
+              <button @click="stepDebugAction('next')" :disabled="!selectedDebugSessionId || isSteppingDebug" title="Step Next" class="p-1 rounded hover:bg-white dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 disabled:opacity-40">▶️</button>
+              <button @click="stepDebugAction('last')" :disabled="!selectedDebugSessionId || isSteppingDebug" title="Last Step" class="p-1 rounded hover:bg-white dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300 disabled:opacity-40">⏭️</button>
+              
+              <div class="px-2 font-mono text-[11px] font-bold text-zinc-700 dark:text-zinc-300 border-l border-zinc-300 dark:border-zinc-700 ml-1">
+                Step {{ selectedDebugSessionData ? selectedDebugSessionData.current_step_index : 0 }} / {{ selectedDebugSessionData ? selectedDebugSessionData.total_steps : 0 }}
+              </div>
+
+              <button @click="runReplaySimulation" :disabled="!selectedDebugSessionId || isReplayingSession" class="px-2 py-0.5 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold text-[10px] ml-1">
+                {{ isReplayingSession ? 'Replaying...' : '🔄 Replay' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Main Split View: Sessions & Debug Workspace -->
+          <div class="flex-1 flex flex-col md:flex-row gap-3 min-h-0">
+            <!-- Left Column: Sessions List -->
+            <div class="w-full md:w-64 bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden flex flex-col">
+              <div class="p-2 border-b border-zinc-100 dark:border-zinc-800/80 font-bold text-xs text-zinc-500 uppercase tracking-wider flex items-center justify-between">
+                <span>Sessions ({{ debugSessions.length }})</span>
+                <button @click="loadDebugData" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">🔄</button>
+              </div>
+              <div class="flex-1 overflow-y-auto p-1.5 space-y-1">
+                <div v-if="debugSessions.length === 0" class="text-zinc-400 italic text-center p-4">No debug sessions.</div>
+                <div
+                  v-for="s in debugSessions"
+                  :key="s.id"
+                  @click="selectDebugSession(s)"
+                  class="p-2 rounded-lg cursor-pointer transition-all border text-left"
+                  :class="selectedDebugSessionId === s.id ? 'bg-indigo-50/60 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-800' : 'bg-transparent border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-900'"
+                >
+                  <div class="flex items-center justify-between">
+                    <span class="font-bold text-xs text-zinc-900 dark:text-zinc-100 truncate">{{ s.name }}</span>
+                    <span class="px-1.5 py-0.5 rounded text-[9px] font-mono uppercase font-bold" :class="s.status === 'active' ? 'bg-emerald-500/20 text-emerald-500' : s.status === 'paused' ? 'bg-amber-500/20 text-amber-500' : 'bg-zinc-500/20 text-zinc-400'">{{ s.status }}</span>
+                  </div>
+                  <div class="text-[10px] text-zinc-500 mt-1 flex items-center justify-between font-mono">
+                    <span>{{ s.target_model }}</span>
+                    <span>{{ s.total_steps }} steps</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Column: Subtabs & Inspector -->
+            <div class="flex-1 bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden flex flex-col min-w-0">
+              <!-- Subtabs Header -->
+              <div class="flex items-center border-b border-zinc-100 dark:border-zinc-800 p-2 gap-1 bg-zinc-50/50 dark:bg-zinc-900/30">
+                <button
+                  @click="activeDebugSubtab = 'trace'"
+                  class="px-2.5 py-1 rounded-md font-semibold text-xs transition-colors"
+                  :class="activeDebugSubtab === 'trace' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                >
+                  🧵 Trace Frames ({{ debugFrames.length }})
+                </button>
+                <button
+                  @click="activeDebugSubtab = 'state'"
+                  class="px-2.5 py-1 rounded-md font-semibold text-xs transition-colors"
+                  :class="activeDebugSubtab === 'state' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                >
+                  🔍 State & Variable Inspector
+                </button>
+                <button
+                  @click="activeDebugSubtab = 'breakpoints'"
+                  class="px-2.5 py-1 rounded-md font-semibold text-xs transition-colors"
+                  :class="activeDebugSubtab === 'breakpoints' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                >
+                  🛑 Breakpoints ({{ debugBreakpoints.length }})
+                </button>
+                <button
+                  @click="activeDebugSubtab = 'snapshots'"
+                  class="px-2.5 py-1 rounded-md font-semibold text-xs transition-colors"
+                  :class="activeDebugSubtab === 'snapshots' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                >
+                  📸 Snapshots ({{ debugSnapshots.length }})
+                </button>
+              </div>
+
+              <!-- Subtab 1: Trace Frames -->
+              <div v-if="activeDebugSubtab === 'trace'" class="flex-1 overflow-y-auto p-2.5 space-y-1">
+                <div v-if="debugFrames.length === 0" class="text-zinc-400 italic text-center p-6">No trace frames captured for this session yet.</div>
+                <div
+                  v-for="f in debugFrames"
+                  :key="f.id"
+                  @click="selectDebugFrame(f)"
+                  class="p-2 rounded-lg border text-left cursor-pointer transition-all flex items-center justify-between"
+                  :class="selectedDebugFrameId === f.id ? 'bg-indigo-50/50 dark:bg-indigo-950/30 border-indigo-300 dark:border-indigo-800' : 'bg-zinc-50/50 dark:bg-zinc-900/30 border-zinc-200/60 dark:border-zinc-800/60 hover:bg-zinc-100 dark:hover:bg-zinc-900'"
+                >
+                  <div class="flex items-center space-x-2 min-w-0">
+                    <span class="font-mono font-bold text-[11px] text-zinc-500">#{{ f.step_index }}</span>
+                    <span class="px-1.5 py-0.5 rounded text-[9px] font-mono uppercase font-bold" :class="f.event_type === 'error' ? 'bg-red-500/20 text-red-500' : f.event_type === 'breakpoint_hit' ? 'bg-amber-500/20 text-amber-500' : 'bg-indigo-500/20 text-indigo-500'">{{ f.event_type }}</span>
+                    <span class="font-bold text-xs text-zinc-800 dark:text-zinc-200 truncate">{{ f.action_name }}</span>
+                    <span v-if="f.is_breakpoint" class="px-1 py-0.5 rounded bg-red-600 text-white font-bold text-[9px]">🛑 BP HIT</span>
+                    <span v-if="f.error_message" class="px-1 py-0.5 rounded bg-red-500/20 text-red-400 font-mono text-[9px]">ERR</span>
+                  </div>
+                  <div class="flex items-center space-x-2 text-[10px] text-zinc-400 font-mono">
+                    <span>{{ f.duration_ms }}ms</span>
+                    <span>{{ f.memory_usage_mb }}MB</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Subtab 2: State & Variable Inspector -->
+              <div v-else-if="activeDebugSubtab === 'state'" class="flex-1 overflow-y-auto p-3 space-y-3 font-mono text-xs">
+                <div v-if="!selectedDebugFrameData" class="text-zinc-400 italic text-center p-6">Select a trace frame to inspect variable state.</div>
+                <div v-else class="space-y-3">
+                  <div class="p-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg">
+                    <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Frame Meta</div>
+                    <div class="text-zinc-700 dark:text-zinc-300">Step #{{ selectedDebugFrameData.step_index }} • Action: {{ selectedDebugFrameData.action_name }} • Caller: {{ selectedDebugFrameData.caller }}</div>
+                    <div v-if="selectedDebugFrameData.error_message" class="text-red-500 font-bold mt-1">Error: {{ selectedDebugFrameData.error_message }}</div>
+                  </div>
+
+                  <div class="p-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg">
+                    <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Variable State</div>
+                    <pre class="bg-zinc-100 dark:bg-black/50 p-2 rounded text-[11px] overflow-x-auto text-zinc-800 dark:text-zinc-200">{{ JSON.stringify(selectedDebugFrameData.variable_state_json || {}, null, 2) }}</pre>
+                  </div>
+
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div class="p-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg">
+                      <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Input Payload</div>
+                      <pre class="bg-zinc-100 dark:bg-black/50 p-2 rounded text-[10px] overflow-x-auto text-zinc-800 dark:text-zinc-200 max-h-40">{{ JSON.stringify(selectedDebugFrameData.input_payload_json || {}, null, 2) }}</pre>
+                    </div>
+                    <div class="p-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg">
+                      <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Output Payload</div>
+                      <pre class="bg-zinc-100 dark:bg-black/50 p-2 rounded text-[10px] overflow-x-auto text-zinc-800 dark:text-zinc-200 max-h-40">{{ JSON.stringify(selectedDebugFrameData.output_payload_json || {}, null, 2) }}</pre>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Subtab 3: Breakpoints -->
+              <div v-else-if="activeDebugSubtab === 'breakpoints'" class="flex-1 overflow-y-auto p-2.5 space-y-2">
+                <div class="flex items-center justify-between pb-1 border-b border-zinc-100 dark:border-zinc-800">
+                  <span class="font-bold text-xs text-zinc-500 uppercase tracking-wider">Watchpoints & Conditional Traps</span>
+                  <button @click="newBreakpointModalOpen = true" class="px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-[10px]">+ Add Breakpoint</button>
+                </div>
+                <div v-if="debugBreakpoints.length === 0" class="text-zinc-400 italic text-center p-6">No breakpoints registered for this session.</div>
+                <div
+                  v-for="bp in debugBreakpoints"
+                  :key="bp.id"
+                  class="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between"
+                >
+                  <div class="space-y-0.5">
+                    <div class="flex items-center space-x-1.5">
+                      <span class="font-bold text-xs text-zinc-800 dark:text-zinc-200">{{ bp.name }}</span>
+                      <span class="px-1.5 py-0.5 rounded text-[9px] font-mono uppercase font-bold bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">{{ bp.condition_type }}</span>
+                      <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500/20 text-amber-500">{{ bp.action }}</span>
+                    </div>
+                    <div v-if="bp.condition_expr" class="text-[10px] font-mono text-zinc-400">Expr: {{ bp.condition_expr }}</div>
+                    <div class="text-[10px] text-zinc-500 font-mono">Hits: {{ bp.hit_count }} • Last hit: {{ bp.last_hit_at || 'never' }}</div>
+                  </div>
+                  <div class="flex items-center space-x-1.5">
+                    <button
+                      @click="toggleBreakpointAction(bp)"
+                      class="px-2 py-1 rounded text-[10px] font-semibold"
+                      :class="bp.enabled ? 'bg-emerald-600 text-white' : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400'"
+                    >
+                      {{ bp.enabled ? 'Enabled' : 'Disabled' }}
+                    </button>
+                    <button @click="deleteBreakpointAction(bp.id)" class="px-2 py-1 rounded bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-white text-[10px] font-bold">✕</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Subtab 4: Snapshots -->
+              <div v-else-if="activeDebugSubtab === 'snapshots'" class="flex-1 overflow-y-auto p-2.5 space-y-2">
+                <div class="flex items-center justify-between pb-1 border-b border-zinc-100 dark:border-zinc-800">
+                  <span class="font-bold text-xs text-zinc-500 uppercase tracking-wider">Memory & Environment Snapshots</span>
+                  <button @click="captureSnapshotAction" class="px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-[10px]">📸 Capture Now</button>
+                </div>
+                <div v-if="debugSnapshots.length === 0" class="text-zinc-400 italic text-center p-6">No snapshots saved for this session.</div>
+                <div
+                  v-for="snap in debugSnapshots"
+                  :key="snap.id"
+                  class="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1"
+                >
+                  <div class="flex items-center justify-between">
+                    <span class="font-bold text-xs text-zinc-800 dark:text-zinc-200">{{ snap.label }}</span>
+                    <span class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">Step #{{ snap.step_index }}</span>
+                  </div>
+                  <div class="text-[10px] text-zinc-500 font-mono">Type: {{ snap.snapshot_type }} • Captured by: {{ snap.captured_by }}</div>
+                  <pre class="bg-zinc-100 dark:bg-black/50 p-1.5 rounded text-[10px] overflow-x-auto text-zinc-800 dark:text-zinc-200 max-h-24">{{ JSON.stringify(snap.memory_snapshot_json || {}, null, 2) }}</pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Synthesize TDD Modal -->
         <div v-if="newTddModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div class="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl">
@@ -1018,6 +1496,122 @@ const AgentsViewComponent = {
               <button @click="quarantineFlakyTestAction" :disabled="isQuarantining || !quarantineTestName.trim()" class="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-semibold">
                 {{ isQuarantining ? 'Quarantining...' : 'Quarantine Test' }}
               </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- New Debug Session Modal (Milestone 16 / Epic 37) -->
+        <div v-if="newDebugModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div class="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl">
+            <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+              <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">⏱️ New Time-Travel Debug Session</h3>
+              <button @click="newDebugModalOpen = false" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-sm">✕</button>
+            </div>
+            <div class="space-y-3">
+              <div>
+                <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 mb-1">Session Name / Target Workflow</label>
+                <input v-model="newDebugName" type="text" placeholder="e.g. Flomaster Tool Invocations Debug Run" class="w-full px-3 py-1.5 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-indigo-500" />
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 mb-1">Target Model</label>
+                <select v-model="newDebugTargetModel" class="w-full px-3 py-1.5 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-indigo-500">
+                  <option value="claude-fable-5">claude-fable-5 (Default Coordinator)</option>
+                  <option value="gpt-5.5">gpt-5.5 (Fast Implementer)</option>
+                  <option value="hermes-3-70b">hermes-3-70b (Local Fast Model)</option>
+                  <option value="custom">custom / flomaster-core</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 mb-1">Entrypoint Function / Routine</label>
+                <input v-model="newDebugEntrypoint" type="text" placeholder="e.g. main_loop or execute_tool_call" class="w-full px-3 py-1.5 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-indigo-500" />
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 mb-1">Tags (Comma-separated)</label>
+                <input v-model="newDebugTags" type="text" placeholder="e.g. tool_call, memory, time_travel" class="w-full px-3 py-1.5 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-indigo-500" />
+              </div>
+            </div>
+            <div class="flex items-center justify-end space-x-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+              <button @click="newDebugModalOpen = false" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800">Cancel</button>
+              <button @click="createDebugSessionAction" :disabled="isCreatingDebugSession || !newDebugName.trim()" class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold">
+                {{ isCreatingDebugSession ? 'Creating...' : 'Start Session' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add Breakpoint Modal (Milestone 16 / Epic 37) -->
+        <div v-if="newBreakpointModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div class="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl">
+            <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+              <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">🛑 Add Watchpoint Breakpoint</h3>
+              <button @click="newBreakpointModalOpen = false" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-sm">✕</button>
+            </div>
+            <div class="space-y-3">
+              <div>
+                <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 mb-1">Breakpoint Name</label>
+                <input v-model="newBpName" type="text" placeholder="e.g. Pause on File Write Error" class="w-full px-3 py-1.5 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-red-500" />
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 mb-1">Condition Trigger</label>
+                <select v-model="newBpConditionType" class="w-full px-3 py-1.5 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-red-500">
+                  <option value="always">Always (Every Frame)</option>
+                  <option value="on_error">On Error (error_message or event_type=error)</option>
+                  <option value="on_tool">On Specific Tool / Action (contains expr)</option>
+                  <option value="on_file">On File Path Touched</option>
+                  <option value="expression">On Expression Match</option>
+                </select>
+              </div>
+              <div v-if="newBpConditionType !== 'always' && newBpConditionType !== 'on_error'">
+                <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 mb-1">Filter / Match Expression</label>
+                <input v-model="newBpConditionExpr" type="text" placeholder="e.g. write_file or ValidationError" class="w-full px-3 py-1.5 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-red-500" />
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 mb-1">Trigger Action</label>
+                <select v-model="newBpAction" class="w-full px-3 py-1.5 text-xs rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-red-500">
+                  <option value="pause">Pause Execution (Break)</option>
+                  <option value="snapshot">Capture State Snapshot</option>
+                  <option value="log">Log Warning</option>
+                  <option value="alert">Dispatch Alert</option>
+                </select>
+              </div>
+            </div>
+            <div class="flex items-center justify-end space-x-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+              <button @click="newBreakpointModalOpen = false" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800">Cancel</button>
+              <button @click="createBreakpointAction" :disabled="isCreatingBreakpoint || !newBpName.trim()" class="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-xs font-semibold">
+                {{ isCreatingBreakpoint ? 'Adding...' : 'Set Breakpoint' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Replay Simulation Modal (Milestone 16 / Epic 37) -->
+        <div v-if="replayModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div class="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-xl">
+            <div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+              <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">🔄 Time-Travel Replay Simulation</h3>
+              <button @click="replayModalOpen = false" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-sm">✕</button>
+            </div>
+            <div v-if="replayResult" class="space-y-3 font-mono text-xs">
+              <div class="p-2.5 bg-zinc-50 dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-1">
+                <div class="font-bold text-zinc-800 dark:text-zinc-200">{{ replayResult.session_name }}</div>
+                <div class="text-[11px] text-zinc-500">Replayed {{ replayResult.frame_count }} frames (Steps {{ replayResult.from_step }} -> {{ replayResult.to_step }})</div>
+                <div class="flex items-center space-x-3 text-[10px] pt-1">
+                  <span class="text-indigo-500 font-bold">Duration: {{ replayResult.cumulative_duration_ms }}ms</span>
+                  <span class="text-emerald-500 font-bold">Breakpoints Hit: {{ replayResult.breakpoint_hit_count }}</span>
+                  <span class="text-red-500 font-bold">Errors: {{ replayResult.error_count }}</span>
+                </div>
+              </div>
+              <div class="max-h-48 overflow-y-auto space-y-1 p-1 bg-zinc-100 dark:bg-black/40 rounded-lg">
+                <div v-for="t in replayResult.replay_timeline" :key="t.step_index" class="p-1.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+                  <span class="text-[10px] text-zinc-400">#{{ t.step_index }} [{{ t.event_type }}] {{ t.action_name }}</span>
+                  <span v-if="t.has_error" class="text-[9px] text-red-500 font-bold">ERR</span>
+                  <span v-else-if="t.is_breakpoint" class="text-[9px] text-amber-500 font-bold">BP</span>
+                  <span v-else class="text-[9px] text-emerald-500 font-bold">OK</span>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center justify-end space-x-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+              <button @click="replayModalOpen = false" class="px-4 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-semibold">Close</button>
             </div>
           </div>
         </div>

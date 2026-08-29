@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "ProjectBase API",
-    "version": "1.35.0",
+    "version": "1.36.0",
     "description": "High-performance, ultra-lightweight Plane & Linear alternative for multi-project Kanban, sprint cycles, and autonomous AI agent orchestration.",
     "contact": {
       "name": "Andrian Balanescu",
@@ -826,7 +826,7 @@
                   "properties": {
                     "version": {
                       "type": "string",
-                      "example": "1.35.0"
+                      "example": "1.36.0"
                     },
                     "service": {
                       "type": "string",
@@ -12714,6 +12714,481 @@
         "responses": {
           "200": {
             "description": "Fleet TDD metrics"
+          }
+        }
+      }
+    },
+    "/projectbase/debug/sessions": {
+      "get": {
+        "tags": [
+          "Autonomous Agent Time-Travel Debugger"
+        ],
+        "summary": "List agent debug sessions with filters",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "issue_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "agent_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of debug sessions"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Autonomous Agent Time-Travel Debugger"
+        ],
+        "summary": "Create and initialize an agent debug session",
+        "responses": {
+          "201": {
+            "description": "Debug session created"
+          }
+        }
+      }
+    },
+    "/projectbase/debug/sessions/{id}": {
+      "get": {
+        "tags": [
+          "Autonomous Agent Time-Travel Debugger"
+        ],
+        "summary": "Get debug session details, recent frames, breakpoints, and snapshots",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Debug session details"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Autonomous Agent Time-Travel Debugger"
+        ],
+        "summary": "Update debug session status or metadata",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Debug session updated"
+          }
+        }
+      }
+    },
+    "/projectbase/debug/sessions/{id}/step": {
+      "post": {
+        "tags": [
+          "Autonomous Agent Time-Travel Debugger"
+        ],
+        "summary": "Step forward/backward/goto in agent execution time-travel",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Step executed"
+          }
+        }
+      }
+    },
+    "/projectbase/debug/sessions/{id}/pause": {
+      "post": {
+        "tags": [
+          "Autonomous Agent Time-Travel Debugger"
+        ],
+        "summary": "Pause debug session execution",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Debug session paused"
+          }
+        }
+      }
+    },
+    "/projectbase/debug/sessions/{id}/resume": {
+      "post": {
+        "tags": [
+          "Autonomous Agent Time-Travel Debugger"
+        ],
+        "summary": "Resume debug session execution",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Debug session resumed"
+          }
+        }
+      }
+    },
+    "/projectbase/debug/sessions/{id}/frames": {
+      "get": {
+        "tags": [
+          "Autonomous Agent Time-Travel Debugger"
+        ],
+        "summary": "List execution trace frames for a debug session",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "event_type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "min_step",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "max_step",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of trace frames"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Autonomous Agent Time-Travel Debugger"
+        ],
+        "summary": "Record and ingest an execution trace frame (triggers breakpoints)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Trace frame recorded"
+          }
+        }
+      }
+    },
+    "/projectbase/debug/sessions/{id}/frames/{frameId}": {
+      "get": {
+        "tags": [
+          "Autonomous Agent Time-Travel Debugger"
+        ],
+        "summary": "Get specific trace frame payload and variable state",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "frameId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Trace frame details"
+          }
+        }
+      }
+    },
+    "/projectbase/debug/sessions/{id}/breakpoints": {
+      "get": {
+        "tags": [
+          "Autonomous Agent Time-Travel Debugger"
+        ],
+        "summary": "List registered breakpoints for debug session",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of breakpoints"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Autonomous Agent Time-Travel Debugger"
+        ],
+        "summary": "Register a conditional breakpoint or watchpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Breakpoint created"
+          }
+        }
+      }
+    },
+    "/projectbase/debug/breakpoints/{id}": {
+      "patch": {
+        "tags": [
+          "Autonomous Agent Time-Travel Debugger"
+        ],
+        "summary": "Update or toggle a breakpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Breakpoint updated"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Autonomous Agent Time-Travel Debugger"
+        ],
+        "summary": "Delete a breakpoint",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Breakpoint deleted"
+          }
+        }
+      }
+    },
+    "/projectbase/debug/sessions/{id}/snapshots": {
+      "get": {
+        "tags": [
+          "Autonomous Agent Time-Travel Debugger"
+        ],
+        "summary": "List state snapshots for a debug session",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of snapshots"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Autonomous Agent Time-Travel Debugger"
+        ],
+        "summary": "Capture a memory/state snapshot for a debug session",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "State snapshot created"
+          }
+        }
+      }
+    },
+    "/projectbase/debug/sessions/{id}/replay": {
+      "post": {
+        "tags": [
+          "Autonomous Agent Time-Travel Debugger"
+        ],
+        "summary": "Simulate and replay execution trace timeline",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Replay simulation result"
+          }
+        }
+      }
+    },
+    "/projectbase/debug/metrics": {
+      "get": {
+        "tags": [
+          "Autonomous Agent Time-Travel Debugger"
+        ],
+        "summary": "Get workspace-wide agent debugging metrics, frame statistics, and error rates",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Debug metrics"
           }
         }
       }

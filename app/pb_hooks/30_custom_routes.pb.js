@@ -5,7 +5,7 @@ routerAdd("GET", "/api/projectbase/health", (e) => {
     return e.json(200, {
         status: "healthy",
         service: "ProjectBase",
-        version: "1.35.0",
+        version: "1.36.0",
         engine: "PocketBase + Vue 3",
         license: "MIT",
         open_source: true,
@@ -24,7 +24,7 @@ routerAdd("POST", "/api/projectbase/health", (e) => {
 
 routerAdd("GET", "/api/projectbase/version", (e) => {
     return e.json(200, {
-        version: "1.35.0",
+        version: "1.36.0",
         service: "ProjectBase",
         license: "MIT",
         open_source: true

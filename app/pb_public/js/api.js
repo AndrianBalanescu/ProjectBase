@@ -3561,5 +3561,190 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to get TDD metrics');
     return data;
+  },
+
+  // Agent Time-Travel Debugger APIs (Milestone 16 / Epic 37)
+  async listDebugSessions(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/debug/sessions${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list debug sessions');
+    return data;
+  },
+
+  async createDebugSession(payload) {
+    const res = await fetch('/api/projectbase/debug/sessions', {
+      method: 'POST',
+      headers: { ...this._authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create debug session');
+    return data;
+  },
+
+  async getDebugSession(id) {
+    const res = await fetch(`/api/projectbase/debug/sessions/${encodeURIComponent(id)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get debug session');
+    return data;
+  },
+
+  async updateDebugSession(id, payload) {
+    const res = await fetch(`/api/projectbase/debug/sessions/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { ...this._authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to update debug session');
+    return data;
+  },
+
+  async stepDebugSession(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/debug/sessions/${encodeURIComponent(id)}/step`, {
+      method: 'POST',
+      headers: { ...this._authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to step debug session');
+    return data;
+  },
+
+  async pauseDebugSession(id) {
+    const res = await fetch(`/api/projectbase/debug/sessions/${encodeURIComponent(id)}/pause`, {
+      method: 'POST',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to pause debug session');
+    return data;
+  },
+
+  async resumeDebugSession(id) {
+    const res = await fetch(`/api/projectbase/debug/sessions/${encodeURIComponent(id)}/resume`, {
+      method: 'POST',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to resume debug session');
+    return data;
+  },
+
+  async listDebugFrames(id, params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/debug/sessions/${encodeURIComponent(id)}/frames${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list debug frames');
+    return data;
+  },
+
+  async recordDebugFrame(id, payload) {
+    const res = await fetch(`/api/projectbase/debug/sessions/${encodeURIComponent(id)}/frames`, {
+      method: 'POST',
+      headers: { ...this._authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to record debug frame');
+    return data;
+  },
+
+  async getDebugFrame(id, frameId) {
+    const res = await fetch(`/api/projectbase/debug/sessions/${encodeURIComponent(id)}/frames/${encodeURIComponent(frameId)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get debug frame');
+    return data;
+  },
+
+  async listDebugBreakpoints(id) {
+    const res = await fetch(`/api/projectbase/debug/sessions/${encodeURIComponent(id)}/breakpoints`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list breakpoints');
+    return data;
+  },
+
+  async createDebugBreakpoint(id, payload) {
+    const res = await fetch(`/api/projectbase/debug/sessions/${encodeURIComponent(id)}/breakpoints`, {
+      method: 'POST',
+      headers: { ...this._authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create breakpoint');
+    return data;
+  },
+
+  async updateDebugBreakpoint(id, payload) {
+    const res = await fetch(`/api/projectbase/debug/breakpoints/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { ...this._authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to update breakpoint');
+    return data;
+  },
+
+  async deleteDebugBreakpoint(id) {
+    const res = await fetch(`/api/projectbase/debug/breakpoints/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete breakpoint');
+    return data;
+  },
+
+  async listDebugSnapshots(id) {
+    const res = await fetch(`/api/projectbase/debug/sessions/${encodeURIComponent(id)}/snapshots`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list debug snapshots');
+    return data;
+  },
+
+  async createDebugSnapshot(id, payload) {
+    const res = await fetch(`/api/projectbase/debug/sessions/${encodeURIComponent(id)}/snapshots`, {
+      method: 'POST',
+      headers: { ...this._authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create debug snapshot');
+    return data;
+  },
+
+  async replayDebugSession(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/debug/sessions/${encodeURIComponent(id)}/replay`, {
+      method: 'POST',
+      headers: { ...this._authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to replay debug session');
+    return data;
+  },
+
+  async getDebugMetrics(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/debug/metrics${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get debug metrics');
+    return data;
   }
 };

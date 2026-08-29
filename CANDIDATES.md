@@ -326,3 +326,13 @@
 - [x] 8 FastMCP JSON-RPC 2.0 tools (`synthesize_tdd_tests`, `run_tdd_suite`, `list_tdd_suites`, `get_tdd_suite_details`, `run_mutation_test`, `quarantine_flaky_test`, `list_quarantined_tests`, `get_fleet_test_coverage`)
 - [x] Frontend AgentsView **🧪 TDD & Mutation Matrix** dashboard (`activeTab === 'tdd'`) with 5 KPI summary cards (TDD Suites, Mutation Score %, Quarantined Flakes, Fleet Coverage %, Avg Suite Time), split-pane suite & cases explorer, 4 interactive subtabs (🧪 Suites & Cases, 🧬 Mutation Matrix, 🔒 Flaky Quarantine Vault, 🎯 Coverage & Gaps), and 3 interactive modals (+ Synthesize Suite, Mutate Code, Quarantine Flake)
 - [x] Comprehensive automated test suite `tests/test_tdd_mutation_engine.py` with 8/8 passing assertions, 520 total passing tests across 41 files, OpenAPI static drift validation, and 100% frontend guard pass verification
+
+---
+
+## Milestone (Cycle 40)
+**Epic 37 – Autonomous Agent Time-Travel Debugger, Execution Trace Replay, Breakpoint Watchpoints & State Snapshot Engine (✅ Done)**
+- [x] Schema migration (`1710000050_add_agent_time_travel_debugger.js`) introducing `debug_sessions`, `debug_trace_frames`, `debug_breakpoints`, and `debug_state_snapshots` collections
+- [x] Backend engine hook (`app/pb_hooks/121_agent_time_travel_debugger.pb.js`) with 18 high-performance REST API endpoints for fine-grained execution trace frame ingestion, time-travel step scrubbing, conditional breakpoint watchpoints, memory/state snapshot comparison, interactive replay simulation, and workspace debugging telemetry
+- [x] 8 FastMCP JSON-RPC 2.0 tools (`start_debug_session`, `record_debug_trace_frame`, `list_debug_sessions`, `get_debug_session_trace`, `step_debug_session`, `set_debug_breakpoint`, `capture_debug_state_snapshot`, `get_debug_workspace_metrics`)
+- [x] Frontend AgentsView **⏱️ Time-Travel Debugger** dashboard (`activeTab === 'debugger'`) with 5 KPI summary cards (Debug Sessions, Trace Frames, Breakpoint Hit Rate, Intercepted Errors, Avg Latency & RAM), split-pane session explorer, 4 interactive subtabs (🧵 Trace Frames & Call Stack, 🔍 State & Variable Inspector, 🛑 Breakpoints & Watchpoints, 📸 State Snapshots), time-travel scrubber controls (⏮️ First, ◀️ Prev, ⏸️ Pause / ▶️ Resume, ▶️ Next, ⏭️ Last, 🔄 Replay, 📸 Snapshot), and 3 interactive modals (+ New Debug Session, + Add Breakpoint, Time-Travel Replay Simulation)
+- [x] Comprehensive automated test suite `tests/test_agent_time_travel_debugger.py` with 8/8 passing assertions, 528 total passing tests across 42 files, OpenAPI static drift validation, and 100% headless Playwright browser E2E verification

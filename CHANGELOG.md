@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.36.0] - 2026-08-28 - Cycle 40
+### Added
+- **Autonomous Agent Time-Travel Debugger, Execution Trace Replay, Breakpoint Watchpoints & State Snapshot Engine (Milestone 16 / Epic 37):**
+  - Schema migration (`1710000050_add_agent_time_travel_debugger.js`) introducing 4 high-assurance debugging collections: `debug_sessions`, `debug_trace_frames`, `debug_breakpoints`, and `debug_state_snapshots`.
+  - Backend engine hook (`app/pb_hooks/121_agent_time_travel_debugger.pb.js`) with 18 high-performance REST API endpoints:
+    - `GET /api/projectbase/debug/sessions` & `POST /api/projectbase/debug/sessions` for listing and creating agent debug sessions.
+    - `GET /api/projectbase/debug/sessions/{id}` & `PATCH /api/projectbase/debug/sessions/{id}` for retrieving session details, recent frames, and updating session metadata.
+    - `POST /api/projectbase/debug/sessions/{id}/step` for stepping forward, backward, or to a specific step index in execution time-travel.
+    - `POST /api/projectbase/debug/sessions/{id}/pause` & `POST /api/projectbase/debug/sessions/{id}/resume` for pausing and resuming execution.
+    - `GET /api/projectbase/debug/sessions/{id}/frames` & `POST /api/projectbase/debug/sessions/{id}/frames` for listing and ingesting trace frames (evaluating and triggering active conditional breakpoints).
+    - `GET /api/projectbase/debug/sessions/{id}/frames/{frameId}` for inspecting specific frame payloads and variable states.
+    - `GET /api/projectbase/debug/sessions/{id}/breakpoints` & `POST /api/projectbase/debug/sessions/{id}/breakpoints` for managing conditional watchpoints.
+    - `PATCH /api/projectbase/debug/breakpoints/{id}` & `DELETE /api/projectbase/debug/breakpoints/{id}` for toggling and deleting breakpoints.
+    - `GET /api/projectbase/debug/sessions/{id}/snapshots` & `POST /api/projectbase/debug/sessions/{id}/snapshots` for capturing memory and environment state snapshots.
+    - `POST /api/projectbase/debug/sessions/{id}/replay` for simulating execution trace replays and calculating cumulative metrics.
+    - `GET /api/projectbase/debug/metrics` for workspace-wide aggregate debugging telemetry.
+  - 8 FastMCP JSON-RPC 2.0 tools in `scripts/mcp_server.py` and `app/pb_hooks/91_mcp_server.pb.js`: `start_debug_session`, `record_debug_trace_frame`, `list_debug_sessions`, `get_debug_session_trace`, `step_debug_session`, `set_debug_breakpoint`, `capture_debug_state_snapshot`, `get_debug_workspace_metrics`.
+  - Frontend AgentsView **⏱️ Time-Travel Debugger** dashboard (`activeTab === 'debugger'`) with 5 KPI summary cards (Debug Sessions, Trace Frames, Breakpoint Hit Rate, Intercepted Errors, Avg Latency & RAM), split-pane session explorer, 4 interactive subtabs (🧵 Trace Frames & Call Stack, 🔍 State & Variable Inspector, 🛑 Breakpoints & Watchpoints, 📸 State Snapshots), time-travel scrubber controls (⏮️ First, ◀️ Prev, ⏸️ Pause / ▶️ Resume, ▶️ Next, ⏭️ Last, 🔄 Replay, 📸 Snapshot), and 3 interactive modals (+ New Debug Session, + Add Breakpoint, Time-Travel Replay Simulation).
+  - Comprehensive automated test suite `tests/test_agent_time_travel_debugger.py` with 8/8 passing assertions, 528 total passing tests across 42 files, OpenAPI static drift validation, and 100% headless Playwright browser E2E verification.
+
 ## [1.35.0] - 2026-08-28 - Cycle 39
 ### Added
 - **Autonomous Agent Test-Driven Development (TDD) Synthesizer, Mutation Testing Matrix, Flaky Test Quarantine & Coverage Sentinel Engine (Milestone 15 / Epic 36):**
