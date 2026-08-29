@@ -275,14 +275,16 @@ const App = {
     },
     async signIn(e) {
       this.authError = '';
-      let email = (this.loginEmail || '').trim();
-      let password = this.loginPassword || '';
+      let email = '';
+      let password = '';
       try {
         const emailEl = document.getElementById('login-email') || document.querySelector('input[type="email"]');
         const passEl = document.getElementById('login-password') || document.querySelector('input[type="password"]');
-        if (emailEl && emailEl.value && !email) email = emailEl.value.trim();
-        if (passEl && passEl.value && !password) password = passEl.value;
+        if (emailEl && emailEl.value) email = emailEl.value.trim();
+        if (passEl && passEl.value) password = passEl.value;
       } catch (domErr) {}
+      if (!email) email = (this.loginEmail || '').trim();
+      if (!password) password = this.loginPassword || '';
       if (!email || !password) {
         this.authError = 'Please enter your email and password.';
         return;
