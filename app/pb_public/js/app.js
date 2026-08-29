@@ -159,6 +159,9 @@ const App = {
       selectedCycleId: null,
       drawerWidthOverride: null,
 
+      // Deep link initialization guard
+      isInitialRouting: true,
+
       // In-app notifications inbox
       notifications: [],
       isNotificationsOpen: false,
@@ -206,8 +209,13 @@ const App = {
     this.isAuthenticated = !!API.client.authStore.isValid;
     this.authReady = true;
     if (this.isAuthenticated) {
+      this.isInitialRouting = true;
       await this.loadAllData();
+      await this.applyRoute();
+      this.isInitialRouting = false;
       this.setupRealtime();
+    } else {
+      this.isInitialRouting = false;
     }
     this.setupKeyboardShortcuts();
 
@@ -219,7 +227,6 @@ const App = {
     window.addEventListener('offline', this.handleOffline);
 
     nextTick(() => {
-      this.applyRoute();
       if (window.lucide) window.lucide.createIcons();
     });
   },
@@ -300,9 +307,11 @@ const App = {
         }
         this.isAuthenticated = true;
         this.loginPassword = '';
+        this.isInitialRouting = true;
         await this.loadAllData();
         this.setupRealtime();
         await this.applyRoute();
+        this.isInitialRouting = false;
       } catch (err) {
         this.authError = err?.response?.message || err?.message || 'Unable to sign in with those credentials.';
       }
@@ -326,10 +335,12 @@ const App = {
         this.isAuthenticated = true;
         this.loginPassword = '';
         this.signupPasswordConfirm = '';
+        this.isInitialRouting = true;
         await this.loadAllData();
         this.setupRealtime();
         // Same deep-link handling as signIn: land on the hashed view.
         await this.applyRoute();
+        this.isInitialRouting = false;
         this.showToast('Welcome! You are in the shared demo workspace — press C to create an issue or I to import yours.', 'success');
         // First-run onboarding: show the welcome guide once per browser after
         // a successful sign-up, and re-allow it when the session signs out.
@@ -729,6 +740,7 @@ const App = {
     },
 
     syncRoute() {
+      if (this.isInitialRouting || !this.isAuthenticated) return;
       const proj = this.currentProject ? this.currentProject.identifier.toLowerCase() : '';
       const viewMap = { board: 'board', list: 'list', cycles: 'cycles', timeline: 'timeline', projects: 'projects', stats: 'stats', docs: 'docs', milestones: 'milestones', portfolio: 'portfolio', agents: 'agents' };
       const v = viewMap[this.currentView] || 'board';

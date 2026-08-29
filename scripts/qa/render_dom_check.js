@@ -45,6 +45,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     if (m.type() === 'error') {
       // Designed fallback: app tries users auth first, then _superusers.
       if (m.text().includes('users/auth-with-password')) return;
+      if (m.text().includes('ERR_CERT_VERIFIER_CHANGED') || m.text().includes('fonts.googleapis.com') || m.text().includes('fonts.gstatic.com')) return;
       consoleErrors.push(m.text().slice(0, 200));
     }
   });
@@ -53,6 +54,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   page.on('requestfailed', (r) => {
     // SSE stream teardown on navigation/reload is expected, not a failure.
     if (r.url().includes('/api/realtime')) return;
+    if (r.url().includes('fonts.googleapis.com') || r.url().includes('fonts.gstatic.com')) return;
     if (ignoredCleanupUrls.has(r.url())) return;
 
     failedReqs.push(r.url().slice(0, 120));

@@ -295,7 +295,7 @@ const KanbanBoardComponent = {
             <i data-lucide="search" class="w-3.5 h-3.5 text-zinc-400 absolute left-2 top-2"></i>
             <input
               v-model="searchModel"
-              placeholder="Filter tasks & sessions..."
+              placeholder="Filter tasks..."
               class="pl-7 pr-2.5 py-1 rounded-md bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 w-44 sm:w-56"
             />
           </div>
@@ -516,7 +516,7 @@ const KanbanBoardComponent = {
                     class="w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0"
                     :class="isSelected(issue) ? 'bg-zinc-900 dark:bg-zinc-100 border-zinc-900 dark:border-zinc-100 text-white dark:text-zinc-900' : 'border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-900 text-transparent hover:border-zinc-400 dark:hover:border-zinc-400'"
                     @click.stop="toggleSelect(issue)"
-                    title="Select task"
+                    :title="isSelected(issue) ? 'Deselect (Esc)' : 'Select for bulk actions'"
                   >
                     <i data-lucide="check" class="w-2.5 h-2.5 stroke-[3]"></i>
                   </button>
@@ -528,9 +528,12 @@ const KanbanBoardComponent = {
                   <!-- Blocked Badge -->
                   <span
                     v-if="isBlocked(issue)"
-                    class="px-1 py-0.5 rounded bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-[9px] text-rose-600 dark:text-rose-400 font-semibold"
+                    class="px-1 py-0.5 rounded border text-[9px] font-semibold bg-red-50 dark:bg-red-950/60 border-red-200 dark:border-red-900/70 text-red-600 dark:text-red-400 shrink-0 flex items-center gap-0.5"
                     title="Blocked by another issue"
-                  >Blocked</span>
+                  >
+                    <i data-lucide="lock" class="w-2.5 h-2.5 inline-block"></i>
+                    Blocked
+                  </span>
 
                   <!-- Estimate Points Pill -->
                   <span
