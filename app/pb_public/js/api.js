@@ -3878,5 +3878,150 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to get architecture metrics');
     return data;
+  },
+
+  // Performance Profiler & Flamegraph APIs (Milestone 18 / Epic 39 / v1.38.0)
+  async listPerfProfiles(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/perf/profiles${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list performance profiles');
+    return data;
+  },
+
+  async createPerfProfile(payload = {}) {
+    const res = await fetch('/api/projectbase/perf/profiles', {
+      method: 'POST',
+      headers: { ...this._authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create performance profile');
+    return data;
+  },
+
+  async getPerfProfile(id) {
+    const res = await fetch(`/api/projectbase/perf/profiles/${encodeURIComponent(id)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get performance profile');
+    return data;
+  },
+
+  async updatePerfProfile(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/perf/profiles/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { ...this._authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to update performance profile');
+    return data;
+  },
+
+  async deletePerfProfile(id) {
+    const res = await fetch(`/api/projectbase/perf/profiles/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete performance profile');
+    return data;
+  },
+
+  async listPerfSpans(profileId, params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/perf/profiles/${encodeURIComponent(profileId)}/spans${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list spans');
+    return data;
+  },
+
+  async recordPerfSpans(profileId, payload = {}) {
+    const res = await fetch(`/api/projectbase/perf/profiles/${encodeURIComponent(profileId)}/spans`, {
+      method: 'POST',
+      headers: { ...this._authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to record spans');
+    return data;
+  },
+
+  async listPerfHeapSnapshots(profileId) {
+    const res = await fetch(`/api/projectbase/perf/profiles/${encodeURIComponent(profileId)}/heap-snapshots`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list heap snapshots');
+    return data;
+  },
+
+  async capturePerfHeapSnapshot(profileId, payload = {}) {
+    const res = await fetch(`/api/projectbase/perf/profiles/${encodeURIComponent(profileId)}/heap-snapshots`, {
+      method: 'POST',
+      headers: { ...this._authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to capture heap snapshot');
+    return data;
+  },
+
+  async analyzePerfProfile(profileId) {
+    const res = await fetch(`/api/projectbase/perf/profiles/${encodeURIComponent(profileId)}/analyze`, {
+      method: 'POST',
+      headers: { ...this._authHeaders(), 'Content-Type': 'application/json' }
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to analyze performance profile');
+    return data;
+  },
+
+  async listPerfBottlenecks(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/perf/bottlenecks${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list bottlenecks');
+    return data;
+  },
+
+  async updatePerfBottleneck(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/perf/bottlenecks/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { ...this._authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to update bottleneck');
+    return data;
+  },
+
+  async synthesizePerfOptimization(payload = {}) {
+    const res = await fetch('/api/projectbase/perf/synthesize-optimization', {
+      method: 'POST',
+      headers: { ...this._authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to synthesize optimization');
+    return data;
+  },
+
+  async getFleetPerfMetrics(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/perf/fleet-metrics${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get fleet performance metrics');
+    return data;
   }
 };

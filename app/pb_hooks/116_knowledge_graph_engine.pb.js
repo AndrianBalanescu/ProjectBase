@@ -599,7 +599,7 @@ routerAdd("POST", "/api/projectbase/knowledge/verify-invariants", (e) => {
         const mcpSessionId = body.mcp_session_id || "";
         const agentName = body.agent_name || "flomaster";
 
-        const activeInvariants = e.app.findRecordsByFilter("architectural_invariants", "is_active = true", "-created", 100, 0);
+        const activeInvariants = e.app.findRecordsByFilter("architectural_invariants", "is_active = true", "-created", 1000, 0);
 
         let violations = [];
         let passedRules = [];

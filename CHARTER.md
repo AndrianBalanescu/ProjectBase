@@ -31,3 +31,6 @@
 - [x] Autonomous Agent Release Flight Control, Deployment Canary Gates, Production Health Probes & Self-Healing Rollback Engine (Milestone 13)
 - [x] Autonomous Agent Security Red-Team, Secret Leak Sentinel, AST Vulnerability Probing & Automated Remediation Hardening Engine (Milestone 14)
 - [x] Autonomous Agent Test-Driven Development (TDD) Synthesizer, Mutation Testing Matrix, Flaky Test Quarantine & Coverage Sentinel Engine (Milestone 15)
+- [x] Autonomous Agent Time-Travel Debugger, Execution Trace Replay, Breakpoint Watchpoints & State Snapshot Engine (Milestone 16)
+- [x] Autonomous Agent Dynamic Architecture Graph, AST Blast-Radius Impact Simulator & Breaking Change Sentinel Engine (Milestone 17)
+- [x] Autonomous Agent Performance Profiler, Memory Leak Detection, Bottleneck Sentinel & Flamegraph Engine (Milestone 18)

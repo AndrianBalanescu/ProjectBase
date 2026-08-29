@@ -13633,6 +13633,200 @@
           }
         }
       }
+    },
+    "/projectbase/perf/profiles": {
+      "get": {
+        "tags": [
+          "Autonomous Agent Performance Profiler & Flamegraph Engine"
+        ],
+        "summary": "List performance profiling profiles",
+        "parameters": [
+          { "name": "project_id", "in": "query", "schema": { "type": "string" } },
+          { "name": "session_id", "in": "query", "schema": { "type": "string" } },
+          { "name": "target_type", "in": "query", "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "schema": { "type": "string" } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "List of performance profiles" }
+        }
+      },
+      "post": {
+        "tags": [
+          "Autonomous Agent Performance Profiler & Flamegraph Engine"
+        ],
+        "summary": "Create/start a new performance profile",
+        "responses": {
+          "201": { "description": "Profile created" }
+        }
+      }
+    },
+    "/projectbase/perf/profiles/{id}": {
+      "get": {
+        "tags": [
+          "Autonomous Agent Performance Profiler & Flamegraph Engine"
+        ],
+        "summary": "Get performance profile details, spans, heap snapshots, and bottlenecks",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Profile details" }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Autonomous Agent Performance Profiler & Flamegraph Engine"
+        ],
+        "summary": "Update performance profile metadata",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Profile updated" }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Autonomous Agent Performance Profiler & Flamegraph Engine"
+        ],
+        "summary": "Delete performance profile and cascaded telemetry",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Profile deleted" }
+        }
+      }
+    },
+    "/projectbase/perf/profiles/{id}/spans": {
+      "get": {
+        "tags": [
+          "Autonomous Agent Performance Profiler & Flamegraph Engine"
+        ],
+        "summary": "List execution spans for a profile",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "category", "in": "query", "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "List of spans" }
+        }
+      },
+      "post": {
+        "tags": [
+          "Autonomous Agent Performance Profiler & Flamegraph Engine"
+        ],
+        "summary": "Ingest single or batch execution spans",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "201": { "description": "Spans ingested" }
+        }
+      }
+    },
+    "/projectbase/perf/profiles/{id}/heap-snapshots": {
+      "get": {
+        "tags": [
+          "Autonomous Agent Performance Profiler & Flamegraph Engine"
+        ],
+        "summary": "List memory heap snapshots for a profile",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "List of heap snapshots" }
+        }
+      },
+      "post": {
+        "tags": [
+          "Autonomous Agent Performance Profiler & Flamegraph Engine"
+        ],
+        "summary": "Ingest a memory heap snapshot for leak detection",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "201": { "description": "Heap snapshot ingested" }
+        }
+      }
+    },
+    "/projectbase/perf/profiles/{id}/analyze": {
+      "post": {
+        "tags": [
+          "Autonomous Agent Performance Profiler & Flamegraph Engine"
+        ],
+        "summary": "Run profiling analysis, synthesize flamegraph tree, and detect bottlenecks & memory leaks",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Analysis results and flamegraph tree" }
+        }
+      }
+    },
+    "/projectbase/perf/bottlenecks": {
+      "get": {
+        "tags": [
+          "Autonomous Agent Performance Profiler & Flamegraph Engine"
+        ],
+        "summary": "List detected bottlenecks and optimization opportunities",
+        "parameters": [
+          { "name": "profile_id", "in": "query", "schema": { "type": "string" } },
+          { "name": "severity", "in": "query", "schema": { "type": "string" } },
+          { "name": "bottleneck_type", "in": "query", "schema": { "type": "string" } },
+          { "name": "status", "in": "query", "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "List of bottlenecks" }
+        }
+      }
+    },
+    "/projectbase/perf/bottlenecks/{id}": {
+      "patch": {
+        "tags": [
+          "Autonomous Agent Performance Profiler & Flamegraph Engine"
+        ],
+        "summary": "Update bottleneck status and verification",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Bottleneck updated" }
+        }
+      }
+    },
+    "/projectbase/perf/synthesize-optimization": {
+      "post": {
+        "tags": [
+          "Autonomous Agent Performance Profiler & Flamegraph Engine"
+        ],
+        "summary": "Synthesize automated code / caching / query optimization patch",
+        "responses": {
+          "200": { "description": "Synthesized optimization patch" }
+        }
+      }
+    },
+    "/projectbase/perf/fleet-metrics": {
+      "get": {
+        "tags": [
+          "Autonomous Agent Performance Profiler & Flamegraph Engine"
+        ],
+        "summary": "Get fleet-wide latency percentiles, memory footprint, and bottleneck analytics",
+        "parameters": [
+          { "name": "project_id", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Fleet performance metrics" }
+        }
+      }
     }
   }
 }

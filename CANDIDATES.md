@@ -346,3 +346,13 @@
 - [x] 8 FastMCP JSON-RPC 2.0 tools (`analyze_architecture_graph`, `register_architecture_node`, `link_architecture_dependency`, `simulate_change_blast_radius`, `list_blast_simulations`, `get_blast_simulation_details`, `generate_targeted_test_plan`, `get_architecture_metrics`)
 - [x] Frontend AgentsView **🌐 Architecture & Blast Radius** dashboard (`activeTab === 'blast_radius'`) with 5 KPI summary cards (Arch Graphs & Nodes, Simulations Executed, Avg Risk Score %, Targeted Test Reduction %, Breaking Changes Caught), 4 interactive subtabs (🗺️ Graph & Topology, 💥 Blast Simulator, 🎯 Targeted Test Planner, 📊 Modularity & Metrics), interactive node dependency inspector, and new graph creation modal
 - [x] Comprehensive automated test suite `tests/test_architecture_blast_radius_engine.py` with 7/7 passing assertions, 535 total passing tests across 43 files, OpenAPI static drift validation, and 100% static CSS compilation verification
+
+---
+
+## Milestone (Cycle 42)
+**Epic 39 – Autonomous Agent Performance Profiler, Memory Leak Detection, Bottleneck Sentinel & Flamegraph Engine (✅ Done)**
+- [x] Schema migration (`1710000052_add_performance_profiler_and_flamegraph_engine.js`) introducing `perf_profiles`, `perf_spans`, `perf_heap_snapshots`, and `perf_bottlenecks` collections
+- [x] Backend engine hook (`app/pb_hooks/123_profiler_flamegraph_engine.pb.js`) with 14 high-performance REST API endpoints for hierarchical call-tree profiling, span telemetry ingestion, heap snapshot leak analysis, automated bottleneck detection, flamegraph call-tree synthesis, and 1-click optimization patch generation
+- [x] 8 FastMCP JSON-RPC 2.0 tools (`start_perf_profile`, `record_perf_span`, `capture_perf_heap_snapshot`, `analyze_perf_profile`, `list_perf_profiles`, `get_perf_profile_details`, `synthesize_perf_optimization`, `get_fleet_perf_metrics`)
+- [x] Frontend AgentsView **⚡ Performance Profiler & Flamegraph** dashboard (`activeTab === 'perf'`) with 5 KPI summary cards (Profiles Recorded, Avg/P95 Latency ms, Peak Heap & Leaks MB, Active Bottlenecks, Fleet Speedup Potential %), split-pane profile explorer, 4 interactive subtabs (🔥 Flamegraph & Call Tree, 📈 Spans & Execution Breakdown, 🧠 Memory Heap & Leak Sentinel, 🚨 Bottlenecks & Auto-Optimizer), and 3 interactive modals (+ Record Profile, + Ingest Heap Snapshot, Synthesize Optimization Patch)
+- [x] Comprehensive automated test suite `tests/test_profiler_flamegraph_engine.py` with 7/7 passing assertions, 542 total passing tests across 44 files, OpenAPI static drift validation, and 100% zero-console-error headless Playwright browser E2E verification (`scripts/qa/run_profiler_flamegraph_e2e.py`)

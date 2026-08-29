@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.38.0] - 2026-08-28 - Cycle 42
+### Added
+- **Autonomous Agent Performance Profiler, Memory Leak Detection, Bottleneck Sentinel & Flamegraph Engine (Milestone 18 / Epic 39):**
+  - Schema migration (`1710000052_add_performance_profiler_and_flamegraph_engine.js`) introducing 4 high-performance collections: `perf_profiles`, `perf_spans`, `perf_heap_snapshots`, and `perf_bottlenecks`.
+  - Backend engine hook (`app/pb_hooks/123_profiler_flamegraph_engine.pb.js`) with 14 high-performance REST API endpoints:
+    - `GET /api/projectbase/perf/profiles` & `POST /api/projectbase/perf/profiles` for profiling run CRUD and lifecycle management.
+    - `GET /api/projectbase/perf/profiles/{id}`, `PATCH /api/projectbase/perf/profiles/{id}`, & `DELETE /api/projectbase/perf/profiles/{id}` with cascaded telemetry cleanup.
+    - `GET /api/projectbase/perf/profiles/{id}/spans` & `POST /api/projectbase/perf/profiles/{id}/spans` for fine-grained function and tool execution span ingestion.
+    - `GET /api/projectbase/perf/profiles/{id}/heap-snapshots` & `POST /api/projectbase/perf/profiles/{id}/heap-snapshots` for memory allocations, retained sizes, and growth velocity tracking.
+    - `POST /api/projectbase/perf/profiles/{id}/analyze` for automated flamegraph call-tree synthesis, p50/p95 latency metrics, N+1 query detection, and memory leak diagnosis.
+    - `GET /api/projectbase/perf/bottlenecks` & `PATCH /api/projectbase/perf/bottlenecks/{id}` for bottleneck triage and verification tracking.
+    - `POST /api/projectbase/perf/synthesize-optimization` for 1-click automated code/caching/query patch generation.
+    - `GET /api/projectbase/perf/fleet-metrics` for fleet-wide latency percentiles, memory footprints, and bottleneck breakdown metrics.
+  - 8 FastMCP JSON-RPC 2.0 tools registered in `app/pb_hooks/91_mcp_server.pb.js`: `start_perf_profile`, `record_perf_span`, `capture_perf_heap_snapshot`, `analyze_perf_profile`, `list_perf_profiles`, `get_perf_profile_details`, `synthesize_perf_optimization`, and `get_fleet_perf_metrics`.
+  - Frontend AgentsView **⚡ Performance Profiler & Flamegraph** dashboard (`activeTab === 'perf'`) with 5 KPI summary cards (Profiles Recorded, Avg/P95 Latency ms, Peak Heap & Leaks MB, Active Bottlenecks, Fleet Speedup Potential %), split-pane profile explorer, 4 interactive subtabs (🔥 Flamegraph & Call Tree, 📈 Spans & Execution Breakdown, 🧠 Memory Heap & Leak Sentinel, 🚨 Bottlenecks & Auto-Optimizer), and 3 interactive modals (+ Record Profile, + Ingest Heap Snapshot, Synthesize Optimization Patch).
+  - Client API extensions in `app/pb_public/js/api.js` covering all performance profiler and flamegraph endpoints.
+  - Comprehensive automated test suite `tests/test_profiler_flamegraph_engine.py` with 7/7 passing assertions, 542 total passing tests across 44 files, OpenAPI static drift validation, and 100% zero-console-error headless Playwright browser E2E verification (`scripts/qa/run_profiler_flamegraph_e2e.py`).
+
 ## [1.37.0] - 2026-08-28 - Cycle 41
 ### Added
 - **Autonomous Agent Dynamic Architecture Graph, AST Blast-Radius Impact Simulator & Breaking Change Sentinel Engine (Milestone 17 / Epic 38):**
