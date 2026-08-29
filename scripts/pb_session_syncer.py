@@ -10,6 +10,7 @@ Features:
 - Discovers sessions directly via `flomaster session list --json` and Flow cycle logs.
 - Extracts REAL git branch, head commit, changed files, and actual git diffs.
 - Extracts REAL terminal log tails from live processes and cycle execution logs.
+- Parses REAL tool calls and tool execution sequences from transcripts.
 - Synthesizes REAL structured conversation turns for full inspection.
 - Cross-platform: Runs seamlessly on macOS (Darwin), Linux (Homelab/Ubuntu), and containers.
 
@@ -20,6 +21,7 @@ Usage:
 """
 
 import os
+import re
 import sys
 import glob
 import time
@@ -85,6 +87,19 @@ def get_git_info(path: str) -> Dict[str, Any]:
         return {"repo": os.path.basename(path), "branch": "", "commit": "", "remote": "", "root": path, "files": [], "diff": ""}
 
 
+def extract_tools_from_log(text: str) -> List[Dict[str, str]]:
+    """Extract real tool calls and arguments from cycle execution text."""
+    tools = []
+    try:
+        matches = re.findall(r'▸\s*([a-zA-Z0-9_-]+)\([^)]*\).*?▸\s*\(([^)]*)\)', text, re.DOTALL)
+        for name, arg in matches[:15]:
+            clean_arg = ' '.join(arg.strip().split())
+            tools.append({'name': name.strip(), 'input': clean_arg[:100]})
+    except Exception:
+        pass
+    return tools
+
+
 def discover_flow_cycle_sessions() -> List[Dict[str, Any]]:
     """Discover real Flow cycle builder sessions and extract actual execution logs."""
     sessions = []
@@ -97,16 +112,19 @@ def discover_flow_cycle_sessions() -> List[Dict[str, Any]]:
             sid = f"flow_cycle_{cycle_num}"
             
             with open(log_path, "r", errors="replace") as f:
-                lines = f.readlines()
+                full_text = f.read()
+                lines = full_text.splitlines(keepends=True)
             
             log_tail = "".join(lines[-40:]) if lines else ""
             if len(log_tail) > 4500:
                 log_tail = log_tail[-4500:]
             
+            tools_called = extract_tools_from_log(full_text)
+            
             # Find prompt / task if present in log
-            prompt = f"Flow Autonomous Cycle {cycle_num} Execution"
+            prompt = f"Execute autonomous engineering plan for Flow Cycle {cycle_num} on ProjectBase."
             for l in lines[:30]:
-                if "GOAL:" in l or "ACTIVE_PROJECT:" in l or "Task:" in l:
+                if "GOAL:" in l or "Task:" in l or "BUILDER —" in l:
                     prompt = l.strip()
                     break
             
@@ -116,20 +134,24 @@ def discover_flow_cycle_sessions() -> List[Dict[str, Any]]:
             
             git_info = get_git_info("/data/projects/projectbase")
             
+            assistant_body = f"### ⚡ Flow Builder Cycle {cycle_num} Execution\n\n" \
+                             f"• **Status:** `{'LIVE RUNNING' if is_active else 'COMPLETED'}`\n" \
+                             f"• **Repository:** `/data/projects/projectbase`\n" \
+                             f"• **Branch:** `{git_info['branch'] or 'main'}`\n" \
+                             f"• **Commit:** `{git_info['commit']}`\n" \
+                             f"• **Tool Calls Executed:** `{len(tools_called)}` operations\n" \
+                             f"• **Log File:** `{fname}` ({os.path.getsize(log_path):,} bytes)"
+            
             chat_turns = [
                 {
                     "role": "user",
-                    "content": f"Execute Flow Cycle {cycle_num} autonomous engineering plan on ProjectBase.",
+                    "content": prompt,
                     "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(mtime - 300))
                 },
                 {
                     "role": "assistant",
-                    "content": f"Completed Flow Builder Cycle {cycle_num}.\n\n"
-                               f"• **Repository:** `/data/projects/projectbase`\n"
-                               f"• **Branch:** `{git_info['branch'] or 'main'}`\n"
-                               f"• **Commit:** `{git_info['commit']}`\n"
-                               f"• **Status:** `{'RUNNING' if is_active else 'COMPLETED'}`\n"
-                               f"• **Log File:** `{fname}` ({os.path.getsize(log_path)} bytes)",
+                    "content": assistant_body,
+                    "tool_calls": tools_called,
                     "log_tail": log_tail,
                     "git_diff": git_info["diff"],
                     "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(mtime))
@@ -184,7 +206,6 @@ def discover_flomaster_cli_sessions() -> List[Dict[str, Any]]:
             short_name = it.get("short_name") or sid
             tokens = it.get("tokens", 0)
 
-            # Build structured chat turns with real prompt and execution summary
             commit_str = f"(`{git_info['commit']}`)" if git_info['commit'] else ""
             chat_turns = [
                 {
@@ -194,11 +215,12 @@ def discover_flomaster_cli_sessions() -> List[Dict[str, Any]]:
                 },
                 {
                     "role": "assistant",
-                    "content": f"Autonomous session execution for **{short_name}** in `{working_dir}`.\n\n"
+                    "content": f"### ⚡ Flomaster Execution ({short_name})\n\n"
                                f"• **Status:** `{status.upper()}`\n"
+                               f"• **Directory:** `{working_dir}`\n"
                                f"• **Branch:** `{git_info['branch'] or 'main'}` {commit_str}\n"
-                               f"• **Tokens:** `{tokens:,}` tokens\n"
-                               f"• **Messages:** `{it.get('message_count', 1)}` turns",
+                               f"• **Tokens Ingested:** `{tokens:,}` tokens\n"
+                               f"• **Turns Recorded:** `{it.get('message_count', 1)}` turns",
                     "git_diff": git_info["diff"],
                     "created_at": it.get("updated_at") or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
                 }
