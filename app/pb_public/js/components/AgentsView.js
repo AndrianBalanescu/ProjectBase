@@ -15,6 +15,7 @@ const AgentsViewComponent = {
       isDispatching: false,
       dispatchSuccess: null,
       dispatchError: null,
+      chatLog: {},
       liveStreamActive: true,
       pollTimer: null
     };
@@ -59,31 +60,20 @@ const AgentsViewComponent = {
     chatTurns() {
       const s = this.selectedSession;
       if (!s) return [];
-      
-      // If session already has a structured chat array with >= 1 items, return it
+      const sid = s.session_id || s.id;
+
+      // 1. Interactive log always wins (survives parent poll re-renders)
+      if (this.chatLog[sid] && this.chatLog[sid].length > 0) {
+        return this.chatLog[sid];
+      }
+
+      // 2. Server-persisted chat history
       if (s.chat && Array.isArray(s.chat) && s.chat.length > 0) {
         return s.chat;
       }
 
-      // If live activity events exist, map them to chat turns
-      if (s.live_activity && Array.isArray(s.live_activity) && s.live_activity.length > 0) {
-        return s.live_activity.map(ev => ({
-          role: 'assistant',
-          content: ev.summary || ev.tool || 'Activity event',
-          tool_calls: ev.tool ? [{ name: ev.tool, input: ev.input, output: ev.output }] : [],
-          created_at: ev.timestamp
-        }));
-      }
-
-      // Build structured conversation turns from real session fields
-      const turns = [];
+      // 3. Synthesize from real session fields
       const promptText = s.last_prompt || s.title || s.command || `Autonomous engineering run on ${s.working_dir || 'workspace'}`;
-      turns.push({
-        role: 'user',
-        content: promptText,
-        created_at: s.started_at || s.created || new Date().toISOString()
-      });
-
       let assistantContent = `⚡ **Agent Execution Summary**\n\n` +
         `• **Agent:** \`${s.agent_name || s.short_name || 'Flomaster'}\`\n` +
         `• **Working Directory:** \`${s.working_dir || s.workdir || '/data/projects/projectbase'}\`\n` +
@@ -96,16 +86,21 @@ const AgentsViewComponent = {
         assistantContent += `\n\n**Terminal Log Excerpt:**\n\`\`\`bash\n${s.log_tail.trim()}\n\`\`\``;
       }
 
-      turns.push({
-        role: 'assistant',
-        content: assistantContent,
-        log_tail: s.log_tail || '',
-        git_diff: s.git_diff_raw || '',
-        test_verdict: s.test_verdict || null,
-        created_at: s.updated || s.created || new Date().toISOString()
-      });
-
-      return turns;
+      return [
+        {
+          role: 'user',
+          content: promptText,
+          created_at: s.started_at || s.created || new Date().toISOString()
+        },
+        {
+          role: 'assistant',
+          content: assistantContent,
+          log_tail: s.log_tail || '',
+          git_diff: s.git_diff_raw || '',
+          test_verdict: s.test_verdict || null,
+          created_at: s.updated || s.created || new Date().toISOString()
+        }
+      ];
     }
   },
   mounted() {
@@ -168,28 +163,32 @@ const AgentsViewComponent = {
     async quickDispatch(agentName) {
       const prompt = this.quickPrompt.trim();
       if (!prompt) return;
-      
+
       this.isDispatching = true;
       this.dispatchSuccess = null;
       this.dispatchError = null;
-      
+
       const target = agentName || (this.activeAgent ? this.activeAgent.name : 'flomaster');
-      const sid = this.selectedSession ? (this.selectedSession.session_id || this.selectedSession.id) : null;
-      
-      // Optimistically push user prompt into active session chat
-      if (this.selectedSession) {
-        if (!this.selectedSession.chat || !Array.isArray(this.selectedSession.chat)) {
-          this.selectedSession.chat = [...this.chatTurns];
-        }
-        this.selectedSession.chat.push({
-          role: 'user',
-          content: prompt,
-          created_at: new Date().toISOString()
-        });
-        this.$nextTick(() => { this.scrollToBottom(); });
+      const s = this.selectedSession;
+      const sid = s ? (s.session_id || s.id) : ('sess_chat_' + Date.now().toString(36));
+      this.selectedSessionId = s ? (s.id || sid) : sid;
+
+      // Seed the interactive log from the current view once, then append.
+      // chatLog is component state, so it survives parent poll re-renders.
+      if (!this.chatLog[sid]) {
+        this.chatLog = { ...this.chatLog, [sid]: [...this.chatTurns] };
       }
 
+      this.chatLog = {
+        ...this.chatLog,
+        [sid]: [
+          ...this.chatLog[sid],
+          { role: 'user', content: prompt, created_at: new Date().toISOString() }
+        ]
+      };
+
       this.quickPrompt = '';
+      this.$nextTick(() => { this.scrollToBottom(); });
 
       try {
         const res = await API.dispatchAgent(target, {
@@ -199,29 +198,28 @@ const AgentsViewComponent = {
 
         const reply = res.response || res.message || 'Task dispatched to agent.';
 
-        if (this.selectedSession) {
-          this.selectedSession.chat.push({
-            role: 'assistant',
-            content: reply,
-            created_at: new Date().toISOString()
-          });
-          this.$nextTick(() => { this.scrollToBottom(); });
-        }
+        this.chatLog = {
+          ...this.chatLog,
+          [sid]: [
+            ...this.chatLog[sid],
+            { role: 'assistant', content: reply, created_at: new Date().toISOString() }
+          ]
+        };
 
         this.dispatchSuccess = `Reply from ${target}`;
         setTimeout(() => { this.dispatchSuccess = null; }, 3000);
-        this.$emit('sync-agents');
+        this.$nextTick(() => { this.scrollToBottom(); });
       } catch (e) {
         console.error('Dispatch failed', e);
         this.dispatchError = e.message || 'Dispatch failed';
-        if (this.selectedSession) {
-          this.selectedSession.chat.push({
-            role: 'assistant',
-            content: `⚠️ Error communicating with agent: ${e.message || String(e)}`,
-            created_at: new Date().toISOString()
-          });
-          this.$nextTick(() => { this.scrollToBottom(); });
-        }
+        this.chatLog = {
+          ...this.chatLog,
+          [sid]: [
+            ...this.chatLog[sid],
+            { role: 'assistant', content: `⚠️ Error: ${e.message || String(e)}`, created_at: new Date().toISOString() }
+          ]
+        };
+        this.$nextTick(() => { this.scrollToBottom(); });
         setTimeout(() => { this.dispatchError = null; }, 5000);
       } finally {
         this.isDispatching = false;
