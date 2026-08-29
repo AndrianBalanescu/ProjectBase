@@ -218,13 +218,20 @@ routerAdd("POST", "/api/projectbase/sessions/ingest", (e) => {
             record.set("workdir", workdir);
             record.set("git_branch", gitBranch);
             if (gitCommitBefore) record.set("git_commit_before", gitCommitBefore);
+            if (body.git_commit) record.set("git_commit_after", String(body.git_commit));
+            if (body.git_commit_after) record.set("git_commit_after", String(body.git_commit_after));
             if (command) record.set("command", command);
+            else if (body.last_prompt) record.set("command", String(body.last_prompt));
             if (filesTouched.length > 0) record.set("files_touched", filesTouched);
-            if (body.log_tail) record.set("log_tail", String(body.log_tail));
+            if (body.log_tail) record.set("log_tail", String(body.log_tail).substring(0, 4500));
+            if (body.git_diff_raw) record.set("git_diff_raw", String(body.git_diff_raw).substring(0, 4500));
+            if (body.tokens) record.set("tokens_out", parseInt(body.tokens));
             if (body.tokens_in) record.set("tokens_in", parseInt(body.tokens_in));
             if (body.tokens_out) record.set("tokens_out", parseInt(body.tokens_out));
             if (body.cost_cents) record.set("cost_cents", parseInt(body.cost_cents));
-            record.set("metadata", metadata);
+            if (body.test_verdict) record.set("test_verdict", body.test_verdict);
+            if (body.chat) record.set("metadata", Object.assign({}, metadata, { chat: body.chat }));
+            else record.set("metadata", metadata);
             record.set("auto_docked", autoDocked);
 
             e.app.save(record);

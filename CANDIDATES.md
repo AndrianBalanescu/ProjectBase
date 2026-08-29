@@ -316,3 +316,13 @@
 - [x] 8 FastMCP JSON-RPC 2.0 tools (`run_security_scan`, `list_security_scans`, `get_security_scan_details`, `scan_for_secret_leaks`, `list_secret_findings`, `generate_security_remediation`, `apply_security_remediation`, `get_fleet_security_posture`)
 - [x] Frontend AgentsView **🛡️ Autonomous Security Sentinel & Red-Team Hub** dashboard (`activeTab === 'security'`) with 5 KPI summary cards (Fleet Security Score, Active Critical/High CVEs, Secret Containment %, Auto-Remediation Rate %, Security MTTR), split-pane scan explorer, 4 interactive subtabs (🛡️ Vulnerabilities & AST Probing, 🔑 Secret Leak Sentinel & Quarantine Vault, 🛠️ Auto-Remediation & Patch Synthesis, 📜 Policy Governance & Compliance), and 3 interactive modals (+ Run Security Scan, Quick Secret Scanner, Create Policy)
 - [x] Comprehensive automated test suite `tests/test_security_sentinel_engine.py` with 10/10 passing assertions, 512 total passing tests across 40 files, OpenAPI static drift validation, and 100% zero-console-error headless Playwright browser E2E verification (`scripts/qa/run_release_flight_control_e2e.py`)
+
+---
+
+## Milestone (Cycle 39)
+**Epic 36 – Autonomous Agent Test-Driven Development (TDD) Synthesizer, Mutation Testing Matrix, Flaky Test Quarantine & Coverage Sentinel Engine (✅ Done)**
+- [x] Schema migration (`1710000049_add_tdd_synthesizer_and_mutation_matrix.js`) introducing `tdd_suites`, `tdd_cases`, `mutation_runs`, and `flaky_quarantines` collections
+- [x] Backend engine hook (`app/pb_hooks/120_tdd_mutation_engine.pb.js`) with 14 high-performance REST API endpoints for TDD suite synthesis, case-level assertion execution, AST/semantic mutation testing (kill rate score %), flaky test quarantine isolation/resolution, and workspace statement/branch test coverage matrix
+- [x] 8 FastMCP JSON-RPC 2.0 tools (`synthesize_tdd_tests`, `run_tdd_suite`, `list_tdd_suites`, `get_tdd_suite_details`, `run_mutation_test`, `quarantine_flaky_test`, `list_quarantined_tests`, `get_fleet_test_coverage`)
+- [x] Frontend AgentsView **🧪 TDD & Mutation Matrix** dashboard (`activeTab === 'tdd'`) with 5 KPI summary cards (TDD Suites, Mutation Score %, Quarantined Flakes, Fleet Coverage %, Avg Suite Time), split-pane suite & cases explorer, 4 interactive subtabs (🧪 Suites & Cases, 🧬 Mutation Matrix, 🔒 Flaky Quarantine Vault, 🎯 Coverage & Gaps), and 3 interactive modals (+ Synthesize Suite, Mutate Code, Quarantine Flake)
+- [x] Comprehensive automated test suite `tests/test_tdd_mutation_engine.py` with 8/8 passing assertions, 520 total passing tests across 41 files, OpenAPI static drift validation, and 100% frontend guard pass verification

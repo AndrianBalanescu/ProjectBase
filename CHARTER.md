@@ -29,3 +29,5 @@
 - [x] Autonomous Agent Knowledge Graph, Architectural Memory Index & Invariant Compliance Engine (Milestone 11)
 - [x] Autonomous Agent Multi-Persona Code Review Swarm, AST-Aware Critique & Patch Synthesis Engine (Milestone 12)
 - [x] Autonomous Agent Release Flight Control, Deployment Canary Gates, Production Health Probes & Self-Healing Rollback Engine (Milestone 13)
+- [x] Autonomous Agent Security Red-Team, Secret Leak Sentinel, AST Vulnerability Probing & Automated Remediation Hardening Engine (Milestone 14)
+- [x] Autonomous Agent Test-Driven Development (TDD) Synthesizer, Mutation Testing Matrix, Flaky Test Quarantine & Coverage Sentinel Engine (Milestone 15)

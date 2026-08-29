@@ -43,6 +43,32 @@ routerAdd("GET", "/api/projectbase/agents", (e) => {
                     const st = r.getString("status") || "completed";
                     const role = r.getString("agent_role") || r.getString("agent_name") || "flomaster";
                     const prompt = r.getString("last_prompt") || r.getString("command") || "";
+                    const meta = r.get("metadata") || {};
+                    const customChat = meta.chat || r.get("chat") || [];
+                    const logTail = r.getString("log_tail") || "";
+                    const gitDiff = r.getString("git_diff_raw") || "";
+                    const filesTouched = r.get("files_touched") || [];
+                    const testVerdict = r.get("test_verdict") || null;
+
+                    let chatList = customChat;
+                    if (!chatList || chatList.length === 0) {
+                        chatList = [
+                            {
+                                role: "user",
+                                content: prompt || `Autonomous session ${sid} on ${r.getString("working_dir") || 'workspace'}`,
+                                created_at: r.getString("created")
+                            },
+                            {
+                                role: "assistant",
+                                content: `Executed autonomous task with agent **${r.getString("agent_name") || role}**.\n\n• **Status:** \`${st.toUpperCase()}\`\n• **Working Directory:** \`${r.getString("working_dir") || r.getString("workdir") || '/data/projects/projectbase'}\`\n• **Git Branch:** \`${r.getString("git_branch") || 'main'}\` ${r.getString("git_commit_after") ? '(`' + r.getString("git_commit_after").slice(0, 7) + '`)' : ''}`,
+                                log_tail: logTail,
+                                git_diff: gitDiff,
+                                test_verdict: testVerdict,
+                                created_at: r.getString("updated")
+                            }
+                        ];
+                    }
+
                     return {
                         id: r.id,
                         session_id: sid,
@@ -57,18 +83,19 @@ routerAdd("GET", "/api/projectbase/agents", (e) => {
                         working_dir: r.getString("working_dir") || r.getString("workdir") || "",
                         project_id: r.getString("project") || "",
                         git_branch: r.getString("git_branch") || "main",
-                        git_commit: r.getString("git_commit") || r.getString("git_commit_after") || "",
-                        tokens: r.getInt("token_usage") || r.getInt("total_tokens") || 0,
+                        git_commit: r.getString("git_commit_after") || r.getString("git_commit") || "",
+                        git_diff_raw: gitDiff,
+                        files_touched: filesTouched,
+                        log_tail: logTail,
+                        test_verdict: testVerdict,
+                        tokens: r.getInt("token_usage") || r.getInt("total_tokens") || r.getInt("tokens_out") || 0,
                         message_count: r.getInt("message_count") || r.getInt("total_steps") || 1,
                         last_prompt: prompt,
                         title: prompt ? (prompt.length > 80 ? prompt.substring(0, 80) + "..." : prompt) : `Session ${sid}`,
                         created: r.getString("created"),
                         updated: r.getString("updated"),
-                        avatar: r.getString("runtime") === "hermes" ? "🐦" : (r.getString("runtime") === "cursor" ? "🖱️" : "🧠"),
-                        chat: prompt ? [
-                            { role: "user", content: prompt, timestamp: r.getString("created") },
-                            { role: "assistant", content: `Active task in ${r.getString("working_dir") || 'workspace'}. Status: ${st}`, timestamp: r.getString("updated") }
-                        ] : []
+                        avatar: r.getString("runtime") === "hermes" ? "🐦" : (r.getString("runtime") === "cursor" ? "🖱️" : (r.getString("runtime") === "flow" ? "⚡" : "🧠")),
+                        chat: chatList
                     };
                 });
             }

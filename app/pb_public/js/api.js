@@ -3427,5 +3427,139 @@ const API = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to get security posture');
     return data;
+  },
+
+  // --- TDD & Mutation Testing APIs ---
+  async listTddSuites(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/tdd/suites${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list TDD suites');
+    return data;
+  },
+
+  async createTddSuite(payload = {}) {
+    const res = await fetch('/api/projectbase/tdd/suites', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create TDD suite');
+    return data;
+  },
+
+  async synthesizeTddSuite(payload = {}) {
+    const res = await fetch('/api/projectbase/tdd/suites/synthesize', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to synthesize TDD suite');
+    return data;
+  },
+
+  async getTddSuite(id) {
+    const res = await fetch(`/api/projectbase/tdd/suites/${encodeURIComponent(id)}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get TDD suite');
+    return data;
+  },
+
+  async runTddSuite(id) {
+    const res = await fetch(`/api/projectbase/tdd/suites/${encodeURIComponent(id)}/run`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to run TDD suite');
+    return data;
+  },
+
+  async deleteTddSuite(id) {
+    const res = await fetch(`/api/projectbase/tdd/suites/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to delete TDD suite');
+    return data;
+  },
+
+  async listMutationRuns(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/tdd/mutation/runs${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list mutation runs');
+    return data;
+  },
+
+  async runMutationTest(payload = {}) {
+    const res = await fetch('/api/projectbase/tdd/mutation/runs', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to run mutation test');
+    return data;
+  },
+
+  async listQuarantines(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/tdd/quarantines${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to list quarantines');
+    return data;
+  },
+
+  async quarantineFlakyTest(payload = {}) {
+    const res = await fetch('/api/projectbase/tdd/quarantines', {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to quarantine flaky test');
+    return data;
+  },
+
+  async resolveQuarantine(id, payload = {}) {
+    const res = await fetch(`/api/projectbase/tdd/quarantines/${encodeURIComponent(id)}/resolve`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to resolve quarantine');
+    return data;
+  },
+
+  async getFleetTestCoverage(params = {}) {
+    const qs = '?' + new URLSearchParams(params).toString();
+    const res = await fetch(`/api/projectbase/tdd/coverage${qs}`, {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get test coverage');
+    return data;
+  },
+
+  async getTddMetrics() {
+    const res = await fetch('/api/projectbase/tdd/metrics', {
+      headers: this._authHeaders()
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to get TDD metrics');
+    return data;
   }
 };

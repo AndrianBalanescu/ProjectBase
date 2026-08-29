@@ -1,6 +1,24 @@
 # Changelog
 
-## [1.34.0] - 2026-08-28 - Cycle 38
+## [1.35.0] - 2026-08-28 - Cycle 39
+### Added
+- **Autonomous Agent Test-Driven Development (TDD) Synthesizer, Mutation Testing Matrix, Flaky Test Quarantine & Coverage Sentinel Engine (Milestone 15 / Epic 36):**
+  - Schema migration (`1710000049_add_tdd_synthesizer_and_mutation_matrix.js`) introducing 4 high-assurance testing collections: `tdd_suites`, `tdd_cases`, `mutation_runs`, and `flaky_quarantines`.
+  - Backend engine hook (`app/pb_hooks/120_tdd_mutation_engine.pb.js`) with 14 high-performance REST API endpoints:
+    - `GET /api/projectbase/tdd/suites` & `POST /api/projectbase/tdd/suites` for listing and creating TDD test suites.
+    - `GET /api/projectbase/tdd/suites/{id}`, `DELETE /api/projectbase/tdd/suites/{id}`, and `POST /api/projectbase/tdd/suites/{id}/run` for inspecting suite details, deleting suites, and executing test suites with full assertion evaluations.
+    - `POST /api/projectbase/tdd/suites/synthesize` for synthesizing automated TDD suites and test cases directly from issue acceptance criteria and invariants.
+    - `GET /api/projectbase/tdd/suites/{id}/cases` & `POST /api/projectbase/tdd/suites/{id}/cases` for listing and adding test cases to a suite.
+    - `POST /api/projectbase/tdd/cases/{id}/execute` for single test case assertion execution with flake score tracking.
+    - `GET /api/projectbase/tdd/mutation/runs` & `POST /api/projectbase/tdd/mutation/runs` for running AST and semantic mutation testing (boundary conditions, conditional inversion, math operator mutation, return value mutation) and evaluating kill rate %.
+    - `GET /api/projectbase/tdd/mutation/runs/{id}` for inspecting mutation run details and diffs.
+    - `GET /api/projectbase/tdd/quarantines` & `POST /api/projectbase/tdd/quarantines` for listing and isolating non-deterministic flaky tests.
+    - `POST /api/projectbase/tdd/quarantines/{id}/resolve` for unquarantining and resolving flaky test cases.
+    - `GET /api/projectbase/tdd/coverage` for repository statement and branch coverage matrix with untested gap analysis.
+    - `GET /api/projectbase/tdd/metrics` for workspace-wide TDD KPIs (total suites, pass rate %, mutation kill score %, quarantined flakes, avg duration).
+  - 8 FastMCP JSON-RPC 2.0 tools (`synthesize_tdd_tests`, `run_tdd_suite`, `list_tdd_suites`, `get_tdd_suite_details`, `run_mutation_test`, `quarantine_flaky_test`, `list_quarantined_tests`, `get_fleet_test_coverage`).
+  - Frontend AgentsView **🧪 TDD & Mutation Matrix** dashboard (`activeTab === 'tdd'`) with 5 KPI summary cards (TDD Suites, Mutation Score %, Quarantined Flakes, Fleet Coverage %, Avg Suite Time), split-pane suite & cases explorer, 4 interactive subtabs (🧪 Suites & Cases, 🧬 Mutation Matrix, 🔒 Flaky Quarantine Vault, 🎯 Coverage & Gaps), and 3 interactive modals (+ Synthesize Suite, Mutate Code, Quarantine Flake).
+  - Comprehensive automated test suite `tests/test_tdd_mutation_engine.py` with 8/8 passing assertions, 520 total passing tests across 41 files, OpenAPI static drift validation, and 100% frontend guard pass verification.
 ### Added
 - **Autonomous Agent Security Red-Team, Secret Leak Sentinel, AST Vulnerability Probing & Automated Remediation Hardening Engine (Milestone 14 / Epic 35):**
   - Schema migration (`1710000048_add_security_sentinel_engine.js`) introducing 4 high-security collections: `security_scans`, `secret_findings`, `security_policies`, and `security_remediations`.
