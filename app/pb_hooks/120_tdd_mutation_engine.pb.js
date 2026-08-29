@@ -30,7 +30,7 @@ routerAdd("GET", "/api/projectbase/tdd/suites", (e) => {
         const records = e.app.findRecordsByFilter(
             "tdd_suites",
             filterExpr || "id != ''",
-            "-id",
+            "-created",
             limit,
             offset
         );
@@ -181,7 +181,7 @@ routerAdd("GET", "/api/projectbase/tdd/suites/{id}", (e) => {
             const mRecords = e.app.findRecordsByFilter(
                 "mutation_runs",
                 `suite_id = '${id}'`,
-                "-id",
+                "-created",
                 20,
                 0
             );
@@ -617,7 +617,7 @@ routerAdd("GET", "/api/projectbase/tdd/mutation/runs", (e) => {
         const records = e.app.findRecordsByFilter(
             "mutation_runs",
             filterExpr || "id != ''",
-            "-id",
+            "-created",
             limit,
             offset
         );
@@ -793,7 +793,7 @@ routerAdd("GET", "/api/projectbase/tdd/quarantines", (e) => {
         const records = e.app.findRecordsByFilter(
             "flaky_quarantines",
             filterExpr || "id != ''",
-            "-id",
+            "-created",
             limit,
             offset
         );
