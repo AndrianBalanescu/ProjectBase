@@ -66,7 +66,7 @@ class TestKnowledgeGraphEngine:
         assert data.get("success") is True
 
     def test_03_list_knowledge_nodes_and_adrs(self):
-        status, data = api_request("/api/projectbase/knowledge/nodes", token=self.token)
+        status, data = api_request("/api/projectbase/knowledge/nodes?limit=500", token=self.token)
         assert status == 200
         items = data.get("items", [])
         assert len(items) >= 4
