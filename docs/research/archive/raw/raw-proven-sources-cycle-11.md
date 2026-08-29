@@ -203,13 +203,6 @@ HN window: Show HN with points≥20 created in the last **90 days** (not all-tim
 - **hn:** https://news.ycombinator.com/item?id=48675435
 - **angle:** Paid SKU? Copycat? Host-OSS? Gap next to this?
 
-### Show HN: Microsoft releases Flint, a visualization language for AI agents
-- **points:** 350
-- **created:** 2026-07-08T17:46:12Z
-- **url:** https://microsoft.github.io/flint-chart/#/
-- **hn:** https://news.ycombinator.com/item?id=48834924
-- **angle:** Paid SKU? Copycat? Host-OSS? Gap next to this?
-
 ### Show HN: Isopolis – Isometric pixel map of SF
 - **points:** 350
 - **created:** 2026-08-03T00:46:38Z
