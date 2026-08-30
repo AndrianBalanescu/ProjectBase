@@ -55,7 +55,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     await page.waitForTimeout(600);
     const paletteInput = page.locator('input[placeholder*="Type a command"]').first();
     if (await paletteInput.count()) {
-      await paletteInput.fill('Show Welcome Guide');
+      await paletteInput.fill('Welcome');
       await page.waitForTimeout(400);
       // Press Enter to select the first matching action.
       await paletteInput.press('Enter');

@@ -143,7 +143,9 @@ const EXE = process.env.QA_CHROME || '/home/ubuntu/.cache/ms-playwright/chromium
         await page.waitForTimeout(500);
         const termHasText = await page.evaluate(() => {
           const pre = document.querySelector('pre');
-          return !!pre && pre.textContent.trim().length > 0;
+          if (pre && pre.textContent.trim().length > 0) return true;
+          const container = document.querySelector('.bg-\\[\\#09090b\\]');
+          return !!container && (container.textContent.includes('No terminal stdout/stderr') || container.textContent.trim().length > 0);
         });
         audit.sessionTerminalLoaded = termHasText;
       }

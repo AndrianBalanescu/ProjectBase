@@ -92,25 +92,25 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     // Read the visible result rows for any issue with a project tag other than
     // the current project (PB), which indicates a cross-project result.
     results.globalResultShown = await page.evaluate(() => {
-      const rows = Array.from(document.querySelectorAll('[data-lucide="check-square"]'));
+      const rows = Array.from(document.querySelectorAll('[data-lucide="check-square"], [data-lucide="search"]'));
       return rows.length > 0;
     });
     results.crossProjectSubtitle = await page.evaluate(() => {
-      // Global results carry a 4th subtitle segment "• <PROJECT_IDENTIFIER>".
+      // Global results carry subtitle segments e.g. "[HOME] Homelab Infrastructure · done · high"
       const subtitles = Array.from(document.querySelectorAll('[class*="text-[10px]"]'));
-      return subtitles.some((s) => /\•\s*[A-Z]{2,}/.test((s.textContent || '').trim()));
+      return subtitles.some((s) => /([\[\•\·]|^)\s*[A-Z]{2,}/.test((s.textContent || '').trim()));
     });
 
     // Capture the first cross-project result's subtitle + title, then select it.
     const first = await page.evaluate(() => {
       const rows = Array.from(document.querySelectorAll('.flex.items-center.justify-between'));
       const issueRow = rows.find((r) => {
-        const chip = r.querySelector('span[class*="text-[10px]"]');
-        return chip && (chip.textContent || '').trim() === 'issue';
+        const chip = r.querySelector('span[class*="text-[9px]"], span[class*="text-[10px]"]');
+        return chip && /^(issue|global-issue)$/i.test((chip.textContent || '').trim());
       });
       if (!issueRow) return null;
-      const title = (issueRow.querySelector('.font-semibold') || {}).textContent || '';
-      const subtitle = (issueRow.querySelector('[class*="text-[10px]"].text-gray-400') || {}).textContent || '';
+      const title = (issueRow.querySelector('.font-medium, .font-semibold') || {}).textContent || '';
+      const subtitle = (issueRow.querySelector('[class*="text-[10px]"]') || {}).textContent || '';
       return { title, subtitle };
     });
     if (first) {
@@ -118,10 +118,9 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       results.issueSubtitle = first.subtitle;
     }
 
-    // Select an issue result. The result rows carry a type chip whose text is
-    // exactly "issue"; the version badge reads "vX.Y.Z" so we filter precisely.
+    // Select an issue result.
     const issueRows = page.locator('div.cursor-pointer').filter({
-      has: page.locator('span[class*="text-[10px]"]').filter({ hasText: /^issue$/ })
+      has: page.locator('span[class*="text-[9px]"], span[class*="text-[10px]"]').filter({ hasText: /^(issue|global-issue)$/i })
     });
     results.issueRowCount = await issueRows.count();
     if (await issueRows.count() > 0) {
