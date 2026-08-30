@@ -40,7 +40,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   const record = authData.record;
 
   console.log('Verifying Knowledge Graph & Invariant Verifier API...');
-  const invRes = await fetch(`${BASE}/api/projectbase/knowledge/invariants/verify`, {
+  const invRes = await fetch(`${BASE}/api/projectbase/knowledge/verify-invariants`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
