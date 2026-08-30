@@ -109,6 +109,7 @@ const App = {
       signupName: '',
       signupPasswordConfirm: '',
       signingUp: false,
+      signingIn: false,
       authError: '',
       currentProject: cache.currentProject || null,
       projects: cache.projects || [],
@@ -281,19 +282,34 @@ const App = {
       this.isOnline = false;
     },
     async signIn(e) {
+      if (e && e.preventDefault) e.preventDefault();
+      if (this.signingIn) return;
+      this.signingIn = true;
       this.authError = '';
-      let email = '';
-      let password = '';
+      let email = (this.loginEmail || '').trim();
+      let password = this.loginPassword || '';
       try {
-        const emailEl = document.getElementById('login-email') || document.querySelector('input[type="email"]');
-        const passEl = document.getElementById('login-password') || document.querySelector('input[type="password"]');
+        const emailEl = document.getElementById('login-email') || document.querySelector('#app input[type="email"]') || document.querySelector('input[name="email"]');
+        const passEl = document.getElementById('login-password') || document.querySelector('#app input[type="password"]') || document.querySelector('input[name="password"]');
         if (emailEl && emailEl.value) email = emailEl.value.trim();
         if (passEl && passEl.value) password = passEl.value;
       } catch (domErr) {}
-      if (!email) email = (this.loginEmail || '').trim();
-      if (!password) password = this.loginPassword || '';
+      if (!email || !password) {
+        try {
+          const allInputs = document.querySelectorAll('input');
+          for (const inp of allInputs) {
+            if (!email && (inp.type === 'email' || inp.name === 'email' || inp.id.includes('email') || (inp.placeholder && inp.placeholder.toLowerCase().includes('email')))) {
+              if (inp.value) email = inp.value.trim();
+            }
+            if (!password && (inp.type === 'password' || inp.name === 'password' || inp.id.includes('password') || (inp.placeholder && inp.placeholder.toLowerCase().includes('pass')))) {
+              if (inp.value) password = inp.value;
+            }
+          }
+        } catch (e) {}
+      }
       if (!email || !password) {
         this.authError = 'Please enter your email and password.';
+        this.signingIn = false;
         return;
       }
       this.loginEmail = email;
@@ -314,6 +330,8 @@ const App = {
         this.isInitialRouting = false;
       } catch (err) {
         this.authError = err?.response?.message || err?.message || 'Unable to sign in with those credentials.';
+      } finally {
+        this.signingIn = false;
       }
     },
     async signUp() {
