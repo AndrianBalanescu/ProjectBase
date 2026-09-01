@@ -177,23 +177,35 @@ const AgentsViewComponent = {
       if (this.chatLog[sid] && this.chatLog[sid].length > 0) {
         return this.chatLog[sid];
       }
-      if (s.chat && Array.isArray(s.chat) && s.chat.length > 0) return s.chat;
+      if (s.chat && Array.isArray(s.chat) && s.chat.length > 0) {
+        return s.chat.filter(t => t && (t.content || t.reasoning || (t.tools && t.tools.length) || (t.tool_calls && t.tool_calls.length)));
+      }
       if (s.live_activity && Array.isArray(s.live_activity) && s.live_activity.length > 0) {
         return s.live_activity.map(ev => ({
           role: 'assistant',
-          content: ev.summary || ev.tool || 'Activity event',
-          tool_calls: ev.tool ? [{ name: ev.tool, input: ev.input, output: ev.output }] : [],
-          created_at: ev.timestamp
+          content: ev.summary || '',
+          reasoning: ev.type === 'reasoning' ? (ev.summary || '') : '',
+          tools: ev.type === 'tool' ? [{ name: ev.name || ev.tool || 'tool', input: ev.input || '', intent: ev.intent || '' }] : [],
+          timestamp: ev.timestamp
         }));
       }
 
       const turns = [];
-      const promptText = s.last_prompt || s.title || s.command || `Autonomous execution run in ${s.working_dir || 'workspace'}`;
+      const promptText = s.intention || s.last_prompt || s.title || s.command || `Autonomous execution run in ${s.working_dir || 'workspace'}`;
       turns.push({
         role: 'user',
         content: promptText,
         created_at: s.started_at || s.created || new Date().toISOString()
       });
+
+      if (s.latest_reasoning || (s.recent_tools && s.recent_tools.length > 0)) {
+        turns.push({
+          role: 'assistant',
+          reasoning: s.latest_reasoning || '',
+          tools: s.recent_tools || [],
+          timestamp: s.last_active_at || s.updated || new Date().toISOString()
+        });
+      }
 
       let assistantContent = `⚡ **Agent:** \`${s.agent_name || s.short_name || 'Flomaster'}\`\n\n` +
         `• **Working Directory:** \`${s.working_dir || s.workdir || '/data/projects/projectbase'}\`\n` +
@@ -1210,7 +1222,16 @@ const AgentsViewComponent = {
                     ? 'bg-indigo-600 text-white order-1'
                     : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 order-2'"
                 >
-                  <div class="whitespace-pre-wrap font-sans text-xs leading-normal">{{ turn.content }}</div>
+                  <!-- Thought / Reasoning block -->
+                  <div v-if="turn.reasoning" class="p-2 rounded bg-zinc-50/90 dark:bg-zinc-950/80 border border-zinc-200/60 dark:border-zinc-800/60 text-[11px] text-zinc-600 dark:text-zinc-400 italic space-y-1">
+                    <div class="flex items-center gap-1 font-semibold text-[10px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 not-italic">
+                      <span>💭 Thought Process</span>
+                    </div>
+                    <div class="whitespace-pre-wrap font-mono text-[11px] leading-relaxed">{{ turn.reasoning }}</div>
+                  </div>
+
+                  <!-- Text content -->
+                  <div v-if="turn.content" class="whitespace-pre-wrap font-sans text-xs leading-normal">{{ turn.content }}</div>
 
                   <!-- Test Verdict Badge -->
                   <div v-if="turn.test_verdict" class="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 font-mono text-[11px] flex items-center justify-between">
@@ -1219,14 +1240,18 @@ const AgentsViewComponent = {
                   </div>
 
                   <!-- Tool calls / activity snippet -->
-                  <div v-if="turn.tool_calls && turn.tool_calls.length" class="space-y-1 pt-1 border-t border-zinc-100 dark:border-zinc-800">
-                    <div v-for="(tc, tIdx) in turn.tool_calls" :key="tIdx" class="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-950 p-1.5 rounded border border-zinc-200/60 dark:border-zinc-800/60">
-                      🔧 {{ tc.name }}
+                  <div v-if="(turn.tools && turn.tools.length) || (turn.tool_calls && turn.tool_calls.length)" class="space-y-1 pt-1 border-t border-zinc-100 dark:border-zinc-800">
+                    <div v-for="(tc, tIdx) in (turn.tools || turn.tool_calls)" :key="tIdx" class="text-[10px] font-mono text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-950 p-1.5 rounded border border-zinc-200/60 dark:border-zinc-800/60 flex flex-col gap-0.5">
+                      <div class="font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
+                        <span>🔧 {{ tc.name || 'tool' }}</span>
+                        <span v-if="tc.intent" class="text-zinc-400 font-normal text-[9px]">({{ tc.intent }})</span>
+                      </div>
+                      <div v-if="tc.input" class="truncate text-zinc-500 dark:text-zinc-400 text-[9px]">{{ tc.input }}</div>
                     </div>
                   </div>
 
                   <div class="text-[9px] opacity-60 font-mono text-right pt-0.5">
-                    {{ fmtTime(turn.created_at) }}
+                    {{ fmtTime(turn.timestamp || turn.created_at || turn.created) }}
                   </div>
                 </div>
               </div>

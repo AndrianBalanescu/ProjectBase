@@ -127,26 +127,107 @@ routerAdd("GET", "/api/projectbase/agents", (e) => {
             };
         });
 
-        // If machine bridge file exists, augment with bridge data
+        // If machine bridge file exists, augment and prioritize live bridge data
+        let bridgeSessions = [];
         for (const bp of BRIDGE_PATHS) {
             if (!exists(bp)) continue;
             try {
                 let raw = $os.readFile(bp);
                 if (typeof raw !== "string") raw = decodeUtf8(raw);
                 const parsed = JSON.parse(raw);
-                if (parsed.sessions && parsed.sessions.length > 0 && dbSessions.length === 0) {
-                    dbSessions = parsed.sessions;
+                if (parsed.sessions && parsed.sessions.length > 0) {
+                    bridgeSessions = parsed.sessions.map(s => {
+                        const sid = s.id || s.session_id || "session_" + Math.random().toString(36).slice(2);
+                        const agName = (s.agent || s.runtime || "flomaster").toLowerCase();
+                        const promptText = s.intention || s.title || s.last_text || s.last_prompt || "";
+                        const isActive = !!s.is_active || s.status === "running" || s.status === "Running";
+                        const st = isActive ? "running" : (s.status ? String(s.status).toLowerCase() : "completed");
+                        const createdTs = s.last_active_at || s.updated_at || new Date().toISOString();
+                        const updatedTs = s.updated_at || s.last_active_at || createdTs;
+                        return {
+                            id: sid,
+                            session_id: sid,
+                            agent: agName,
+                            agent_name: s.agent_name || (agName === "flomaster" ? "Flomaster" : (agName === "hermes" ? "Hermes" : s.short_name || agName)),
+                            short_name: s.short_name || sid.slice(0, 12),
+                            runtime: s.runtime || agName,
+                            model: s.model || "omniroute/premium",
+                            status: st,
+                            is_active: isActive,
+                            pid: s.pid || 0,
+                            working_dir: s.working_dir || s.workdir || "/data/projects/projectbase",
+                            project_id: s.project_id || "",
+                            git_branch: s.git_branch || "main",
+                            git_commit: s.git_commit || "",
+                            git_diff_raw: s.git_diff_raw || "",
+                            files_touched: s.files_touched || [],
+                            log_tail: s.log_tail || "",
+                            test_verdict: s.test_verdict || null,
+                            tokens: (s.token_usage && (s.token_usage.total || s.token_usage.Total)) || s.tokens || 0,
+                            token_usage: s.token_usage || null,
+                            message_count: s.message_count || (s.chat ? s.chat.length : 1),
+                            last_prompt: promptText,
+                            title: promptText || (s.short_name ? "Session " + s.short_name : "Execution Run"),
+                            chat: s.chat || [],
+                            live_activity: s.live_activity || [],
+                            recent_tools: s.recent_tools || [],
+                            latest_reasoning: s.latest_reasoning || "",
+                            reasoning_steps: s.reasoning_steps || [],
+                            todos: s.todos || [],
+                            created: createdTs,
+                            updated: updatedTs,
+                            avatar: s.avatar || (agName === "hermes" ? "🐦" : "🧠")
+                        };
+                    });
+                    break;
                 }
-            } catch (err) {}
+            } catch (err) {
+                console.log(">>> [Agents] bridge parse warning:", err);
+            }
         }
+
+        // Merge: Live bridge sessions first, then non-duplicate DB sessions
+        const seenIds = new Set();
+        const combinedSessions = [];
+        for (const s of bridgeSessions) {
+            const k = s.session_id || s.id;
+            if (k && !seenIds.has(k)) {
+                seenIds.add(k);
+                combinedSessions.push(s);
+            }
+        }
+        for (const s of dbSessions) {
+            const k = s.session_id || s.id;
+            if (k && !seenIds.has(k)) {
+                seenIds.add(k);
+                combinedSessions.push(s);
+            }
+        }
+
+        // Recalculate agents list based on combined sessions
+        const finalAgentsList = AGENTS.map(ag => {
+            const agSessions = combinedSessions.filter(s => s.agent === ag.name || s.runtime === ag.name);
+            const isOnline = agSessions.some(s => s.is_active);
+            return {
+                name: ag.name,
+                provider: ag.provider,
+                runtime: ag.runtime,
+                avatar: ag.avatar,
+                source_dir: "$HOME/" + ag.dir,
+                found: true,
+                core: ag.core,
+                status: isOnline ? "online" : (agSessions.length > 0 ? "idle" : "offline"),
+                session_count: agSessions.length
+            };
+        });
 
         return e.json(200, {
             home,
-            source: dbSessions.length > 0 ? "db_and_live" : "direct",
-            agents: agentsList,
-            sessions: dbSessions,
-            total_agents: agentsList.length,
-            total_sessions: dbSessions.length
+            source: bridgeSessions.length > 0 ? "bridge_live" : (dbSessions.length > 0 ? "db" : "direct"),
+            agents: finalAgentsList,
+            sessions: combinedSessions,
+            total_agents: finalAgentsList.length,
+            total_sessions: combinedSessions.length
         });
     } catch (err) {
         const msg = err && err.message ? err.message : JSON.stringify(err);
