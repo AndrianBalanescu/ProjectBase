@@ -177,17 +177,57 @@ const AgentsViewComponent = {
       if (this.chatLog[sid] && this.chatLog[sid].length > 0) {
         return this.chatLog[sid];
       }
+      let rawTurns = [];
       if (s.chat && Array.isArray(s.chat) && s.chat.length > 0) {
-        return s.chat.filter(t => t && (t.content || t.reasoning || (t.tools && t.tools.length) || (t.tool_calls && t.tool_calls.length)));
-      }
-      if (s.live_activity && Array.isArray(s.live_activity) && s.live_activity.length > 0) {
-        return s.live_activity.map(ev => ({
+        rawTurns = s.chat;
+      } else if (s.live_activity && Array.isArray(s.live_activity) && s.live_activity.length > 0) {
+        rawTurns = s.live_activity.map(ev => ({
           role: 'assistant',
-          content: ev.summary || '',
+          content: ev.type === 'text' ? (ev.summary || '') : '',
           reasoning: ev.type === 'reasoning' ? (ev.summary || '') : '',
           tools: ev.type === 'tool' ? [{ name: ev.name || ev.tool || 'tool', input: ev.input || '', intent: ev.intent || '' }] : [],
           timestamp: ev.timestamp
         }));
+      }
+
+      const validTurns = rawTurns.filter(t => t && (t.content || t.reasoning || (t.tools && t.tools.length) || (t.tool_calls && t.tool_calls.length)));
+      
+      if (validTurns.length > 0) {
+        const coalesced = [];
+        for (const t of validTurns) {
+          const tTools = t.tools || t.tool_calls || [];
+          if (t.role === 'assistant' && coalesced.length > 0 && coalesced[coalesced.length - 1].role === 'assistant') {
+            const prev = coalesced[coalesced.length - 1];
+            if (t.reasoning) {
+              prev.reasoning = prev.reasoning ? (prev.reasoning + '\n\n' + t.reasoning) : t.reasoning;
+            }
+            if (tTools.length > 0) {
+              prev.tools = (prev.tools || []).concat(tTools);
+            }
+            if (t.content) {
+              prev.content = prev.content ? (prev.content + '\n\n' + t.content) : t.content;
+            }
+            if (t.timestamp || t.created_at) {
+              prev.timestamp = t.timestamp || t.created_at;
+            }
+          } else {
+            coalesced.push({
+              ...t,
+              tools: tTools
+            });
+          }
+        }
+        if (coalesced.length > 0 && coalesced[0].role !== 'user') {
+          const promptText = s.intention || s.last_prompt || s.title || s.command || '';
+          if (promptText) {
+            coalesced.unshift({
+              role: 'user',
+              content: promptText,
+              timestamp: s.started_at || s.created || (coalesced[0].timestamp || coalesced[0].created_at)
+            });
+          }
+        }
+        return coalesced;
       }
 
       const turns = [];
@@ -248,6 +288,28 @@ const AgentsViewComponent = {
     if (window.lucide) window.lucide.createIcons();
   },
   methods: {
+    renderMarkdown(content) {
+      if (!content) return '';
+      if (window.marked && window.DOMPurify) {
+        try {
+          return window.DOMPurify.sanitize(window.marked.parse(String(content), { breaks: true, gfm: true }));
+        } catch (e) {
+          return String(content);
+        }
+      }
+      return String(content);
+    },
+    getToolIcon(name) {
+      const n = (name || '').toLowerCase();
+      if (n.includes('bash') || n.includes('cmd') || n.includes('exec')) return '⚡';
+      if (n.includes('read') || n.includes('file')) return '📄';
+      if (n.includes('edit') || n.includes('write') || n.includes('patch')) return '✏️';
+      if (n.includes('grep') || n.includes('search') || n.includes('find')) return '🔍';
+      if (n.includes('todo') || n.includes('task')) return '📋';
+      if (n.includes('browser') || n.includes('web')) return '🌐';
+      if (n.includes('git')) return '🌿';
+      return '🔧';
+    },
     selectAgent(agentName) {
       this.$emit('navigate', agentName || null);
       this.selectedSessionId = null;
@@ -1208,30 +1270,63 @@ const AgentsViewComponent = {
               <div
                 v-for="(turn, idx) in chatTurns"
                 :key="idx"
-                class="flex items-start gap-2"
+                class="flex items-start gap-2.5"
                 :class="turn.role === 'user' ? 'justify-end' : 'justify-start'"
               >
-                <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 mt-0.5"
-                  :class="turn.role === 'user' ? 'bg-indigo-100 dark:bg-indigo-950/60 order-2' : 'bg-zinc-200 dark:bg-zinc-800 order-1'">
+                <!-- Avatar -->
+                <span class="w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-2xs border"
+                  :class="turn.role === 'user'
+                    ? 'bg-indigo-600 border-indigo-500 text-white order-2'
+                    : 'bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700/60 text-zinc-900 dark:text-zinc-100 order-1'">
                   {{ turn.role === 'user' ? '🧑' : (selectedSession.avatar || '🧠') }}
                 </span>
 
+                <!-- Message Box -->
                 <div
-                  class="max-w-[85%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed space-y-2 shadow-2xs"
+                  class="max-w-[88%] rounded-2xl p-3.5 text-xs leading-relaxed space-y-2.5 shadow-sm transition-all"
                   :class="turn.role === 'user'
-                    ? 'bg-indigo-600 text-white order-1'
+                    ? 'bg-indigo-600 text-white order-1 border border-indigo-500/80'
                     : 'bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 order-2'"
                 >
-                  <!-- Thought / Reasoning block -->
-                  <div v-if="turn.reasoning" class="p-2 rounded bg-zinc-50/90 dark:bg-zinc-950/80 border border-zinc-200/60 dark:border-zinc-800/60 text-[11px] text-zinc-600 dark:text-zinc-400 italic space-y-1">
-                    <div class="flex items-center gap-1 font-semibold text-[10px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 not-italic">
-                      <span>💭 Thought Process</span>
+                  <!-- Thought / Reasoning Collapsible Disclosure Block -->
+                  <details v-if="turn.reasoning" class="group rounded-xl border border-amber-500/20 dark:border-amber-500/20 bg-amber-50/40 dark:bg-amber-950/10 overflow-hidden text-xs">
+                    <summary class="px-3 py-1.5 cursor-pointer font-mono text-[10px] font-semibold text-amber-700 dark:text-amber-400 flex items-center justify-between hover:bg-amber-100/40 dark:hover:bg-amber-900/20 select-none">
+                      <span class="flex items-center gap-1.5">
+                        <span>💭</span>
+                        <span class="tracking-wider uppercase">Thought Process</span>
+                      </span>
+                      <span class="text-[9px] opacity-75 font-normal">details ▾</span>
+                    </summary>
+                    <div class="px-3.5 py-2.5 border-t border-amber-500/10 dark:border-amber-500/10 font-mono text-[11px] leading-relaxed text-zinc-700 dark:text-zinc-300 italic whitespace-pre-wrap select-text bg-white/40 dark:bg-black/30" v-html="renderMarkdown(turn.reasoning)"></div>
+                  </details>
+
+                  <!-- Tool Executions Deck -->
+                  <div v-if="turn.tools && turn.tools.length" class="space-y-1.5">
+                    <div class="flex items-center justify-between text-[10px] font-mono font-semibold text-zinc-500 dark:text-zinc-400 px-0.5">
+                      <span class="flex items-center gap-1">
+                        <span>🔧</span>
+                        <span>EXECUTED TOOLS ({{ turn.tools.length }})</span>
+                      </span>
                     </div>
-                    <div class="whitespace-pre-wrap font-mono text-[11px] leading-relaxed">{{ turn.reasoning }}</div>
+                    <div class="space-y-1">
+                      <div v-for="(tc, tIdx) in turn.tools" :key="tIdx" class="p-2 rounded-lg bg-zinc-50/90 dark:bg-zinc-950/80 border border-zinc-200/80 dark:border-zinc-800/80 text-[11px] font-mono flex flex-col gap-1 shadow-2xs">
+                        <div class="flex items-center justify-between gap-2">
+                          <div class="flex items-center gap-1.5 min-w-0">
+                            <span class="px-1.5 py-0.5 rounded font-bold text-[10px] bg-indigo-500/10 dark:bg-indigo-400/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 dark:border-indigo-400/20 shrink-0">
+                              {{ getToolIcon(tc.name) }} {{ tc.name }}
+                            </span>
+                            <span v-if="tc.intent" class="font-medium text-zinc-800 dark:text-zinc-200 truncate text-[10.5px]">{{ tc.intent }}</span>
+                          </div>
+                        </div>
+                        <div v-if="tc.input" class="text-[10px] text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900/90 p-1.5 rounded border border-zinc-200/60 dark:border-zinc-800/60 truncate font-mono select-all">
+                          {{ tc.input }}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <!-- Text content -->
-                  <div v-if="turn.content" class="whitespace-pre-wrap font-sans text-xs leading-normal">{{ turn.content }}</div>
+                  <!-- Text content (Markdown Rendered with Code Highlight Styling) -->
+                  <div v-if="turn.content" class="chat-markdown markdown-body text-xs leading-relaxed select-text" :class="turn.role === 'user' ? 'text-white' : 'text-zinc-800 dark:text-zinc-100'" v-html="renderMarkdown(turn.content)"></div>
 
                   <!-- Test Verdict Badge -->
                   <div v-if="turn.test_verdict" class="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 font-mono text-[11px] flex items-center justify-between">
@@ -1239,18 +1334,8 @@ const AgentsViewComponent = {
                     <span>✓ {{ turn.test_verdict.status || 'passed' }}</span>
                   </div>
 
-                  <!-- Tool calls / activity snippet -->
-                  <div v-if="(turn.tools && turn.tools.length) || (turn.tool_calls && turn.tool_calls.length)" class="space-y-1 pt-1 border-t border-zinc-100 dark:border-zinc-800">
-                    <div v-for="(tc, tIdx) in (turn.tools || turn.tool_calls)" :key="tIdx" class="text-[10px] font-mono text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-950 p-1.5 rounded border border-zinc-200/60 dark:border-zinc-800/60 flex flex-col gap-0.5">
-                      <div class="font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
-                        <span>🔧 {{ tc.name || 'tool' }}</span>
-                        <span v-if="tc.intent" class="text-zinc-400 font-normal text-[9px]">({{ tc.intent }})</span>
-                      </div>
-                      <div v-if="tc.input" class="truncate text-zinc-500 dark:text-zinc-400 text-[9px]">{{ tc.input }}</div>
-                    </div>
-                  </div>
-
-                  <div class="text-[9px] opacity-60 font-mono text-right pt-0.5">
+                  <!-- Timestamp Footer -->
+                  <div class="text-[9px] opacity-60 font-mono text-right pt-0.5" :class="turn.role === 'user' ? 'text-indigo-100' : 'text-zinc-400'">
                     {{ fmtTime(turn.timestamp || turn.created_at || turn.created) }}
                   </div>
                 </div>

@@ -329,6 +329,91 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ---------------------------------------------------------------------------
+ * 9.1 Chat Stream Markdown & Code Block Styles
+ * ------------------------------------------------------------------------- */
+.chat-markdown {
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+.chat-markdown p {
+  margin-bottom: 0.5rem;
+}
+.chat-markdown p:last-child {
+  margin-bottom: 0;
+}
+.chat-markdown h1, .chat-markdown h2, .chat-markdown h3, .chat-markdown h4 {
+  font-weight: 600;
+  margin-top: 0.75rem;
+  margin-bottom: 0.35rem;
+  color: inherit;
+}
+.chat-markdown h1 { font-size: 1.1rem; }
+.chat-markdown h2 { font-size: 1rem; }
+.chat-markdown h3 { font-size: 0.9rem; }
+.chat-markdown ul, .chat-markdown ol {
+  padding-left: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+.chat-markdown ul { list-style-type: disc; }
+.chat-markdown ol { list-style-type: decimal; }
+.chat-markdown li {
+  margin-bottom: 0.25rem;
+}
+.chat-markdown code {
+  background: rgba(120, 120, 140, 0.15);
+  color: inherit;
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85em;
+  border: 1px solid rgba(120, 120, 140, 0.2);
+}
+.chat-markdown pre {
+  background: #090a0f !important;
+  color: #e2e8f0 !important;
+  border: 1px solid #1e293b !important;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+}
+.chat-markdown pre code {
+  background: transparent !important;
+  color: inherit !important;
+  padding: 0 !important;
+  border: none !important;
+  font-size: inherit !important;
+}
+.chat-markdown blockquote {
+  border-left: 3px solid #6366f1;
+  padding-left: 0.75rem;
+  font-style: italic;
+  opacity: 0.85;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.chat-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+  font-size: 0.75rem;
+}
+.chat-markdown th, .chat-markdown td {
+  border: 1px solid rgba(120, 120, 140, 0.2);
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+}
+.chat-markdown th {
+  background: rgba(120, 120, 140, 0.1);
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------------
  * 10. Entrance animations (lightweight)
  * ------------------------------------------------------------------------- */
 @keyframes pb-fade-in {

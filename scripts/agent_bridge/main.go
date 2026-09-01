@@ -552,39 +552,88 @@ func collectHermesSessions(homeDir string) []Session {
 			toolCalls := asString(m["tool_calls"])
 			reasoning := asString(m["reasoning_content"])
 
-			if (role == "user" || role == "assistant") && strings.TrimSpace(content) != "" {
-				turn := ChatMessage{Role: role, Timestamp: ts}
-				turn.Content = truncateString(strings.TrimSpace(content), 800)
-				if strings.TrimSpace(reasoning) != "" {
-					turn.Reasoning = truncateString(strings.TrimSpace(reasoning), 700)
-					events = append(events, ActivityEvent{Type: "reasoning", Summary: truncateString(strings.TrimSpace(reasoning), 320), Timestamp: ts})
+			if role == "user" {
+				if strings.TrimSpace(content) != "" {
+					chat = append(chat, ChatMessage{
+						Role:      "user",
+						Content:   truncateString(strings.TrimSpace(content), 800),
+						Timestamp: ts,
+					})
 				}
-				chat = append(chat, turn)
-				if role == "assistant" {
-					events = append(events, ActivityEvent{Type: "text", Summary: turn.Content, Timestamp: ts})
-				}
-			} else if role == "assistant" && strings.TrimSpace(reasoning) != "" {
-				events = append(events, ActivityEvent{Type: "reasoning", Summary: truncateString(strings.TrimSpace(reasoning), 320), Timestamp: ts})
-			}
+			} else if role == "assistant" {
+				cleanContent := strings.TrimSpace(content)
+				cleanReasoning := strings.TrimSpace(reasoning)
 
-			if toolName != "" {
-				t := Tool{Name: toolName, Timestamp: ts}
-				if input := strings.TrimSpace(content); input != "" {
-					t.Input = truncateString(input, 160)
-				}
-				tools = append(tools, t)
-				events = append(events, ActivityEvent{Type: "tool", Name: toolName, Summary: t.Input, Timestamp: ts})
-			} else if toolCalls != "" && strings.Contains(toolCalls, "\"name\"") {
-				// OpenAI-style tool_calls JSON array
-				var calls []struct {
-					Name string `json:"name"`
-				}
-				if json.Unmarshal([]byte(toolCalls), &calls) == nil {
-					for _, c := range calls {
-						if c.Name != "" {
-							tools = append(tools, Tool{Name: c.Name, Timestamp: ts})
-							events = append(events, ActivityEvent{Type: "tool", Name: c.Name, Timestamp: ts})
+				var msgTools []ChatTool
+				if toolName != "" {
+					t := Tool{Name: toolName, Timestamp: ts}
+					if cleanContent != "" {
+						t.Input = truncateString(cleanContent, 160)
+					}
+					tools = append(tools, t)
+					events = append(events, ActivityEvent{Type: "tool", Name: toolName, Summary: t.Input, Timestamp: ts})
+					msgTools = append(msgTools, ChatTool{Name: toolName, Input: t.Input})
+				} else if toolCalls != "" && strings.Contains(toolCalls, "\"name\"") {
+					var calls []struct {
+						Name string `json:"name"`
+					}
+					if json.Unmarshal([]byte(toolCalls), &calls) == nil {
+						for _, c := range calls {
+							if c.Name != "" {
+								tools = append(tools, Tool{Name: c.Name, Timestamp: ts})
+								events = append(events, ActivityEvent{Type: "tool", Name: c.Name, Timestamp: ts})
+								msgTools = append(msgTools, ChatTool{Name: c.Name})
+							}
 						}
+					}
+				}
+
+				if cleanReasoning != "" {
+					events = append(events, ActivityEvent{Type: "reasoning", Summary: truncateString(cleanReasoning, 320), Timestamp: ts})
+				}
+				if cleanContent != "" && toolName == "" {
+					events = append(events, ActivityEvent{Type: "text", Summary: truncateString(cleanContent, 240), Timestamp: ts})
+				}
+
+				turn := ChatMessage{
+					Role:      "assistant",
+					Timestamp: ts,
+				}
+				if cleanContent != "" && toolName == "" {
+					turn.Content = truncateString(cleanContent, 800)
+				}
+				if cleanReasoning != "" {
+					turn.Reasoning = truncateString(cleanReasoning, 700)
+				}
+				if len(msgTools) > 0 {
+					turn.Tools = msgTools
+				}
+
+				if turn.Content != "" || turn.Reasoning != "" || len(turn.Tools) > 0 {
+					if len(chat) > 0 && chat[len(chat)-1].Role == "assistant" {
+						prev := &chat[len(chat)-1]
+						if turn.Reasoning != "" {
+							if prev.Reasoning == "" {
+								prev.Reasoning = turn.Reasoning
+							} else if !strings.Contains(prev.Reasoning, turn.Reasoning) {
+								prev.Reasoning = prev.Reasoning + "\n\n" + turn.Reasoning
+							}
+						}
+						if len(turn.Tools) > 0 {
+							prev.Tools = append(prev.Tools, turn.Tools...)
+						}
+						if turn.Content != "" {
+							if prev.Content == "" {
+								prev.Content = turn.Content
+							} else {
+								prev.Content = prev.Content + "\n\n" + turn.Content
+							}
+						}
+						if turn.Timestamp != "" {
+							prev.Timestamp = turn.Timestamp
+						}
+					} else {
+						chat = append(chat, turn)
 					}
 				}
 			}
@@ -1078,7 +1127,31 @@ func buildChat(scan []interface{}, max int) []ChatMessage {
 		}
 
 		if turn.Content != "" || turn.Reasoning != "" || len(turn.Tools) > 0 {
-			chat = append(chat, turn)
+			if role == "assistant" && len(chat) > 0 && chat[len(chat)-1].Role == "assistant" {
+				prev := &chat[len(chat)-1]
+				if turn.Reasoning != "" {
+					if prev.Reasoning == "" {
+						prev.Reasoning = turn.Reasoning
+					} else if !strings.Contains(prev.Reasoning, turn.Reasoning) {
+						prev.Reasoning = prev.Reasoning + "\n\n" + turn.Reasoning
+					}
+				}
+				if len(turn.Tools) > 0 {
+					prev.Tools = append(prev.Tools, turn.Tools...)
+				}
+				if turn.Content != "" {
+					if prev.Content == "" {
+						prev.Content = turn.Content
+					} else {
+						prev.Content = prev.Content + "\n\n" + turn.Content
+					}
+				}
+				if turn.Timestamp != "" {
+					prev.Timestamp = turn.Timestamp
+				}
+			} else {
+				chat = append(chat, turn)
+			}
 		}
 	}
 
