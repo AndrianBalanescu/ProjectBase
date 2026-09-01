@@ -15,7 +15,6 @@
 // Run:
 //
 //	bin/agent_bridge --out /run/projectbase/agents.json
-//
 package main
 
 import (
@@ -24,6 +23,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	"sort"
@@ -76,11 +76,11 @@ type Session struct {
 // type-distinct bubbles (reasoning, text, tools). Never forwards raw tool
 // outputs or secrets.
 type ChatMessage struct {
-	Role       string         `json:"role"`
-	Content    string         `json:"content,omitempty"`     // plain text (user / assistant text)
-	Reasoning  string         `json:"reasoning,omitempty"`   // cursive, low-saturation thought block
-	Tools      []ChatTool     `json:"tools,omitempty"`       // grouped tool invocations
-	Timestamp  string         `json:"timestamp,omitempty"`
+	Role      string     `json:"role"`
+	Content   string     `json:"content,omitempty"`   // plain text (user / assistant text)
+	Reasoning string     `json:"reasoning,omitempty"` // cursive, low-saturation thought block
+	Tools     []ChatTool `json:"tools,omitempty"`     // grouped tool invocations
+	Timestamp string     `json:"timestamp,omitempty"`
 }
 
 // ChatTool is a compact, grouped tool invocation inside an assistant turn.
@@ -99,11 +99,11 @@ type TokenStats struct {
 
 // ActivityEvent is an interleaved chronological item in the live session stream.
 type ActivityEvent struct {
-	Type      string `json:"type"`                // "reasoning" | "tool" | "text"
-	Name      string `json:"name,omitempty"`      // tool name (for tool events)
-	Intent    string `json:"intent,omitempty"`    // tool intent label
-	Input     string `json:"input,omitempty"`     // input summary (file path, query, command)
-	Summary   string `json:"summary,omitempty"`   // reasoning or text snippet
+	Type      string `json:"type"`              // "reasoning" | "tool" | "text"
+	Name      string `json:"name,omitempty"`    // tool name (for tool events)
+	Intent    string `json:"intent,omitempty"`  // tool intent label
+	Input     string `json:"input,omitempty"`   // input summary (file path, query, command)
+	Summary   string `json:"summary,omitempty"` // reasoning or text snippet
 	Timestamp string `json:"timestamp,omitempty"`
 }
 
@@ -180,6 +180,14 @@ func main() {
 				a.Status = "online"
 			}
 			sessions = append(sessions, s...)
+		}
+		if a.Name == "hermes" && a.Found {
+			hs := collectHermesSessions(homeDir)
+			a.SessionCount = len(hs)
+			if a.SessionCount > 0 {
+				a.Status = "online"
+			}
+			sessions = append(sessions, hs...)
 		}
 		agents = append(agents, a)
 	}
@@ -418,6 +426,285 @@ func collectSessions(homeDir, dir, avatar string) []Session {
 		}
 	}
 	return out
+}
+
+// hermesRow is one row from ~/.hermes/state.db sessions table.
+type hermesRow struct {
+	ID          string  `json:"id"`
+	Title       string  `json:"title"`
+	Model       string  `json:"model"`
+	Source      string  `json:"source"`
+	MessageCnt  int     `json:"message_count"`
+	StartedAt   float64 `json:"started_at"`
+	EndedAt     float64 `json:"ended_at"`
+	EndReason   string  `json:"end_reason"`
+	Cwd         string  `json:"cwd"`
+	GitBranch   string  `json:"git_branch"`
+	GitRepoRoot string  `json:"git_repo_root"`
+	InputTok    int     `json:"input_tokens"`
+	OutputTok   int     `json:"output_tokens"`
+	LastActive  float64 `json:"last_activity_at"`
+}
+
+// hermesMsg is one row from ~/.hermes/state.db messages table.
+type hermesMsg struct {
+	Role      string  `json:"role"`
+	Content   string  `json:"content"`
+	ToolName  string  `json:"tool_name"`
+	ToolCalls string  `json:"tool_calls"`
+	Reasoning string  `json:"reasoning_content"`
+	Timestamp float64 `json:"timestamp"`
+}
+
+// runSQLiteJSON shells out to the sqlite3 CLI, which is present on the homelab
+// (JSON1 enabled). Returns parsed rows as []map[string]interface{}.
+//
+// The sqlite3 CLI cannot bind parameters from CLI args, so `?` placeholders
+// are substituted with single-quote-escaped string literals before execution.
+// Only used for trusted internal IDs (session ids), never user input.
+func runSQLiteJSON(dbPath, query string, args ...string) []map[string]interface{} {
+	for _, a := range args {
+		lit := "'" + strings.ReplaceAll(a, "'", "''") + "'"
+		query = strings.Replace(query, "?", lit, 1)
+	}
+	out, err := exec.Command("sqlite3", "-json", dbPath, query).Output()
+	if err != nil {
+		return nil
+	}
+	var rows []map[string]interface{}
+	if json.Unmarshal(out, &rows) != nil {
+		return nil
+	}
+	return rows
+}
+
+// collectHermesSessions reads recent sessions and their message snapshots from
+// Hermes' SQLite session store (~/.hermes/state.db) and returns the sanctioned
+// public metadata as ProjectBase Session cards. Hermes stores timestamps as
+// Unix seconds (REAL), unlike Flomaster which uses RFC3339 strings.
+func collectHermesSessions(homeDir string) []Session {
+	dbPath := filepath.Join(homeDir, ".hermes", "state.db")
+	if _, err := os.Stat(dbPath); err != nil {
+		return nil
+	}
+
+	rows := runSQLiteJSON(dbPath, `SELECT id, COALESCE(title,'') title, COALESCE(model,'') model, COALESCE(source,'') source,
+		message_count, started_at, COALESCE(ended_at,0) ended_at, COALESCE(end_reason,'') end_reason,
+		COALESCE(cwd,'') cwd, COALESCE(git_branch,'') git_branch, COALESCE(git_repo_root,'') git_repo_root,
+		input_tokens, output_tokens, COALESCE(last_activity_at,started_at) last_activity_at
+		FROM sessions WHERE COALESCE(archived,0)=0 AND COALESCE(hidden,0)=0
+		ORDER BY COALESCE(last_activity_at, started_at) DESC LIMIT 12`)
+
+	now := time.Now().Unix()
+	sessions := make([]Session, 0, len(rows))
+	for _, r := range rows {
+		if r == nil {
+			continue
+		}
+		id := asString(r["id"])
+		if id == "" {
+			continue
+		}
+		title := asString(r["title"])
+		if title == "" {
+			title = "Hermes session " + id
+		}
+		model := asString(r["model"])
+		short := id
+		if len(id) > 16 {
+			short = id[:16]
+		}
+		started := asFloat(r["started_at"])
+		lastActive := asFloat(r["last_activity_at"])
+		if lastActive <= 0 {
+			lastActive = started
+		}
+		// Sessions with activity within the last 15 min are live.
+		isActive := lastActive > 0 && (now-int64(lastActive)) < 900
+		status := "completed"
+		if isActive {
+			status = "running"
+		}
+		ended := asFloat(r["ended_at"])
+		if ended > 0 && (now-int64(ended)) < 900 {
+			status = "running"
+			isActive = true
+		}
+
+		// Load chat + tool activity from messages.
+		var chat []ChatMessage
+		var tools []Tool
+		var events []ActivityEvent
+		msgRows := runSQLiteJSON(dbPath, `SELECT role, COALESCE(content,'') content, COALESCE(tool_name,'') tool_name,
+			COALESCE(tool_calls,'') tool_calls, COALESCE(reasoning_content,'') reasoning_content, timestamp
+			FROM messages WHERE session_id=? AND active=1 ORDER BY timestamp ASC LIMIT 80`, id)
+		for _, m := range msgRows {
+			if m == nil {
+				continue
+			}
+			role := asString(m["role"])
+			ts := ""
+			if tf := asFloat(m["timestamp"]); tf > 0 {
+				ts = time.Unix(int64(tf), 0).UTC().Format(time.RFC3339)
+			}
+			content := asString(m["content"])
+			toolName := asString(m["tool_name"])
+			toolCalls := asString(m["tool_calls"])
+			reasoning := asString(m["reasoning_content"])
+
+			if (role == "user" || role == "assistant") && strings.TrimSpace(content) != "" {
+				turn := ChatMessage{Role: role, Timestamp: ts}
+				turn.Content = truncateString(strings.TrimSpace(content), 800)
+				if strings.TrimSpace(reasoning) != "" {
+					turn.Reasoning = truncateString(strings.TrimSpace(reasoning), 700)
+					events = append(events, ActivityEvent{Type: "reasoning", Summary: truncateString(strings.TrimSpace(reasoning), 320), Timestamp: ts})
+				}
+				chat = append(chat, turn)
+				if role == "assistant" {
+					events = append(events, ActivityEvent{Type: "text", Summary: turn.Content, Timestamp: ts})
+				}
+			} else if role == "assistant" && strings.TrimSpace(reasoning) != "" {
+				events = append(events, ActivityEvent{Type: "reasoning", Summary: truncateString(strings.TrimSpace(reasoning), 320), Timestamp: ts})
+			}
+
+			if toolName != "" {
+				t := Tool{Name: toolName, Timestamp: ts}
+				if input := strings.TrimSpace(content); input != "" {
+					t.Input = truncateString(input, 160)
+				}
+				tools = append(tools, t)
+				events = append(events, ActivityEvent{Type: "tool", Name: toolName, Summary: t.Input, Timestamp: ts})
+			} else if toolCalls != "" && strings.Contains(toolCalls, "\"name\"") {
+				// OpenAI-style tool_calls JSON array
+				var calls []struct {
+					Name string `json:"name"`
+				}
+				if json.Unmarshal([]byte(toolCalls), &calls) == nil {
+					for _, c := range calls {
+						if c.Name != "" {
+							tools = append(tools, Tool{Name: c.Name, Timestamp: ts})
+							events = append(events, ActivityEvent{Type: "tool", Name: c.Name, Timestamp: ts})
+						}
+					}
+				}
+			}
+		}
+		if len(tools) > 12 {
+			tools = tools[:12]
+		}
+		if len(chat) > 30 {
+			chat = chat[len(chat)-30:]
+		}
+
+		// Last assistant text + latest reasoning for the live stream panel.
+		lastText := ""
+		latestReasoning := ""
+		for i := len(events) - 1; i >= 0; i-- {
+			if latestReasoning == "" && events[i].Type == "reasoning" {
+				latestReasoning = events[i].Summary
+			}
+			if lastText == "" && events[i].Type == "text" {
+				lastText = events[i].Summary
+			}
+			if lastText != "" && latestReasoning != "" {
+				break
+			}
+		}
+
+		// Working dir from session metadata (git branch is client-visible via
+		// the AgentsView workspace panel derived from cwd).
+		workdir := asString(r["cwd"])
+		if workdir == "" {
+			workdir = asString(r["git_repo_root"])
+		}
+		filesTouched := []string{}
+
+		sessions = append(sessions, Session{
+			Agent:           "hermes",
+			ID:              id,
+			ShortName:       short,
+			Title:           truncateString(title, 140),
+			Status:          status,
+			IsActive:        isActive,
+			Model:           model,
+			WorkingDir:      workdir,
+			UpdatedAt:       tsFromUnix(lastActive),
+			LastActiveAt:    tsFromUnix(lastActive),
+			Intention:       title,
+			Chat:            chat,
+			RecentTools:     tools,
+			LiveActivity:    events,
+			FilesTouched:    filesTouched,
+			LastText:        lastText,
+			LatestReasoning: latestReasoning,
+			ReasoningSteps:  extractReasoningSteps(latestReasoning),
+			TokenUsage: TokenStats{
+				Prompt:     asInt(r["input_tokens"]),
+				Completion: asInt(r["output_tokens"]),
+				Total:      asInt(r["input_tokens"]) + asInt(r["output_tokens"]),
+			},
+			MessageCount: asInt(r["message_count"]),
+			Avatar:       "🐦",
+		})
+		if len(sessions) >= 8 {
+			break
+		}
+	}
+	return sessions
+}
+
+// tsFromUnix renders a Unix-seconds float as RFC3339 (empty for zero).
+func tsFromUnix(sec float64) string {
+	if sec <= 0 {
+		return ""
+	}
+	return time.Unix(int64(sec), 0).UTC().Format(time.RFC3339)
+}
+
+// asString / asFloat / asInt coerce sqlite3 -json values.
+func asString(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return fmt.Sprintf("%v", v)
+}
+func asFloat(v interface{}) float64 {
+	switch t := v.(type) {
+	case float64:
+		return t
+	case int64:
+		return float64(t)
+	case json.Number:
+		f, _ := t.Float64()
+		return f
+	case string:
+		var f float64
+		fmt.Sscanf(t, "%f", &f)
+		return f
+	}
+	return 0
+}
+func asInt(v interface{}) int {
+	if v == nil {
+		return 0
+	}
+	switch t := v.(type) {
+	case float64:
+		return int(t)
+	case int64:
+		return int(t)
+	case json.Number:
+		n, _ := t.Int64()
+		return int(n)
+	case string:
+		var n int64
+		fmt.Sscanf(t, "%d", &n)
+		return int(n)
+	}
+	return 0
 }
 
 // parseSessionJSON reads session snapshot and appends any fresh journal lines.
