@@ -225,7 +225,7 @@ const KanbanBoardComponent = {
       });
     },
     destroySortable() {
-      this.sortables.forEach(s => s.destroy());
+      this.sortables.forEach((s) => { s.destroy(); });
       this.sortables = [];
     },
     startQuickAdd(colKey) {

@@ -9932,7 +9932,7 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
                     secretPatterns.forEach(pat => {
                         let re = new RegExp(pat.regex);
                         let match;
-                        while ((match = re.exec(line)) !== null) {
+                        while (true) { match = re.exec(line); if (match === null) break; // classic exec loop
                             let rawMatch = match[0];
                             let preview = rawMatch.length > 10 ? rawMatch.slice(0, 6) + "****" + rawMatch.slice(-4) : "****";
                             secretFindingsList.push({
@@ -10112,7 +10112,7 @@ routerAdd("POST", "/api/projectbase/mcp", (e) => {
             secretPatterns.forEach(pat => {
                 let re = new RegExp(pat.regex);
                 let match;
-                while ((match = re.exec(line)) !== null) {
+                while (true) { match = re.exec(line); if (match === null) break; // classic exec loop
                     let rawMatch = match[0];
                     let preview = rawMatch.length > 10 ? rawMatch.slice(0, 6) + "****" + rawMatch.slice(-4) : "****";
                     findings.push({

@@ -114,9 +114,9 @@ routerAdd("DELETE", "/api/projectbase/arch/graphs/{id}", (e) => {
 
         try {
             const nodes = e.app.findRecordsByFilter("arch_nodes", `graph_id = '${id}'`, "", 1000, 0);
-            nodes.forEach(n => e.app.delete(n));
+            nodes.forEach((n) => { e.app.delete(n); });
             const edges = e.app.findRecordsByFilter("arch_edges", `graph_id = '${id}'`, "", 2000, 0);
-            edges.forEach(ed => e.app.delete(ed));
+            edges.forEach((ed) => { e.app.delete(ed); });
         } catch (_) {}
 
         e.app.delete(graph);
@@ -577,9 +577,9 @@ routerAdd("POST", "/api/projectbase/arch/graphs/{id}/scan", (e) => {
 
         try {
             const existingNodes = e.app.findRecordsByFilter("arch_nodes", `graph_id = '${graphId}'`, "", 1000, 0);
-            existingNodes.forEach(n => e.app.delete(n));
+            existingNodes.forEach((n) => { e.app.delete(n); });
             const existingEdges = e.app.findRecordsByFilter("arch_edges", `graph_id = '${graphId}'`, "", 2000, 0);
-            existingEdges.forEach(ed => e.app.delete(ed));
+            existingEdges.forEach((ed) => { e.app.delete(ed); });
         } catch (_) {}
 
         const createdNodes = {};

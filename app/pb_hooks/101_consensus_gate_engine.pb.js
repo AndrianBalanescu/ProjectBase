@@ -461,7 +461,7 @@ routerAdd("POST", "/api/projectbase/consensus/gates/evaluate", (e) => {
 
             const bFindings = b.get("findings");
             if (Array.isArray(bFindings)) {
-                bFindings.forEach(f => findingsSummary.push(typeof f === "object" ? f : { note: String(f), source: b.get("persona") }));
+                bFindings.forEach((f) => { findingsSummary.push(typeof f === "object" ? f : { note: String(f), source: b.get("persona") }); });
             }
         });
 

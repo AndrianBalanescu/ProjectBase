@@ -116,7 +116,7 @@ routerAdd("POST", "/api/projectbase/security/scans", (e) => {
             patterns.forEach(pat => {
                 const re = new RegExp(pat.regex);
                 let match;
-                while ((match = re.exec(line)) !== null) {
+                while (true) { match = re.exec(line); if (match === null) break; // classic exec loop
                     const rawMatch = match[0];
                     findings.push({
                         secret_type: pat.type,
@@ -447,7 +447,7 @@ routerAdd("POST", "/api/projectbase/security/scans/{id}/execute", (e) => {
             patterns.forEach(pat => {
                 const re = new RegExp(pat.regex);
                 let match;
-                while ((match = re.exec(line)) !== null) {
+                while (true) { match = re.exec(line); if (match === null) break; // classic exec loop
                     const rawMatch = match[0];
                     findings.push({
                         secret_type: pat.type,
@@ -675,7 +675,7 @@ routerAdd("POST", "/api/projectbase/security/secrets/scan-content", (e) => {
             patterns.forEach(pat => {
                 const re = new RegExp(pat.regex);
                 let match;
-                while ((match = re.exec(line)) !== null) {
+                while (true) { match = re.exec(line); if (match === null) break; // classic exec loop
                     const rawMatch = match[0];
                     findings.push({
                         secret_type: pat.type,

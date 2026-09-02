@@ -92,11 +92,8 @@ const API = {
   },
 
   // Agentic-native: local AI agents surfaced as board teammates (bridge).
-  async getAgents() {
-    if (!pb.authStore.isValid) return { agents: [], sessions: [] };
-    const res = await pb.send('/api/projectbase/agents', { method: 'GET' });
-    return res;
-  },
+  // (getAgents is defined in the "Agents & Autonomous Dispatch" section below;
+  //  a duplicate here silently shadowed it with a variant lacking auth headers.)
   async syncAgents() {
     const res = await pb.send('/api/projectbase/agents/sync', { method: 'POST' });
     return res;

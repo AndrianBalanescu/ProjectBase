@@ -238,7 +238,7 @@ routerAdd("DELETE", "/api/projectbase/tdd/suites/{id}", (e) => {
         }
 
         const cases = e.app.findRecordsByFilter("tdd_cases", `suite_id = '${id}'`, "", 500, 0);
-        cases.forEach(c => e.app.delete(c));
+        cases.forEach((c) => { e.app.delete(c); });
 
         e.app.delete(record);
         return e.json(200, { success: true, message: "TDD suite and associated cases deleted successfully" });

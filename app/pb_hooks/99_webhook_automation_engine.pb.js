@@ -929,7 +929,7 @@ routerAdd("DELETE", "/api/projectbase/webhooks/dlq/{id}", (e) => {
         const id = e.request.pathValue("id");
         if (id === "all") {
             const allItems = e.app.findRecordsByFilter("webhook_dlq", "1=1", "-created", 500, 0);
-            allItems.forEach(item => e.app.delete(item));
+            allItems.forEach((item) => { e.app.delete(item); });
             return e.json(200, { status: "success", message: "All DLQ items purged", purged_count: allItems.length });
         }
 

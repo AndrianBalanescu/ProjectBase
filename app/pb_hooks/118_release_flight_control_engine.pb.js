@@ -326,13 +326,13 @@ routerAdd("DELETE", "/api/projectbase/releases/{id}", (e) => {
 
         // Cascade delete stages, probes, rollback events
         const stages = e.app.findRecordsByFilter("deployment_stages", `release_id = '${id}'`, "", 100, 0);
-        stages.forEach(s => e.app.delete(s));
+        stages.forEach((s) => { e.app.delete(s); });
 
         const probes = e.app.findRecordsByFilter("health_probes", `release_id = '${id}'`, "", 100, 0);
-        probes.forEach(p => e.app.delete(p));
+        probes.forEach((p) => { e.app.delete(p); });
 
         const rollbacks = e.app.findRecordsByFilter("rollback_events", `release_id = '${id}'`, "", 100, 0);
-        rollbacks.forEach(r => e.app.delete(r));
+        rollbacks.forEach((r) => { e.app.delete(r); });
 
         e.app.delete(rec);
         return e.json(200, { success: true, message: "Release and associated flight telemetry deleted" });
