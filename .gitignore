@@ -14,3 +14,8 @@ backups/
 pocketbase-types.ts
 /bin/
 scripts/agent_bridge/bin/
+qa-*.png
+
+# QA screenshots (generated artifacts)
+qa-agents-*.png
+qa-*.png
