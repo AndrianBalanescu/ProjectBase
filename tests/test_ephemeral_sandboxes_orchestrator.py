@@ -417,7 +417,7 @@ def test_frontend_guard_and_css_sync():
 
     assert "sandboxes" in content
     assert "Autonomous Ephemeral Sandboxes & Dev Environments" in content
-    assert "loadSandboxesGovernanceData" in content
-    assert "triggerProvisionSandbox" in content
-    assert "handleSandboxAction" in content
-    assert "executeInSandbox" in content
+    # The lean console shows sandbox telemetry (PID, model, tokens, duration)
+    # in the runs tab. Action stubs were removed during the Phase 1 de-bloat.
+    assert "selectedSession.pid" in content
+    assert "fmtTokens" in content
