@@ -2832,6 +2832,48 @@ def test_ai_assist_summarize_cycle_fallback():
     assert "WIP task" in result, "summary must reference in-progress work"
     assert "Todo task" in result, "summary must reference backlog work"
 
+def test_burndown_and_velocity_wired_in_cycles_view():
+    """Phase 2 (Core Polish) drift-guard: the Cycles & Sprints view must render
+    a precise burndown (ideal linear line vs actual remaining story points
+    derived from completion timestamps, as an inline SVG) and a velocity trend
+    from completed cycles' delivered points. The view recomputes the chart
+    whenever the selected cycle changes, and degrades gracefully when the
+    cycle lacks dates or estimates."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    cycles = open(os.path.join(root, "app", "pb_public", "js", "components", "CyclesView.js")).read()
+
+    # Burndown computation + chart wiring (computed property, not method).
+    assert "burndownChart()" in cycles, "CyclesView must define the burndownChart computed"
+    assert "burndownSvg" in cycles, "CyclesView must define the burndownSvg chart"
+    assert "<svg" in cycles and "polyline" in cycles, (
+        "burndownSvg must render an inline SVG with polylines"
+    )
+    assert "ideal" in cycles, "burndown chart must render the ideal line"
+
+    # Precise actuals: completion derived from issue timestamps (done_at/updated).
+    assert "done_at" in cycles and "updated" in cycles, (
+        "burndown actuals must use issue completion timestamps"
+    )
+    # Graceful degradation without dates or estimates.
+    assert "start and end dates" in cycles
+    assert "story-point estimates" in cycles
+
+    # Velocity trend from completed cycles.
+    assert "velocityData()" in cycles, (
+        "CyclesView must compute a velocity trend from completed cycles"
+    )
+    assert "Velocity Trend" in cycles, "CyclesView template must render the Velocity Trend panel"
+    assert "completed" in cycles, "velocity must count only completed cycles"
+
+    # Template renders both panels with a legend.
+    assert "Burndown" in cycles, "CyclesView template must render the Burndown panel"
+    assert "v-html" in cycles, "burndown chart must render via v-html"
+
+    # The live-served asset must carry the new wiring (no stale bundle).
+    st, body = _get("/js/components/CyclesView.js")
+    assert st == 200, f"CyclesView.js not served: {st}"
+    assert "burndownChart()" in body, "served CyclesView.js must include burndown computed"
+
 def test_global_search_wired_in_command_palette():
     """The Cmd+K omnibox must wire global cross-project search to the
     /api/projectbase/search route. This drift-guard pins the frontend surface:

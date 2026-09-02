@@ -25,6 +25,65 @@ const CyclesViewComponent = {
       if (!this.currentCycle) return [];
       return this.issues.filter(i => i.cycle === this.currentCycle.id);
     },
+    // Burndown is a reactive COMPUTED (not a data prop + watcher): it
+    // recomputes automatically whenever currentCycle, issues, or their
+    // completion timestamps change — so the chart is correct on first paint
+    // even when the parent loads cycles/issues asynchronously after mount.
+    burndownChart() {
+      const cycle = this.currentCycle;
+      if (!cycle) return null;
+      const c0 = cycle.start_date ? new Date(cycle.start_date) : null;
+      const c1 = cycle.end_date ? new Date(cycle.end_date) : null;
+      if (!c0 || !c1 || isNaN(c0) || isNaN(c1)) {
+        return { supported: false, reason: 'This cycle needs start and end dates to compute a burndown.' };
+      }
+      const list = this.cycleIssues;
+      const totalDuration = Math.max((c1 - c0) / 86400000, 1);
+      const totalDays = Math.ceil(totalDuration);
+      const nowMs = Date.now();
+      const totalPts = list.reduce((s, i) => s + (Number(i.estimate) || 0), 0);
+      if (totalPts <= 0) {
+        return { supported: false, reason: 'Add story-point estimates to issues in this cycle to see a burndown.' };
+      }
+      const doneTime = (i) => {
+        if (i.status === 'done' && i.done_at) return new Date(i.done_at).getTime();
+        if (i.status === 'done' && i.updated) return new Date(i.updated).getTime();
+        return null;
+      };
+      const idealAt = (d) => totalPts * (1 - d / totalDuration);
+      const days = [];
+      for (let d = 0; d <= totalDays; d++) {
+        const dayMs = c0.getTime() + d * 86400000;
+        const ideal = idealAt(d);
+        let remaining = totalPts;
+        if (dayMs < nowMs || dayMs === c1.getTime()) {
+          remaining = list.reduce((s, i) => {
+            const dt = doneTime(i);
+            return (dt === null || dt > dayMs) ? s + (Number(i.estimate) || 0) : s;
+          }, 0);
+        }
+        days.push({
+          label: new Date(dayMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          ideal: Math.round(ideal * 10) / 10,
+          actual: (dayMs < nowMs || dayMs === c1.getTime()) ? remaining : null
+        });
+      }
+      const avgDaily = totalPts / totalDays;
+      return { supported: true, totalDays, totalPts, avgDaily: Math.round(avgDaily * 10) / 10, days };
+    },
+    // Velocity = story points delivered by COMPLETED cycles, oldest first.
+    velocityData() {
+      const done = this.cycles
+        .filter(c => c.status === 'completed')
+        .map(c => {
+          const list = this.issues.filter(i => i.cycle === c.id);
+          const pts = list.filter(i => i.status === 'done').reduce((s, i) => s + (Number(i.estimate) || 0), 0);
+          const count = list.filter(i => i.status === 'done').length;
+          return { id: c.id, name: c.name, end: c.end_date || c.updated || c.created, pts, count };
+        })
+        .sort((a, b) => new Date(a.end) - new Date(b.end));
+      return done.slice(-6);
+    },
     cycleStats() {
       const list = this.cycleIssues;
       const total = list.length;
@@ -40,6 +99,24 @@ const CyclesViewComponent = {
     }
   },
   methods: {
+    burndownSvg() {
+      if (!this.burndownChart || !this.burndownChart.supported) return '';
+      const W = 560, H = 150, P = 24;
+      const pts = this.burndownChart.days;
+      const n = pts.length;
+      const maxY = Math.max(this.burndownChart.totalPts, 1);
+      const x = d => P + (n > 1 ? (d / (n - 1)) * (W - 2 * P) : 0);
+      const y = v => H - P - (Math.min(v, maxY) / maxY) * (H - 2 * P);
+      const idealPts = pts.map((p, d) => `${x(d)},${y(p.ideal)}`).join(' ');
+      const actualPts = pts.map((p, d) => p.actual === null ? null : `${x(d)},${y(p.actual)}`).filter(Boolean).join(' ');
+      const grid = [0.25, 0.5, 0.75].map(f => {
+        const gy = H - P - f * (H - 2 * P);
+        return `<line x1="${P}" y1="${gy}" x2="${W - P}" y2="${gy}" stroke="currentColor" stroke-opacity="0.12" stroke-dasharray="3 3"/>`;
+      }).join('');
+      const labels = n > 1 ? `<text x="${P}" y="${H - 6}" font-size="9" fill="currentColor" opacity="0.5">${pts[0].label}</text><text x="${W - P}" y="${H - 6}" font-size="9" fill="currentColor" opacity="0.5" text-anchor="end">${pts[n - 1].label}</text>` : '';
+      return `<svg viewBox="0 0 ${W} ${H}" class="w-full" role="img" aria-label="Cycle burndown chart">
+${grid}<polyline points="${idealPts}" fill="none" stroke="#a1a1aa" stroke-width="1.5" stroke-dasharray="4 4"/><polyline points="${actualPts}" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linejoin="round"/>${labels}</svg>`;
+    },
     formatDateRange(start, end) {
       if (!start) return 'No dates set';
       const s = new Date(start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -219,6 +296,46 @@ const CyclesViewComponent = {
               <div class="space-y-1">
                 <div class="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-1.5 overflow-hidden">
                   <div class="bg-zinc-800 dark:bg-zinc-200 h-full rounded-full transition-all" :style="{ width: cycleStats.percent + '%' }"></div>
+                </div>
+              </div>
+
+              <!-- Burndown & Velocity -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-3 border-t border-zinc-200 dark:border-zinc-800">
+                <div class="p-3.5 rounded-lg bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800">
+                  <div class="flex items-center justify-between mb-1.5">
+                    <h4 class="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center space-x-1.5">
+                      <i data-lucide="trending-down" class="w-3.5 h-3.5"></i>
+                      <span>Burndown</span>
+                    </h4>
+                    <div v-if="burndownChart && burndownChart.supported" class="flex items-center space-x-2 text-[10px] text-zinc-400">
+                      <span class="flex items-center space-x-1"><span class="w-3 h-0.5 bg-zinc-400 inline-block" style="border-top:1px dashed currentColor"></span>ideal</span>
+                      <span class="flex items-center space-x-1"><span class="w-3 h-0.5 bg-blue-500 inline-block"></span>actual</span>
+                    </div>
+                  </div>
+                  <div v-if="burndownChart && burndownChart.supported" class="text-blue-500" v-html="burndownSvg"></div>
+                  <div v-else class="py-4 text-center text-xs text-zinc-400">
+                    {{ (burndownChart && burndownChart.reason) || 'Add start/end dates and story-point estimates to see the burndown.' }}
+                  </div>
+                  <div v-if="burndownChart && burndownChart.supported" class="mt-1.5 text-[10px] text-zinc-400 font-mono">
+                    {{ burndownChart.totalPts }} pts over {{ burndownChart.totalDays }} days (~{{ burndownChart.avgDaily }} pts/day)
+                  </div>
+                </div>
+
+                <div class="p-3.5 rounded-lg bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800">
+                  <h4 class="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center space-x-1.5 mb-2">
+                    <i data-lucide="activity" class="w-3.5 h-3.5"></i>
+                    <span>Velocity Trend</span>
+                  </h4>
+                  <div v-if="velocityHistory.length === 0" class="py-4 text-center text-xs text-zinc-400">
+                    No completed cycles yet — velocity appears once a cycle is marked completed.
+                  </div>
+                  <div v-else class="flex items-end justify-around gap-2 h-20 pb-4 relative">
+                    <div v-for="v in velocityHistory" :key="v.id" class="flex flex-col items-center flex-1 min-w-0" :title="v.name + ': ' + v.pts + ' pts (' + v.count + ' issues)'">
+                      <div class="w-full max-w-[36px] bg-blue-500/80 dark:bg-blue-400/70 rounded-t transition-all" :style="{ height: (v.pts / Math.max(...velocityHistory.map(x => x.pts), 1)) * 100 + '%' }"></div>
+                      <span class="text-[9px] font-mono text-zinc-500 mt-1 truncate w-full text-center">{{ v.pts }}p</span>
+                      <span class="text-[9px] text-zinc-400 truncate w-full text-center">{{ v.name }}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
