@@ -57,7 +57,16 @@ const AgentsViewComponent = {
     visibleSessions() {
       const all = this.sessions || [];
       if (this.activeAgent) {
-        return all.filter(s => s.agent === this.activeAgent.name || s.runtime === this.activeAgent.name);
+        // `agent` is not a schema field; match the runtime family plus the per-session
+        // display name (agent_name is shaped like "Flomaster (parrot)").
+        const name = (this.activeAgent.name || '').toLowerCase();
+        const rt = (this.activeAgent.runtime || '').toLowerCase();
+        return all.filter(s =>
+          (s.runtime || '').toLowerCase() === rt ||
+          (s.runtime || '').toLowerCase() === name ||
+          (s.agent || '').toLowerCase() === name ||
+          (s.agent_name || '').toLowerCase().startsWith(name)
+        );
       }
       return all;
     },

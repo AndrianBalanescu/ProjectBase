@@ -36,7 +36,9 @@ routerAdd("GET", "/api/projectbase/sessions", (e) => {
             filterParams.project = projectId;
         }
         if (agentName) {
-            filterParts.push("agent_name = {:agent}");
+            // `agent` is not a schema field; the reliable identity columns are the
+            // runtime family plus the per-session display name ("Flomaster (parrot)").
+            filterParts.push("runtime = {:agent}");
             filterParams.agent = agentName;
         }
         if (status) {
@@ -66,6 +68,8 @@ routerAdd("GET", "/api/projectbase/sessions", (e) => {
                 agent_name: r.getString("agent_name") || "flomaster",
                 runtime: r.getString("runtime") || "flomaster",
                 model: r.getString("model") || "default",
+                machine: r.getString("machine") || "",
+                is_active: r.getBool("is_active"),
                 status: r.getString("status") || "running",
                 pid: r.getInt("pid") || 0,
                 workdir: r.getString("workdir") || "",
@@ -106,6 +110,29 @@ routerAdd("GET", "/api/projectbase/sessions", (e) => {
 // 2. POST /api/projectbase/sessions/ingest - Ingest / register session
 routerAdd("POST", "/api/projectbase/sessions/ingest", (e) => {
     try {
+        // Machine identity for the "machine" field. Prefer an explicit body.machine
+        // (the session feeder reports the real hostname); otherwise fall back to the
+        // host's stable machine-id. Wrapped in try/catch so a missing/unreadable value
+        // degrades to "" and can NEVER crash the ingest write. ($os.hostname() does not
+        // exist in the Goja hook API and would 500.)
+        let machineOverride = "";
+        try {
+            if ($os.getenv("PB_MACHINE_ID")) {
+                machineOverride = String($os.getenv("PB_MACHINE_ID")).trim();
+            } else {
+                // $os.readFile returns raw bytes; decode to a UTF-8 string manually so
+                // the machine-id is stored as the human-readable hex id, not a byte list.
+                const _mid = $os.readFile("/etc/machine-id");
+                if (_mid) {
+                    const _codecs = (typeof globalThis !== "undefined" && globalThis.globalThis) ? globalThis.globalThis.codecs : (typeof globalThis !== "undefined" ? globalThis.codecs : null);
+                    if (_codecs && _codecs.decode) {
+                        machineOverride = String(_codecs.decode(new Uint8Array(_mid))).trim();
+                    } else {
+                        machineOverride = _mid.map(b => String.fromCharCode(b)).join("").trim();
+                    }
+                }
+            }
+        } catch (_mErr) {}
         const resolveProject = (app, projectIdOrIdentifier, workdir) => {
             if (projectIdOrIdentifier) {
                 try {
@@ -168,8 +195,12 @@ routerAdd("POST", "/api/projectbase/sessions/ingest", (e) => {
         const runtime = (body.runtime || "flomaster").trim();
         const model = (body.model || "default").trim();
         const status = (body.status || "running").trim();
+        // Live flag: honor an explicit is_active (syncer/heartbeat), else derive from
+        // the status so the UI's "online" state reflects real activity, not just age.
+        const isActive = body.is_active !== undefined ? !!body.is_active : (status === "running" || status === "verifying" || status === "active");
         const pid = body.pid ? parseInt(body.pid) : 0;
         const workdir = (body.workdir || "").trim();
+        const machine = (body.machine || machineOverride || "").trim();
         const gitBranch = (body.git_branch || "main").trim();
         const gitCommitBefore = (body.git_commit_before || "").trim();
         const command = (body.command || body.prompt || "").trim();
@@ -211,9 +242,11 @@ routerAdd("POST", "/api/projectbase/sessions/ingest", (e) => {
             if (resolvedProjectId) record.set("project", resolvedProjectId);
             if (issueId) record.set("issue", issueId);
             record.set("agent_name", agentName);
+            if (machine) record.set("machine", machine);
             record.set("runtime", runtime);
             record.set("model", model);
             record.set("status", status);
+            record.set("is_active", isActive);
             record.set("pid", pid);
             record.set("workdir", workdir);
             record.set("git_branch", gitBranch);
@@ -495,6 +528,8 @@ routerAdd("GET", "/api/projectbase/sessions/{id}", (e) => {
             agent_name: record.getString("agent_name"),
             runtime: record.getString("runtime"),
             model: record.getString("model"),
+            machine: record.getString("machine") || "",
+            is_active: record.getBool("is_active"),
             status: record.getString("status"),
             pid: record.getInt("pid"),
             workdir: record.getString("workdir"),

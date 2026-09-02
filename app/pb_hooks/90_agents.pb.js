@@ -7,7 +7,18 @@
 // 3. Local Fallback: Scans `~/.flomaster`, `~/.hermes`, `~/.agents`, `~/.cursor`.
 
 routerAdd("GET", "/api/projectbase/agents", (e) => {
-    const BRIDGE_PATHS = ["/run/projectbase/agents.json", "/tmp/projectbase/agents.json"];
+    // The agent-bridge sidecar (bin/agent_bridge) writes to a world-readable path
+    // under the app data dir. /run/projectbase was the original design, but /run is
+    // systemd-managed (root:root) and the bridge user cannot mkdir there, so the
+    // installed service writes under app/pb_data instead. Keep all candidates so
+    // both the legacy and the current deployment path are honored.
+    const PB_ROOT = $os.getenv("PB_ROOT") || "/data/projects/projectbase";
+    const BRIDGE_PATHS = [
+        PB_ROOT + "/app/pb_data/agents.json",
+        PB_ROOT + "/pb_data/agents.json",
+        "/run/projectbase/agents.json",
+        "/tmp/projectbase/agents.json"
+    ];
     const exists = (p) => { try { $os.stat(p); return true; } catch (x) { return false; } };
 
     const decodeUtf8 = (bytes) => {
@@ -77,8 +88,9 @@ routerAdd("GET", "/api/projectbase/agents", (e) => {
                         short_name: role,
                         runtime: r.getString("runtime") || "flomaster",
                         model: r.getString("model") || "omniroute/premium",
+                        machine: r.getString("machine") || "",
                         status: st,
-                        is_active: st === "running" || st === "spawning",
+                        is_active: r.getBool("is_active") || st === "running" || st === "spawning" || st === "verifying",
                         pid: r.getInt("pid") || 0,
                         working_dir: r.getString("working_dir") || r.getString("workdir") || "",
                         project_id: r.getString("project") || "",
@@ -112,8 +124,11 @@ routerAdd("GET", "/api/projectbase/agents", (e) => {
         ];
 
         const agentsList = AGENTS.map(ag => {
-            const agSessions = dbSessions.filter(s => s.agent === ag.name || s.runtime === ag.name);
-            const isOnline = agSessions.some(s => s.is_active);
+            // Classify by runtime (family) first — the agent_sessions records always
+            // carry runtime, whereas `agent` is not a schema field (ingest sets
+            // agent_name, which is a per-session display name like "Flomaster (parrot)").
+            const agSessions = dbSessions.filter(s => s.runtime === ag.runtime || s.runtime === ag.name || s.agent === ag.name);
+            const isOnline = agSessions.some(s => s.is_active) || agSessions.some(s => s.status === "running" || s.status === "verifying");
             return {
                 name: ag.name,
                 provider: ag.provider,

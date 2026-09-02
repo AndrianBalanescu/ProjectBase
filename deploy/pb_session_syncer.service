@@ -1,0 +1,20 @@
+[Unit]
+Description=ProjectBase session feeder (ingests live agent sessions)
+After=network-online.target projectbase.service
+Wants=projectbase.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+# The session syncer polls flomaster/flow session stores and pushes them to the
+# ProjectBase API. It needs no auth (the ingest endpoint is open) but must point
+# at the live instance on 8120.
+Environment=PROJECTBASE_URL=http://127.0.0.1:8120
+WorkingDirectory=/data/projects/projectbase
+ExecStart=/usr/bin/python3 /data/projects/projectbase/scripts/pb_session_syncer.py --daemon --interval 5
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
