@@ -7,6 +7,8 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
+StartLimitIntervalSec=15min
+StartLimitBurst=10
 Type=oneshot
 User=ubuntu
 Group=ubuntu
