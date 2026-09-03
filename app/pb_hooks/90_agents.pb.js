@@ -107,7 +107,8 @@ routerAdd("GET", "/api/projectbase/agents", (e) => {
                         created: r.getString("created"),
                         updated: r.getString("updated"),
                         avatar: r.getString("runtime") === "hermes" ? "🐦" : (r.getString("runtime") === "cursor" ? "🖱️" : (r.getString("runtime") === "flow" ? "⚡" : "🧠")),
-                        chat: chatList
+                        chat: chatList,
+                        live_activity: Array.isArray(meta.live_activity) ? meta.live_activity : []
                     };
                 });
             }
@@ -184,6 +185,7 @@ routerAdd("GET", "/api/projectbase/agents", (e) => {
                             last_prompt: promptText,
                             title: promptText || (s.short_name ? "Session " + s.short_name : "Execution Run"),
                             chat: s.chat || [],
+                            live_activity: Array.isArray(s.live_activity) ? s.live_activity : [],
                             live_activity: s.live_activity || [],
                             recent_tools: s.recent_tools || [],
                             latest_reasoning: s.latest_reasoning || "",
@@ -200,6 +202,24 @@ routerAdd("GET", "/api/projectbase/agents", (e) => {
                 console.log(">>> [Agents] bridge parse warning:", err);
             }
         }
+
+        // Persist fresh bridge live_activity into the DB record so the
+        // /api/projectbase/sessions list + detail endpoints can also serve it
+        // (agents.json is ephemeral; DB is the authoritative long-term store).
+        try {
+            for (const s of bridgeSessions) {
+                const sid = s.session_id || s.id;
+                if (!sid || !Array.isArray(s.live_activity) || s.live_activity.length === 0) continue;
+                try {
+                    const rec = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: sid });
+                    if (!rec) continue;
+                    const existingMeta = rec.get("metadata") || {};
+                    if (Array.isArray(existingMeta.live_activity) && existingMeta.live_activity.length >= s.live_activity.length) continue;
+                    rec.set("metadata", Object.assign({}, existingMeta, { live_activity: s.live_activity }));
+                    e.app.save(rec);
+                } catch (x) { /* non-fatal */ }
+            }
+        } catch (x) { /* non-fatal */ }
 
         // Merge: Live bridge sessions first, then non-duplicate DB sessions
         const seenIds = new Set();

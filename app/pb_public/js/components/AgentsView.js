@@ -84,16 +84,32 @@ const AgentsViewComponent = {
         return this.chatLog[sid];
       }
       let rawTurns = [];
-      if (s.chat && Array.isArray(s.chat) && s.chat.length > 0) {
+      // Check multiple sources for chat data (defensive: any source field may
+      // be missing or non-array depending on the ingestion path).
+      if (s.chat && Array.isArray(s.chat)) {
         rawTurns = s.chat;
-      } else if (s.live_activity && Array.isArray(s.live_activity) && s.live_activity.length > 0) {
-        rawTurns = s.live_activity.map(ev => ({
-          role: 'assistant',
-          content: ev.type === 'text' ? (ev.summary || '') : '',
-          reasoning: ev.type === 'reasoning' ? (ev.summary || '') : '',
-          tools: ev.type === 'tool' ? [{ name: ev.name || ev.tool || 'tool', input: ev.input || '', intent: ev.intent || '' }] : [],
-          timestamp: ev.timestamp
-        }));
+      } else if (s.metadata && Array.isArray(s.metadata.chat)) {
+        rawTurns = s.metadata.chat;
+      } else if (s.chat && !Array.isArray(s.chat)) {
+        rawTurns = [s.chat];
+      }
+      if (s.live_activity && Array.isArray(s.live_activity) && s.live_activity.length > 0) {
+        const evTurns = s.live_activity.map(ev => {
+          const o = Object.assign({}, ev);
+          o.role = 'assistant';
+          if (ev.type === 'text') o.content = ev.summary || ev.content || '';
+          if (ev.type === 'reasoning') o.reasoning = ev.summary || '';
+          if (ev.type === 'tool') {
+            const t = { name: ev.name || ev.tool || 'tool', input: ev.input || '', intent: ev.intent || '' };
+            if (Array.isArray(ev.tools)) {
+              t.input = (o.input || '') + (ev.tools.length ? '\n' + ev.tools.map(x => x.name || x.tool || 'tool').join(', ') : '');
+            }
+            o.tools = [t];
+          }
+          o.timestamp = ev.timestamp;
+          return o;
+        });
+        rawTurns = (s.chat || (s.metadata && s.metadata.chat)) ? rawTurns.concat(evTurns) : evTurns;
       }
 
       const validTurns = rawTurns.filter(t => t && (t.content || t.reasoning || (t.tools && t.tools.length) || (t.tool_calls && t.tool_calls.length)));
@@ -123,57 +139,19 @@ const AgentsViewComponent = {
             });
           }
         }
-        if (coalesced.length > 0 && coalesced[0].role !== 'user') {
-          const promptText = s.intention || s.last_prompt || s.title || s.command || '';
-          if (promptText) {
-            coalesced.unshift({
-              role: 'user',
-              content: promptText,
-              timestamp: s.started_at || s.created || (coalesced[0].timestamp || coalesced[0].created_at)
-            });
-          }
-        }
         return coalesced;
       }
 
-      const turns = [];
-      const promptText = s.intention || s.last_prompt || s.title || s.command || `Autonomous execution run in ${s.working_dir || 'workspace'}`;
-      turns.push({
-        role: 'user',
-        content: promptText,
-        created_at: s.started_at || s.created || new Date().toISOString()
-      });
-
-      if (s.latest_reasoning || (s.recent_tools && s.recent_tools.length > 0)) {
-        turns.push({
+      // No chat data captured — show the dispatched command as a placeholder
+      const cmd = s.command || s.title || s.last_prompt || '';
+      if (cmd) {
+        return [{
           role: 'assistant',
-          reasoning: s.latest_reasoning || '',
-          tools: s.recent_tools || [],
-          timestamp: s.last_active_at || s.updated || new Date().toISOString()
-        });
+          content: `**${s.agent_name || 'Agent'}** was dispatched: "${cmd}"\n\nNo message log was captured for this run.`,
+          timestamp: s.started_at || s.created,
+        }];
       }
-
-      let assistantContent = `⚡ **Agent:** \`${s.agent_name || s.short_name || 'Flomaster'}\`\n\n` +
-        `• **Working Directory:** \`${s.working_dir || s.workdir || '/data/projects/projectbase'}\`\n` +
-        `• **Model:** \`${s.model || 'omniroute/premium'}\`\n` +
-        `• **Git Branch:** \`${s.git_branch || 'main'}\` ${s.git_commit ? '(`' + s.git_commit.slice(0, 7) + '`)' : ''}\n` +
-        `• **Status:** \`${(s.status || 'completed').toUpperCase()}\` ${s.pid ? '(PID: ' + s.pid + ')' : ''}\n` +
-        `• **Token Usage:** \`${this.fmtTokens(s.tokens || (s.tokens_in || 0) + (s.tokens_out || 0))}\``;
-
-      if (s.log_tail) {
-        assistantContent += `\n\n**Recent Activity Output:**\n\`\`\`bash\n${s.log_tail.trim()}\n\`\`\``;
-      }
-
-      turns.push({
-        role: 'assistant',
-        content: assistantContent,
-        log_tail: s.log_tail || '',
-        git_diff: s.git_diff_raw || '',
-        test_verdict: s.test_verdict || null,
-        created_at: s.updated || s.created || new Date().toISOString()
-      });
-
-      return turns;
+      return [];
     }
   },
   mounted() {
@@ -226,11 +204,24 @@ const AgentsViewComponent = {
         return;
       }
       this.selectedSessionId = s.id || s.session_id;
+      // Invalidate cached chat log for this session so computed re-evaluates
+      const sid = s.session_id || s.id;
+      if (sid) {
+        this.$delete(this.chatLog, sid);
+      }
       try {
-        if (window.API && window.API.getSessionDetail) {
-          const detail = await window.API.getSessionDetail(this.selectedSessionId).catch(() => null);
+        if (window.API && window.API.getAgentSessionDetails) {
+          const detail = await window.API.getAgentSessionDetails(this.selectedSessionId).catch(() => null);
           if (detail) {
+            // Extract chat from metadata.chat if present (PocketBase stores it there)
+            if (detail.metadata && Array.isArray(detail.metadata.chat) && detail.metadata.chat.length > 0) {
+              detail.chat = detail.metadata.chat;
+            }
+            // Mutate the list item AND re-set the id so any watcher on
+            // selectedSessionId re-evaluates the chatTurns computed even when
+            // the user re-clicks the same session.
             Object.assign(s, detail);
+            this.$nextTick(() => { this.selectedSessionId = s.id || s.session_id; });
           }
         }
       } catch (x) {}
@@ -512,6 +503,32 @@ const AgentsViewComponent = {
 
         <!-- TAB 1: Chat Stream -->
         <div v-if="activeTab === 'chat'" class="flex-1 flex flex-col min-h-0">
+          <div v-if="selectedSession" class="flex items-center gap-3 px-3 py-1.5 border-b border-zinc-200 dark:border-zinc-800/60 bg-zinc-50/40 dark:bg-zinc-900/30 text-[10px] font-mono text-zinc-500 dark:text-zinc-400 flex-wrap">
+            <span v-if="selectedSession.pid" class="flex items-center gap-1">
+              <span class="text-zinc-400 dark:text-zinc-500">PID</span>
+              <span class="text-zinc-700 dark:text-zinc-200 font-semibold">{{ selectedSession.pid }}</span>
+            </span>
+            <span v-if="selectedSession.model" class="flex items-center gap-1">
+              <span class="text-zinc-400 dark:text-zinc-500">MODEL</span>
+              <span class="text-zinc-700 dark:text-zinc-200 font-semibold">{{ selectedSession.model }}</span>
+            </span>
+            <span class="flex items-center gap-1">
+              <span class="text-zinc-400 dark:text-zinc-500">TOKENS</span>
+              <span class="text-zinc-700 dark:text-zinc-200 font-semibold">{{ fmtTokens((selectedSession.tokens_in || 0) + (selectedSession.tokens_out || 0)) }}</span>
+            </span>
+            <span v-if="selectedSession.git_commit_after" class="flex items-center gap-1">
+              <span class="text-zinc-400 dark:text-zinc-500">GIT</span>
+              <span class="text-zinc-700 dark:text-zinc-200 font-semibold">{{ selectedSession.git_commit_after.slice(0, 7) }}</span>
+            </span>
+            <span v-if="selectedSession.files_touched && selectedSession.files_touched.length" class="flex items-center gap-1.5 min-w-0">
+              <span class="text-zinc-400 dark:text-zinc-500 shrink-0">FILES</span>
+              <span class="flex items-center gap-1 flex-wrap min-w-0">
+                <span v-for="f in (selectedSession.files_touched || []).slice(0, 3)" :key="f" class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 text-[9px] truncate max-w-[140px]">{{ f.split('/').slice(-2).join('/') }}</span>
+                <span v-if="selectedSession.files_touched.length > 3" class="text-zinc-400">+{{ selectedSession.files_touched.length - 3 }}</span>
+              </span>
+            </span>
+          </div>
+
           <div class="flex-1 overflow-y-auto p-3 space-y-3 bg-zinc-50/50 dark:bg-zinc-950/30">
             <div v-if="!selectedSession" class="h-full flex flex-col items-center justify-center text-center text-zinc-400 text-xs space-y-2">
               <i data-lucide="bot" class="w-8 h-8 opacity-30"></i>
