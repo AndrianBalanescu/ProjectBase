@@ -14,7 +14,7 @@ Focus: Ultra-fluid Kanban drag-and-drop, high-density List view, sprint Cycles, 
 - **Align AI Stack:** Standardize 100% on real Homelab OmniRoute models (`omniroute/premium`, `omniroute/fast`, `vram/BAAI/bge-m3`).
 
 ### Phase 2: Core Task & Board Perfection
-- **Kanban Board:** Fluid drag-and-drop, instant column status transitions, keyboard shortcuts (`Cmd+K`, `C` for create, `I` for import).
+- **Kanban Board:** Fluid drag-and-drop, instant column status transitions, keyboard shortcuts (`Cmd+K`, `C` for create, `I` for import), keyboard shortcuts guide (`?` key / toolbar button / palette entry, verified by `scripts/qa/verify_shortcuts_modal.js`).
 - **List View:** Multi-select shift+click range selection, instant bulk updates, column sorting.
 - **Cycles & Milestones:** Precise burndown calculations, sprint velocity tracking.
 - **Mobile Ergonomics:** 0px horizontal overflow across all viewports (Mobile 375px, Tablet 768px, Desktop 1440px).
