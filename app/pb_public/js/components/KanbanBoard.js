@@ -292,11 +292,11 @@ const KanbanBoardComponent = {
         <div class="flex items-center space-x-2 flex-wrap gap-1">
           <!-- Search input -->
           <div class="relative">
-            <i data-lucide="search" class="w-3.5 h-3.5 text-zinc-400 absolute left-2 top-2"></i>
+            <i data-lucide="search" class="w-3.5 h-3.5 text-zinc-400 absolute left-2 top-2 pointer-events-none z-10"></i>
             <input
               v-model="searchModel"
               placeholder="Filter tasks..."
-              class="pl-7 pr-2.5 py-1 rounded-md bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 w-44 sm:w-56"
+              class="pl-7 pr-2.5 py-1 rounded-md bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 w-44 sm:w-56 relative z-20"
             />
           </div>
 
