@@ -32,3 +32,14 @@
 
 - [x] #P2 done **Normalize QA credential env vars (QA_PASS vs QA_PASSWORD)** (cycle 70)
   - `QA_PASSWORD` is now the canonical var (accepting `QA_PASS` as fallback for one release) across `render_dom_check.js`, `verify_shortcuts_modal.js`, `verify_welcome_modal.js`, `verify_export_modal.js`, `verify_global_search.js`.
+
+## ✅ Cycle 73 (harden: veto housekeeping + dual-gate re-verification)
+
+- [x] #P1 done **Cycle-72 FAILED_AUDIT veto proven false and cleared**
+  - Inspect-72 session hit the 3600s timeout mid-verification and never wrote `/tmp/flow-inspect-result.json`; the supervisor log-fallback then matched 3 echoed `FAILED_AUDIT` tokens from the auditor reading the stale cycle-70 veto file (housekeeping `cat`), not a real verdict.
+  - Ground truth re-established this cycle: `uv run --with pytest pytest tests/` = 546 passed / 0 failed (181s); `scripts/qa/qa-render.sh` = RENDER QA: PASS (0 console/page errors, 0 failed requests, 0 4xx, no header/page overflow at 1440px; routing, resize, bulk, range, deep-link, export/import, dispatch, docs checks all green).
+  - Repo clean and synced: main == origin/main (10bbc16), zero uncommitted product changes at veto time.
+- [x] #P2 done **NEXT_DEV_TASK "Fix the idle-kill observer lie" closed**
+  - Referent (1) flomaster idle-kill contract: PR #7 merged (confirmed by cycle-68 inspect notes).
+  - Referent (2) iBrowse false-negative observer: worker/audio capture traps (iBrowse 2d7a0f1) + inspector settle window (cf915ef); `bun test src/__tests__/health-trap-observer.test.ts` = 7 pass / 0 fail; iBrowse main == origin/main.
+- [x] #P2 note **Broken `~/.local/bin/pytest` symlink (achiles deprecation debris)** — points to removed `/home/ubuntu/dev/achiles/.venv/bin/pytest`; use `uv run --with pytest pytest tests/` (AGENTS.md-canonical) until relinked.
