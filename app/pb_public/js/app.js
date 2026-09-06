@@ -92,7 +92,8 @@ const App = {
     'cycle-modal': CycleModalComponent,
     'custom-fields-modal': CustomFieldsModalComponent,
     'notification-settings-modal': NotificationSettingsModalComponent,
-    'welcome-modal': WelcomeModalComponent
+    'welcome-modal': WelcomeModalComponent,
+    'shortcuts-modal': ShortcutsModalComponent
   },
   data() {
     // Restore the last-known-good snapshot from localStorage so a page refresh
@@ -149,6 +150,7 @@ const App = {
       isCycleModalOpen: false,
       isCustomFieldsOpen: false,
       isWelcomeOpen: false,
+      isShortcutsOpen: false,
 
       // Filters (URL-synced: shared as ?q=&priority=&cycle= hash params)
       filterQuery: '',
@@ -577,6 +579,7 @@ const App = {
           this.isCycleModalOpen = false;
           this.isImportOpen = false;
           this.isWelcomeOpen = false;
+          this.isShortcutsOpen = false;
           if (this.selectedIssue) {
             this.selectedIssue = null;
           } else if (this.selectedIssueIds.size > 0) {
@@ -587,9 +590,13 @@ const App = {
 
         // Ignore single-key shortcuts when typing, when modifiers are pressed (e.g. Cmd+C copy), or when a modal/drawer is open
         if (isInput || e.metaKey || e.ctrlKey || e.altKey) return;
-        if (this.isNewIssueOpen || this.isOmnibarOpen || this.isProjectModalOpen || this.isCycleModalOpen || this.isImportOpen || this.isExportOpen || this.isNotificationSettingsOpen || this.isWelcomeOpen || this.selectedIssue) return;
+        if (this.isNewIssueOpen || this.isOmnibarOpen || this.isProjectModalOpen || this.isCycleModalOpen || this.isImportOpen || this.isExportOpen || this.isNotificationSettingsOpen || this.isWelcomeOpen || this.isShortcutsOpen || this.selectedIssue) return;
 
-        if (e.key === 'c' || e.key === 'C' || e.key === 'n' || e.key === 'N') {
+        if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+          // '?' (Shift+/) opens the keyboard shortcut guide.
+          e.preventDefault();
+          this.isShortcutsOpen = true;
+        } else if (e.key === 'c' || e.key === 'C' || e.key === 'n' || e.key === 'N') {
           e.preventDefault();
           this.isNewIssueOpen = true;
         } else if (e.key === 'i' || e.key === 'I') {

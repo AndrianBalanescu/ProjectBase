@@ -134,6 +134,7 @@
         @delete-issue="handleDeleteIssue"
         @toggle-issue-selection="toggleIssueSelection"
         @range-select-issue="rangeSelectIssue"
+        @open-shortcuts-modal="isShortcutsOpen = true"
       ></kanban-board>
 
       <!-- 2. List View -->
@@ -403,6 +404,7 @@
       @open-import="isImportOpen = true"
       @open-export="isExportOpen = true"
       @open-welcome="isOmnibarOpen = false; isWelcomeOpen = true"
+      @open-shortcuts="isOmnibarOpen = false; isShortcutsOpen = true"
     ></command-palette>
 
     <!-- New Issue Modal -->
@@ -479,6 +481,12 @@
       @go-board="openWelcomeBoard"
     ></welcome-modal>
 
+    <!-- Keyboard Shortcuts Guide Modal -->
+    <shortcuts-modal
+      :is-open="isShortcutsOpen"
+      @close="isShortcutsOpen = false"
+    ></shortcuts-modal>
+
     <!-- Floating Toasts -->
     <div class="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none">
       <div 
@@ -528,6 +536,7 @@
   <script src="/js/components/CustomFieldsModal.js"></script>
   <script src="/js/components/NotificationSettingsModal.js"></script>
   <script src="/js/components/WelcomeModal.js"></script>
+  <script src="/js/components/ShortcutsModal.js"></script>
   <script>
     // Offline-first app shell: register the Service Worker (progressive enhancement).
     if ('serviceWorker' in navigator) {

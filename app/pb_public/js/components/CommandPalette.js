@@ -3,7 +3,7 @@
 
 const CommandPaletteComponent = {
   props: ['isOpen', 'issues', 'projects'],
-  emits: ['close', 'select-issue', 'select-global-issue', 'select-project', 'change-view', 'open-new-issue', 'open-import', 'open-export', 'open-welcome'],
+  emits: ['close', 'select-issue', 'select-global-issue', 'select-project', 'change-view', 'open-new-issue', 'open-import', 'open-export', 'open-welcome', 'open-shortcuts'],
   data() {
     return {
       query: '',
@@ -32,7 +32,8 @@ const CommandPaletteComponent = {
         { type: 'action', id: 'act_agents', title: 'Switch to Agents Cockpit', subtitle: 'Autonomous Task Orchestration', action: () => this.$emit('change-view', 'agents'), icon: 'bot' },
         { type: 'action', id: 'act_portfolio', title: 'Switch to Portfolio View', subtitle: 'Multi-Project Health & Rollups', action: () => this.$emit('change-view', 'portfolio'), icon: 'layers' },
         { type: 'action', id: 'act_timeline', title: 'Switch to Timeline View', subtitle: 'Gantt Roadmap & Schedules', action: () => this.$emit('change-view', 'timeline'), icon: 'calendar' },
-        { type: 'action', id: 'act_welcome', title: 'Open Welcome & Shortcuts', subtitle: 'Keyboard shortcuts guide', action: () => this.$emit('open-welcome'), icon: 'help-circle' }
+        { type: 'action', id: 'act_welcome', title: 'Open Welcome Guide', subtitle: 'Get started checklist', action: () => this.$emit('open-welcome'), icon: 'help-circle' },
+        { type: 'action', id: 'act_shortcuts', title: 'Keyboard Shortcuts', subtitle: 'Shortcut: ? · all key bindings', action: () => this.$emit('open-shortcuts'), icon: 'keyboard' }
       ];
 
       actions.forEach(a => {
