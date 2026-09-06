@@ -2023,6 +2023,33 @@ def test_quick_task_valid_key_creates_and_cleans():
              headers={"Authorization": _superuser_token()})
 
 
+def test_issue_creation_writes_created_activity():
+    """Regression (cycle 71 finding): creating an issue must leave a 'created'
+    row in the activity audit trail, not only 'updated' rows from later edits."""
+    pid = _first_project_id()
+    title = f"Activity Audit {uuid.uuid4().hex[:10]}"
+    status, issue = _authed_json("POST", "/api/collections/issues/records",
+                                 {"project": pid, "title": title})
+    assert status == 200, f"issue create failed: {status} {issue}"
+    issue_id = issue["id"]
+    try:
+        from urllib.parse import quote
+        q = ("/api/collections/activity/records?perPage=10&sort=-created&filter="
+             + quote(f"issue='{issue_id}' && action='created'"))
+        status, act = _get_authed(q)
+        assert status == 200, f"activity list failed: {status} {act}"
+        rows = act.get("items", [])
+        assert rows, "no 'created' activity row after issue creation"
+        row = rows[0]
+        assert row.get("issue") == issue_id
+        assert row.get("action") == "created"
+        assert (row.get("details") or {}).get("title") == title
+    finally:
+        _request("DELETE", f"/api/collections/issues/records/{issue_id}",
+                 headers={"Authorization": _superuser_token()})
+        # Activity rows cascade-delete with the issue (relation cascadeDelete).
+
+
 def test_mcp_server_dispatch_agent_tool():
     """The FastMCP `dispatch_agent` tool must claim an issue end-to-end.
 

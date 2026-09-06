@@ -40,6 +40,32 @@ onRecordCreate((e) => {
     e.next()
 }, "issues")
 
+// Activity audit logging — issue creation must be in the trail too.
+// Runs after successful persist so the issue relation points at a real record.
+onRecordAfterCreateSuccess((e) => {
+    try {
+        let activityCol = e.app.findCollectionByNameOrId("activity")
+        if (activityCol) {
+            let act = new Record(activityCol)
+            act.set("project", e.record.get("project"))
+            act.set("issue", e.record.id)
+            act.set("actor", "Agent/User")
+            act.set("actor_type", "system")
+            act.set("action", "created")
+            act.set("details", {
+                status: e.record.get("status"),
+                priority: e.record.get("priority"),
+                title: e.record.get("title")
+            })
+            e.app.save(act)
+        }
+    } catch (err) {
+        // Non-fatal activity log failure — issue creation must not break
+        console.error(">>> Error logging issue-created activity:", err)
+    }
+    e.next()
+}, "issues")
+
 onRecordUpdate((e) => {
     try {
         // Activity audit logging
