@@ -194,13 +194,13 @@ const SearchableSelectComponent = {
         <!-- Search Filter Input -->
         <div v-if="searchable && normalizedOptions.length > 5" class="p-1.5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
           <div class="relative flex items-center">
-            <span class="absolute left-2.5 text-zinc-400 text-xs">🔍</span>
+            <span class="absolute left-2.5 text-zinc-400 text-xs pointer-events-none">🔍</span>
             <input
               ref="searchInput"
               v-model="searchQuery"
               type="text"
               :placeholder="searchPlaceholder"
-              class="w-full pl-7 pr-2.5 py-1 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500"
+              class="w-full pl-7 pr-2.5 py-1 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 relative"
               @click.stop
             />
           </div>
