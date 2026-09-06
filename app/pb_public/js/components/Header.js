@@ -70,28 +70,28 @@ const HeaderComponent = {
     }
   },
   template: `
-    <header class="h-14 border-b border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-[#121215]/95 backdrop-blur-md px-3 flex items-center gap-2 sticky top-0 z-30 select-none">
-      <!-- Left: Logo & Project Switcher -->
-      <div class="flex items-center space-x-3 flex-shrink-0">
-        <div class="flex items-center space-x-2 font-bold text-zinc-900 dark:text-white tracking-tight cursor-pointer" @click="$emit('change-view', 'projects')">
+    <header class="h-14 border-b border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-[#121215]/95 backdrop-blur-md px-2 sm:px-3 flex items-center gap-1.5 sm:gap-2 sticky top-0 z-30 select-none min-w-0 overflow-x-clip">
+      <!-- Left: Logo & Project Switcher (shrinks on mobile; name truncates) -->
+      <div class="flex items-center space-x-1.5 sm:space-x-3 flex-shrink min-w-0">
+        <div class="flex items-center space-x-2 font-bold text-zinc-900 dark:text-white tracking-tight cursor-pointer flex-shrink-0" @click="$emit('change-view', 'projects')">
           <div class="w-7 h-7 rounded-md bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 flex items-center justify-center font-bold text-sm shadow-2xs">
             ⚡
           </div>
-          <span class="text-sm font-semibold tracking-tight">ProjectBase</span>
-          <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700/50 select-none">v1.39.0</span>
+          <span class="text-sm font-semibold tracking-tight hidden min-[480px]:inline">ProjectBase</span>
+          <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700/50 select-none hidden min-[480px]:inline">v1.39.0</span>
         </div>
 
-        <div class="h-4 w-px bg-zinc-200 dark:bg-zinc-800"></div>
+        <div class="h-4 w-px bg-zinc-200 dark:bg-zinc-800 hidden min-[480px]:block"></div>
 
         <!-- Project Selector Dropdown -->
-        <div class="relative" ref="dropdown">
+        <div class="relative min-w-0" ref="dropdown">
           <button
             @click="dropdownOpen = !dropdownOpen"
-            class="flex items-center space-x-1.5 px-2 py-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium text-zinc-700 dark:text-zinc-200 transition-colors border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700"
+            class="flex items-center space-x-1.5 px-2 py-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium text-zinc-700 dark:text-zinc-200 transition-colors border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 max-w-full"
           >
-            <span v-if="currentProject" class="flex items-center space-x-1.5">
-              <span>{{ currentProject.icon || '📁' }}</span>
-              <span class="font-semibold">{{ currentProject.name }}</span>
+            <span v-if="currentProject" class="flex items-center space-x-1.5 min-w-0">
+              <span class="flex-shrink-0">{{ currentProject.icon || '📁' }}</span>
+              <span class="font-semibold truncate max-w-[76px] sm:max-w-[130px] md:max-w-none">{{ currentProject.name }}</span>
             </span>
             <span v-else class="text-zinc-500">All Projects</span>
             <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-zinc-400"></i>
