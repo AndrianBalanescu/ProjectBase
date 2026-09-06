@@ -17,6 +17,9 @@
 //            log_agent_telemetry, register_webhook, list_webhooks, delete_webhook
 
 routerAdd("POST", "/api/projectbase/mcp", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     const TOOLS = [
         { name: "list_projects", description: "List all projects.", inputSchema: { type: "object", properties: {} } },
         {

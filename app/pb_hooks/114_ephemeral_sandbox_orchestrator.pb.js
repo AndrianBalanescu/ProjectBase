@@ -86,6 +86,9 @@ routerAdd("GET", "/api/projectbase/sandboxes", (e) => {
 // 2. POST /api/projectbase/sandboxes/provision - Provision new sandbox
 routerAdd("POST", "/api/projectbase/sandboxes/provision", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let body = {};
         try { body = e.requestInfo().body || {}; } catch (err) {}
 
@@ -285,6 +288,9 @@ routerAdd("GET", "/api/projectbase/sandboxes/{id}", (e) => {
 // 4. DELETE /api/projectbase/sandboxes/{id} - Terminate / delete sandbox
 routerAdd("DELETE", "/api/projectbase/sandboxes/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         let r = null;
         try {
@@ -312,6 +318,9 @@ routerAdd("DELETE", "/api/projectbase/sandboxes/{id}", (e) => {
 // 5. POST /api/projectbase/sandboxes/{id}/action - Lifecycle action (start, stop, restart, terminate)
 routerAdd("POST", "/api/projectbase/sandboxes/{id}/action", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         let body = {};
         try { body = e.requestInfo().body || {}; } catch (x) {}
@@ -359,6 +368,9 @@ routerAdd("POST", "/api/projectbase/sandboxes/{id}/action", (e) => {
 // 6. POST /api/projectbase/sandboxes/{id}/exec - Execute command inside sandbox
 routerAdd("POST", "/api/projectbase/sandboxes/{id}/exec", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         let body = {};
         try { body = e.requestInfo().body || {}; } catch (x) {}
@@ -450,6 +462,9 @@ routerAdd("GET", "/api/projectbase/sandboxes/{id}/executions", (e) => {
 // 8. POST /api/projectbase/sandboxes/{id}/snapshot - Create snapshot
 routerAdd("POST", "/api/projectbase/sandboxes/{id}/snapshot", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         let body = {};
         try { body = e.requestInfo().body || {}; } catch (x) {}
@@ -532,6 +547,9 @@ routerAdd("GET", "/api/projectbase/sandboxes/{id}/snapshots", (e) => {
 // 10. POST /api/projectbase/sandboxes/{id}/health - Update health
 routerAdd("POST", "/api/projectbase/sandboxes/{id}/health", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         let body = {};
         try { body = e.requestInfo().body || {}; } catch (x) {}
@@ -591,6 +609,9 @@ routerAdd("GET", "/api/projectbase/sandboxes/templates", (e) => {
 // 12. POST /api/projectbase/sandboxes/templates - Create template
 routerAdd("POST", "/api/projectbase/sandboxes/templates", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let body = {};
         try { body = e.requestInfo().body || {}; } catch (x) {}
 
@@ -694,6 +715,9 @@ routerAdd("GET", "/api/projectbase/sandboxes/metrics", (e) => {
 // 14. POST /api/projectbase/sandboxes/cleanup-idle - Clean up expired TTL sandboxes
 routerAdd("POST", "/api/projectbase/sandboxes/cleanup-idle", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const records = e.app.findRecordsByFilter("dev_sandboxes", "status != 'terminated' && auto_teardown = true", "-created", 200, 0);
         const now = new Date().getTime();
         let cleaned = 0;
@@ -724,6 +748,9 @@ routerAdd("POST", "/api/projectbase/sandboxes/cleanup-idle", (e) => {
 // 15. POST /api/projectbase/sandboxes/seed-defaults - Seed templates
 routerAdd("POST", "/api/projectbase/sandboxes/seed-defaults", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const defaultTemplates = [
             {
                 name: "Vue 3 + Vite / Tailwind Frontend",

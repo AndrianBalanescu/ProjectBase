@@ -17,6 +17,9 @@
 // 1. POST /api/projectbase/sessions/{id}/branch - Create a branched/forked child session
 routerAdd("POST", "/api/projectbase/sessions/{id}/branch", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const parseJson = (val, fallback) => {
             if (val === null || val === undefined || val === "") return fallback;
             if (typeof val === "string") {
@@ -333,6 +336,9 @@ routerAdd("GET", "/api/projectbase/sessions/dag", (e) => {
 // 4. POST /api/projectbase/sessions/{id}/pause - Pause session
 routerAdd("POST", "/api/projectbase/sessions/{id}/pause", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";
         const body = e.requestInfo().body || {};
         let session = null;
@@ -377,6 +383,9 @@ routerAdd("POST", "/api/projectbase/sessions/{id}/pause", (e) => {
 // 5. POST /api/projectbase/sessions/{id}/resume - Resume session
 routerAdd("POST", "/api/projectbase/sessions/{id}/resume", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";
         const body = e.requestInfo().body || {};
         let session = null;
@@ -420,6 +429,9 @@ routerAdd("POST", "/api/projectbase/sessions/{id}/resume", (e) => {
 // 6. POST /api/projectbase/sessions/{id}/inject - Inject human steerings/constraints into live context
 routerAdd("POST", "/api/projectbase/sessions/{id}/inject", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const parseJson = (val, fallback) => {
             if (val === null || val === undefined || val === "") return fallback;
             if (typeof val === "string") {
@@ -609,6 +621,9 @@ routerAdd("GET", "/api/projectbase/sessions/{id}/interventions", (e) => {
 // 8. POST /api/projectbase/sessions/{id}/gate - Set / resolve Human Intervention Gate status
 routerAdd("POST", "/api/projectbase/sessions/{id}/gate", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";
         const body = e.requestInfo().body || {};
         let session = null;
@@ -686,6 +701,9 @@ routerAdd("POST", "/api/projectbase/sessions/{id}/gate", (e) => {
 // 9. POST /api/projectbase/sessions/{id}/arbitrate - Arbitrate worktree and file collisions
 routerAdd("POST", "/api/projectbase/sessions/{id}/arbitrate", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const parseJson = (val, fallback) => {
             if (val === null || val === undefined || val === "") return fallback;
             if (typeof val === "string") {
@@ -897,6 +915,9 @@ routerAdd("GET", "/api/projectbase/sessions/conflicts", (e) => {
 // 11. POST /api/projectbase/sessions/swarm/dispatch - Dispatch multi-agent swarm child sessions
 routerAdd("POST", "/api/projectbase/sessions/swarm/dispatch", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         const rootSessionId = body.root_session_id || body.parent_session_id || "";
         let parentRecord = null;

@@ -16,6 +16,9 @@
 // 1. POST /api/projectbase/sessions/{id}/trajectories
 routerAdd("POST", "/api/projectbase/sessions/{id}/trajectories", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";
         const body = e.requestInfo().body || {};
         const sessionId = (id || body.session_id || "").trim();
@@ -112,6 +115,9 @@ routerAdd("POST", "/api/projectbase/sessions/{id}/trajectories", (e) => {
 // 2. POST /api/projectbase/sessions/trajectories
 routerAdd("POST", "/api/projectbase/sessions/trajectories", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         const sessionId = (body.session_id || "").trim();
 
@@ -207,6 +213,9 @@ routerAdd("POST", "/api/projectbase/sessions/trajectories", (e) => {
 // 3. POST /api/projectbase/sessions/trajectories/bulk
 routerAdd("POST", "/api/projectbase/sessions/trajectories/bulk", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const info = e.requestInfo();
         const body = info.body || {};
         const steps = Array.isArray(body.steps) ? body.steps : (Array.isArray(body) ? body : []);
@@ -479,6 +488,9 @@ routerAdd("GET", "/api/projectbase/sessions/{id}/trajectories/summary", (e) => {
 // 6. POST /api/projectbase/swarm/clusters
 routerAdd("POST", "/api/projectbase/swarm/clusters", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const info = e.requestInfo();
         const body = info.body || {};
 
@@ -693,6 +705,9 @@ routerAdd("GET", "/api/projectbase/swarm/clusters/{id}", (e) => {
 // 9. POST /api/projectbase/swarm/clusters/{id}/workers
 routerAdd("POST", "/api/projectbase/swarm/clusters/{id}/workers", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";
         let cluster = null;
         try {
@@ -766,6 +781,9 @@ routerAdd("POST", "/api/projectbase/swarm/clusters/{id}/workers", (e) => {
 // 10. POST /api/projectbase/swarm/clusters/{id}/status
 routerAdd("POST", "/api/projectbase/swarm/clusters/{id}/status", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";
         let cluster = null;
         try {

@@ -16,6 +16,9 @@
 // 1. POST /api/projectbase/merges/propose
 routerAdd("POST", "/api/projectbase/merges/propose", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const resolveSession = (app, sidOrId) => {
             if (!sidOrId) return null;
             let rec = null;
@@ -379,6 +382,9 @@ routerAdd("GET", "/api/projectbase/merges/{id}", (e) => {
 // 4. POST /api/projectbase/merges/{id}/analyze
 routerAdd("POST", "/api/projectbase/merges/{id}/analyze", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const idRef = e.request.pathValue("id");
         let mergeRec = null;
         try {
@@ -426,6 +432,9 @@ routerAdd("POST", "/api/projectbase/merges/{id}/analyze", (e) => {
 // 5. POST /api/projectbase/merges/{id}/conflicts/{conflictId}/resolve
 routerAdd("POST", "/api/projectbase/merges/{id}/conflicts/{conflictId}/resolve", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const idRef = e.request.pathValue("id");
         const conflictId = e.request.pathValue("conflictId");
         let mergeRec = null;
@@ -497,6 +506,9 @@ routerAdd("POST", "/api/projectbase/merges/{id}/conflicts/{conflictId}/resolve",
 // 6. POST /api/projectbase/merges/{id}/auto-resolve
 routerAdd("POST", "/api/projectbase/merges/{id}/auto-resolve", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const resolveSession = (app, sidOrId) => {
             if (!sidOrId) return null;
             let rec = null;
@@ -626,6 +638,9 @@ routerAdd("POST", "/api/projectbase/merges/{id}/auto-resolve", (e) => {
 // 7. POST /api/projectbase/merges/{id}/verify
 routerAdd("POST", "/api/projectbase/merges/{id}/verify", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const idRef = e.request.pathValue("id");
         let mergeRec = null;
         try {
@@ -673,6 +688,9 @@ routerAdd("POST", "/api/projectbase/merges/{id}/verify", (e) => {
 // 8. POST /api/projectbase/merges/{id}/execute
 routerAdd("POST", "/api/projectbase/merges/{id}/execute", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const resolveSession = (app, sidOrId) => {
             if (!sidOrId) return null;
             let rec = null;
@@ -746,6 +764,9 @@ routerAdd("POST", "/api/projectbase/merges/{id}/execute", (e) => {
 // 9. POST /api/projectbase/merges/{id}/reject
 routerAdd("POST", "/api/projectbase/merges/{id}/reject", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const resolveSession = (app, sidOrId) => {
             if (!sidOrId) return null;
             let rec = null;

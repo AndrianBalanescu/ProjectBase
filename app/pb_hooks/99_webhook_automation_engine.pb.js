@@ -18,6 +18,9 @@
 
 // 1. POST /api/projectbase/webhooks/endpoints - Register or update outbound webhook endpoint
 routerAdd("POST", "/api/projectbase/webhooks/endpoints", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     try {
         const generateRandomHex = (len) => {
             const chars = "abcdef0123456789";
@@ -160,6 +163,9 @@ routerAdd("GET", "/api/projectbase/webhooks/endpoints/{id}", (e) => {
 
 // 4. DELETE /api/projectbase/webhooks/endpoints/{id} - Delete/decommission webhook endpoint
 routerAdd("DELETE", "/api/projectbase/webhooks/endpoints/{id}", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     try {
         const id = e.request.pathValue("id");
         const record = e.app.findRecordById("webhook_endpoints", id);
@@ -174,6 +180,9 @@ routerAdd("DELETE", "/api/projectbase/webhooks/endpoints/{id}", (e) => {
 
 // 5. POST /api/projectbase/webhooks/dispatch - Dispatch webhook event with transformations & HMAC signing
 routerAdd("POST", "/api/projectbase/webhooks/dispatch", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     try {
         const sha256Bytes = (bytes) => {
             const K = [
@@ -607,6 +616,9 @@ routerAdd("POST", "/api/projectbase/webhooks/dispatch", (e) => {
 
 // 6. POST /api/projectbase/webhooks/verify - Inbound cryptographic HMAC-SHA256 signature verifier & replay guard
 routerAdd("POST", "/api/projectbase/webhooks/verify", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     try {
         const sha256Bytes = (bytes) => {
             const K = [
@@ -867,6 +879,9 @@ routerAdd("GET", "/api/projectbase/webhooks/dlq", (e) => {
 
 // 9. POST /api/projectbase/webhooks/dlq/retry - Retry/replay dead-letter queue messages
 routerAdd("POST", "/api/projectbase/webhooks/dlq/retry", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     try {
         const body = e.requestInfo().body || {};
         const itemId = body.item_id || "all";
@@ -925,6 +940,9 @@ routerAdd("POST", "/api/projectbase/webhooks/dlq/retry", (e) => {
 
 // 10. DELETE /api/projectbase/webhooks/dlq/{id} - Purge DLQ message or clear queue
 routerAdd("DELETE", "/api/projectbase/webhooks/dlq/{id}", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     try {
         const id = e.request.pathValue("id");
         if (id === "all") {

@@ -106,6 +106,9 @@ routerAdd("GET", "/api/projectbase/tenants", (e) => {
 // 2. POST /api/projectbase/tenants - Create a new tenant workspace
 routerAdd("POST", "/api/projectbase/tenants", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const DEFAULT_QUOTAS = {
             free: { max_projects: 5, max_issues: 250, max_agents: 3, max_storage_mb: 500, max_monthly_api_calls: 5000, max_workflow_runs: 500, enforcement_mode: "hard" },
             pro: { max_projects: 25, max_issues: 2500, max_agents: 15, max_storage_mb: 5000, max_monthly_api_calls: 50000, max_workflow_runs: 10000, enforcement_mode: "soft" },
@@ -254,6 +257,9 @@ routerAdd("GET", "/api/projectbase/tenants/{id}", (e) => {
 // 4. PATCH /api/projectbase/tenants/{id} - Update tenant metadata
 routerAdd("PATCH", "/api/projectbase/tenants/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || "";
         const rec = e.app.findRecordById("tenants", id);
         if (!rec) return e.json(404, { error: "Tenant not found" });
@@ -286,6 +292,9 @@ routerAdd("PATCH", "/api/projectbase/tenants/{id}", (e) => {
 // 5. DELETE /api/projectbase/tenants/{id} - Delete tenant workspace
 routerAdd("DELETE", "/api/projectbase/tenants/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || "";
         const rec = e.app.findRecordById("tenants", id);
         if (!rec) return e.json(404, { error: "Tenant not found" });
@@ -351,6 +360,9 @@ routerAdd("GET", "/api/projectbase/tenants/{id}/quotas", (e) => {
 // 7. PUT /api/projectbase/tenants/{id}/quotas - Update tenant quotas
 routerAdd("PUT", "/api/projectbase/tenants/{id}/quotas", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || "";
         const tRec = e.app.findRecordById("tenants", id);
         if (!tRec) return e.json(404, { error: "Tenant not found" });
@@ -501,6 +513,9 @@ routerAdd("GET", "/api/projectbase/tenants/{id}/usage", (e) => {
 // 9. POST /api/projectbase/tenants/{id}/check-quota - Dynamic quota enforcement gate check
 routerAdd("POST", "/api/projectbase/tenants/{id}/check-quota", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const DEFAULT_QUOTAS = {
             free: { max_projects: 5, max_issues: 250, max_agents: 3, max_storage_mb: 500, max_monthly_api_calls: 5000, max_workflow_runs: 500, enforcement_mode: "hard" },
             pro: { max_projects: 25, max_issues: 2500, max_agents: 15, max_storage_mb: 5000, max_monthly_api_calls: 50000, max_workflow_runs: 10000, enforcement_mode: "soft" },
@@ -574,6 +589,9 @@ routerAdd("POST", "/api/projectbase/tenants/{id}/check-quota", (e) => {
 // 10. POST /api/projectbase/tenants/{id}/switch - Switch active tenant workspace context
 routerAdd("POST", "/api/projectbase/tenants/{id}/switch", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || "";
         const tRec = e.app.findRecordById("tenants", id);
         if (!tRec) return e.json(404, { error: "Tenant not found" });
@@ -701,6 +719,9 @@ routerAdd("GET", "/api/projectbase/tenants/{id}/members", (e) => {
 // 13. POST /api/projectbase/tenants/{id}/members - Add member/agent to tenant
 routerAdd("POST", "/api/projectbase/tenants/{id}/members", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || "";
         const tRec = e.app.findRecordById("tenants", id);
         if (!tRec) return e.json(404, { error: "Tenant not found" });
@@ -736,6 +757,9 @@ routerAdd("POST", "/api/projectbase/tenants/{id}/members", (e) => {
 // 14. DELETE /api/projectbase/tenants/{id}/members/{userId} - Remove member
 routerAdd("DELETE", "/api/projectbase/tenants/{id}/members/{userId}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || "";
         const userId = (e.request && e.request.pathValue ? e.request.pathValue("userId") : "") || (e.requestInfo().params && e.requestInfo().params.userId) || "";
 

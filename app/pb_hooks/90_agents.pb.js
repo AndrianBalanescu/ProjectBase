@@ -304,6 +304,9 @@ routerAdd("GET", "/api/projectbase/agents/flomaster", (e) => {
 
 // POST /api/projectbase/agents/sync - Rescan & sync agents
 routerAdd("POST", "/api/projectbase/agents/sync", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     try {
         let sessionCount = 0;
         try {

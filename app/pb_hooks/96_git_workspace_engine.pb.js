@@ -10,6 +10,7 @@
 // 3. POST /api/projectbase/git/patch        - Stage unified diff or patch for peer review & agent verification
 // 4. GET  /api/projectbase/git/patch/:id    - Retrieve full patch content & unified diff statistics
 // 5. POST /api/projectbase/webhooks/git     - Universal Git webhook receiver (GitHub/GitLab/CI) for automated issue triage
+//                                            (auth: e.auth OR valid X-Hub-Signature-256 HMAC via PROJECTBASE_GIT_WEBHOOK_SECRET; no secret => fail-closed)
 // 6. GET  /api/projectbase/git/status       - Aggregated workspace/project git status & CI reliability metrics
 
 // 1. GET /api/projectbase/git/artifacts
@@ -360,6 +361,62 @@ routerAdd("GET", "/api/projectbase/git/patch/{id}", (e) => {
 
 // 5. POST /api/projectbase/webhooks/git
 routerAdd("POST", "/api/projectbase/webhooks/git", (e) => {
+    // Cycle 74 hardening (cycle-75 fix): this is a universal CI/Git webhook
+    // receiver — inbound GitHub/GitLab events authenticate via HMAC signature,
+    // not superuser credentials. Access requires ONE of:
+    //   1. an authenticated principal (e.auth), or
+    //   2. a valid X-Hub-Signature-256: sha256=<hex> HMAC-SHA256 signature of
+    //      the raw request body, keyed by PROJECTBASE_GIT_WEBHOOK_SECRET env
+    //      (or PROJECTBASE_WEBHOOK_SECRET fallback). No secret configured =>
+    //      anonymous traffic stays rejected (fail-closed).
+    // Reuses the $security.hs256/$security.equal JSVM pattern proven in the
+    // webhook-automation engine's inbound verifier.
+    if (!e.auth || !e.auth.id) {
+        let webhookSecret = ""
+        try { webhookSecret = $os.getenv("PROJECTBASE_GIT_WEBHOOK_SECRET") || "" } catch (err) {}
+        if (!webhookSecret) {
+            try { webhookSecret = $os.getenv("PROJECTBASE_WEBHOOK_SECRET") || "" } catch (err) {}
+        }
+        if (!webhookSecret) {
+            return e.unauthorizedError("Authentication required")
+        }
+        let sigHeader = ""
+        try {
+            const headers = e.requestInfo().headers || {}
+            for (let k in headers) {
+                if (String(k).toLowerCase().replace(/_/g, "-") === "x-hub-signature-256") {
+                    let v = headers[k]
+                    sigHeader = Array.isArray(v) ? String(v[0] || "") : String(v || "")
+                    break
+                }
+            }
+        } catch (err) {}
+        let rawBody = ""
+        try { rawBody = toString(e.request && e.request.body) } catch (err) {
+            try { rawBody = String(e.request && e.request.body) } catch (err2) {}
+        }
+        let provided = ""
+        if (sigHeader && sigHeader.indexOf("sha256=") === 0) {
+            provided = sigHeader.substring(7).trim().toLowerCase()
+        }
+        if (!provided || !rawBody) {
+            return e.unauthorizedError("Authentication required")
+        }
+        let expected = ""
+        try { expected = $security.hs256(rawBody, webhookSecret).toLowerCase() } catch (err) {
+            return e.unauthorizedError("Authentication required")
+        }
+        // Constant-time-ish comparison, char-by-char (same pattern as 99_webhook_automation_engine).
+        let mismatch = expected.length !== provided.length
+        if (!mismatch) {
+            for (let i = 0; i < expected.length; i++) {
+                if (expected.charCodeAt(i) !== provided.charCodeAt(i)) { mismatch = true; break }
+            }
+        }
+        if (mismatch) {
+            return e.unauthorizedError("Authentication required")
+        }
+    }
     try {
         let body = e.requestInfo().body || {}
         let headers = e.requestInfo().headers || {}

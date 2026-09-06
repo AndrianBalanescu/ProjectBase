@@ -71,6 +71,9 @@ routerAdd("GET", "/api/projectbase/tdd/suites", (e) => {
 // 2. POST /api/projectbase/tdd/suites
 routerAdd("POST", "/api/projectbase/tdd/suites", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         if (!body.name) {
             return e.json(400, { error: "name is required" });
@@ -231,6 +234,9 @@ routerAdd("GET", "/api/projectbase/tdd/suites/{id}", (e) => {
 // 4. DELETE /api/projectbase/tdd/suites/{id}
 routerAdd("DELETE", "/api/projectbase/tdd/suites/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const record = e.app.findRecordById("tdd_suites", id);
         if (!record) {
@@ -250,6 +256,9 @@ routerAdd("DELETE", "/api/projectbase/tdd/suites/{id}", (e) => {
 // 5. POST /api/projectbase/tdd/suites/{id}/run
 routerAdd("POST", "/api/projectbase/tdd/suites/{id}/run", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const record = e.app.findRecordById("tdd_suites", id);
         if (!record) {
@@ -353,6 +362,9 @@ routerAdd("POST", "/api/projectbase/tdd/suites/{id}/run", (e) => {
 // 6. POST /api/projectbase/tdd/suites/synthesize
 routerAdd("POST", "/api/projectbase/tdd/suites/synthesize", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         const title = body.title || body.name || "Feature Acceptance Suite";
         const issueId = body.issue_id || "";
@@ -496,6 +508,9 @@ routerAdd("GET", "/api/projectbase/tdd/suites/{id}/cases", (e) => {
 
 routerAdd("POST", "/api/projectbase/tdd/suites/{id}/cases", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const suite = e.app.findRecordById("tdd_suites", id);
         if (!suite) {
@@ -549,6 +564,9 @@ routerAdd("POST", "/api/projectbase/tdd/suites/{id}/cases", (e) => {
 // 8. POST /api/projectbase/tdd/cases/{id}/execute
 routerAdd("POST", "/api/projectbase/tdd/cases/{id}/execute", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const record = e.app.findRecordById("tdd_cases", id);
         if (!record) {
@@ -652,6 +670,9 @@ routerAdd("GET", "/api/projectbase/tdd/mutation/runs", (e) => {
 
 routerAdd("POST", "/api/projectbase/tdd/mutation/runs", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         if (!body.target_file) {
             return e.json(400, { error: "target_file is required" });
@@ -829,6 +850,9 @@ routerAdd("GET", "/api/projectbase/tdd/quarantines", (e) => {
 
 routerAdd("POST", "/api/projectbase/tdd/quarantines", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         if (!body.test_name) {
             return e.json(400, { error: "test_name is required" });
@@ -880,6 +904,9 @@ routerAdd("POST", "/api/projectbase/tdd/quarantines", (e) => {
 // 12. POST /api/projectbase/tdd/quarantines/{id}/resolve
 routerAdd("POST", "/api/projectbase/tdd/quarantines/{id}/resolve", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const record = e.app.findRecordById("flaky_quarantines", id);
         if (!record) {

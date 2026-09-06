@@ -135,6 +135,9 @@ routerAdd("GET", "/api/projectbase/sso/providers", (e) => {
 
 // 2. POST /api/projectbase/sso/providers - Register / update an SSO Identity Provider
 routerAdd("POST", "/api/projectbase/sso/providers", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     try {
         const col = e.app.findCollectionByNameOrId("sso_providers");
         if (!col) return e.json(500, { error: "sso_providers collection missing" });
@@ -217,6 +220,9 @@ routerAdd("POST", "/api/projectbase/sso/providers", (e) => {
 
 // 3. DELETE /api/projectbase/sso/providers/{id} - Delete an SSO provider
 routerAdd("DELETE", "/api/projectbase/sso/providers/{id}", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     try {
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || "";
         if (!id) return e.json(400, { error: "Provider ID is required" });
@@ -288,6 +294,9 @@ routerAdd("GET", "/api/projectbase/sso/providers/{id}/discovery", (e) => {
 
 // 5. POST /api/projectbase/sso/auth/exchange - Exchange auth token & perform JIT user provisioning
 routerAdd("POST", "/api/projectbase/sso/auth/exchange", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     try {
         const body = e.requestInfo().body || {};
         let providerKey = String(body.provider_key || "google").trim().toLowerCase();
@@ -413,6 +422,9 @@ routerAdd("GET", "/api/projectbase/rbac/roles", (e) => {
 
 // 7. POST /api/projectbase/rbac/roles - Create or update a custom RBAC role
 routerAdd("POST", "/api/projectbase/rbac/roles", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     try {
         const col = e.app.findCollectionByNameOrId("rbac_roles");
         if (!col) return e.json(500, { error: "rbac_roles collection missing" });
@@ -472,6 +484,9 @@ routerAdd("POST", "/api/projectbase/rbac/roles", (e) => {
 
 // 8. DELETE /api/projectbase/rbac/roles/{id} - Delete a custom role
 routerAdd("DELETE", "/api/projectbase/rbac/roles/{id}", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     try {
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || "";
         if (!id) return e.json(400, { error: "Role ID or key required" });
@@ -592,6 +607,9 @@ routerAdd("GET", "/api/projectbase/rbac/matrix", (e) => {
 
 // 10. POST /api/projectbase/rbac/check - Check if actor has permission for capability
 routerAdd("POST", "/api/projectbase/rbac/check", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     try {
         const body = e.requestInfo().body || {};
         let actorId = String(body.actor_id || body.user_id || body.email || "").trim();
@@ -703,6 +721,9 @@ routerAdd("GET", "/api/projectbase/rbac/assignments", (e) => {
 
 // 12. POST /api/projectbase/rbac/assign - Assign or update role for user/agent
 routerAdd("POST", "/api/projectbase/rbac/assign", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     try {
         const col = e.app.findCollectionByNameOrId("rbac_assignments");
         if (!col) return e.json(500, { error: "rbac_assignments collection missing" });
@@ -760,6 +781,9 @@ routerAdd("POST", "/api/projectbase/rbac/assign", (e) => {
 
 // 13. DELETE /api/projectbase/rbac/assignments/{id} - Revoke a role assignment
 routerAdd("DELETE", "/api/projectbase/rbac/assignments/{id}", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     try {
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || "";
         if (!id) return e.json(400, { error: "Assignment ID is required" });
@@ -790,6 +814,9 @@ routerAdd("DELETE", "/api/projectbase/rbac/assignments/{id}", (e) => {
 
 // 14. POST /api/projectbase/rbac/tokens/create - Generate scoped API token
 routerAdd("POST", "/api/projectbase/rbac/tokens/create", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     try {
         const col = e.app.findCollectionByNameOrId("rbac_scoped_tokens");
         if (!col) return e.json(500, { error: "rbac_scoped_tokens collection missing" });
@@ -868,6 +895,9 @@ routerAdd("GET", "/api/projectbase/rbac/tokens", (e) => {
 
 // 16. POST /api/projectbase/rbac/tokens/revoke - Revoke a scoped API token
 routerAdd("POST", "/api/projectbase/rbac/tokens/revoke", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     try {
         const body = e.requestInfo().body || {};
         let tokenId = String(body.token_id || body.id || "").trim();
@@ -944,6 +974,9 @@ routerAdd("GET", "/api/projectbase/rbac/audit-logs", (e) => {
 
 // 18. POST /api/projectbase/rbac/audit-logs/export - Export security audit logs
 routerAdd("POST", "/api/projectbase/rbac/audit-logs/export", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     try {
         const body = e.requestInfo().body || {};
         const format = String(body.format || "json").toLowerCase();

@@ -73,6 +73,9 @@ routerAdd("GET", "/api/projectbase/reviews", (e) => {
 // 2. POST /api/projectbase/reviews
 routerAdd("POST", "/api/projectbase/reviews", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         if (!body.title) {
             return e.json(400, { error: "title is required" });
@@ -236,6 +239,9 @@ routerAdd("GET", "/api/projectbase/reviews/{id}", (e) => {
 // 4. PATCH /api/projectbase/reviews/{id}
 routerAdd("PATCH", "/api/projectbase/reviews/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const record = e.app.findRecordById("code_reviews", id);
         const body = e.requestInfo().body || {};
@@ -269,6 +275,9 @@ routerAdd("PATCH", "/api/projectbase/reviews/{id}", (e) => {
 // 5. DELETE /api/projectbase/reviews/{id}
 routerAdd("DELETE", "/api/projectbase/reviews/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const record = e.app.findRecordById("code_reviews", id);
 
@@ -292,6 +301,9 @@ routerAdd("DELETE", "/api/projectbase/reviews/{id}", (e) => {
 // 6. POST /api/projectbase/reviews/{id}/critiques
 routerAdd("POST", "/api/projectbase/reviews/{id}/critiques", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const reviewId = e.request.pathValue("id");
         const review = e.app.findRecordById("code_reviews", reviewId);
         const body = e.requestInfo().body || {};
@@ -413,6 +425,9 @@ routerAdd("GET", "/api/projectbase/reviews/{id}/critiques", (e) => {
 // 8. PATCH /api/projectbase/reviews/critiques/{id}
 routerAdd("PATCH", "/api/projectbase/reviews/critiques/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const record = e.app.findRecordById("review_critiques", id);
         const reviewId = record.getString("review_id");
@@ -474,6 +489,9 @@ routerAdd("PATCH", "/api/projectbase/reviews/critiques/{id}", (e) => {
 // 9. DELETE /api/projectbase/reviews/critiques/{id}
 routerAdd("DELETE", "/api/projectbase/reviews/critiques/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const record = e.app.findRecordById("review_critiques", id);
         const reviewId = record.getString("review_id");
@@ -521,6 +539,9 @@ routerAdd("DELETE", "/api/projectbase/reviews/critiques/{id}", (e) => {
 // 10. POST /api/projectbase/reviews/{id}/swarm
 routerAdd("POST", "/api/projectbase/reviews/{id}/swarm", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const review = e.app.findRecordById("code_reviews", id);
         const diffContent = review.getString("diff_content");
@@ -692,6 +713,9 @@ routerAdd("POST", "/api/projectbase/reviews/{id}/swarm", (e) => {
 // 11. POST /api/projectbase/reviews/{id}/synthesize-patch
 routerAdd("POST", "/api/projectbase/reviews/{id}/synthesize-patch", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const reviewId = e.request.pathValue("id");
         const review = e.app.findRecordById("code_reviews", reviewId);
         const body = e.requestInfo().body || {};
@@ -788,6 +812,9 @@ routerAdd("GET", "/api/projectbase/reviews/{id}/patches", (e) => {
 // 13. POST /api/projectbase/reviews/patches/{id}/apply
 routerAdd("POST", "/api/projectbase/reviews/patches/{id}/apply", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const parseJson = (val, fallback) => {
             if (val === null || val === undefined || val === "") return fallback;
             if (typeof val === "string") {
@@ -885,6 +912,9 @@ routerAdd("POST", "/api/projectbase/reviews/patches/{id}/apply", (e) => {
 // 14. POST /api/projectbase/reviews/patches/{id}/revert
 routerAdd("POST", "/api/projectbase/reviews/patches/{id}/revert", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const parseJson = (val, fallback) => {
             if (val === null || val === undefined || val === "") return fallback;
             if (typeof val === "string") {
@@ -982,6 +1012,9 @@ routerAdd("POST", "/api/projectbase/reviews/patches/{id}/revert", (e) => {
 // 15. POST /api/projectbase/reviews/{id}/evaluate-gate
 routerAdd("POST", "/api/projectbase/reviews/{id}/evaluate-gate", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const reviewId = e.request.pathValue("id");
         const review = e.app.findRecordById("code_reviews", reviewId);
         const critiques = e.app.findRecordsByFilter("review_critiques", `review_id = '${reviewId}'`, "-created", 500, 0);
@@ -1069,6 +1102,9 @@ routerAdd("POST", "/api/projectbase/reviews/{id}/evaluate-gate", (e) => {
 // 16. POST /api/projectbase/reviews/{id}/override-gate
 routerAdd("POST", "/api/projectbase/reviews/{id}/override-gate", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const reviewId = e.request.pathValue("id");
         const review = e.app.findRecordById("code_reviews", reviewId);
         const body = e.requestInfo().body || {};
@@ -1111,6 +1147,9 @@ routerAdd("POST", "/api/projectbase/reviews/{id}/override-gate", (e) => {
 // 17. POST /api/projectbase/reviews/{id}/merge
 routerAdd("POST", "/api/projectbase/reviews/{id}/merge", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const reviewId = e.request.pathValue("id");
         const review = e.app.findRecordById("code_reviews", reviewId);
 

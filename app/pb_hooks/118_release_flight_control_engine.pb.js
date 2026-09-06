@@ -65,6 +65,9 @@ routerAdd("GET", "/api/projectbase/releases", (e) => {
 // 2. POST /api/projectbase/releases
 routerAdd("POST", "/api/projectbase/releases", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         if (!body.name || !body.version) {
             return e.json(400, { success: false, error: "name and version are required" });
@@ -284,6 +287,9 @@ routerAdd("GET", "/api/projectbase/releases/{id}", (e) => {
 // 4. PATCH /api/projectbase/releases/:id
 routerAdd("PATCH", "/api/projectbase/releases/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const rec = e.app.findRecordById("releases", id);
         if (!rec) return e.json(404, { success: false, error: "Release not found" });
@@ -320,6 +326,9 @@ routerAdd("PATCH", "/api/projectbase/releases/{id}", (e) => {
 // 5. DELETE /api/projectbase/releases/:id
 routerAdd("DELETE", "/api/projectbase/releases/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const rec = e.app.findRecordById("releases", id);
         if (!rec) return e.json(404, { success: false, error: "Release not found" });
@@ -344,6 +353,9 @@ routerAdd("DELETE", "/api/projectbase/releases/{id}", (e) => {
 // 6. POST /api/projectbase/releases/:id/start-deployment
 routerAdd("POST", "/api/projectbase/releases/{id}/start-deployment", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const rec = e.app.findRecordById("releases", id);
         if (!rec) return e.json(404, { success: false, error: "Release not found" });
@@ -386,6 +398,9 @@ routerAdd("POST", "/api/projectbase/releases/{id}/start-deployment", (e) => {
 // 7. POST /api/projectbase/releases/:id/advance-stage
 routerAdd("POST", "/api/projectbase/releases/{id}/advance-stage", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const rec = e.app.findRecordById("releases", id);
         if (!rec) return e.json(404, { success: false, error: "Release not found" });
@@ -469,6 +484,9 @@ routerAdd("POST", "/api/projectbase/releases/{id}/advance-stage", (e) => {
 // 8. POST /api/projectbase/releases/:id/probes
 routerAdd("POST", "/api/projectbase/releases/{id}/probes", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const rec = e.app.findRecordById("releases", id);
         if (!rec) return e.json(404, { success: false, error: "Release not found" });
@@ -542,6 +560,9 @@ routerAdd("GET", "/api/projectbase/releases/{id}/probes", (e) => {
 // 10. POST /api/projectbase/releases/:id/simulate-traffic
 routerAdd("POST", "/api/projectbase/releases/{id}/simulate-traffic", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const rec = e.app.findRecordById("releases", id);
         if (!rec) return e.json(404, { success: false, error: "Release not found" });
@@ -619,6 +640,9 @@ routerAdd("POST", "/api/projectbase/releases/{id}/simulate-traffic", (e) => {
 // 11. POST /api/projectbase/releases/:id/evaluate-health
 routerAdd("POST", "/api/projectbase/releases/{id}/evaluate-health", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const rec = e.app.findRecordById("releases", id);
         if (!rec) return e.json(404, { success: false, error: "Release not found" });
@@ -703,6 +727,9 @@ routerAdd("POST", "/api/projectbase/releases/{id}/evaluate-health", (e) => {
 // 12. POST /api/projectbase/releases/:id/trigger-rollback
 routerAdd("POST", "/api/projectbase/releases/{id}/trigger-rollback", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const rec = e.app.findRecordById("releases", id);
         if (!rec) return e.json(404, { success: false, error: "Release not found" });
@@ -759,6 +786,9 @@ routerAdd("POST", "/api/projectbase/releases/{id}/trigger-rollback", (e) => {
 // 13. POST /api/projectbase/releases/:id/promote
 routerAdd("POST", "/api/projectbase/releases/{id}/promote", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const rec = e.app.findRecordById("releases", id);
         if (!rec) return e.json(404, { success: false, error: "Release not found" });
@@ -795,6 +825,9 @@ routerAdd("POST", "/api/projectbase/releases/{id}/promote", (e) => {
 // 14. POST /api/projectbase/releases/:id/abort
 routerAdd("POST", "/api/projectbase/releases/{id}/abort", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const rec = e.app.findRecordById("releases", id);
         if (!rec) return e.json(404, { success: false, error: "Release not found" });
@@ -893,6 +926,9 @@ routerAdd("GET", "/api/projectbase/releases/metrics/summary", (e) => {
 // 17. POST /api/projectbase/releases/seed-samples
 routerAdd("POST", "/api/projectbase/releases/seed-samples", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const existing = e.app.findRecordsByFilter("releases", "id != ''", "", 5, 0);
         if (existing.length > 0) {
             return e.json(200, { success: true, message: "Releases already exist, skipping seed", count: existing.length });

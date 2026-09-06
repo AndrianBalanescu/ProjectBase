@@ -2788,7 +2788,7 @@
           "Git Workspace"
         ],
         "summary": "Universal Git Webhook Receiver",
-        "description": "Handles GitHub/GitLab push, pull_request, and CI webhooks for automated issue triage.",
+        "description": "Handles GitHub/GitLab push, pull_request, and CI webhooks for automated issue triage. Auth: an authenticated principal OR a valid 'X-Hub-Signature-256: sha256=<hex>' HMAC-SHA256 signature over the raw request body keyed by the PROJECTBASE_GIT_WEBHOOK_SECRET server env (fail-closed when unset).",
         "responses": {
           "200": {
             "description": "Webhook processed and issues triaged"

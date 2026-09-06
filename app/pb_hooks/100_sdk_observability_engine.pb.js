@@ -16,6 +16,9 @@
 // 1. POST /api/projectbase/sdk/generate - Generate typed SDK snippets
 routerAdd("POST", "/api/projectbase/sdk/generate", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         const language = (body.language || "python").toLowerCase();
         const targetEndpoint = body.target_endpoint || "/api/collections/issues/records";
@@ -418,6 +421,9 @@ routerAdd("GET", "/api/projectbase/observability/alerts", (e) => {
 // 6. POST /api/projectbase/observability/alerts/configure - Create or update alert threshold rules
 routerAdd("POST", "/api/projectbase/observability/alerts/configure", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         const name = body.name || "Custom Alert Rule";
         const metricName = body.metric_name || "error_rate_pct";
@@ -484,6 +490,9 @@ routerAdd("POST", "/api/projectbase/observability/alerts/configure", (e) => {
 // 7. POST /api/projectbase/observability/alerts/evaluate - Evaluate alert rules against live telemetry
 routerAdd("POST", "/api/projectbase/observability/alerts/evaluate", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const breaches = [];
         let configs = [];
 
@@ -568,6 +577,9 @@ routerAdd("POST", "/api/projectbase/observability/alerts/evaluate", (e) => {
 // 8. DELETE /api/projectbase/observability/alerts/{id} - Delete alert rule
 routerAdd("DELETE", "/api/projectbase/observability/alerts/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         try {
             const rec = e.app.findRecordById("observability_alert_configs", id);

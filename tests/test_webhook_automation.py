@@ -31,12 +31,32 @@ BASE_URL = os.environ.get("PROJECTBASE_URL", "http://127.0.0.1:8120")
 SUPERUSER_EMAIL = os.environ.get("PROJECTBASE_EMAIL", "f@flow.com")
 SUPERUSER_PASSWORD = os.environ.get("PROJECTBASE_PASSWORD", "superdev123")
 
+# Cycle 74 hardening: /api/projectbase/* custom routes are auth-guarded. Tests
+# exercise business logic, not the auth gate, so _request defaults to an
+# authenticated superuser; use _request_anon for the unauthenticated path.
+_AUTH_TOKEN_CACHE = {"token": None}
+
+def _super_auth_header():
+    if _AUTH_TOKEN_CACHE["token"] is None:
+        tok = ""
+        for col in ("_superusers", "users"):
+            try:
+                st, body = _request_raw("POST", f"/api/collections/{col}/auth-with-password", {
+                    "identity": SUPERUSER_EMAIL, "password": SUPERUSER_PASSWORD})
+                if st == 200 and body.get("token"):
+                    tok = body["token"]
+                    break
+            except Exception:
+                pass
+        _AUTH_TOKEN_CACHE["token"] = tok
+    return {"Authorization": _AUTH_TOKEN_CACHE["token"]} if _AUTH_TOKEN_CACHE["token"] else {}
+
 
 def _uid():
     return f"w_{int(time.time() * 1000) % 10000000}"
 
 
-def _request(method, path, body=None, headers=None):
+def _request_raw(method, path, body=None, headers=None):
     url = f"{BASE_URL}{path}"
     data = json.dumps(body).encode("utf-8") if body is not None else None
     hdrs = {"Content-Type": "application/json"}
@@ -55,6 +75,24 @@ def _request(method, path, body=None, headers=None):
             return e.code, {"error": raw}
 
 
+
+
+def _request(method, path, body=None, headers=None):
+    """_request with a default superuser Authorization header.
+
+    The engine custom routes are auth-guarded (cycle 74); tests here exercise
+    the business logic, not the auth gate, so requests default to an
+    authenticated superuser. Pass headers={"Authorization": ""} to force the
+    unauthenticated path."""
+    if headers is None or "Authorization" not in (headers or {}):
+        merged = dict(_super_auth_header())
+        merged.update(headers or {})
+        headers = merged
+    return _request_raw(method, path, body, headers)
+
+def _request_anon(method, path, body=None, headers=None):
+    """Explicitly unauthenticated request (for route-guard negative tests)."""
+    return _request_raw(method, path, body, headers)
 def _auth_token():
     status, res = _request(
         "POST",

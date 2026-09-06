@@ -52,6 +52,9 @@ routerAdd("GET", "/api/projectbase/debug/sessions", (e) => {
 // 2. POST /api/projectbase/debug/sessions
 routerAdd("POST", "/api/projectbase/debug/sessions", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         if (!body.name || typeof body.name !== "string" || !body.name.trim()) {
             return e.json(400, { error: "Session name is required." });
@@ -144,6 +147,9 @@ routerAdd("GET", "/api/projectbase/debug/sessions/{id}", (e) => {
 // 4. PATCH /api/projectbase/debug/sessions/:id
 routerAdd("PATCH", "/api/projectbase/debug/sessions/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let id = "";
         try { id = e.request.pathValue("id"); } catch (_) {}
         if (!id) { try { id = e.requestInfo().pathParams.id; } catch (_) {} }
@@ -174,6 +180,9 @@ routerAdd("PATCH", "/api/projectbase/debug/sessions/{id}", (e) => {
 // 5. POST /api/projectbase/debug/sessions/:id/step
 routerAdd("POST", "/api/projectbase/debug/sessions/{id}/step", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let id = "";
         try { id = e.request.pathValue("id"); } catch (_) {}
         if (!id) { try { id = e.requestInfo().pathParams.id; } catch (_) {} }
@@ -234,6 +243,9 @@ routerAdd("POST", "/api/projectbase/debug/sessions/{id}/step", (e) => {
 // 6. POST /api/projectbase/debug/sessions/:id/pause
 routerAdd("POST", "/api/projectbase/debug/sessions/{id}/pause", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let id = "";
         try { id = e.request.pathValue("id"); } catch (_) {}
         if (!id) { try { id = e.requestInfo().pathParams.id; } catch (_) {} }
@@ -256,6 +268,9 @@ routerAdd("POST", "/api/projectbase/debug/sessions/{id}/pause", (e) => {
 // 7. POST /api/projectbase/debug/sessions/:id/resume
 routerAdd("POST", "/api/projectbase/debug/sessions/{id}/resume", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let id = "";
         try { id = e.request.pathValue("id"); } catch (_) {}
         if (!id) { try { id = e.requestInfo().pathParams.id; } catch (_) {} }
@@ -322,6 +337,9 @@ routerAdd("GET", "/api/projectbase/debug/sessions/{id}/frames", (e) => {
 // 9. POST /api/projectbase/debug/sessions/:id/frames
 routerAdd("POST", "/api/projectbase/debug/sessions/{id}/frames", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let id = "";
         try { id = e.request.pathValue("id"); } catch (_) {}
         if (!id) { try { id = e.requestInfo().pathParams.id; } catch (_) {} }
@@ -476,6 +494,9 @@ routerAdd("GET", "/api/projectbase/debug/sessions/{id}/breakpoints", (e) => {
 // 12. POST /api/projectbase/debug/sessions/:id/breakpoints
 routerAdd("POST", "/api/projectbase/debug/sessions/{id}/breakpoints", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let id = "";
         try { id = e.request.pathValue("id"); } catch (_) {}
         if (!id) { try { id = e.requestInfo().pathParams.id; } catch (_) {} }
@@ -511,6 +532,9 @@ routerAdd("POST", "/api/projectbase/debug/sessions/{id}/breakpoints", (e) => {
 // 13. PATCH /api/projectbase/debug/breakpoints/:id
 routerAdd("PATCH", "/api/projectbase/debug/breakpoints/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let id = "";
         try { id = e.request.pathValue("id"); } catch (_) {}
         if (!id) { try { id = e.requestInfo().pathParams.id; } catch (_) {} }
@@ -537,6 +561,9 @@ routerAdd("PATCH", "/api/projectbase/debug/breakpoints/{id}", (e) => {
 // 14. DELETE /api/projectbase/debug/breakpoints/:id
 routerAdd("DELETE", "/api/projectbase/debug/breakpoints/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let id = "";
         try { id = e.request.pathValue("id"); } catch (_) {}
         if (!id) { try { id = e.requestInfo().pathParams.id; } catch (_) {} }
@@ -570,6 +597,9 @@ routerAdd("GET", "/api/projectbase/debug/sessions/{id}/snapshots", (e) => {
 // 16. POST /api/projectbase/debug/sessions/:id/snapshots
 routerAdd("POST", "/api/projectbase/debug/sessions/{id}/snapshots", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let id = "";
         try { id = e.request.pathValue("id"); } catch (_) {}
         if (!id) { try { id = e.requestInfo().pathParams.id; } catch (_) {} }
@@ -608,6 +638,9 @@ routerAdd("POST", "/api/projectbase/debug/sessions/{id}/snapshots", (e) => {
 // 17. POST /api/projectbase/debug/sessions/:id/replay
 routerAdd("POST", "/api/projectbase/debug/sessions/{id}/replay", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let id = "";
         try { id = e.request.pathValue("id"); } catch (_) {}
         if (!id) { try { id = e.requestInfo().pathParams.id; } catch (_) {} }

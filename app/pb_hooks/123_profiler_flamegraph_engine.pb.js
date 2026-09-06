@@ -53,6 +53,9 @@ routerAdd("GET", "/api/projectbase/perf/profiles", (e) => {
 // 2. POST /api/projectbase/perf/profiles
 routerAdd("POST", "/api/projectbase/perf/profiles", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         if (!body.title) {
             return e.json(400, { success: false, error: "title is required" });
@@ -142,6 +145,9 @@ routerAdd("GET", "/api/projectbase/perf/profiles/{id}", (e) => {
 // 4. PATCH /api/projectbase/perf/profiles/:id
 routerAdd("PATCH", "/api/projectbase/perf/profiles/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         let profile = null;
         try {
@@ -180,6 +186,9 @@ routerAdd("PATCH", "/api/projectbase/perf/profiles/{id}", (e) => {
 // 5. DELETE /api/projectbase/perf/profiles/:id
 routerAdd("DELETE", "/api/projectbase/perf/profiles/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         let profile = null;
         try {
@@ -221,6 +230,9 @@ routerAdd("DELETE", "/api/projectbase/perf/profiles/{id}", (e) => {
 // 6. POST /api/projectbase/perf/profiles/:id/spans
 routerAdd("POST", "/api/projectbase/perf/profiles/{id}/spans", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const profile = e.app.findRecordById("perf_profiles", id);
         if (!profile) {
@@ -304,6 +316,9 @@ routerAdd("GET", "/api/projectbase/perf/profiles/{id}/spans", (e) => {
 // 8. POST /api/projectbase/perf/profiles/:id/heap-snapshots
 routerAdd("POST", "/api/projectbase/perf/profiles/{id}/heap-snapshots", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const profile = e.app.findRecordById("perf_profiles", id);
         if (!profile) {
@@ -381,6 +396,9 @@ routerAdd("GET", "/api/projectbase/perf/profiles/{id}/heap-snapshots", (e) => {
 // 10. POST /api/projectbase/perf/profiles/:id/analyze
 routerAdd("POST", "/api/projectbase/perf/profiles/{id}/analyze", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const profile = e.app.findRecordById("perf_profiles", id);
         if (!profile) {
@@ -646,6 +664,9 @@ routerAdd("GET", "/api/projectbase/perf/bottlenecks", (e) => {
 // 12. PATCH /api/projectbase/perf/bottlenecks/:id
 routerAdd("PATCH", "/api/projectbase/perf/bottlenecks/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         let record = null;
         try {
@@ -678,6 +699,9 @@ routerAdd("PATCH", "/api/projectbase/perf/bottlenecks/{id}", (e) => {
 // 13. POST /api/projectbase/perf/synthesize-optimization
 routerAdd("POST", "/api/projectbase/perf/synthesize-optimization", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         const bottleneckId = body.bottleneck_id;
         let bottleneck = null;

@@ -69,6 +69,9 @@ routerAdd("GET", "/api/projectbase/knowledge/nodes", (e) => {
 // 2. POST /api/projectbase/knowledge/nodes
 routerAdd("POST", "/api/projectbase/knowledge/nodes", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const data = e.requestInfo().body || {};
         if (!data.title) {
             return e.json(400, { error: "Missing required field: title" });
@@ -224,6 +227,9 @@ routerAdd("GET", "/api/projectbase/knowledge/nodes/{id}", (e) => {
 // 4. PATCH /api/projectbase/knowledge/nodes/{id}
 routerAdd("PATCH", "/api/projectbase/knowledge/nodes/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         let record = null;
         try {
@@ -264,6 +270,9 @@ routerAdd("PATCH", "/api/projectbase/knowledge/nodes/{id}", (e) => {
 // 5. DELETE /api/projectbase/knowledge/nodes/{id}
 routerAdd("DELETE", "/api/projectbase/knowledge/nodes/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         let record = null;
         try {
@@ -294,6 +303,9 @@ routerAdd("DELETE", "/api/projectbase/knowledge/nodes/{id}", (e) => {
 // 6. POST /api/projectbase/knowledge/nodes/{id}/status
 routerAdd("POST", "/api/projectbase/knowledge/nodes/{id}/status", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         let record = null;
         try {
@@ -332,6 +344,9 @@ routerAdd("POST", "/api/projectbase/knowledge/nodes/{id}/status", (e) => {
 // 7. POST /api/projectbase/knowledge/relations
 routerAdd("POST", "/api/projectbase/knowledge/relations", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const data = e.requestInfo().body || {};
         if (!data.source_node_id || !data.target_node_id || !data.relation_type) {
             return e.json(400, { error: "Missing required fields: source_node_id, target_node_id, relation_type" });
@@ -410,6 +425,9 @@ routerAdd("GET", "/api/projectbase/knowledge/relations", (e) => {
 // 9. DELETE /api/projectbase/knowledge/relations/{id}
 routerAdd("DELETE", "/api/projectbase/knowledge/relations/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const record = e.app.findRecordById("knowledge_relations", id);
         if (!record) return e.json(404, { error: "Relation not found: " + id });
@@ -466,6 +484,9 @@ routerAdd("GET", "/api/projectbase/knowledge/graph", (e) => {
 // 11. POST /api/projectbase/knowledge/invariants
 routerAdd("POST", "/api/projectbase/knowledge/invariants", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const data = e.requestInfo().body || {};
         if (!data.rule_name || !data.rule_type || !data.pattern_expression) {
             return e.json(400, { error: "Missing required fields: rule_name, rule_type, pattern_expression" });
@@ -549,6 +570,9 @@ routerAdd("GET", "/api/projectbase/knowledge/invariants", (e) => {
 // 13. PATCH /api/projectbase/knowledge/invariants/{id}
 routerAdd("PATCH", "/api/projectbase/knowledge/invariants/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const record = e.app.findRecordById("architectural_invariants", id);
         if (!record) return e.json(404, { error: "Invariant not found: " + id });
@@ -573,6 +597,9 @@ routerAdd("PATCH", "/api/projectbase/knowledge/invariants/{id}", (e) => {
 // 14. DELETE /api/projectbase/knowledge/invariants/{id}
 routerAdd("DELETE", "/api/projectbase/knowledge/invariants/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const record = e.app.findRecordById("architectural_invariants", id);
         if (!record) return e.json(404, { error: "Invariant not found: " + id });
@@ -585,6 +612,9 @@ routerAdd("DELETE", "/api/projectbase/knowledge/invariants/{id}", (e) => {
 
 // 15. POST /api/projectbase/knowledge/verify-invariants
 routerAdd("POST", "/api/projectbase/knowledge/verify-invariants", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     const startTime = Date.now();
     try {
         const body = e.requestInfo().body || {};
@@ -824,6 +854,9 @@ routerAdd("GET", "/api/projectbase/knowledge/metrics", (e) => {
 // 18. POST /api/projectbase/knowledge/query
 routerAdd("POST", "/api/projectbase/knowledge/query", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         const queryRaw = (body.query || "").toLowerCase().trim();
         const tokens = queryRaw.split(/\s+/).filter(Boolean);
@@ -889,6 +922,9 @@ routerAdd("POST", "/api/projectbase/knowledge/query", (e) => {
 // 19. POST /api/projectbase/knowledge/seed-demo
 routerAdd("POST", "/api/projectbase/knowledge/seed-demo", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const nodeCol = e.app.findCollectionByNameOrId("knowledge_nodes");
         const relCol = e.app.findCollectionByNameOrId("knowledge_relations");
         const invCol = e.app.findCollectionByNameOrId("architectural_invariants");

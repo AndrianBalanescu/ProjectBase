@@ -21,6 +21,9 @@
 
 // 1. POST /api/projectbase/semantic/review - Review candidate issue against active board
 routerAdd("POST", "/api/projectbase/semantic/review", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     const getOmniRouteConfig = () => {
         let apiKey = ""
         try { apiKey = $os.getenv("OMNIROUTE_API_KEY") || "" } catch (err) {}
@@ -363,6 +366,9 @@ routerAdd("POST", "/api/projectbase/semantic/review", (e) => {
 
 // 2. POST /api/projectbase/semantic/rerank - Cross-encoder rerank candidate issues against query
 routerAdd("POST", "/api/projectbase/semantic/rerank", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     const getOmniRouteConfig = () => {
         let apiKey = ""
         try { apiKey = $os.getenv("OMNIROUTE_API_KEY") || "" } catch (err) {}
@@ -589,6 +595,9 @@ routerAdd("POST", "/api/projectbase/semantic/rerank", (e) => {
 
 // 3. POST /api/projectbase/semantic/cluster - Discover duplicate clusters across project
 routerAdd("POST", "/api/projectbase/semantic/cluster", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     const tokenize = (text) => {
         if (!text || typeof text !== "string") return []
         return text.toLowerCase().replace(/[^a-z0-9_-]/g, " ").trim().split(/\s+/).filter(w => w.length > 1)
@@ -719,7 +728,13 @@ routerAdd("POST", "/api/projectbase/semantic/cluster", (e) => {
 
 // 4. POST /api/projectbase/semantic/consolidate - Consolidate duplicate cluster
 routerAdd("POST", "/api/projectbase/semantic/consolidate", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let body = {}
         try { body = e.requestInfo().body || {} } catch (bErr) { body = {} }
         
@@ -817,7 +832,13 @@ routerAdd("GET", "/api/projectbase/semantic/policies", (e) => {
 
 // 6. POST /api/projectbase/semantic/policies - Create policy
 routerAdd("POST", "/api/projectbase/semantic/policies", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let body = {}
         try { body = e.requestInfo().body || {} } catch (bErr) { body = {} }
         
@@ -907,6 +928,9 @@ routerAdd("GET", "/api/projectbase/semantic/metrics", (e) => {
 
 // 9. POST /api/projectbase/semantic/embeddings/reindex - Batch vectorize all issues
 routerAdd("POST", "/api/projectbase/semantic/embeddings/reindex", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     const getOmniRouteConfig = () => {
         let apiKey = ""
         try { apiKey = $os.getenv("OMNIROUTE_API_KEY") || "" } catch (err) {}
