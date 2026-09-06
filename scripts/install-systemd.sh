@@ -78,6 +78,7 @@ render_unit() {
   sed -e "s|__PB_USER__|${SERVICE_USER}|g" \
       -e "s|__PB_GROUP__|${SERVICE_USER}|g" \
       -e "s|__APP_DIR__|${APP_SUBDIR}|g" \
+      -e "s|__SCRIPTS_DIR__|${APP_DIR}/scripts|g" \
       -e "s|__PB_BIN__|${APP_DIR}/pocketbase|g" \
       -e "s|__PB_HOST__|${HOST}|g" \
       -e "s|__PB_PORT__|${PORT}|g" \

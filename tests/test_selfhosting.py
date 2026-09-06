@@ -116,9 +116,13 @@ def test_installer_print_unit_resolves_all_placeholders():
     r = run([INSTALLER, "--print-unit"])
     assert r.returncode == 0, r.stderr
     assert "__PB_" not in r.stdout, "unresolved placeholder in rendered unit"
+    assert "__SCRIPTS_DIR__" not in r.stdout, "unresolved placeholder in rendered unit"
     assert "0.0.0.0:8120" in r.stdout
     assert f"WorkingDirectory={REPO}/app" in r.stdout
-    assert f"ExecStart={REPO}/pocketbase" in r.stdout
+    # ExecStart routes through the first-boot wrapper (PB 0.39.x: records are
+    # invisible on the very first boot of a fresh data dir until restart).
+    assert f"ExecStart={REPO}/scripts/serve-firstboot.sh {REPO}/app/pb_data {REPO}/pocketbase" in r.stdout
+    assert "--dir pb_data serve" in r.stdout
 
 
 def test_installer_rejects_reserved_gateway_ports():
