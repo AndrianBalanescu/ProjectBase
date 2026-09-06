@@ -57,8 +57,8 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     await page.waitForTimeout(2000);
     const email = page.locator('input[placeholder="Email"]');
     if (await email.count()) {
-      await email.fill('f@flow.com');
-      await page.locator('input[placeholder="Password"]').fill('superdev123');
+      await email.fill(process.env.QA_EMAIL || 'f@flow.com');
+      await page.locator('input[placeholder="Password"]').fill(process.env.QA_PASSWORD || 'superdev123');
       await page.locator('button:has-text("Sign in")').first().click();
       await page.waitForTimeout(3000);
     }
