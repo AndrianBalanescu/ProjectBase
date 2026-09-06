@@ -250,11 +250,45 @@ def test_notification_settings_wired_in_frontend():
     # The dispatcher must read the DB settings with env fallback.
     dispatcher = open(os.path.join(root, "app", "pb_hooks", "60_notifications.pb.js")).read()
     assert "notification_settings" in dispatcher, "dispatcher must read notification_settings collection"
-    # Goja runtime: module-scope function declarations are NOT resolvable from
-    # inside a hook callback (throws ReferenceError, so external notifications
-    # never delivered). The dispatcher must inline all dispatch logic; it must
-    # NOT call a module-scope `sendDiscordNotification(...)` / `sendTelegram...`
-    # helper as a bare identifier.
+
+
+def test_shortcuts_modal_wired_in_frontend():
+    """Drift-guard: the keyboard shortcuts guide must be reachable end-to-end —
+    the (?) hint on the Kanban toolbar emits `open-shortcuts-modal`, app.js binds
+    the `?` key (Shift+/) and registers/renders the modal, and every binding
+    listed in the modal actually exists in app.js's keyboard handler."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    modal = open(os.path.join(root, "app", "pb_public", "js", "components", "ShortcutsModal.js")).read()
+    app_js = open(os.path.join(root, "app", "pb_public", "js", "app.js")).read()
+    index = open(os.path.join(root, "app", "pb_public", "index.html")).read()
+    kanban = open(os.path.join(root, "app", "pb_public", "js", "components", "KanbanBoard.js")).read()
+    sw = open(os.path.join(root, "app", "pb_public", "sw.js")).read()
+
+    # app.js must register the modal + state + open/close wiring.
+    assert "shortcuts-modal" in app_js, "app.js must register the shortcuts modal component"
+    assert "isShortcutsOpen" in app_js
+    assert "'?'" in app_js or '"?"' in app_js, "app.js must bind the ? key"
+    assert "open-shortcuts-modal" in index, "index.html must listen for the kanban hint button event"
+    assert "ShortcutsModal.js" in index, "index.html must include the ShortcutsModal script"
+    assert "shortcuts-modal" in index, "index.html must mount the shortcuts-modal element"
+    # KanbanBoard must emit the open event from its (?) hint button.
+    assert "open-shortcuts-modal" in kanban, "KanbanBoard (?) button must emit open-shortcuts-modal"
+    # Modal lists shortcuts that genuinely exist in app.js handler.
+    assert "Shift+/" in modal or "'/'" in modal, "modal must document the ?/Shift+/ binding"
+    for key in ("'c'", "'i'", "'e'", "'1'"):
+        assert key in app_js, f"app.js keyboard handler must bind {key}"
+    # Offline shell must precache the new asset.
+    assert "'./js/components/ShortcutsModal.js'" in sw, "sw.js precache must include ShortcutsModal.js"
+
+
+def test_notification_dispatcher_inlines_dispatch_helpers():
+    """Goja runtime: module-scope function declarations are NOT resolvable from
+    inside a hook callback (throws ReferenceError, so external notifications
+    never delivered). The dispatcher must inline all dispatch logic; it must
+    NOT call a module-scope `sendDiscordNotification(...)` / `sendTelegram...`
+    helper as a bare identifier."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    dispatcher = open(os.path.join(root, "app", "pb_hooks", "60_notifications.pb.js")).read()
     assert "sendDiscordNotification(" not in dispatcher, "dispatcher must inline Discord dispatch (Goja scope bug)"
     assert "sendTelegramNotification(" not in dispatcher, "dispatcher must inline Telegram dispatch (Goja scope bug)"
     assert "onRecordAfterCreateSuccess" in dispatcher, "dispatcher must keep the create hook"

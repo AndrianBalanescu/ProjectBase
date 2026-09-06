@@ -13,7 +13,7 @@
  * air-gapped LAN / Raspberry Pi — no CDN round-trips, no network requirement.
  */
 
-const CACHE_NAME = 'projectbase-shell-v9';
+const CACHE_NAME = 'projectbase-shell-v10';
 
 // The complete app shell. Keep in sync with index.html's asset list.
 const PRECACHE_PATHS = [
@@ -58,7 +58,8 @@ const PRECACHE_PATHS = [
   './js/components/CycleModal.js',
   './js/components/CustomFieldsModal.js',
   './js/components/NotificationSettingsModal.js',
-  './js/components/WelcomeModal.js'
+  './js/components/WelcomeModal.js',
+  './js/components/ShortcutsModal.js'
 ];
 
 self.addEventListener('install', (event) => {
