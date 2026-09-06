@@ -83,6 +83,9 @@ routerAdd("GET", "/api/projectbase/evals/suites", (e) => {
 // 2. POST /api/projectbase/evals/suites
 routerAdd("POST", "/api/projectbase/evals/suites", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let body = {};
         try { body = e.requestInfo().body || {}; } catch (err) {}
 
@@ -206,6 +209,9 @@ routerAdd("GET", "/api/projectbase/evals/suites/{id}", (e) => {
 // 4. DELETE /api/projectbase/evals/suites/{id}
 routerAdd("DELETE", "/api/projectbase/evals/suites/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         let suiteRec = null;
         try {
@@ -230,6 +236,9 @@ routerAdd("DELETE", "/api/projectbase/evals/suites/{id}", (e) => {
 // 5. POST /api/projectbase/evals/runs/trigger
 routerAdd("POST", "/api/projectbase/evals/runs/trigger", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let body = {};
         try { body = e.requestInfo().body || {}; } catch (err) {}
 
@@ -551,6 +560,9 @@ routerAdd("GET", "/api/projectbase/evals/runs/{id}", (e) => {
 // 8. POST /api/projectbase/evals/runs/{id}/metrics
 routerAdd("POST", "/api/projectbase/evals/runs/{id}/metrics", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const runId = e.request.pathValue("id");
         let runRec = null;
         try {
@@ -776,6 +788,9 @@ routerAdd("GET", "/api/projectbase/evals/regressions", (e) => {
 // 11. POST /api/projectbase/evals/compare
 routerAdd("POST", "/api/projectbase/evals/compare", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let body = {};
         try { body = e.requestInfo().body || {}; } catch (err) {}
 
@@ -840,6 +855,9 @@ routerAdd("POST", "/api/projectbase/evals/compare", (e) => {
 // 12. POST /api/projectbase/evals/seed-defaults
 routerAdd("POST", "/api/projectbase/evals/seed-defaults", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const defaultSuites = [
             {
                 name: "Autonomous Coding & Syntax Precision",

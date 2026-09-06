@@ -67,6 +67,9 @@ routerAdd("GET", "/api/projectbase/security/scans", (e) => {
 
 // 2. POST /api/projectbase/security/scans
 routerAdd("POST", "/api/projectbase/security/scans", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     const calcEntropy = (str) => {
         if (!str || str.length === 0) return 0;
         const freq = {};
@@ -386,6 +389,9 @@ routerAdd("GET", "/api/projectbase/security/scans/{id}", (e) => {
 // 4. DELETE /api/projectbase/security/scans/{id}
 routerAdd("DELETE", "/api/projectbase/security/scans/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const rec = e.app.findRecordById("security_scans", id);
         e.app.delete(rec);
@@ -398,6 +404,9 @@ routerAdd("DELETE", "/api/projectbase/security/scans/{id}", (e) => {
 
 // 5. POST /api/projectbase/security/scans/{id}/execute
 routerAdd("POST", "/api/projectbase/security/scans/{id}/execute", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     const calcEntropy = (str) => {
         if (!str || str.length === 0) return 0;
         const freq = {};
@@ -626,6 +635,9 @@ routerAdd("GET", "/api/projectbase/security/secrets", (e) => {
 
 // 7. POST /api/projectbase/security/secrets/scan-content
 routerAdd("POST", "/api/projectbase/security/secrets/scan-content", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     const calcEntropy = (str) => {
         if (!str || str.length === 0) return 0;
         const freq = {};
@@ -725,6 +737,9 @@ routerAdd("POST", "/api/projectbase/security/secrets/scan-content", (e) => {
 // 8. POST /api/projectbase/security/secrets/{id}/quarantine
 routerAdd("POST", "/api/projectbase/security/secrets/{id}/quarantine", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const rec = e.app.findRecordById("secret_findings", id);
 
@@ -751,6 +766,9 @@ routerAdd("POST", "/api/projectbase/security/secrets/{id}/quarantine", (e) => {
 // 9. POST /api/projectbase/security/secrets/{id}/resolve
 routerAdd("POST", "/api/projectbase/security/secrets/{id}/resolve", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const rec = e.app.findRecordById("secret_findings", id);
         const body = e.requestInfo().body || {};
@@ -814,6 +832,9 @@ routerAdd("GET", "/api/projectbase/security/policies", (e) => {
 // 11. POST /api/projectbase/security/policies
 routerAdd("POST", "/api/projectbase/security/policies", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         if (!body.name) {
             return e.json(400, { success: false, error: "name is required" });
@@ -888,6 +909,9 @@ routerAdd("GET", "/api/projectbase/security/remediations", (e) => {
 
 // 13. POST /api/projectbase/security/remediations/generate
 routerAdd("POST", "/api/projectbase/security/remediations/generate", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     const synthesizeRemediationPatch = (finding) => {
         if (!finding) return null;
         const ruleId = finding.rule_id || "SEC-GEN-001";
@@ -945,6 +969,9 @@ routerAdd("POST", "/api/projectbase/security/remediations/generate", (e) => {
 // 14. POST /api/projectbase/security/remediations/{id}/apply
 routerAdd("POST", "/api/projectbase/security/remediations/{id}/apply", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const rec = e.app.findRecordById("security_remediations", id);
         const body = e.requestInfo().body || {};

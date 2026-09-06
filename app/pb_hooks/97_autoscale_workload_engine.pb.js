@@ -661,6 +661,9 @@ routerAdd("GET", "/api/projectbase/benchmarks/live", (e) => {
 })
 
 routerAdd("POST", "/api/projectbase/benchmarks/run", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     try {
         let body = {}
         try { body = e.requestInfo().body || {} } catch (bErr) { body = {} }

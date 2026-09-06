@@ -31,13 +31,44 @@ import platform
 import argparse
 import subprocess
 import urllib.request
+import urllib.error
 import urllib.parse
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
 DEFAULT_PB_URL = os.environ.get("PROJECTBASE_URL", "http://127.0.0.1:8120")
+# Ingest endpoint is auth-guarded (cycle 74 hardening): authenticate via env
+# credentials or an explicit token. Keep old anonymous deployments working by
+# still attempting the push — the server will reject with 401 and the error
+# counter surfaces it instead of silently dropping sessions.
+DEFAULT_PB_TOKEN = os.environ.get("PROJECTBASE_TOKEN", "")
+DEFAULT_PB_EMAIL = os.environ.get("PROJECTBASE_EMAIL", "")
+DEFAULT_PB_PASSWORD = os.environ.get("PROJECTBASE_PASSWORD", "")
 HOSTNAME = socket.gethostname()
 PLATFORM_SYSTEM = platform.system()
+
+
+def _auth_token(pb_url: str) -> str:
+    """Best-effort auth token: explicit token env, else password auth."""
+    if DEFAULT_PB_TOKEN:
+        return DEFAULT_PB_TOKEN
+    if DEFAULT_PB_EMAIL and DEFAULT_PB_PASSWORD:
+        try:
+            url = f"{pb_url.rstrip('/')}/api/collections/_superusers/auth-with-password"
+            data = json.dumps({"identity": DEFAULT_PB_EMAIL, "password": DEFAULT_PB_PASSWORD}).encode("utf-8")
+            req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
+            with urllib.request.urlopen(req, timeout=10) as res:
+                return json.loads(res.read().decode("utf-8")).get("token", "")
+        except Exception:
+            try:
+                url = f"{pb_url.rstrip('/')}/api/collections/users/auth-with-password"
+                data = json.dumps({"identity": DEFAULT_PB_EMAIL, "password": DEFAULT_PB_PASSWORD}).encode("utf-8")
+                req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
+                with urllib.request.urlopen(req, timeout=10) as res:
+                    return json.loads(res.read().decode("utf-8")).get("token", "")
+            except Exception:
+                pass
+    return ""
 
 
 def get_git_info(path: str) -> Dict[str, Any]:
@@ -256,23 +287,39 @@ def discover_flomaster_cli_sessions() -> List[Dict[str, Any]]:
 def send_sessions_to_projectbase(pb_url: str, sessions: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Push discovered sessions with real git diffs and logs to ProjectBase API."""
     url = f"{pb_url.rstrip('/')}/api/projectbase/sessions/ingest"
+    token = _auth_token(pb_url)
     synced = 0
     errors = 0
+    unauthorized = 0
 
     for s in sessions:
         try:
             payload = json.dumps(s).encode("utf-8")
+            headers = {"Content-Type": "application/json"}
+            if token:
+                headers["Authorization"] = token
             req = urllib.request.Request(
                 url,
                 data=payload,
-                headers={"Content-Type": "application/json"},
+                headers=headers,
                 method="POST"
             )
             with urllib.request.urlopen(req, timeout=5) as res:
                 if res.status in (200, 201):
                     synced += 1
+        except urllib.error.HTTPError as e:
+            errors += 1
+            if e.code in (401, 403):
+                unauthorized += 1
         except Exception as e:
             errors += 1
+
+    if unauthorized:
+        print(
+            f"⚠️ {unauthorized} ingest POST(s) rejected (401/403): the ingest endpoint is "
+            f"auth-guarded. Set PROJECTBASE_TOKEN or PROJECTBASE_EMAIL/PROJECTBASE_PASSWORD.",
+            file=sys.stderr,
+        )
 
     return {"total": len(sessions), "synced": synced, "errors": errors}
 

@@ -65,6 +65,9 @@ routerAdd("GET", "/api/projectbase/incidents", (e) => {
 // 2. POST /api/projectbase/incidents
 routerAdd("POST", "/api/projectbase/incidents", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         const title = (body.title || "").trim();
         if (!title) {
@@ -263,6 +266,9 @@ routerAdd("GET", "/api/projectbase/incidents/{id}", (e) => {
 // 4. PATCH /api/projectbase/incidents/{id}
 routerAdd("PATCH", "/api/projectbase/incidents/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const body = e.requestInfo().body || {};
         const incident = e.app.findRecordById("incidents", id);
@@ -290,6 +296,9 @@ routerAdd("PATCH", "/api/projectbase/incidents/{id}", (e) => {
 // 5. DELETE /api/projectbase/incidents/{id}
 routerAdd("DELETE", "/api/projectbase/incidents/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const incident = e.app.findRecordById("incidents", id);
 
@@ -318,6 +327,9 @@ routerAdd("DELETE", "/api/projectbase/incidents/{id}", (e) => {
 // 6. POST /api/projectbase/incidents/{id}/status
 routerAdd("POST", "/api/projectbase/incidents/{id}/status", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const body = e.requestInfo().body || {};
         const newStatus = body.status;
@@ -373,6 +385,9 @@ routerAdd("POST", "/api/projectbase/incidents/{id}/status", (e) => {
 // 7. POST /api/projectbase/incidents/{id}/events
 routerAdd("POST", "/api/projectbase/incidents/{id}/events", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const body = e.requestInfo().body || {};
         const title = (body.title || "").trim();
@@ -441,6 +456,9 @@ routerAdd("GET", "/api/projectbase/incidents/{id}/events", (e) => {
 // 9. POST /api/projectbase/incidents/{id}/hypotheses
 routerAdd("POST", "/api/projectbase/incidents/{id}/hypotheses", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const body = e.requestInfo().body || {};
         const hypothesis = (body.hypothesis || "").trim();
@@ -500,6 +518,9 @@ routerAdd("POST", "/api/projectbase/incidents/{id}/hypotheses", (e) => {
 // 10. PATCH /api/projectbase/incidents/{id}/hypotheses/{hypoId}
 routerAdd("PATCH", "/api/projectbase/incidents/{id}/hypotheses/{hypoId}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const hypoId = e.request.pathValue("hypoId");
         const body = e.requestInfo().body || {};
@@ -584,6 +605,9 @@ routerAdd("GET", "/api/projectbase/incidents/{id}/hypotheses", (e) => {
 // 12. POST /api/projectbase/incidents/{id}/mitigations
 routerAdd("POST", "/api/projectbase/incidents/{id}/mitigations", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const body = e.requestInfo().body || {};
         const title = (body.title || "").trim();
@@ -643,6 +667,9 @@ routerAdd("POST", "/api/projectbase/incidents/{id}/mitigations", (e) => {
 // 13. PATCH /api/projectbase/incidents/{id}/mitigations/{mitId}
 routerAdd("PATCH", "/api/projectbase/incidents/{id}/mitigations/{mitId}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const mitId = e.request.pathValue("mitId");
         const body = e.requestInfo().body || {};
@@ -725,6 +752,9 @@ routerAdd("GET", "/api/projectbase/incidents/{id}/mitigations", (e) => {
 // 15. POST /api/projectbase/incidents/{id}/postmortem
 routerAdd("POST", "/api/projectbase/incidents/{id}/postmortem", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const body = e.requestInfo().body || {};
         const incident = e.app.findRecordById("incidents", id);
@@ -825,6 +855,9 @@ routerAdd("GET", "/api/projectbase/incidents/{id}/postmortem", (e) => {
 // 17. PATCH /api/projectbase/incidents/{id}/postmortem
 routerAdd("PATCH", "/api/projectbase/incidents/{id}/postmortem", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const body = e.requestInfo().body || {};
         const incident = e.app.findRecordById("incidents", id);
@@ -945,6 +978,9 @@ routerAdd("GET", "/api/projectbase/incidents/metrics", (e) => {
 // 19. POST /api/projectbase/incidents/seed-demo
 routerAdd("POST", "/api/projectbase/incidents/seed-demo", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let existing = null;
         try {
             existing = e.app.findFirstRecordByData("incidents", "slug", "inc-demo-auth-leak");

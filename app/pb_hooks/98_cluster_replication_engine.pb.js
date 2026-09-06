@@ -16,6 +16,9 @@
 
 // 1. POST /api/projectbase/cluster/nodes/register
 routerAdd("POST", "/api/projectbase/cluster/nodes/register", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     const getClusterLeadershipState = (app) => {
         let currentPrimary = null
         let term = 1
@@ -238,6 +241,9 @@ routerAdd("GET", "/api/projectbase/cluster/nodes", (e) => {
 
 // 3. POST /api/projectbase/cluster/nodes/heartbeat
 routerAdd("POST", "/api/projectbase/cluster/nodes/heartbeat", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     const getClusterLeadershipState = (app) => {
         let currentPrimary = null
         let term = 1
@@ -499,6 +505,9 @@ routerAdd("GET", "/api/projectbase/cluster/sync/pull", (e) => {
 
 // 6. POST /api/projectbase/cluster/sync/push
 routerAdd("POST", "/api/projectbase/cluster/sync/push", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     const getClusterLeadershipState = (app) => {
         let currentPrimary = null
         let term = 1
@@ -609,6 +618,9 @@ routerAdd("POST", "/api/projectbase/cluster/sync/push", (e) => {
 
 // 7. POST /api/projectbase/cluster/sync/snapshot
 routerAdd("POST", "/api/projectbase/cluster/sync/snapshot", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     const getClusterLeadershipState = (app) => {
         let currentPrimary = null
         let term = 1
@@ -797,6 +809,9 @@ routerAdd("GET", "/api/projectbase/cluster/failover/status", (e) => {
 
 // 9. POST /api/projectbase/cluster/failover/promote
 routerAdd("POST", "/api/projectbase/cluster/failover/promote", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     const getClusterLeadershipState = (app) => {
         let currentPrimary = null
         let term = 1
@@ -915,6 +930,9 @@ routerAdd("POST", "/api/projectbase/cluster/failover/promote", (e) => {
 
 // 10. POST /api/projectbase/cluster/failover/fencing
 routerAdd("POST", "/api/projectbase/cluster/failover/fencing", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     const getClusterLeadershipState = (app) => {
         let currentPrimary = null
         let term = 1
@@ -996,6 +1014,9 @@ routerAdd("POST", "/api/projectbase/cluster/failover/fencing", (e) => {
 
 // 11. POST /api/projectbase/cluster/edge/reconcile
 routerAdd("POST", "/api/projectbase/cluster/edge/reconcile", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     const getClusterLeadershipState = (app) => {
         let currentPrimary = null
         let term = 1

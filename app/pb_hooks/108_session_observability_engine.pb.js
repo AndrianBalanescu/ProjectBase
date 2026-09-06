@@ -51,6 +51,9 @@ routerAdd("GET", "/api/projectbase/sessions/{id}/diff", (e) => {
 // 2. POST /api/projectbase/sessions/{id}/diff - Ingest/update unified diff
 routerAdd("POST", "/api/projectbase/sessions/{id}/diff", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";
         const body = e.requestInfo().body || {};
         let record = null;
@@ -224,6 +227,9 @@ routerAdd("GET", "/api/projectbase/sessions/{id}/verdict", (e) => {
 // 4. POST /api/projectbase/sessions/{id}/verdict - Ingest test execution results
 routerAdd("POST", "/api/projectbase/sessions/{id}/verdict", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";
         const body = e.requestInfo().body || {};
         let record = null;
@@ -345,6 +351,9 @@ routerAdd("GET", "/api/projectbase/sessions/{id}/audit", (e) => {
 // 6. POST /api/projectbase/sessions/{id}/audit - Submit Sceptic audit report
 routerAdd("POST", "/api/projectbase/sessions/{id}/audit", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";
         const body = e.requestInfo().body || {};
         let record = null;
@@ -513,6 +522,9 @@ routerAdd("GET", "/api/projectbase/observability/summary", (e) => {
 // 8. POST /api/projectbase/observability/verify-suite - Fast automated verification runner
 routerAdd("POST", "/api/projectbase/observability/verify-suite", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         const sessionId = (body.session_id || "").trim();
 

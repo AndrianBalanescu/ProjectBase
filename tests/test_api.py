@@ -467,13 +467,15 @@ def test_superuser_bootstrap_credential():
 
 def test_fuzz_ai_assist_malformed_json():
     status, body = _request("POST", "/api/projectbase/ai-assist",
-                            b"{not valid json!!")
+                            b"{not valid json!!",
+                            headers={"Authorization": _superuser_token()})
     assert status != 500, f"malformed JSON crashed endpoint: {status} {body}"
     assert 400 <= status < 500
 
 
 def test_fuzz_ai_assist_missing_fields():
-    status, body = _request("POST", "/api/projectbase/ai-assist", {})
+    status, body = _request("POST", "/api/projectbase/ai-assist", {},
+                            headers={"Authorization": _superuser_token()})
     assert status != 500, f"empty payload crashed endpoint: {status} {body}"
 
 
@@ -481,7 +483,7 @@ def test_fuzz_ai_assist_oversized_title():
     status, body = _request(
         "POST", "/api/projectbase/ai-assist",
         {"action": "generate_subtasks", "title": "A" * 200_000},
-        timeout=30)
+        headers={"Authorization": _superuser_token()}, timeout=30)
     assert status != 500, f"oversized title crashed endpoint: {status} {body}"
 
 

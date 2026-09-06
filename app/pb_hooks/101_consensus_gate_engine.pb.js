@@ -14,6 +14,9 @@
 // 1. POST /api/projectbase/consensus/gates - Create a peer-review consensus gate
 routerAdd("POST", "/api/projectbase/consensus/gates", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const col = e.app.findCollectionByNameOrId("consensus_gates");
         if (!col) return e.json(500, { error: "consensus_gates collection missing" });
 
@@ -245,6 +248,9 @@ routerAdd("GET", "/api/projectbase/consensus/gates/{id}", (e) => {
 // 4. DELETE /api/projectbase/consensus/gates/{id} - Delete or archive a consensus gate
 routerAdd("DELETE", "/api/projectbase/consensus/gates/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         let gate = null;
         try { gate = e.app.findRecordById("consensus_gates", id); } catch (err) {}
@@ -273,6 +279,9 @@ routerAdd("DELETE", "/api/projectbase/consensus/gates/{id}", (e) => {
 // 5. POST /api/projectbase/consensus/ballots/submit - Submit a verifiable, signed peer-review ballot
 routerAdd("POST", "/api/projectbase/consensus/ballots/submit", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const sha256Hex = (str) => {
             const K = [
                 0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -416,6 +425,9 @@ routerAdd("POST", "/api/projectbase/consensus/ballots/submit", (e) => {
 // 6. POST /api/projectbase/consensus/gates/evaluate - Evaluate gate quorum & scores
 routerAdd("POST", "/api/projectbase/consensus/gates/evaluate", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         const gateId = String(body.gate_id || body.id || "").trim();
         if (!gateId) {
@@ -577,6 +589,9 @@ routerAdd("POST", "/api/projectbase/consensus/gates/evaluate", (e) => {
 // 7. POST /api/projectbase/consensus/debate/start - Orchestrate automated multi-model debate
 routerAdd("POST", "/api/projectbase/consensus/debate/start", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const sha256Hex = (str) => {
             const K = [
                 0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,

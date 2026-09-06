@@ -289,7 +289,7 @@ class TestGitWebhookTriage:
             "POST",
             "/api/projectbase/webhooks/git",
             webhook_payload,
-            headers={"X-GitHub-Event": "push"},
+            headers={"X-GitHub-Event": "push", "Authorization": token},
         )
         assert status == 200
         assert res["event"] == "push"
@@ -321,7 +321,7 @@ class TestGitWebhookTriage:
             "POST",
             "/api/projectbase/webhooks/git",
             webhook_payload,
-            headers={"X-GitHub-Event": "pull_request"},
+            headers={"X-GitHub-Event": "pull_request", "Authorization": token},
         )
         assert status == 200
         assert res["triaged_count"] >= 1
@@ -351,7 +351,7 @@ class TestGitWebhookTriage:
             "POST",
             "/api/projectbase/webhooks/git",
             webhook_payload,
-            headers={"X-GitHub-Event": "workflow_run"},
+            headers={"X-GitHub-Event": "workflow_run", "Authorization": token},
         )
         assert status == 200
         assert res["triaged_count"] >= 1

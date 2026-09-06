@@ -46,6 +46,9 @@ routerAdd("GET", "/api/projectbase/arch/graphs", (e) => {
 // 2. POST /api/projectbase/arch/graphs
 routerAdd("POST", "/api/projectbase/arch/graphs", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         const name = body.name || "";
         if (!name.trim()) {
@@ -106,6 +109,9 @@ routerAdd("GET", "/api/projectbase/arch/graphs/{id}", (e) => {
 // 4. DELETE /api/projectbase/arch/graphs/:id
 routerAdd("DELETE", "/api/projectbase/arch/graphs/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || "";
         const graph = e.app.findRecordById("arch_graphs", id);
         if (!graph) {
@@ -133,6 +139,9 @@ routerAdd("DELETE", "/api/projectbase/arch/graphs/{id}", (e) => {
 // 5. POST /api/projectbase/arch/graphs/:id/nodes
 routerAdd("POST", "/api/projectbase/arch/graphs/{id}/nodes", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const graphId = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || "";
         const graph = e.app.findRecordById("arch_graphs", graphId);
         if (!graph) {
@@ -219,6 +228,9 @@ routerAdd("GET", "/api/projectbase/arch/graphs/{id}/nodes", (e) => {
 // 7. POST /api/projectbase/arch/graphs/:id/edges
 routerAdd("POST", "/api/projectbase/arch/graphs/{id}/edges", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const graphId = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || "";
         const graph = e.app.findRecordById("arch_graphs", graphId);
         if (!graph) {
@@ -303,6 +315,9 @@ routerAdd("GET", "/api/projectbase/arch/graphs/{id}/edges", (e) => {
 // 9. POST /api/projectbase/arch/simulate-blast
 routerAdd("POST", "/api/projectbase/arch/simulate-blast", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         let graphId = body.graph_id || "";
         const projectId = body.project_id || "";
@@ -550,6 +565,9 @@ routerAdd("GET", "/api/projectbase/arch/simulations/{id}", (e) => {
 // 12. POST /api/projectbase/arch/graphs/:id/scan
 routerAdd("POST", "/api/projectbase/arch/graphs/{id}/scan", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const graphId = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || "";
         const graph = e.app.findRecordById("arch_graphs", graphId);
         if (!graph) {

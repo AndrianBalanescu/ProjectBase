@@ -110,6 +110,9 @@ routerAdd("GET", "/api/projectbase/sessions", (e) => {
 // 2. POST /api/projectbase/sessions/ingest - Ingest / register session
 routerAdd("POST", "/api/projectbase/sessions/ingest", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         // Machine identity for the "machine" field. Prefer an explicit body.machine
         // (the session feeder reports the real hostname); otherwise fall back to the
         // host's stable machine-id. Wrapped in try/catch so a missing/unreadable value
@@ -289,6 +292,9 @@ routerAdd("POST", "/api/projectbase/sessions/ingest", (e) => {
 // 3. POST /api/projectbase/sessions/heartbeat - Record heartbeat
 routerAdd("POST", "/api/projectbase/sessions/heartbeat", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         const sessionId = (body.session_id || body.id || "").trim();
         if (!sessionId) return e.json(400, { error: "session_id is required" });
@@ -334,6 +340,9 @@ routerAdd("POST", "/api/projectbase/sessions/heartbeat", (e) => {
 // 4. POST /api/projectbase/sessions/complete - Finalize session
 routerAdd("POST", "/api/projectbase/sessions/complete", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         const sessionId = (body.session_id || body.id || "").trim();
         if (!sessionId) return e.json(400, { error: "session_id is required" });
@@ -569,6 +578,9 @@ routerAdd("GET", "/api/projectbase/sessions/{id}", (e) => {
 // 8. PATCH /api/projectbase/sessions/{id} - Update session
 routerAdd("PATCH", "/api/projectbase/sessions/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";
         const body = e.requestInfo().body || {};
 
@@ -605,6 +617,9 @@ routerAdd("PATCH", "/api/projectbase/sessions/{id}", (e) => {
 // 9. DELETE /api/projectbase/sessions/{id} - Delete session
 routerAdd("DELETE", "/api/projectbase/sessions/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";
         let record = null;
         try {
@@ -628,6 +643,9 @@ routerAdd("DELETE", "/api/projectbase/sessions/{id}", (e) => {
 // 10. POST /api/projectbase/sessions/{id}/terminate - Cancel/terminate session
 routerAdd("POST", "/api/projectbase/sessions/{id}/terminate", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";
         let record = null;
         try {
@@ -658,6 +676,9 @@ routerAdd("POST", "/api/projectbase/sessions/{id}/terminate", (e) => {
 // 11. POST /api/projectbase/sessions/{id}/fork - Fork session for re-tasking
 routerAdd("POST", "/api/projectbase/sessions/{id}/fork", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";
         const body = e.requestInfo().body || {};
         let parentRecord = null;
@@ -712,6 +733,9 @@ routerAdd("POST", "/api/projectbase/sessions/{id}/fork", (e) => {
 // 12. POST /api/projectbase/sessions/{id}/dock - Dock/undock session to issue
 routerAdd("POST", "/api/projectbase/sessions/{id}/dock", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";
         const body = e.requestInfo().body || {};
         const issueId = (body.issue_id || "").trim();
@@ -756,6 +780,9 @@ routerAdd("POST", "/api/projectbase/sessions/{id}/dock", (e) => {
 // 13. POST /api/projectbase/sessions/clean - Prune old sessions
 routerAdd("POST", "/api/projectbase/sessions/clean", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         const olderThanDays = Math.max(parseInt(body.older_than_days) || 30, 1);
         const cutoff = new Date(Date.now() - olderThanDays * 86400 * 1000).toISOString();

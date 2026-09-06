@@ -101,6 +101,9 @@ routerAdd("GET", "/api/projectbase/auto-heal/policies", (e) => {
 // 2. POST /api/projectbase/auto-heal/policies - Create a new auto-heal trigger policy
 routerAdd("POST", "/api/projectbase/auto-heal/policies", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         const name = (body.name || "").trim();
         const triggerType = (body.trigger_type || "crash_loop").trim();
@@ -216,6 +219,9 @@ routerAdd("GET", "/api/projectbase/auto-heal/policies/{id}", (e) => {
 // 4. PATCH /api/projectbase/auto-heal/policies/{id} - Update auto-heal policy
 routerAdd("PATCH", "/api/projectbase/auto-heal/policies/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || "";
         const body = e.requestInfo().body || {};
 
@@ -278,6 +284,9 @@ routerAdd("PATCH", "/api/projectbase/auto-heal/policies/{id}", (e) => {
 // 5. DELETE /api/projectbase/auto-heal/policies/{id} - Delete an auto-heal policy
 routerAdd("DELETE", "/api/projectbase/auto-heal/policies/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || "";
         try {
             const rec = e.app.findRecordById("auto_heal_policies", id);
@@ -398,6 +407,9 @@ routerAdd("GET", "/api/projectbase/auto-heal/incidents", (e) => {
 // 7. POST /api/projectbase/auto-heal/incidents - Report / create incident
 routerAdd("POST", "/api/projectbase/auto-heal/incidents", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         const agent = (body.agent || "FlomasterAgent").trim();
         const issue = (body.issue || "").trim();
@@ -550,6 +562,9 @@ routerAdd("GET", "/api/projectbase/auto-heal/incidents/{id}", (e) => {
 // 9. POST /api/projectbase/auto-heal/incidents/{id}/resolve - Resolve incident
 routerAdd("POST", "/api/projectbase/auto-heal/incidents/{id}/resolve", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || "";
         const body = e.requestInfo().body || {};
         const resolutionNotes = body.resolution_notes || "Manually verified and resolved";
@@ -601,6 +616,9 @@ routerAdd("POST", "/api/projectbase/auto-heal/incidents/{id}/resolve", (e) => {
 // 10. POST /api/projectbase/auto-heal/incidents/{id}/escalate - Escalate incident
 routerAdd("POST", "/api/projectbase/auto-heal/incidents/{id}/escalate", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || "";
         const body = e.requestInfo().body || {};
         const reason = body.reason || "Automatic remediation exhausted max retries";
@@ -700,6 +718,9 @@ routerAdd("GET", "/api/projectbase/auto-heal/health-checks", (e) => {
 // 12. POST /api/projectbase/auto-heal/trigger - Evaluate triggers and execute self-healing remediation
 routerAdd("POST", "/api/projectbase/auto-heal/trigger", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         const agent = body.agent || "FlomasterAgent";
         const issue = body.issue || "PB-100";
@@ -761,6 +782,9 @@ routerAdd("POST", "/api/projectbase/auto-heal/trigger", (e) => {
 // 13. POST /api/projectbase/auto-heal/crash-recovery - Workspace-wide crash recovery sweep
 routerAdd("POST", "/api/projectbase/auto-heal/crash-recovery", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let expiredLeasesReleased = 0;
         let deadTasksRecovered = 0;
         let restartedAgents = 1;
@@ -854,6 +878,9 @@ routerAdd("GET", "/api/projectbase/auto-heal/recipes", (e) => {
 // 15. POST /api/projectbase/auto-heal/recipes/{id}/apply - Apply blueprint recipe as active policy
 routerAdd("POST", "/api/projectbase/auto-heal/recipes/{id}/apply", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || "";
         
         const recipes = [

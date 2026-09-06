@@ -8,9 +8,12 @@ Type=simple
 User=ubuntu
 Group=ubuntu
 # The session syncer polls flomaster/flow session stores and pushes them to the
-# ProjectBase API. It needs no auth (the ingest endpoint is open) but must point
-# at the live instance on 8120.
+# ProjectBase API. The ingest endpoint is auth-guarded since cycle 74: credentials
+# come from PROJECTBASE_TOKEN or PROJECTBASE_EMAIL/PROJECTBASE_PASSWORD (env or
+# an EnvironmentFile). Point it at the live instance on 8120.
 Environment=PROJECTBASE_URL=http://127.0.0.1:8120
+Environment=PROJECTBASE_EMAIL=f@flow.com
+Environment=PROJECTBASE_PASSWORD=superdev123
 WorkingDirectory=/data/projects/projectbase
 ExecStart=/usr/bin/python3 /data/projects/projectbase/scripts/pb_session_syncer.py --daemon --interval 5
 Restart=on-failure

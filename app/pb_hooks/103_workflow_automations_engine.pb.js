@@ -79,6 +79,9 @@ routerAdd("GET", "/api/projectbase/automations/rules", (e) => {
 // 2. POST /api/projectbase/automations/rules - Create or update an automation rule
 routerAdd("POST", "/api/projectbase/automations/rules", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const col = e.app.findCollectionByNameOrId("workflow_rules");
         if (!col) return e.json(500, { error: "workflow_rules collection missing" });
 
@@ -163,6 +166,9 @@ routerAdd("POST", "/api/projectbase/automations/rules", (e) => {
 // 3. DELETE /api/projectbase/automations/rules/{id} - Delete an automation rule
 routerAdd("DELETE", "/api/projectbase/automations/rules/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         if (!id) return e.json(400, { error: "Rule ID required" });
 
@@ -179,6 +185,9 @@ routerAdd("DELETE", "/api/projectbase/automations/rules/{id}", (e) => {
 // 4. POST /api/projectbase/automations/rules/{id}/toggle - Enable / disable an automation rule
 routerAdd("POST", "/api/projectbase/automations/rules/{id}/toggle", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         if (!id) return e.json(400, { error: "Rule ID required" });
 
@@ -203,6 +212,9 @@ routerAdd("POST", "/api/projectbase/automations/rules/{id}/toggle", (e) => {
 // 5. POST /api/projectbase/automations/rules/{id}/test - Test execute an automation rule
 routerAdd("POST", "/api/projectbase/automations/rules/{id}/test", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const ruleRecord = e.app.findRecordById("workflow_rules", id);
         if (!ruleRecord) return e.json(404, { error: "Automation rule not found" });
@@ -399,6 +411,9 @@ routerAdd("GET", "/api/projectbase/automations/runs/{id}", (e) => {
 // 8. POST /api/projectbase/automations/runs/{id}/cancel - Cancel a workflow run
 routerAdd("POST", "/api/projectbase/automations/runs/{id}/cancel", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const r = e.app.findRecordById("workflow_runs", id);
         if (!r) return e.json(404, { error: "Workflow run not found" });
@@ -421,6 +436,9 @@ routerAdd("POST", "/api/projectbase/automations/runs/{id}/cancel", (e) => {
 // 9. POST /api/projectbase/automations/runs/{id}/retry - Retry a workflow run
 routerAdd("POST", "/api/projectbase/automations/runs/{id}/retry", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = e.request.pathValue("id");
         const r = e.app.findRecordById("workflow_runs", id);
         if (!r) return e.json(404, { error: "Workflow run not found" });
@@ -462,6 +480,9 @@ routerAdd("POST", "/api/projectbase/automations/runs/{id}/retry", (e) => {
 // 10. POST /api/projectbase/automations/trigger - Dispatch an event into the automation engine
 routerAdd("POST", "/api/projectbase/automations/trigger", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const body = e.requestInfo().body || {};
         const eventType = String(body.event_type || "").trim();
         if (!eventType) return e.json(400, { error: "'event_type' is required" });

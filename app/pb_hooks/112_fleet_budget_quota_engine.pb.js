@@ -19,6 +19,9 @@
 // 1. POST /api/projectbase/billing/policies
 routerAdd("POST", "/api/projectbase/billing/policies", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let body = {};
         try { body = e.requestInfo().body || {}; } catch (err) {}
 
@@ -216,6 +219,9 @@ routerAdd("GET", "/api/projectbase/billing/policies/{id}", (e) => {
 // 4. DELETE /api/projectbase/billing/policies/{id}
 routerAdd("DELETE", "/api/projectbase/billing/policies/{id}", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const id = (e.request && e.request.pathValue ? e.request.pathValue("id") : "") || (e.requestInfo().params && e.requestInfo().params.id) || (e.pathParam ? e.pathParam("id") : "") || "";
         try {
             const p = e.app.findRecordById("budget_policies", id);
@@ -232,6 +238,9 @@ routerAdd("DELETE", "/api/projectbase/billing/policies/{id}", (e) => {
 // 5. POST /api/projectbase/billing/quotas/check
 routerAdd("POST", "/api/projectbase/billing/quotas/check", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const pricingTable = {
             "claude-3-5-sonnet": { prompt: 3.00, completion: 15.00, cached: 0.30, reasoning: 15.00, provider: "anthropic" },
             "claude-3-opus": { prompt: 15.00, completion: 75.00, cached: 1.50, reasoning: 75.00, provider: "anthropic" },
@@ -359,6 +368,9 @@ routerAdd("POST", "/api/projectbase/billing/quotas/check", (e) => {
 // 6. POST /api/projectbase/billing/quotas/reserve
 routerAdd("POST", "/api/projectbase/billing/quotas/reserve", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let body = {};
         try { body = e.requestInfo().body || {}; } catch (err) {}
 
@@ -409,6 +421,9 @@ routerAdd("POST", "/api/projectbase/billing/quotas/reserve", (e) => {
 // 7. POST /api/projectbase/billing/quotas/release
 routerAdd("POST", "/api/projectbase/billing/quotas/release", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let body = {};
         try { body = e.requestInfo().body || {}; } catch (err) {}
 
@@ -444,6 +459,9 @@ routerAdd("POST", "/api/projectbase/billing/quotas/release", (e) => {
 // 8. POST /api/projectbase/billing/usage/record
 routerAdd("POST", "/api/projectbase/billing/usage/record", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         const pricingTable = {
             "claude-3-5-sonnet": { prompt: 3.00, completion: 15.00, cached: 0.30, reasoning: 15.00, provider: "anthropic" },
             "claude-3-opus": { prompt: 15.00, completion: 75.00, cached: 1.50, reasoning: 75.00, provider: "anthropic" },
@@ -604,6 +622,9 @@ routerAdd("POST", "/api/projectbase/billing/usage/record", (e) => {
 // 9. POST /api/projectbase/billing/overrides/grant
 routerAdd("POST", "/api/projectbase/billing/overrides/grant", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let body = {};
         try { body = e.requestInfo().body || {}; } catch (err) {}
 
@@ -826,6 +847,9 @@ routerAdd("GET", "/api/projectbase/billing/pricing", (e) => {
 // 13. POST /api/projectbase/billing/circuit-breaker/reset
 routerAdd("POST", "/api/projectbase/billing/circuit-breaker/reset", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let body = {};
         try { body = e.requestInfo().body || {}; } catch (err) {}
 

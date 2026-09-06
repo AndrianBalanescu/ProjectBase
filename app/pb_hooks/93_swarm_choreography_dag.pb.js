@@ -11,6 +11,9 @@
 
 // 1. POST /api/projectbase/dag/decompose
 routerAdd("POST", "/api/projectbase/dag/decompose", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     const resolveIssue = (issueRef) => {
         if (!issueRef) return null
         let ref = String(issueRef).trim()
@@ -373,6 +376,9 @@ routerAdd("GET", "/api/projectbase/dag/status", (e) => {
 
 // 3. POST /api/projectbase/dag/step
 routerAdd("POST", "/api/projectbase/dag/step", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     const resolveIssue = (issueRef) => {
         if (!issueRef) return null
         let ref = String(issueRef).trim()
@@ -530,6 +536,9 @@ routerAdd("POST", "/api/projectbase/dag/step", (e) => {
 
 // 4. POST /api/projectbase/tasks/split
 routerAdd("POST", "/api/projectbase/tasks/split", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     const resolveIssue = (issueRef) => {
         if (!issueRef) return null
         let ref = String(issueRef).trim()
@@ -599,6 +608,9 @@ routerAdd("POST", "/api/projectbase/tasks/split", (e) => {
 
 // 5. POST /api/projectbase/checkpoints/submit
 routerAdd("POST", "/api/projectbase/checkpoints/submit", (e) => {
+    if (!e.auth || !e.auth.id) {
+        return e.unauthorizedError("Authentication required")
+    }
     const resolveIssue = (issueRef) => {
         if (!issueRef) return null
         let ref = String(issueRef).trim()
