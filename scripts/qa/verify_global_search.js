@@ -55,7 +55,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
 
     // Authenticate via the UI login form (same as the app's first-run flow).
     const email = process.env.QA_EMAIL || 'f@flow.com';
-    const pass = process.env.QA_PASS || 'superdev123';
+    const pass = process.env.QA_PASSWORD || process.env.QA_PASS || 'superdev123';
     const emailInput = page.locator('input[type="email"], input[name="email"]').first();
     if (await emailInput.count()) {
       await emailInput.fill(email);
