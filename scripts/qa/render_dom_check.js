@@ -23,6 +23,21 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   });
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 
+  // Poll a browser predicate until truthy or timeout (default 10s). Replaces
+  // fragile single-shot checks after fixed waits: under machine load the SSE
+  // fan-out + Vue re-render can exceed any fixed timeout, which produced a
+  // false FAIL on an idle-quiet rerun (cycle 69). Returns last truthy value.
+  async function pollUntil(fn, arg, timeoutMs = 10000) {
+    const deadline = Date.now() + timeoutMs;
+    let last = null;
+    while (Date.now() < deadline) {
+      last = await page.evaluate(fn, arg);
+      if (last) return last;
+      await page.waitForTimeout(300);
+    }
+    return last;
+  }
+
   const relations = { checked: false };
   const urlState = { checked: false };
   const bulk = { checked: false };
@@ -158,6 +173,25 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
         newIssue: newIssueRect
       };
     });
+    // Page-level mobile overflow gate (cycle 67): AGENTS.md requires 0px
+    // horizontal overflow at 375/768/1440. Correct semantics: the PAGE must
+    // not horizontally scroll — the kanban columns container is overflow-x-auto
+    // by design (drag-and-drop), so we probe window.scrollX after an attempted
+    // horizontal scroll instead of comparing scrollWidth>clientWidth.
+    checks.pageScrollOverflow = [];
+    for (const w of [375, 768, 1440]) {
+      await page.setViewportSize({ width: w, height: 900 });
+      await page.waitForTimeout(600);
+      const pageScrolls = await page.evaluate(() => {
+        window.scrollTo(200, 0);
+        const x = window.scrollX;
+        window.scrollTo(0, 0);
+        return x > 1;
+      });
+      if (pageScrolls) checks.pageScrollOverflow.push(w);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.waitForTimeout(400);
     // Open a real issue first so a stale drawer could exist, then navigate
     // to a bogus issue id in the same project.
     await page.evaluate(() => { location.hash = '#/pb/board/issue/nonexistentid12345'; });
@@ -830,34 +864,34 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       // loop from API route -> SSE -> Vue reactivity -> card badge.
       await page.evaluate(() => { location.hash = '#/pb/board'; });
       await page.waitForTimeout(2500);
-      relations.kanbanLockNoReload = await page.evaluate((title) => {
+      relations.kanbanLockNoReload = await pollUntil((title) => {
         const card = Array.from(document.querySelectorAll('.kanban-card-drag-handle'))
           .find((c) => (c.textContent || '').includes(title));
         if (!card) return false;
         return !!(card.querySelector('[data-lucide="lock"]') || card.querySelector('.text-red-400, .text-red-500, .text-red-600'));
-      }, tmpTitle);
+      }, tmpTitle, 10000);
       // Then reload as the server-persistence baseline (fresh fetch path).
       await page.reload({ waitUntil: 'domcontentloaded' });
       await page.waitForTimeout(3000);
       await page.evaluate(() => { location.hash = '#/pb/board'; });
       await page.waitForTimeout(2500);
-      relations.kanbanLockShown = await page.evaluate((title) => {
+      relations.kanbanLockShown = await pollUntil((title) => {
         const card = Array.from(document.querySelectorAll('.kanban-card-drag-handle'))
           .find((c) => (c.textContent || '').includes(title));
         if (!card) return false;
         return !!(card.querySelector('[data-lucide="lock"]') || card.querySelector('.text-red-400, .text-red-500, .text-red-600'));
-      }, tmpTitle);
+      }, tmpTitle, 10000);
       // 7. The list view must also surface the blocked lock badge for the temp
       // issue (cycle-42: list view previously had no relationship indicator even
       // though issues carry relations — mirrors the kanban board UI).
       await page.evaluate(() => { location.hash = '#/pb/list'; });
       await page.waitForTimeout(2500);
-      relations.listLockShown = await page.evaluate((title) => {
+      relations.listLockShown = await pollUntil((title) => {
         const row = Array.from(document.querySelectorAll('tbody tr'))
           .find((r) => (r.textContent || '').includes(title));
         if (!row) return false;
         return !!(row.querySelector('[data-lucide="lock"]') || row.querySelector('.text-red-400, .text-red-500, .text-red-600'));
-      }, tmpTitle);
+      }, tmpTitle, 10000);
     } else {
       relations.error = tmp.error || 'temp issue create failed';
     }
@@ -1240,6 +1274,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   if (checks.rawMustaches > 0) failures.push(`${checks.rawMustaches} raw mustaches leaked`);
   if (checks.headerBadge !== EXPECTED_BADGE) failures.push(`header version badge ${checks.headerBadge} != ${EXPECTED_BADGE} (VERSION file)`);
   if (checks.headerLayout && checks.headerLayout.overflows) failures.push(`header horizontally overflows (scrollW ${checks.headerLayout.scrollW} > clientW ${checks.headerLayout.clientW})`);
+  if (checks.pageScrollOverflow && checks.pageScrollOverflow.length) failures.push(`page-level horizontal scroll at viewport(s) ${checks.pageScrollOverflow.join(', ')}px (kanban inner overflow-x-auto is by design; page itself must not scroll)`);
   if (checks.headerLayout && checks.headerLayout.newIssue && !checks.headerLayout.newIssue.visible) failures.push(`New Issue button off-screen: ${JSON.stringify(checks.headerLayout.newIssue)}`);
   if (!['rgb(11, 15, 25)', 'rgb(9, 9, 11)', 'rgb(248, 250, 252)', 'rgb(236, 238, 242)', 'rgb(223, 227, 232)', 'rgb(226, 230, 235)'].includes(checks.bodyBg)) failures.push(`body bg ${checks.bodyBg} != expected theme background`);
   if (checks.probe.paddingLeft !== '28px') failures.push(`pl-7 padding ${checks.probe.paddingLeft} != 28px`);
