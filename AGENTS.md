@@ -89,6 +89,8 @@ ProjectBase operates on the **Session-as-a-Card** principle:
      - **0 Console Errors** & **0 Page Exceptions**.
      - **0 px Horizontal Overflow** across Desktop (1440px), Tablet (768px), and Mobile (375px).
      - Full interactive verification: drag-and-drop Kanban, resizable drawers, fullscreen editors, command palette (`Cmd+K`), dark/light themes, and real-time live run updates.
+     - Keyboard shortcuts guide has a dedicated E2E: `NODE_PATH=/home/ubuntu/.hermes/hermes-agent/node_modules node scripts/qa/verify_shortcuts_modal.js` (opens via real `?` key, all close/reopen paths, C-guard while open).
+     - **iBrowse URL pitfall (cycle 67):** iBrowse runs containerized, so never pass `http://127.0.0.1:<port>` to `flow-ibrowse.sh` — that is the container's loopback (connection refused). Use the host LAN IP `http://192.168.1.161:8120/` (proven reachable from the ibrowse container) or `http://172.17.0.1:8120/` (docker0).
      - Capture concrete numerical evidence and visual proof.
 4. **Commit & Push:** Make ONE consolidated, descriptive commit per functional unit and push to `origin main`.
 5. **Session Ingestion:** The daemon and hooks automatically attach the git commit, test verdict, and iBrowse audit report to the ProjectBase board.
