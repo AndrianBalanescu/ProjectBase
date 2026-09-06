@@ -122,6 +122,8 @@ if [[ -n "$STAGE_DIR" ]]; then
     # plus the systemd unit template the installer renders from.
     cp -a "$APP_DIR/pocketbase" "$STAGE_DIR/"
     cp -a "$APP_DIR/app/." "$STAGE_DIR/app/"
+    mkdir -p "$STAGE_DIR/scripts"
+    cp -a "$APP_DIR/scripts/." "$STAGE_DIR/scripts/"
     mkdir -p "$STAGE_DIR/deploy"
     cp -a "$APP_DIR/deploy/projectbase.service" "$STAGE_DIR/deploy/"
     APP_DIR="$STAGE_DIR"

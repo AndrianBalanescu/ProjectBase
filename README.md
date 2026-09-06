@@ -17,6 +17,15 @@
 
 Free and open source.
 
+## 🐣 First Boot (fresh deployments)
+
+On a brand-new data directory, the container/systemd entrypoint applies the
+schema migrations once, restarts the server, and then serves normally
+(`scripts/serve-firstboot.sh`). This works around a PocketBase 0.39.x quirk
+where the very first boot's records API cannot see rows created by migrations
+until the process restarts. Existing data dirs are unaffected and boot
+straight through.
+
 ## 📄 License
 
 MIT © [Andrian Balanescu](https://github.com/AndrianBalanescu)
