@@ -1,5 +1,11 @@
 # TODO — ProjectBase
 
+## Cycle 77 (harden)
+
+- [x] **Cycle-76 veto investigated and proven false-positive (3rd occurrence of the same supervisor bug).** The cycle-76 inspect session again died mid-run before writing any findings: `/tmp/flow-inspect-result.json` is stale from cycle 74, the cycle-76 inspect log has no final verdict JSON (only the skill-template text and a mid-run activity-orphan check that came back clean: 237 rows, 0 dangling refs), yet `.flow-audit-veto.json` holds a bare `FAILED_AUDIT`. Substance re-verified independently: full suite **606 passed / 0 failed** (196s) against live 8120, main==origin/main, repo clean, 0 open PRs. Same root cause as cycle 75: `flow/supervisor.py` `inspect_verdict()` log fallback (engine-bug item below remains open).
+- [x] **AGENTS.md test-count drift fixed at the class level** (6b2c82d): the directory-map line claimed "562 tests across 46 files" while the drift-guard-locked **Tests:** bullet said 556 — a conflicting stale claim that misled agents. Fixed both claims to the real surface (557) and added `test_agents_no_conflicting_count_claims` so the guard now rejects ANY 'N tests across M files' claim that disagrees with the tree, instead of only checking the first regex match.
+- [ ] **flomaster engine bug to file as PR (engine read-only this phase):** `flow/supervisor.py` `inspect_verdict()` log fallback matches `FAILED_AUDIT|BINDING_VETO` tokens anywhere in the inspect log, including quoted skill instructions and stale result JSON from a previous cycle. Three concrete fixes: (1) exclude matches inside quoted skill text / markdown fences, (2) ignore result JSON whose `cycle` field is older than the current cycle instead of only "matching current cycle counts", (3) require a findings artifact (`/tmp/flow-inspect-result.json` with matching cycle) before treating a log-only FAILED_AUDIT as a binding veto — cycles 72/75/76 all produced vetoes with zero findings.
+
 ## Cycle 76 (harden)
 
 - [x] **Cycle-75 veto investigated and proven false-positive.** The inspect session was killed at timeout before writing `/tmp/flow-inspect-result.json`; the supervisor's log-fallback regex matched `FAILED_AUDIT`/`BINDING_VETO` tokens that appear in quoted skill instructions inside the log. Substance check: full suite 606/606 green on live 8120, all cycle-74/75 findings already resolved by PR #26 (6205bb2).
