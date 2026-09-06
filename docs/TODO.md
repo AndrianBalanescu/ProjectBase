@@ -25,3 +25,7 @@
 - [x] #P1 done **Keyboard shortcuts guide shipped & verified (cycle 66, PR #24)**
   - `?` key / toolbar (?) button / palette entry; ShortcutsModal with grouped bindings.
   - Dedicated E2E `scripts/qa/verify_shortcuts_modal.js` (cycle 67): PASS x5, iBrowse-harness limitation documented.
+
+- [x] #P1 done **Local CI parity proven despite GitHub Actions billing block (cycle 67)**
+  - `docker build` + fresh-container boot + `/api/health` all pass locally (image `projectbase:ci-check`).
+  - Fixed local-only blocker: `pb_data/` mode 750 (projectbase:projectbase) made the legacy docker builder fail to stat the context; now 755.
