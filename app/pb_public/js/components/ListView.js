@@ -28,13 +28,11 @@ const ListViewComponent = {
       });
 
       list.sort((a, b) => {
-        let valA = a[this.sortBy];
-        let valB = b[this.sortBy];
-
-        if (this.sortBy === 'estimate') {
-          valA = Number(valA) || 0;
-          valB = Number(valB) || 0;
-        }
+        // Semantic ordering at the data source (not raw string compare):
+        // estimate numerically, dates chronologically (nulls last), status by
+        // workflow order, priority by severity rank, subtasks by completion.
+        const valA = this.sortValue(a);
+        const valB = this.sortValue(b);
 
         if (valA < valB) return this.sortDesc ? 1 : -1;
         if (valA > valB) return this.sortDesc ? -1 : 1;
@@ -45,6 +43,40 @@ const ListViewComponent = {
     }
   },
   methods: {
+    statusRank(status) {
+      const order = ['backlog', 'todo', 'in_progress', 'in_review', 'done', 'cancelled'];
+      const idx = order.indexOf(status || 'backlog');
+      return idx === -1 ? order.length : idx;
+    },
+    priorityRank(priority) {
+      const order = ['urgent', 'high', 'medium', 'low', 'none'];
+      const idx = order.indexOf(priority || 'none');
+      return idx === -1 ? order.length : idx;
+    },
+    sortValue(issue) {
+      switch (this.sortBy) {
+        case 'estimate':
+          return Number(issue.estimate) || 0;
+        case 'due_date': {
+          // Chronological; undated issues sort last in both directions.
+          if (!issue.due_date) return this.sortDesc ? -Infinity : Infinity;
+          return new Date(issue.due_date).getTime() || 0;
+        }
+        case 'subtasks': {
+          const subs = Array.isArray(issue.subtasks) ? issue.subtasks : [];
+          const done = subs.filter(s => s && s.done).length;
+          const total = subs.length;
+          // Sort by completion ratio, then by absolute done count.
+          return (total === 0 ? -1 : done / total) * 1000 + done;
+        }
+        case 'status':
+          return this.statusRank(issue.status);
+        case 'priority':
+          return this.priorityRank(issue.priority);
+        default:
+          return issue[this.sortBy] || '';
+      }
+    },
     toggleSort(field) {
       if (this.sortBy === field) {
         this.sortDesc = !this.sortDesc;
@@ -205,6 +237,12 @@ const ListViewComponent = {
                     <i v-if="sortBy === 'estimate'" :data-lucide="sortDesc ? 'chevron-down' : 'chevron-up'" class="w-3 h-3"></i>
                   </div>
                 </th>
+                <th class="py-2.5 px-3 w-28 cursor-pointer hover:text-zinc-900 dark:hover:text-zinc-100" @click="toggleSort('subtasks')">
+                  <div class="flex items-center space-x-1">
+                    <span>Subs</span>
+                    <i v-if="sortBy === 'subtasks'" :data-lucide="sortDesc ? 'chevron-down' : 'chevron-up'" class="w-3 h-3"></i>
+                  </div>
+                </th>
                 <th class="py-2.5 px-3 w-28 cursor-pointer hover:text-zinc-900 dark:hover:text-zinc-100" @click="toggleSort('due_date')">
                   <div class="flex items-center space-x-1">
                     <span>Due Date</span>
@@ -306,6 +344,17 @@ const ListViewComponent = {
                   {{ issue.estimate || '—' }}
                 </td>
 
+                <!-- Subtask progress -->
+                <td class="py-2 px-3">
+                  <div v-if="issue.subtasks && issue.subtasks.length > 0" class="flex items-center space-x-1.5">
+                    <div class="w-10 h-1 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
+                      <div class="h-full rounded-full bg-emerald-500 transition-all" :style="{ width: (issue.subtasks.filter(s => s.done).length / issue.subtasks.length * 100) + '%' }"></div>
+                    </div>
+                    <span class="text-[10px] text-zinc-500 font-mono whitespace-nowrap">{{ issue.subtasks.filter(s => s.done).length }}/{{ issue.subtasks.length }}</span>
+                  </div>
+                  <span v-else class="text-zinc-400 dark:text-zinc-600 text-[11px]">—</span>
+                </td>
+
                 <!-- Due Date -->
                 <td class="py-2 px-3 text-zinc-500 whitespace-nowrap">
                   {{ formatDate(issue.due_date) }}
@@ -324,7 +373,7 @@ const ListViewComponent = {
               </tr>
 
               <tr v-if="processedIssues.length === 0">
-                <td colspan="8" class="py-8 text-center text-zinc-400">
+                <td colspan="9" class="py-8 text-center text-zinc-400">
                   <i data-lucide="inbox" class="w-7 h-7 mx-auto mb-1.5 opacity-40"></i>
                   <p class="text-xs">No work items matching the current filter</p>
                 </td>
