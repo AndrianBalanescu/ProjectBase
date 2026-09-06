@@ -326,12 +326,12 @@ ${grid}<polyline points="${idealPts}" fill="none" stroke="#a1a1aa" stroke-width=
                     <i data-lucide="activity" class="w-3.5 h-3.5"></i>
                     <span>Velocity Trend</span>
                   </h4>
-                  <div v-if="velocityHistory.length === 0" class="py-4 text-center text-xs text-zinc-400">
+                  <div v-if="velocityData.length === 0" class="py-4 text-center text-xs text-zinc-400">
                     No completed cycles yet — velocity appears once a cycle is marked completed.
                   </div>
                   <div v-else class="flex items-end justify-around gap-2 h-20 pb-4 relative">
-                    <div v-for="v in velocityHistory" :key="v.id" class="flex flex-col items-center flex-1 min-w-0" :title="v.name + ': ' + v.pts + ' pts (' + v.count + ' issues)'">
-                      <div class="w-full max-w-[36px] bg-blue-500/80 dark:bg-blue-400/70 rounded-t transition-all" :style="{ height: (v.pts / Math.max(...velocityHistory.map(x => x.pts), 1)) * 100 + '%' }"></div>
+                    <div v-for="v in velocityData" :key="v.id" class="flex flex-col items-center flex-1 min-w-0" :title="v.name + ': ' + v.pts + ' pts (' + v.count + ' issues)'">
+                      <div class="w-full max-w-[36px] bg-blue-500/80 dark:bg-blue-400/70 rounded-t transition-all" :style="{ height: (v.pts / Math.max(...velocityData.map(x => x.pts), 1)) * 100 + '%' }"></div>
                       <span class="text-[9px] font-mono text-zinc-500 mt-1 truncate w-full text-center">{{ v.pts }}p</span>
                       <span class="text-[9px] text-zinc-400 truncate w-full text-center">{{ v.name }}</span>
                     </div>

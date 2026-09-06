@@ -32,7 +32,7 @@ def _uid():
     return f"semantic_{uuid.uuid4().hex[:8]}"
 
 
-def _request(method, path, body=None, headers=None):
+def _request(method, path, body=None, headers=None, timeout=60):
     url = f"{BASE_URL}{path}"
     data = json.dumps(body).encode("utf-8") if body is not None else None
     hdrs = {"Content-Type": "application/json"}
@@ -40,7 +40,7 @@ def _request(method, path, body=None, headers=None):
         hdrs.update(headers)
     req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             resp_body = resp.read().decode("utf-8")
             return resp.status, json.loads(resp_body) if resp_body else {}
     except urllib.error.HTTPError as e:
@@ -197,7 +197,10 @@ def test_semantic_embeddings_reindex():
     token = _get_auth_token()
     headers = {"Authorization": token}
 
-    status, res = _request("POST", "/api/projectbase/semantic/embeddings/reindex", {}, headers)
+    # This route embeds every issue through the neural embedder and can take
+    # well over 60s while the full suite hammers the same server. Give it a
+    # dedicated, generous timeout instead of the 60s default.
+    status, res = _request("POST", "/api/projectbase/semantic/embeddings/reindex", {}, headers, timeout=240)
     assert status == 200, f"Expected 200, got {status}: {res}"
     assert res.get("status") == "success"
     assert res.get("vector_dimensions") in [64, 1024]
