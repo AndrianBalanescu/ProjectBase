@@ -66,6 +66,33 @@ class TestAgentsMapMatchesTree(unittest.TestCase):
             f"AGENTS.md says {claimed_files} test files but the tree has {actual_files}",
         )
 
+    def test_agents_no_conflicting_count_claims(self):
+        """Every 'N tests across M files' claim in AGENTS.md must agree.
+
+        AGENTS.md repeats the count in the **Tests:** bullet and the tests/
+        directory-map line; a stale copy of either misleads agents (e.g. one
+        line said 556 while another said 562). All occurrences must match
+        the real collected surface.
+        """
+        claims = re.findall(r"(\d+)\s+tests\s+across\s+(\d+)\s+files", AGENTS)
+        self.assertTrue(claims, "AGENTS.md missing 'N tests across M files' claim")
+        actual_tests = _count_test_functions()
+        actual_files = len(_test_filenames())
+        for claimed_tests, claimed_files in claims:
+            self.assertEqual(
+                int(claimed_tests),
+                actual_tests,
+                f"AGENTS.md claims {claimed_tests} tests in one place but the tree "
+                f"has {actual_tests}; every count claim must match "
+                "(run `pytest tests/ -q` to confirm and update AGENTS.md)",
+            )
+            self.assertEqual(
+                int(claimed_files),
+                actual_files,
+                f"AGENTS.md claims {claimed_files} test files in one place but the "
+                f"tree has {actual_files}; every count claim must match",
+            )
+
     def test_agents_lists_all_test_files(self):
         """Every test_*.py under tests/ appears in the AGENTS.md tests/ line."""
         # The directory-map tests/ line continues across subsequent lines.
