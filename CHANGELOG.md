@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.39.0] - 2026-09-06 - Cycles 43-65
+### Added
+- **Portfolio overview:** cross-project ProjectsView mode with aggregate stats cards, top-milestones by progress, recent issues feed, and inline cross-project search; Header nav entry + route guard with drift-guard tests (`a6bce8a`).
+- **Rich agent chat rendering:** markdown code blocks with copy, collapsible thought disclosures, tool invocation decks, and turn coalescing in the Agents console (`5279496`).
+- **10-suite iBrowse E2E QA report** (10/10 passed) and hardened automated browser sign-in (`bb092aa`, `cd5ef2c`).
+- Tracked workspace auto-generated `INDEX.md` (`abb1a11`).
+
+### Changed
+- **De-bloat AgentsView (Phase 1):** 2905 -> ~700 lines, keeping only Live Sessions Stream + Direct Prompt Bar per roadmap mandate (`eb62c45`).
+- **Hermes sessions streamed into the board:** agent_bridge ingests Hermes sessions with token usage and reasoning activity (`c8fc593`); real live Flomaster and Hermes chat turns, thoughts, and tool calls stream end-to-end (`75847a1`).
+- Live agent sessions populate machine + `is_active` fields end-to-end (`65f8e1d`); bridge live_activity persists to DB (`c6e8037`).
+
+### Fixed
+- **agent_bridge restart-storm hardening:** cadence relaxed 10s -> 5min with systemd `StartLimitIntervalSec/Burst` after the 2026-09-02 incident (14k failed starts) (`50e213d`).
+- **Cycles Velocity Trend render:** repaired `velocityHistory -> velocityData` binding; de-flaked semantic reindex test (`2c3fedc`, `69303b0`).
+- Kanban filter input no longer occluded by search icon (`2dfea9f`); Multiselect/SearchableSelect search icons no longer intercept clicks (`6ef669c`).
+- Resolved all 17 biome error-level lint findings (`eba416c`).
+- Interactive chat persists in component state so history survives parent polls (`2051c49`); live AI streaming via OmniRoute with real tool-call extraction (`7085594`).
+- Agent dispatch validation aligned; AgentsView workspace tabs with chat persistence restored (`9b1909a`).
+- TDD suites/mutation runs/quarantines sorted by `-created` instead of `-id` (`1aa9f8a`).
+- iBrowse homelab endpoints + Playwright selectors aligned for global search and welcome modals (`55bf65e`); Knowledge Graph QA route aligned (`b6a3415`).
+- Untracked QA screenshots; `qa-*.png` gitignored (`d073353`).
+
 ## [1.38.0] - 2026-08-28 - Cycle 42
 ### Added
 - **Autonomous Agent Performance Profiler, Memory Leak Detection, Bottleneck Sentinel & Flamegraph Engine (Milestone 18 / Epic 39):**

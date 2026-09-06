@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "ProjectBase API",
-    "version": "1.38.0",
+    "version": "1.39.0",
     "description": "High-performance, ultra-lightweight Plane & Linear alternative for multi-project Kanban, sprint cycles, and autonomous AI agent orchestration.",
     "contact": {
       "name": "Andrian Balanescu",
@@ -826,7 +826,7 @@
                   "properties": {
                     "version": {
                       "type": "string",
-                      "example": "1.38.0"
+                      "example": "1.39.0"
                     },
                     "service": {
                       "type": "string",
@@ -13641,16 +13641,60 @@
         ],
         "summary": "List performance profiling profiles",
         "parameters": [
-          { "name": "project_id", "in": "query", "schema": { "type": "string" } },
-          { "name": "session_id", "in": "query", "schema": { "type": "string" } },
-          { "name": "target_type", "in": "query", "schema": { "type": "string" } },
-          { "name": "status", "in": "query", "schema": { "type": "string" } },
-          { "name": "search", "in": "query", "schema": { "type": "string" } },
-          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
-          { "name": "offset", "in": "query", "schema": { "type": "integer" } }
+          {
+            "name": "project_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "target_type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "List of performance profiles" }
+          "200": {
+            "description": "List of performance profiles"
+          }
         }
       },
       "post": {
@@ -13659,7 +13703,9 @@
         ],
         "summary": "Create/start a new performance profile",
         "responses": {
-          "201": { "description": "Profile created" }
+          "201": {
+            "description": "Profile created"
+          }
         }
       }
     },
@@ -13670,10 +13716,19 @@
         ],
         "summary": "Get performance profile details, spans, heap snapshots, and bottlenecks",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Profile details" }
+          "200": {
+            "description": "Profile details"
+          }
         }
       },
       "patch": {
@@ -13682,10 +13737,19 @@
         ],
         "summary": "Update performance profile metadata",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Profile updated" }
+          "200": {
+            "description": "Profile updated"
+          }
         }
       },
       "delete": {
@@ -13694,10 +13758,19 @@
         ],
         "summary": "Delete performance profile and cascaded telemetry",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Profile deleted" }
+          "200": {
+            "description": "Profile deleted"
+          }
         }
       }
     },
@@ -13708,13 +13781,40 @@
         ],
         "summary": "List execution spans for a profile",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
-          { "name": "category", "in": "query", "schema": { "type": "string" } },
-          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
-          { "name": "offset", "in": "query", "schema": { "type": "integer" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "List of spans" }
+          "200": {
+            "description": "List of spans"
+          }
         }
       },
       "post": {
@@ -13723,10 +13823,19 @@
         ],
         "summary": "Ingest single or batch execution spans",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "201": { "description": "Spans ingested" }
+          "201": {
+            "description": "Spans ingested"
+          }
         }
       }
     },
@@ -13737,10 +13846,19 @@
         ],
         "summary": "List memory heap snapshots for a profile",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "List of heap snapshots" }
+          "200": {
+            "description": "List of heap snapshots"
+          }
         }
       },
       "post": {
@@ -13749,10 +13867,19 @@
         ],
         "summary": "Ingest a memory heap snapshot for leak detection",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "201": { "description": "Heap snapshot ingested" }
+          "201": {
+            "description": "Heap snapshot ingested"
+          }
         }
       }
     },
@@ -13763,10 +13890,19 @@
         ],
         "summary": "Run profiling analysis, synthesize flamegraph tree, and detect bottlenecks & memory leaks",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Analysis results and flamegraph tree" }
+          "200": {
+            "description": "Analysis results and flamegraph tree"
+          }
         }
       }
     },
@@ -13777,15 +13913,53 @@
         ],
         "summary": "List detected bottlenecks and optimization opportunities",
         "parameters": [
-          { "name": "profile_id", "in": "query", "schema": { "type": "string" } },
-          { "name": "severity", "in": "query", "schema": { "type": "string" } },
-          { "name": "bottleneck_type", "in": "query", "schema": { "type": "string" } },
-          { "name": "status", "in": "query", "schema": { "type": "string" } },
-          { "name": "limit", "in": "query", "schema": { "type": "integer" } },
-          { "name": "offset", "in": "query", "schema": { "type": "integer" } }
+          {
+            "name": "profile_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bottleneck_type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "List of bottlenecks" }
+          "200": {
+            "description": "List of bottlenecks"
+          }
         }
       }
     },
@@ -13796,10 +13970,19 @@
         ],
         "summary": "Update bottleneck status and verification",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Bottleneck updated" }
+          "200": {
+            "description": "Bottleneck updated"
+          }
         }
       }
     },
@@ -13810,7 +13993,9 @@
         ],
         "summary": "Synthesize automated code / caching / query optimization patch",
         "responses": {
-          "200": { "description": "Synthesized optimization patch" }
+          "200": {
+            "description": "Synthesized optimization patch"
+          }
         }
       }
     },
@@ -13821,10 +14006,18 @@
         ],
         "summary": "Get fleet-wide latency percentiles, memory footprint, and bottleneck analytics",
         "parameters": [
-          { "name": "project_id", "in": "query", "schema": { "type": "string" } }
+          {
+            "name": "project_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Fleet performance metrics" }
+          "200": {
+            "description": "Fleet performance metrics"
+          }
         }
       }
     }
