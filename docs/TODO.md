@@ -19,3 +19,9 @@
 
 - [x] #P1 todo **Full Sceptic iBrowse & Pytest Verification**
   - Verify complete application health: 0 console errors, 0 page exceptions, fast load.
+
+## ✅ Cycle 66-67 (keyboard shortcuts guide + QA hardening)
+
+- [x] #P1 done **Keyboard shortcuts guide shipped & verified (cycle 66, PR #24)**
+  - `?` key / toolbar (?) button / palette entry; ShortcutsModal with grouped bindings.
+  - Dedicated E2E `scripts/qa/verify_shortcuts_modal.js` (cycle 67): PASS x5, iBrowse-harness limitation documented.
