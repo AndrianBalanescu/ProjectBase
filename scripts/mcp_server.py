@@ -59,7 +59,10 @@ _AUTH_HELP = (
     "Verify health:  curl -s {base}/api/projectbase/health  -> should return 200."
 )
 
-def _request(endpoint: str, method: str = "GET", data: Optional[Dict] = None) -> Any:
+def _request(endpoint: str, method: str = "GET", data: Optional[Dict] = None, params: Optional[Dict] = None) -> Any:
+    if params:
+        from urllib.parse import urlencode
+        endpoint = endpoint + ("&" if "?" in endpoint else "?") + urlencode(params)
     url = f"{BASE_URL}{endpoint}"
     req_data = json.dumps(data).encode("utf-8") if data else None
     headers = {"Content-Type": "application/json"}
@@ -1138,155 +1141,6 @@ def get_semantic_metrics() -> Dict[str, Any]:
 def reindex_semantic_embeddings() -> Dict[str, Any]:
     """Batch vectorize and index all workspace issues into dense embeddings."""
     return _request("/api/projectbase/semantic/embeddings/reindex", method="POST")
-
-@mcp.tool()
-def start_debug_session(
-    name: str,
-    project: Optional[str] = None,
-    issue: Optional[str] = None,
-    agent_id: str = "flomaster",
-    target_model: str = "claude-fable-5",
-    entrypoint: str = "main",
-    tags: str = ""
-) -> Dict[str, Any]:
-    """Start or initialize an autonomous agent time-travel debugging session."""
-    proj_id = _find_project_id(project) if project else None
-    issue_id = _find_issue(issue)["id"] if issue else None
-    data = {
-        "name": name,
-        "agent_id": agent_id,
-        "target_model": target_model,
-        "entrypoint": entrypoint,
-        "tags": tags
-    }
-    if proj_id:
-        data["project_id"] = proj_id
-    if issue_id:
-        data["issue_id"] = issue_id
-    return _request("/api/projectbase/debug/sessions", method="POST", data=data)
-
-@mcp.tool()
-def record_debug_trace_frame(
-    debug_session_id: str,
-    action_name: str,
-    event_type: str = "tool_call",
-    caller: str = "agent_coordinator",
-    input_payload: Optional[Dict[str, Any]] = None,
-    output_payload: Optional[Dict[str, Any]] = None,
-    variable_state: Optional[Dict[str, Any]] = None,
-    error_message: str = "",
-    duration_ms: int = 0,
-    memory_usage_mb: float = 0.0
-) -> Dict[str, Any]:
-    """Record an execution trace frame in an agent debug session with payload and variable state."""
-    data = {
-        "action_name": action_name,
-        "event_type": event_type,
-        "caller": caller,
-        "input_payload_json": input_payload or {},
-        "output_payload_json": output_payload or {},
-        "variable_state_json": variable_state or {},
-        "error_message": error_message,
-        "duration_ms": duration_ms,
-        "memory_usage_mb": memory_usage_mb
-    }
-    return _request(f"/api/projectbase/debug/sessions/{debug_session_id}/frames", method="POST", data=data)
-
-@mcp.tool()
-def list_debug_sessions(
-    project: Optional[str] = None,
-    status: Optional[str] = None,
-    limit: int = 50
-) -> Dict[str, Any]:
-    """List agent debug sessions with filtering by project and status."""
-    proj_id = _find_project_id(project) if project else None
-    params = [f"limit={limit}"]
-    if proj_id:
-        params.append(f"project_id={proj_id}")
-    if status:
-        params.append(f"status={status}")
-    q = "?" + "&".join(params)
-    return _request(f"/api/projectbase/debug/sessions{q}")
-
-@mcp.tool()
-def get_debug_session_trace(
-    debug_session_id: str,
-    event_type: Optional[str] = None,
-    min_step: Optional[int] = None,
-    max_step: Optional[int] = None,
-    limit: int = 100
-) -> Dict[str, Any]:
-    """Get trace frames and call events for a debug session."""
-    params = [f"limit={limit}"]
-    if event_type:
-        params.append(f"event_type={event_type}")
-    if min_step is not None:
-        params.append(f"min_step={min_step}")
-    if max_step is not None:
-        params.append(f"max_step={max_step}")
-    q = "?" + "&".join(params)
-    return _request(f"/api/projectbase/debug/sessions/{debug_session_id}/frames{q}")
-
-@mcp.tool()
-def step_debug_session(
-    debug_session_id: str,
-    direction: str = "next",
-    steps: int = 1,
-    target_step: Optional[int] = None
-) -> Dict[str, Any]:
-    """Step forward, backward, or to a specific step index in agent execution time-travel."""
-    data = {
-        "direction": direction,
-        "steps": steps
-    }
-    if target_step is not None:
-        data["target_step"] = target_step
-    return _request(f"/api/projectbase/debug/sessions/{debug_session_id}/step", method="POST", data=data)
-
-@mcp.tool()
-def set_debug_breakpoint(
-    debug_session_id: str,
-    name: str,
-    condition_type: str = "always",
-    condition_expr: str = "",
-    action: str = "pause"
-) -> Dict[str, Any]:
-    """Register a conditional breakpoint or watchpoint in a debug session."""
-    data = {
-        "name": name,
-        "condition_type": condition_type,
-        "condition_expr": condition_expr,
-        "action": action
-    }
-    return _request(f"/api/projectbase/debug/sessions/{debug_session_id}/breakpoints", method="POST", data=data)
-
-@mcp.tool()
-def capture_debug_state_snapshot(
-    debug_session_id: str,
-    label: str,
-    snapshot_type: str = "manual",
-    memory_snapshot: Optional[Dict[str, Any]] = None,
-    env_snapshot: Optional[Dict[str, Any]] = None,
-    fs_diff: str = ""
-) -> Dict[str, Any]:
-    """Capture a memory, environment, and filesystem state snapshot during agent execution."""
-    data = {
-        "label": label,
-        "snapshot_type": snapshot_type,
-        "memory_snapshot_json": memory_snapshot or {},
-        "env_snapshot_json": env_snapshot or {},
-        "fs_diff": fs_diff
-    }
-    return _request(f"/api/projectbase/debug/sessions/{debug_session_id}/snapshots", method="POST", data=data)
-
-@mcp.tool()
-def get_debug_workspace_metrics(
-    project: Optional[str] = None
-) -> Dict[str, Any]:
-    """Retrieve workspace-wide agent debugging metrics, frame statistics, and error interception rates."""
-    proj_id = _find_project_id(project) if project else None
-    q = f"?project_id={proj_id}" if proj_id else ""
-    return _request(f"/api/projectbase/debug/metrics{q}")
 
 if __name__ == "__main__":
     mcp.run()
