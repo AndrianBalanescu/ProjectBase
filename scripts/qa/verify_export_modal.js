@@ -49,9 +49,15 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       await page.waitForTimeout(2000);
     }
 
-    // Open the Export modal via the header button.
-    const exportBtn = page.locator('button:has-text("Export")').first();
-    if (await exportBtn.count()) {
+    // Open the Export modal via the header "more actions" dropdown
+    // (Export lives behind the kebab menu since the header cleanup).
+    const moreBtn = page.locator('button[title*="More actions"]').first();
+    if (await moreBtn.count()) {
+      await moreBtn.click();
+      await page.waitForTimeout(400);
+    }
+    const exportBtn = page.locator('button:has-text("Export Issues")').first();
+    if (await exportBtn.count() && await exportBtn.isVisible().catch(() => false)) {
       await exportBtn.click();
       await page.waitForTimeout(600);
       results['exportHeaderButton'] = true;

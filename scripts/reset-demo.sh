@@ -49,9 +49,12 @@ docker compose down || true
 log "Wiping app/pb_data ..."
 # The container runs as root and owns pb_data files on the bind mount, so a
 # plain host `rm -rf` fails with permission denied for non-root deploy users.
-# Wipe via a throwaway root container over the bind mount instead.
-docker run --rm -v "$(pwd)/pb_data:/data" alpine:latest sh -c 'find /data -mindepth 1 -delete' \
-  || die "failed to wipe pb_data (is the docker daemon reachable?)"
+# Wipe via a throwaway root container over the bind mount instead. The bind
+# mount is ./app/pb_data (docker-compose.yml) — wiping $(pwd)/pb_data would be
+# a silent no-op that leaves demo data intact and creates a stray root-owned
+# directory at the repo root.
+docker run --rm -v "$(pwd)/app/pb_data:/data" alpine:latest sh -c 'find /data -mindepth 1 -delete' \
+  || die "failed to wipe app/pb_data (is the docker daemon reachable?)"
 
 log "Rebooting (seed migration will rebuild the demo workspace) ..."
 export PROJECTBASE_PORT="$PORT"
