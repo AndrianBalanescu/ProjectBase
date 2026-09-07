@@ -126,6 +126,12 @@ def test_mutating_route_accepts_authenticated(method, path, body):
     assert status not in (401, 403), (
         f"{method} {path} rejected an authenticated superuser: {status} {str(resp)[:120]}"
     )
+    # alerts/configure actually persists a rule; delete it so repeated suite
+    # runs don't accumulate junk rules that starve the evaluate window.
+    if path.endswith("/observability/alerts/configure"):
+        rule_id = (resp or {}).get("alert_config", {}).get("id")
+        if rule_id:
+            _request("DELETE", f"/api/projectbase/observability/alerts/{rule_id}", headers={"Authorization": token})
 
 
 def test_public_developer_docs_stay_open():

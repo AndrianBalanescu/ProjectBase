@@ -497,7 +497,9 @@ routerAdd("POST", "/api/projectbase/observability/alerts/evaluate", (e) => {
         let configs = [];
 
         try {
-            const configRecords = e.app.findRecordsByFilter("observability_alert_configs", "is_active = true", "", 50);
+            // Sort newest-first and allow 200 so old junk rules (from guard-probe
+            // suites) can never truncate real rules out of the evaluation window.
+            const configRecords = e.app.findRecordsByFilter("observability_alert_configs", "is_active = true", "-created", 200);
             configs = configRecords.map(function(r) {
                 return {
                     id: r.id,

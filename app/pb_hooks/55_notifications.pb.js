@@ -116,7 +116,11 @@ onRecordAfterCreateSuccess((e) => {
         try { $app.store().remove("pbNotifActor:" + ridKey + ":type") } catch (x) {}
 
         const assignee = issue.get("assignee") || ""
-        if (!assignee) return
+        // Always continue the hook chain — returning without e.next() here
+        // silently killed every later-registered afterCreateSuccess handler for
+        // issues (e.g. 20_issue_hooks' 'created' activity row) depending on
+        // sandbox load order. See cycle 83.
+        if (!assignee) { e.next(); return }
         const identifier = issue.get("identifier") || "task"
         const title = issue.get("title") || ""
 
@@ -146,6 +150,7 @@ onRecordAfterCreateSuccess((e) => {
     } catch (err) {
         console.warn(">>> [ProjectBase] create-assignment notification failed:", err)
     }
+    e.next()
 }, "issues")
 
 onRecordAfterUpdateSuccess((e) => {
@@ -215,6 +220,7 @@ onRecordAfterUpdateSuccess((e) => {
     } catch (err) {
         console.warn(">>> [ProjectBase] update-assignment notification failed:", err)
     }
+    e.next()
 }, "issues")
 
 // 4 + 5. Comment created: notify the issue assignee + @mentions.
@@ -222,13 +228,13 @@ onRecordAfterCreateSuccess((e) => {
     try {
         const comment = e.record
         const issueId = comment.get("issue")
-        if (!issueId) return
+        if (!issueId) { e.next(); return }
         const author = comment.get("author") || "Someone"
         const authorType = comment.get("author_type") || "user"
         const content = comment.get("content") || ""
 
         let issue = null
-        try { issue = e.app.findRecordById("issues", issueId) } catch (nfErr) { return }
+        try { issue = e.app.findRecordById("issues", issueId) } catch (nfErr) { e.next(); return }
         const identifier = issue.get("identifier") || "task"
         const assignee = issue.get("assignee") || ""
 
@@ -279,6 +285,7 @@ onRecordAfterCreateSuccess((e) => {
     } catch (err) {
         console.warn(">>> [ProjectBase] comment notification failed:", err)
     }
+    e.next()
 }, "comments")
 
 // Mark all notifications read for the current user (bell "mark all read").
