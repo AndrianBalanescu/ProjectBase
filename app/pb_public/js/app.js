@@ -93,7 +93,8 @@ const App = {
     'custom-fields-modal': CustomFieldsModalComponent,
     'notification-settings-modal': NotificationSettingsModalComponent,
     'welcome-modal': WelcomeModalComponent,
-    'shortcuts-modal': ShortcutsModalComponent
+    'shortcuts-modal': ShortcutsModalComponent,
+    'saved-view-modal': SavedViewModalComponent
   },
   data() {
     // Restore the last-known-good snapshot from localStorage so a page refresh
@@ -157,6 +158,12 @@ const App = {
       filterPriority: '',
       filterCycle: '',
       filterLabel: '',
+
+      // Saved views (per-user named filter states, saved_views collection)
+      savedViews: [],
+      isSaveViewOpen: false,
+      saveViewName: '',
+      saveViewError: '',
 
       // URL-synced UI state: selected cycle tab in Cycles view (?cycle=)
       // and drawer width override in px (?w=, session-only; localStorage still wins after a manual resize)
@@ -279,6 +286,67 @@ const App = {
         root.classList.add('light');
       }
     },
+    // ===== Saved views (per-user named filter states) =====
+    // Serialized filter state — the exact query params syncRoute() writes, so
+    // applying a view is a plain hash navigation through the existing router.
+    currentFilterQueryState() {
+      const params = new URLSearchParams();
+      if (this.filterQuery) params.set('q', this.filterQuery);
+      if (this.filterPriority) params.set('priority', this.filterPriority);
+      if (this.filterLabel) params.set('label', this.filterLabel);
+      if (this.filterCycle) params.set('cycle', this.filterCycle);
+      return params.toString();
+    },
+    hasActiveFilters() {
+      return !!(this.filterQuery || this.filterPriority || this.filterLabel || this.filterCycle);
+    },
+    openSaveViewModal() {
+      this.isSaveViewOpen = true;
+    },
+    async confirmSaveViewFromModal(payload) {
+      this.saveViewError = '';
+      const name = (payload && payload.name ? payload.name : '').trim();
+      if (!name) { this.saveViewError = 'Name is required'; this.isSaveViewOpen = false; return; }
+      const view = payload && payload.view === 'list' ? 'list' : 'board';
+      try {
+        const rec = await API.createSavedView({
+          name,
+          query: this.currentFilterQueryState(),
+          view,
+          project: this.currentProject ? this.currentProject.id : ''
+        });
+        this.savedViews = [...this.savedViews, rec].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        this.isSaveViewOpen = false;
+      } catch (err) {
+        const msg = (err && err.response && err.response.message) ? err.response.message : 'Could not save view';
+        // Surface inline in the modal without closing it.
+        this.saveViewError = msg;
+        const el = document.getElementById('save-view-name-input');
+        if (el && el.parentElement) {
+          let p = el.parentElement.querySelector('p');
+          if (!p) { p = document.createElement('p'); p.className = 'text-[11px] text-red-500'; el.parentElement.appendChild(p); }
+          p.textContent = msg;
+        }
+      }
+    },
+    applySavedView(sv) {
+      if (!sv) return;
+      // Navigate to the saved surface + query; the router owns the state.
+      const proj = this.currentProject ? this.currentProject.identifier.toLowerCase() : '';
+      const v = sv.view === 'list' ? 'list' : 'board';
+      const base = proj ? `#/${proj}/${v}` : `#/${v}`;
+      const qs = sv.query || '';
+      window.location.hash = qs ? `${base}?${qs}` : base;
+    },
+    async removeSavedView(sv) {
+      if (!sv) return;
+      try {
+        await API.deleteSavedView(sv.id);
+        this.savedViews = this.savedViews.filter(s => s.id !== sv.id);
+      } catch (err) {
+        console.warn('Delete saved view failed:', err);
+      }
+    },
     handleOnline() {
       this.isOnline = true;
     },
@@ -387,6 +455,7 @@ const App = {
       this.issues = [];
       this.cycles = [];
       this.labels = [];
+      this.savedViews = [];
       this.currentProject = null;
       this.selectedIssue = null;
       this.isWelcomeOpen = false;
@@ -397,14 +466,15 @@ const App = {
     },
     async loadAllData() {
       try {
-        const [projs, iss, cycs, mls, lbls, notifs, agents] = await Promise.all([
+        const [projs, iss, cycs, mls, lbls, notifs, agents, savedViews] = await Promise.all([
           API.getProjects(),
           API.getIssues(this.currentProject ? this.currentProject.id : null),
           API.getCycles(this.currentProject ? this.currentProject.id : null),
           API.getMilestones(this.currentProject ? this.currentProject.id : null),
           API.getLabels(this.currentProject ? this.currentProject.id : null),
           API.getNotifications(),
-          API.getAgents().catch(() => ({ agents: [] }))
+          API.getAgents().catch(() => ({ agents: [] })),
+          API.getSavedViews().catch(() => [])
         ]);
 
         this.projects = projs;
@@ -412,6 +482,7 @@ const App = {
         this.cycles = cycs;
         this.milestones = mls;
         this.labels = lbls;
+        this.savedViews = savedViews || [];
         this.notifications = (notifs && notifs.items) || [];
         this.agents = (agents && agents.agents) || [];
         this.agentSessions = (agents && agents.sessions) || [];

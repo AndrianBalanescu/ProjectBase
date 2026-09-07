@@ -2,8 +2,8 @@
 // Minimalist, high-density Kanban Board supporting Dark/Light themes, dual Task & Live Agent Session cards.
 
 const KanbanBoardComponent = {
-  props: ['issues', 'projects', 'currentProject', 'cycles', 'labels', 'filterQuery', 'filterPriority', 'filterCycle', 'filterLabel', 'selectedIssueIds', 'agents', 'sessions'],
-  emits: ['open-issue', 'create-issue', 'update-issue', 'delete-issue', 'open-shortcuts-modal', 'toggle-issue-selection', 'range-select-issue', 'update:filterQuery', 'update:filterPriority', 'update:filterCycle', 'update:filterLabel', 'open-session', 'change-view'],
+  props: ['issues', 'projects', 'currentProject', 'cycles', 'labels', 'filterQuery', 'filterPriority', 'filterCycle', 'filterLabel', 'selectedIssueIds', 'agents', 'sessions', 'savedViews'],
+  emits: ['open-issue', 'create-issue', 'update-issue', 'delete-issue', 'open-shortcuts-modal', 'toggle-issue-selection', 'range-select-issue', 'update:filterQuery', 'update:filterPriority', 'update:filterCycle', 'update:filterLabel', 'open-session', 'change-view', 'save-view', 'apply-saved-view', 'delete-saved-view'],
   data() {
     return {
       boardMode: 'all', // 'all' | 'issues' | 'sessions'
@@ -19,12 +19,16 @@ const KanbanBoardComponent = {
       ],
       quickAddColumn: null,
       quickAddTitle: '',
+      savedViewsOpen: false,
       sortables: [],
       dragInProgress: false,
       sortableRefreshPending: false
     };
   },
   computed: {
+    hasActiveFilters() {
+      return !!(this.filterQuery || this.filterPriority || this.filterCycle || this.filterLabel || this.agentFilter);
+    },
     searchModel: {
       get() { return this.filterQuery; },
       set(v) { this.$emit('update:filterQuery', v); }
@@ -112,6 +116,13 @@ const KanbanBoardComponent = {
       this.cycleModel = '';
       this.agentFilter = '';
       this.labelModel = '';
+    },
+    applySavedView(sv) {
+      this.savedViewsOpen = false;
+      this.$emit('apply-saved-view', sv);
+    },
+    deleteSavedView(sv) {
+      this.$emit('delete-saved-view', sv);
     },
     // Project-scoped label definitions from the labels collection, sorted by name.
     knownLabels() {
@@ -448,6 +459,52 @@ const KanbanBoardComponent = {
             <i data-lucide="x" class="w-3 h-3"></i>
             <span>Clear ({{ activeFilterCount }})</span>
           </button>
+
+          <!-- Saved Views: save current filters + apply saved ones -->
+          <button
+            v-if="hasActiveFilters"
+            @click="$emit('save-view')"
+            class="px-2 py-1 text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 flex items-center space-x-1"
+            title="Save current filters as a view"
+          >
+            <i data-lucide="bookmark-plus" class="w-3 h-3"></i>
+            <span>Save view</span>
+          </button>
+          <div v-if="savedViews.length > 0" class="relative">
+            <button
+              @click="savedViewsOpen = !savedViewsOpen"
+              class="px-2 py-1 rounded-md text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 flex items-center space-x-1"
+              title="Apply a saved view"
+            >
+              <i data-lucide="bookmark" class="w-3 h-3"></i>
+              <span>Views</span>
+            </button>
+            <div
+              v-if="savedViewsOpen"
+              class="absolute right-0 mt-1 w-56 max-h-72 overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#121215] shadow-xl z-20 py-1"
+            >
+              <div
+                v-for="sv in savedViews"
+                :key="sv.id"
+                class="group flex items-center justify-between px-3 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
+              >
+                <button
+                  @click="applySavedView(sv)"
+                  class="flex-1 text-left text-xs text-zinc-700 dark:text-zinc-200 truncate"
+                  :title="(sv.view === 'list' ? 'List: ' : 'Board: ') + (sv.query || 'no filters')"
+                >
+                  <i :data-lucide="sv.view === 'list' ? 'list' : 'kanban'" class="w-3 h-3 inline-block align-[-2px] mr-1 text-zinc-400"></i>{{ sv.name }}
+                </button>
+                <button
+                  @click="deleteSavedView(sv)"
+                  class="opacity-0 group-hover:opacity-100 p-0.5 text-zinc-400 hover:text-red-500 transition-opacity"
+                  title="Delete saved view"
+                >
+                  <i data-lucide="trash-2" class="w-3 h-3"></i>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="flex items-center space-x-2">

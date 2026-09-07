@@ -59,7 +59,8 @@ const PRECACHE_PATHS = [
   './js/components/CustomFieldsModal.js',
   './js/components/NotificationSettingsModal.js',
   './js/components/WelcomeModal.js',
-  './js/components/ShortcutsModal.js'
+  './js/components/ShortcutsModal.js',
+  './js/components/SavedViewModal.js'
 ];
 
 self.addEventListener('install', (event) => {
