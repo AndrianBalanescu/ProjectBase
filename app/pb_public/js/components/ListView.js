@@ -2,13 +2,14 @@
 // Minimalist, high-density List View supporting Dark and Light themes with subtle, low-contrast accents.
 
 const ListViewComponent = {
-  props: ['issues', 'projects', 'currentProject', 'cycles', 'labels', 'filterQuery', 'filterPriority', 'filterCycle', 'filterLabel', 'selectedIssueIds', 'agents'],
-  emits: ['open-issue', 'update-issue', 'delete-issue', 'open-new-issue', 'toggle-issue-selection', 'range-select-issue', 'select-all-visible', 'update:filterLabel'],
+  props: ['issues', 'projects', 'currentProject', 'cycles', 'labels', 'filterQuery', 'filterPriority', 'filterCycle', 'filterLabel', 'selectedIssueIds', 'agents', 'savedViews'],
+  emits: ['open-issue', 'update-issue', 'delete-issue', 'open-new-issue', 'toggle-issue-selection', 'range-select-issue', 'select-all-visible', 'update:filterLabel', 'save-view', 'apply-saved-view', 'delete-saved-view'],
   data() {
     return {
       sortBy: 'created',
       sortDesc: true,
-      agentFilter: ''
+      agentFilter: '',
+      savedViewsOpen: false
     };
   },
   computed: {
@@ -44,6 +45,16 @@ const ListViewComponent = {
     }
   },
   methods: {
+    hasActiveFilters() {
+      return !!(this.filterQuery || this.filterPriority || this.filterCycle || this.filterLabel);
+    },
+    applySavedView(sv) {
+      this.savedViewsOpen = false;
+      this.$emit('apply-saved-view', sv);
+    },
+    deleteSavedView(sv) {
+      this.$emit('delete-saved-view', sv);
+    },
     // Project-scoped label definitions from the labels collection, sorted by name.
     knownLabels() {
       const defs = (this.labels || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -216,6 +227,53 @@ const ListViewComponent = {
               <option value="">All Agents</option>
               <option v-for="a in agents" :key="a.name" :value="a.name">{{ a.avatar }} {{ a.name }}</option>
             </select>
+
+            <!-- Saved Views: save current filters + apply saved ones -->
+            <button
+              v-if="hasActiveFilters()"
+              @click="$emit('save-view')"
+              class="px-2.5 py-1 rounded-md text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 flex items-center space-x-1"
+              title="Save current filters as a view"
+            >
+              <i data-lucide="bookmark-plus" class="w-3 h-3"></i>
+              <span>Save view</span>
+            </button>
+            <div v-if="savedViews && savedViews.length > 0" class="relative">
+              <button
+                @click="savedViewsOpen = !savedViewsOpen"
+                class="px-2.5 py-1 rounded-md text-xs text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 flex items-center space-x-1"
+                title="Apply a saved view"
+              >
+                <i data-lucide="bookmark" class="w-3 h-3"></i>
+                <span>Views</span>
+              </button>
+              <div
+                v-if="savedViewsOpen"
+                class="absolute right-0 mt-1 w-56 max-h-72 overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-[#121215] shadow-xl z-20 py-1"
+              >
+                <div
+                  v-for="sv in savedViews"
+                  :key="sv.id"
+                  class="group flex items-center justify-between px-3 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
+                >
+                  <button
+                    @click="applySavedView(sv)"
+                    class="flex-1 text-left text-xs text-zinc-700 dark:text-zinc-200 truncate"
+                    :title="(sv.view === 'list' ? 'List: ' : 'Board: ') + (sv.query || 'no filters')"
+                  >
+                    <i :data-lucide="sv.view === 'list' ? 'list' : 'kanban'" class="w-3 h-3 inline-block align-[-2px] mr-1 text-zinc-400"></i>{{ sv.name }}
+                  </button>
+                  <button
+                    @click="deleteSavedView(sv)"
+                    class="opacity-0 group-hover:opacity-100 p-0.5 text-zinc-400 hover:text-red-500 transition-opacity"
+                    title="Delete saved view"
+                  >
+                    <i data-lucide="trash-2" class="w-3 h-3"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <button
               @click="$emit('open-new-issue')"
               class="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 text-xs font-semibold shadow-2xs transition-colors"

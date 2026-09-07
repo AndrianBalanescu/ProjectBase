@@ -1,7 +1,14 @@
 # Changelog
 
-## [Unreleased] - Cycle 86
+## [Unreleased] - Cycle 87
 ### Added
+- **Saved views (per-user named filter states):** new `saved_views` collection (migration 54, owner-forced + owner-only list/view/update rules, admin-gated delete); `36_saved_views.pb.js` hook validates name (≤64 chars, unique per owner+project+view), view enum (board|list), and a whitelisted query string (only `q`/`priority`/`cycle`/`label` keys with length caps). Board and list toolbars gain a "Save view" button (visible with active filters) and a "Views" dropdown to apply/switch/delete saved states; applying navigates the existing hash router with the stored query params. SavedViewModal for naming; `llms.txt` documents the endpoints for agents.
+
+### Fixed
+- PocketBase order-of-evaluation pitfall: `createRule` must not inspect `@request.body.owner` (rules run before `onRecordCreateRequest` hooks, so a spoofed owner is now safely overwritten by the hook instead of leaking a rejection). Owner forcing lives solely in the hook.
+
+## [1.39.0] - 2026-09-06 - Cycles 43-65
+### Added (Cycle 86)
 - **Labels table-stakes completion:** reusable Multiselect label picker in the New Issue modal (project-scoped, from the `labels` collection); colored label chips on Kanban cards and List rows (collection color with deterministic fallback); one-click label quick-picks in the Issue Drawer; "All Labels" filter on board + list with URL-synced `?label=` deep links.
 ### Fixed
 - **Labels REST validation parity:** direct issue create/update now validate `labels` exactly like bulk-update (array of non-empty strings ≤64 chars) via `20_issue_hooks.pb.js`; PB 0.39 jsvm surfaces the json field to record hooks as char-code arrays, so the hooks normalize it before validating and re-set the decoded value.

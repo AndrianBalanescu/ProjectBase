@@ -12,6 +12,7 @@ Must-Have = table stakes vs Linear/Plane. Moat = differentiators nobody in the l
 | Sprints / cycles | ✅ | ✅ | ✅ cycles + burndown | ✅ shipped |
 | Subtasks / relationships | ✅ | ✅ | ✅ subtasks + markdown drawer + blocks/blocked_by/related (reciprocal mirroring, kanban blocked badges, REST + FastMCP) | ✅ shipped (cycle 40) |
 | Labels & priorities | ✅ | ✅ | ✅ colored label defs (`labels` collection: name+color+project), picker in new-issue modal, quick-picks + colored chips in drawer, colored chips board/list, label filter (board/list, URL `?label=`), hook-validated REST writes | ✅ shipped (completed cycle 86) |
+| Saved views | ✅ | ✅ | ✅ per-user named filter states (`saved_views` collection: owner-forced + owner-only rules, query whitelist q/priority/cycle/label, view board|list), Save-view button + Views dropdown on board/list toolbars, apply via hash navigation, SavedViewModal | ✅ shipped (cycle 87) |
 | Multi-user auth + roles | ✅ | ✅ | ✅ auth gate, admin/manager roles, hardened rules | ✅ shipped (cycle-1 audit: rules verified) |
 | Real-time updates | ✅ | ✅ | ✅ SSE | ✅ shipped |
 | File attachments | ✅ | ✅ | ✅ FileField | ✅ shipped |

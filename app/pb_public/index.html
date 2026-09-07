@@ -124,6 +124,7 @@
         :agents="agents"
         :sessions="agentSessions"
         :selected-issue-ids="selectedIssueIds"
+        :saved-views="savedViews"
         v-model:filter-query="filterQuery"
         v-model:filter-priority="filterPriority"
         v-model:filter-cycle="filterCycle"
@@ -136,6 +137,9 @@
         @toggle-issue-selection="toggleIssueSelection"
         @range-select-issue="rangeSelectIssue"
         @open-shortcuts-modal="isShortcutsOpen = true"
+        @save-view="openSaveViewModal"
+        @apply-saved-view="applySavedView"
+        @delete-saved-view="removeSavedView"
       ></kanban-board>
 
       <!-- 2. List View -->
@@ -148,6 +152,7 @@
         :labels="labels"
         :agents="agents"
         :selected-issue-ids="selectedIssueIds"
+        :saved-views="savedViews"
         v-model:filter-query="filterQuery"
         v-model:filter-priority="filterPriority"
         v-model:filter-cycle="filterCycle"
@@ -158,6 +163,9 @@
         @open-new-issue="isNewIssueOpen = true"
         @toggle-issue-selection="toggleIssueSelection"
         @range-select-issue="rangeSelectIssue"
+        @save-view="openSaveViewModal"
+        @apply-saved-view="applySavedView"
+        @delete-saved-view="removeSavedView"
         @select-all-visible="selectAllVisibleIssues"
       ></list-view>
 
@@ -489,6 +497,15 @@
       @close="isShortcutsOpen = false"
     ></shortcuts-modal>
 
+    <!-- Save Current View Modal -->
+    <saved-view-modal
+      :is-open="isSaveViewOpen"
+      :current-view="currentView"
+      :current-project="currentProject"
+      @close="isSaveViewOpen = false"
+      @confirm="confirmSaveViewFromModal"
+    ></saved-view-modal>
+
     <!-- Floating Toasts -->
     <div class="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none">
       <div 
@@ -539,6 +556,7 @@
   <script src="/js/components/NotificationSettingsModal.js"></script>
   <script src="/js/components/WelcomeModal.js"></script>
   <script src="/js/components/ShortcutsModal.js"></script>
+  <script src="/js/components/SavedViewModal.js"></script>
   <script>
     // Offline-first app shell: register the Service Worker (progressive enhancement).
     if ('serviceWorker' in navigator) {

@@ -247,6 +247,25 @@ const API = {
     return await pb.collection('labels').create(data);
   },
 
+  // Saved views (per-user named filter states)
+  async getSavedViews() {
+    return await pb.collection('saved_views').getFullList({
+      sort: 'name'
+    });
+  },
+
+  async createSavedView(data) {
+    return await pb.collection('saved_views').create(data);
+  },
+
+  async updateSavedView(id, data) {
+    return await pb.collection('saved_views').update(id, data);
+  },
+
+  async deleteSavedView(id) {
+    return await pb.collection('saved_views').delete(id);
+  },
+
   // Comments
   async getComments(issueId) {
     return await pb.collection('comments').getFullList({
