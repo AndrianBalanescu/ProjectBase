@@ -21,7 +21,7 @@ manually, but the CI safety net is down until the account billing is fixed.
 invoice or raise the limit) so Actions runners start again. This requires a
 real payment on the human's account — not delegated to an agent.
 
-> **Cycle 80 (2026-09-07): still active.** Every CI run on ProjectBase since
+> **Cycle 83 (2026-09-07): still active.** Every CI run on ProjectBase since
 > cycle 35 fails in <10s with the same annotation (jobs never start). Local
-> gates (pytest 609 passed, real-browser QA, iBrowse audit) remain the
-> effective verification path; PRs are merged manually.
+> gates (pytest 624 passed on merged main, real-browser QA, iBrowse audit)
+> remain the effective verification path; PRs #27/#28/#29 were merged manually.
