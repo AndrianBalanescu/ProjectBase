@@ -26,8 +26,6 @@ const AgentsViewComponent = {
       branchNameInput: '',
       branchPromptInput: '',
       isBranchingSession: false,
-      sandboxes: [],
-      activeSandboxTab: 'overview',
     };
   },
   computed: {
@@ -672,7 +670,7 @@ const AgentsViewComponent = {
             </div>
           </div>
           <div v-else class="py-16 text-center text-zinc-400 italic">
-            Select a session run to inspect telemetry and dev sandboxes.
+            Select a session run to inspect telemetry.
           </div>
         </div>
 
