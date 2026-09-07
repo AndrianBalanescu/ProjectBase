@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.41.0] - 2026-09-07 - Cycle 91
+### Removed (de-bloat, roadmap Phase 1)
+- **Synthetic ballast engines stripped (hooks 112-123, 12 files, ~11.5k lines):** fleet budget/USD billing calculator, agent eval leaderboard/benchmarks, ephemeral sandbox orchestrator, incident war-room (5-whys), knowledge-graph engine, code-review swarm, release flight control, AST security sentinel scanner, TDD/mutation matrix, time-travel debugger, architecture blast-radius, profiler/flamegraph. These were synthetic mock endpoints violating the product boundary ("no fake cloud billing, no AST security red-team scanners, no incident war rooms, no benchmark leaderboards"). Real engines kept: auto-heal pipeline (105), SSO/RBAC (102, incl. `security_audit_logs`), semantic brain (106), session ingestion (107), auto-scaling (97), consensus gates (101).
+- **76 + 13 + 3 synthetic MCP tools removed** from the FastMCP server (91): billing/ledger/pricing, evals, sandboxes, incidents, knowledge-graph, code-review swarm, releases/canary/rollback, security scans/AST rules, TDD/mutation, debug sessions, blast radius, perf profiles/flamegraphs, hardcoded `compare_model_benchmarks` fake scores, token-usage recorder, codebase-symbol/knowledge leftovers. 233 → 136 tools; 11,501 → 7,197 lines; schema/dispatch/handlers verified consistent.
+- **350 dead browser API methods removed** from `js/api.js` (4,044 → ~390 lines): every client method for the removed engines that no UI component ever called.
+- **138 OpenAPI paths + 12 migrations + 12 ballast test files removed**; `security_scans`, `debug_sessions`, `eval_*`, `billing_*`, sandbox, knowledge-graph, code-review, release, perf collections dropped from the schema surface.
+- **Cleanup:** dangling engine banner comments, unused AgentsView sandbox state, AGENTS.md hooks map/data-model/test-count drift (495 tests across 39 files).
+
+### Changed
+- Version bump 1.40.0 → 1.41.0 (VERSION, health/version routes, openapi.json, header badge). ~50 MB RAM target now trivially met; MCP surface agent-focused again.
+
 ## [1.40.0] - 2026-09-07 - Cycle 89
 ### Added
 - **Saved views (shipped as PR #31, merged):** per-user named board/list filter states — `saved_views` collection, "Save view" toolbar button, "Views" apply/switch/delete dropdown, URL-hash navigation on apply. Version bumped 1.39.0 → 1.40.0 across VERSION, `/api/projectbase/health` + version routes, openapi.json, header badge.
