@@ -47,6 +47,7 @@ Add to ~/.cursor/mcp.json or ~/.flomaster/config.json:
    file can be re-imported into another ProjectBase or Linear/Plane/Trello):
    - CSV:  GET /api/projectbase/export/csv?project=<ID>   (attachment download)
    - JSON: GET /api/projectbase/export/json?project=<ID>  (machine-readable)
+   - ICS:  GET /api/projectbase/export/ics?project=<ID>   (RFC 5545 calendar feed — one VEVENT per issue due_date, cycle start/end, and milestone target_date; stable UIDs so Google/Apple/Thunderbird subscriptions dedupe across refreshes)
 7. Notification Channel Settings (runtime-editable, self-hosted; admin/manager only):
    - Read:  GET /api/projectbase/notification-settings   → { discord_webhook_url, telegram_token, telegram_chat_id, generic_webhook_url }
    - Write: PUT /api/projectbase/notification-settings {"discord_webhook_url":"...","telegram_token":"...","telegram_chat_id":"...","generic_webhook_url":"..."}
