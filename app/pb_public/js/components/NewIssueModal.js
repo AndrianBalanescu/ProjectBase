@@ -52,6 +52,15 @@ const NewIssueModalComponent = {
       if (!this.projectId) return list;
       return list.filter(m => m.project === this.projectId);
     },
+    // Label picker options: project-scoped definitions from the labels
+    // collection (plus unassigned global labels), name-sorted.
+    labelOptions() {
+      const defs = Array.isArray(this.labels) ? this.labels.slice() : [];
+      const scoped = defs
+        .filter(l => !this.projectId || !l.project || l.project === this.projectId)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      return scoped.map(l => ({ value: l.name, label: l.name, color: l.color }));
+    },
     selectedProjectFieldDefs() {
       if (!this.projectId || !this.projects) return [];
       const p = this.projects.find(x => x.id === this.projectId);
@@ -393,6 +402,18 @@ const NewIssueModalComponent = {
                 class="w-full px-2 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600"
               />
             </div>
+          </div>
+
+          <!-- Labels (multi-select from the project label collection) -->
+          <div class="space-y-1" v-if="labelOptions.length > 0">
+            <label class="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Labels</label>
+            <multiselect
+              v-model="selectedLabels"
+              :options="labelOptions"
+              placeholder="No labels selected"
+              search-placeholder="Filter labels..."
+              :max-display="6"
+            ></multiselect>
           </div>
 
           <!-- Subtasks Checklist -->

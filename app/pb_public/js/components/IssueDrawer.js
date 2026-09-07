@@ -71,6 +71,15 @@ const IssueDrawerComponent = {
         minWidth: '380px'
       };
     },
+    // Label quick-pick options: project-scoped definitions from the labels
+    // collection, excluding already-applied labels, name-sorted.
+    labelQuickPicks() {
+      const pid = this.issue && this.issue.project;
+      const applied = this.editLabels || [];
+      return (this.labels || [])
+        .filter(l => (!pid || !l.project || l.project === pid) && !applied.includes(l.name))
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    },
     subtaskStats() {
       if (!this.subtasks || this.subtasks.length === 0) return { total: 0, completed: 0, percent: 0 };
       const completed = this.subtasks.filter(s => s.done).length;
@@ -512,6 +521,17 @@ const IssueDrawerComponent = {
       this.editLabels = this.editLabels.filter(l => l !== lbl);
       this.saveChanges();
     },
+    // Stable deterministic fallback color for labels with no definition (hash of the name).
+    fallbackLabelColor(name) {
+      let h = 0;
+      for (let i = 0; i < (name || '').length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+      const hues = [212, 262, 292, 340, 12, 32, 145, 172];
+      return 'hsl(' + hues[h % hues.length] + ', 62%, 55%)';
+    },
+    labelColor(name) {
+      const def = (this.labels || []).find(l => l.name === name);
+      return (def && def.color) || this.fallbackLabelColor(name);
+    },
     toolColor(name) {
       if (!name) return 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300';
       if (name.includes('edit') || name.includes('write') || name.includes('patch')) {
@@ -840,7 +860,8 @@ const IssueDrawerComponent = {
               <span
                 v-for="lbl in editLabels"
                 :key="lbl"
-                class="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700/60 text-xs font-medium flex items-center space-x-1"
+                class="px-2 py-0.5 rounded-md border text-xs font-medium flex items-center space-x-1"
+                :style="{ backgroundColor: labelColor(lbl) + '26', borderColor: labelColor(lbl) + '59', color: labelColor(lbl) }"
               >
                 <span>{{ lbl }}</span>
                 <button @click="removeLabel(lbl)" class="hover:text-red-500 ml-1">×</button>
@@ -851,6 +872,18 @@ const IssueDrawerComponent = {
                 placeholder="+ Add label (press Enter)"
                 class="px-2 py-0.5 text-xs rounded-md bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 focus:outline-none focus:border-zinc-400"
               />
+            </div>
+            <!-- Quick-pick from the project's label collection -->
+            <div v-if="labelQuickPicks.length > 0" class="flex flex-wrap items-center gap-1 pt-0.5">
+              <span class="text-[9px] text-zinc-400 uppercase tracking-wider font-semibold">Add:</span>
+              <button
+                v-for="l in labelQuickPicks"
+                :key="l.id"
+                @click="addLabel(l.name)"
+                class="px-1.5 py-0.5 rounded border text-[10px] font-medium transition-colors hover:brightness-110"
+                :style="{ borderColor: l.color + '59', color: l.color, backgroundColor: l.color + '14' }"
+                :title="'Add label ' + l.name"
+              >{{ l.name }}</button>
             </div>
           </div>
 

@@ -2,8 +2,8 @@
 // Minimalist, high-density List View supporting Dark and Light themes with subtle, low-contrast accents.
 
 const ListViewComponent = {
-  props: ['issues', 'projects', 'currentProject', 'cycles', 'labels', 'filterQuery', 'filterPriority', 'filterCycle', 'selectedIssueIds', 'agents'],
-  emits: ['open-issue', 'update-issue', 'delete-issue', 'open-new-issue', 'toggle-issue-selection', 'range-select-issue', 'select-all-visible'],
+  props: ['issues', 'projects', 'currentProject', 'cycles', 'labels', 'filterQuery', 'filterPriority', 'filterCycle', 'filterLabel', 'selectedIssueIds', 'agents'],
+  emits: ['open-issue', 'update-issue', 'delete-issue', 'open-new-issue', 'toggle-issue-selection', 'range-select-issue', 'select-all-visible', 'update:filterLabel'],
   data() {
     return {
       sortBy: 'created',
@@ -24,6 +24,7 @@ const ListViewComponent = {
         if (this.filterPriority && issue.priority !== this.filterPriority) return false;
         if (this.filterCycle && issue.cycle !== this.filterCycle) return false;
         if (this.agentFilter && !(issue.assignee || '').toLowerCase().includes(this.agentFilter.toLowerCase())) return false;
+        if (this.filterLabel && !(issue.labels || []).includes(this.filterLabel)) return false;
         return true;
       });
 
@@ -43,6 +44,31 @@ const ListViewComponent = {
     }
   },
   methods: {
+    // Project-scoped label definitions from the labels collection, sorted by name.
+    knownLabels() {
+      const defs = (this.labels || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      if (this.currentProject) {
+        return defs.filter(l => !l.project || l.project === this.currentProject.id);
+      }
+      return defs;
+    },
+    // In-use label names across visible issues (fallback when no labels are defined yet).
+    usedLabels() {
+      const counts = {};
+      (this.issues || []).forEach(i => (i.labels || []).forEach(l => { counts[l] = (counts[l] || 0) + 1; }));
+      return Object.keys(counts).sort((a, b) => a.localeCompare(b));
+    },
+    // Stable deterministic fallback color for labels with no definition (hash of the name).
+    fallbackLabelColor(name) {
+      let h = 0;
+      for (let i = 0; i < (name || '').length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+      const hues = [212, 262, 292, 340, 12, 32, 145, 172];
+      return 'hsl(' + hues[h % hues.length] + ', 62%, 55%)';
+    },
+    labelColor(name) {
+      const def = (this.labels || []).find(l => l.name === name);
+      return (def && def.color) || this.fallbackLabelColor(name);
+    },
     statusRank(status) {
       const order = ['backlog', 'todo', 'in_progress', 'in_review', 'done', 'cancelled'];
       const idx = order.indexOf(status || 'backlog');
@@ -173,6 +199,16 @@ const ListViewComponent = {
 
           <div class="flex items-center space-x-2">
             <select
+              v-if="knownLabels().length > 0 || usedLabels().length > 0"
+              :value="filterLabel"
+              @change="$emit('update:filterLabel', $event.target.value)"
+              class="px-2.5 py-1 rounded-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 max-w-[150px]"
+            >
+              <option value="">All Labels</option>
+              <option v-for="l in knownLabels()" :key="'def-' + l.id" :value="l.name">{{ l.name }}</option>
+              <option v-for="l in usedLabels().filter(n => !knownLabels().some(d => d.name === n))" :key="'use-' + l" :value="l">{{ l }}</option>
+            </select>
+            <select
               v-if="agents && agents.length > 0"
               v-model="agentFilter"
               class="px-2.5 py-1 rounded-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 max-w-[150px]"
@@ -300,6 +336,15 @@ const ListViewComponent = {
                       <span>{{ issue.pr_url ? '🔀' : '🌿' }}</span>
                       <span class="truncate max-w-[80px]">{{ issue.pr_status || (issue.git_branch ? issue.git_branch.split('/')[issue.git_branch.split('/').length - 1] : '') }}</span>
                     </span>
+
+                    <!-- Label chips -->
+                    <span
+                      v-for="lbl in (issue.labels || []).slice(0, 3)"
+                      :key="lbl"
+                      class="px-1.5 py-0.5 rounded text-[9px] truncate max-w-[70px] border shrink-0"
+                      :style="{ backgroundColor: labelColor(lbl) + '26', borderColor: labelColor(lbl) + '59', color: labelColor(lbl) }"
+                      :title="lbl"
+                    >{{ lbl }}</span>
 
                     <!-- Subtask count badge -->
                     <span v-if="issue.subtasks && issue.subtasks.length > 0" class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/60 text-[10px] text-zinc-500 font-mono shrink-0">
