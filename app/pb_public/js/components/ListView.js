@@ -213,6 +213,7 @@ const ListViewComponent = {
               v-if="knownLabels().length > 0 || usedLabels().length > 0"
               :value="filterLabel"
               @change="$emit('update:filterLabel', $event.target.value)"
+              aria-label="Filter by label"
               class="px-2.5 py-1 rounded-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 max-w-[150px]"
             >
               <option value="">All Labels</option>
@@ -222,6 +223,7 @@ const ListViewComponent = {
             <select
               v-if="agents && agents.length > 0"
               v-model="agentFilter"
+              aria-label="Filter by agent"
               class="px-2.5 py-1 rounded-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 max-w-[150px]"
             >
               <option value="">All Agents</option>

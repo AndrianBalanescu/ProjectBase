@@ -111,17 +111,17 @@ const ExportModalComponent = {
             <button
               @click="format='csv'"
               class="px-3 py-1 rounded-md text-xs font-medium transition-colors"
-              :class="format==='csv' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+              :class="format==='csv' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200'"
             >CSV</button>
             <button
               @click="format='json'"
               class="px-3 py-1 rounded-md text-xs font-medium transition-colors"
-              :class="format==='json' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+              :class="format==='json' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200'"
             >JSON</button>
             <button
               @click="format='ics'"
               class="px-3 py-1 rounded-md text-xs font-medium transition-colors"
-              :class="format==='ics' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+              :class="format==='ics' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200'"
             >ICS</button>
           </div>
 

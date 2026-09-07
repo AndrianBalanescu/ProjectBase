@@ -89,7 +89,7 @@ const WelcomeModalComponent = {
 
         <!-- Footer -->
         <div class="flex items-center justify-between pt-1 border-t border-zinc-200 dark:border-zinc-800">
-          <button type="button" @click="$emit('close')" class="text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200">Skip for now</button>
+          <button type="button" @click="$emit('close')" class="text-xs text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200">Skip for now</button>
           <button type="button" @click="$emit('close')" class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 text-xs font-medium shadow-2xs transition-colors cursor-pointer">Get started</button>
         </div>
       </div>

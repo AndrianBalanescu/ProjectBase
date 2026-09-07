@@ -896,17 +896,17 @@ const IssueDrawerComponent = {
                   <button
                     @click="descTab = 'rich'"
                     class="px-2 py-0.5 rounded transition-colors"
-                    :class="descTab === 'rich' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                    :class="descTab === 'rich' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium shadow-2xs' : 'text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200'"
                   >WYSIWYG</button>
                   <button
                     @click="descTab = 'raw'"
                     class="px-2 py-0.5 rounded transition-colors"
-                    :class="descTab === 'raw' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                    :class="descTab === 'raw' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium shadow-2xs' : 'text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200'"
                   >Markdown</button>
                   <button
                     @click="descTab = 'preview'"
                     class="px-2 py-0.5 rounded transition-colors"
-                    :class="descTab === 'preview' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                    :class="descTab === 'preview' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium shadow-2xs' : 'text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200'"
                   >Preview</button>
                 </div>
               </div>
@@ -1167,7 +1167,7 @@ const IssueDrawerComponent = {
                 <span v-if="copiedGitBadge" class="text-[10px] text-emerald-500 font-mono">Copied checkout!</span>
                 <button
                   @click="gitModalOpen = !gitModalOpen"
-                  class="text-[11px] text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 flex items-center gap-1"
+                  class="text-[11px] text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200 flex items-center gap-1"
                   title="Link branch, PR, or commit"
                 >
                   <span>+ Link Code</span>

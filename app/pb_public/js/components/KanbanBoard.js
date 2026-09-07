@@ -384,6 +384,8 @@ const KanbanBoardComponent = {
             <i data-lucide="search" class="w-3.5 h-3.5 text-zinc-400 absolute left-2 top-2 pointer-events-none z-10"></i>
             <input
               v-model="searchModel"
+              type="search"
+              aria-label="Filter tasks"
               placeholder="Filter tasks..."
               class="pl-7 pr-2.5 py-1 rounded-md bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600 w-44 sm:w-56 relative z-20"
             />
@@ -394,21 +396,21 @@ const KanbanBoardComponent = {
             <button
               @click="boardMode = 'all'"
               class="px-2 py-0.5 rounded-md font-medium transition-colors"
-              :class="boardMode === 'all' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs font-semibold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+              :class="boardMode === 'all' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs font-semibold' : 'text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200'"
             >
               All ({{ (issues || []).length + totalSessionsCount }})
             </button>
             <button
               @click="boardMode = 'issues'"
               class="px-2 py-0.5 rounded-md font-medium transition-colors"
-              :class="boardMode === 'issues' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs font-semibold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+              :class="boardMode === 'issues' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs font-semibold' : 'text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200'"
             >
               📋 Tasks ({{ (issues || []).length }})
             </button>
             <button
               @click="boardMode = 'sessions'"
               class="px-2 py-0.5 rounded-md font-medium transition-colors flex items-center gap-1"
-              :class="boardMode === 'sessions' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs font-semibold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+              :class="boardMode === 'sessions' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs font-semibold' : 'text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200'"
             >
               <span>🤖 Agent Sessions</span>
               <span v-if="liveSessionsCount > 0" class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -419,6 +421,7 @@ const KanbanBoardComponent = {
           <!-- Priority Filter -->
           <select
             v-model="priorityModel"
+            aria-label="Filter by priority"
             class="px-2 py-1 rounded-md bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600"
           >
             <option value="">All Priorities</option>
@@ -566,7 +569,7 @@ const KanbanBoardComponent = {
             <div class="flex items-center justify-end space-x-1.5 mt-1.5">
               <button
                 @click="cancelQuickAdd"
-                class="px-2 py-0.5 text-[11px] text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 rounded"
+                class="px-2 py-0.5 text-[11px] text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200 rounded"
               >Cancel</button>
               <button
                 @click="submitQuickAdd(col.key)"

@@ -312,10 +312,10 @@ const ImportModalComponent = {
         <div class="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
           <!-- Source Mode Tabs -->
           <div class="flex items-center space-x-1 p-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-fit">
-            <button @click="mode='csv'" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors" :class="mode==='csv' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'">CSV</button>
-            <button @click="mode='github'" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors" :class="mode==='github' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'">GitHub</button>
-            <button @click="mode='linear'" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors" :class="mode==='linear' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'">Linear</button>
-            <button @click="mode='plane'" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors" :class="mode==='plane' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'">Plane</button>
+            <button @click="mode='csv'" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors" :class="mode==='csv' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200'">CSV</button>
+            <button @click="mode='github'" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors" :class="mode==='github' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200'">GitHub</button>
+            <button @click="mode='linear'" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors" :class="mode==='linear' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200'">Linear</button>
+            <button @click="mode='plane'" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors" :class="mode==='plane' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200'">Plane</button>
           </div>
 
           <!-- Target Project -->
@@ -417,8 +417,8 @@ const ImportModalComponent = {
           <!-- CSV Import Fields -->
           <template v-if="mode==='csv'">
             <div class="flex items-center space-x-1 p-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-fit">
-              <button @click="inputType='paste'" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors" :class="inputType==='paste' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'">Paste CSV</button>
-              <button @click="inputType='upload'" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors" :class="inputType==='upload' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'">Upload file</button>
+              <button @click="inputType='paste'" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors" :class="inputType==='paste' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200'">Paste CSV</button>
+              <button @click="inputType='upload'" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors" :class="inputType==='upload' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200'">Upload file</button>
             </div>
 
             <textarea

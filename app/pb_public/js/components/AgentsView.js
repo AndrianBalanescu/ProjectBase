@@ -460,28 +460,28 @@ const AgentsViewComponent = {
               <button
                 @click="activeTab = 'chat'"
                 class="px-2 py-0.5 rounded-md font-medium transition-colors"
-                :class="activeTab === 'chat' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs font-semibold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                :class="activeTab === 'chat' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs font-semibold' : 'text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200'"
               >
                 💬 Stream
               </button>
               <button
                 @click="activeTab = 'terminal'"
                 class="px-2 py-0.5 rounded-md font-medium transition-colors"
-                :class="activeTab === 'terminal' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs font-semibold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                :class="activeTab === 'terminal' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs font-semibold' : 'text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200'"
               >
                 💻 Logs / Output
               </button>
               <button
                 @click="activeTab = 'diff'"
                 class="px-2 py-0.5 rounded-md font-medium transition-colors"
-                :class="activeTab === 'diff' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs font-semibold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                :class="activeTab === 'diff' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs font-semibold' : 'text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200'"
               >
                 🌿 Git Diff
               </button>
               <button
                 @click="activeTab = 'runs'"
                 class="px-2 py-0.5 rounded-md font-medium transition-colors"
-                :class="activeTab === 'runs' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs font-semibold' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+                :class="activeTab === 'runs' ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs font-semibold' : 'text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-200'"
               >
                 📊 Telemetry
               </button>
