@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.41.1] - 2026-09-07 - Cycle 92
+### Fixed
+- **reset-demo.sh wiped the wrong directory (P1):** the demo-reset script deleted `$(pwd)/pb_data` while docker-compose.yml binds `./app/pb_data`, so "reset" was a silent no-op: demo data accumulated across resets and a stray root-owned `pb_data/` appeared at the repo root. Wipe path now matches the bind mount; proven with a canary record that survived before the fix and is gone after it.
+- **verify_export_modal.js stale selector:** the suite looked for a header-level Export button that moved behind the "More actions" kebab menu during the header cleanup, silently falling back to the `E` shortcut and reporting `exportHeaderButton: false`. It now opens the dropdown and clicks "Export Issues" through the real UI.
+- **a11y (iBrowse cycle-92 audit):** filter input and label/agent/priority selects now carry `aria-label`s; inactive tab/board-mode buttons raised from `text-zinc-500` (3.67:1) to `text-zinc-600` (≥4.5:1 WCAG AA) across 8 components.
+
+### Verified (deploy-script validation matrix, no code change required)
+- `backup.sh` (online snapshot + download + prune) and `restore.sh` (online native restore and offline extract with rollback) both proven end-to-end on a scratch instance with a canary record.
+- `deploy-demo.sh` full compose deploy + health/seed verification; `install-systemd.sh --print-unit/--dry-run` render correct paths; all Makefile targets reference real files.
+
 ## [1.41.0] - 2026-09-07 - Cycle 91
 ### Removed (de-bloat, roadmap Phase 1)
 - **Synthetic ballast engines stripped (hooks 112-123, 12 files, ~11.5k lines):** fleet budget/USD billing calculator, agent eval leaderboard/benchmarks, ephemeral sandbox orchestrator, incident war-room (5-whys), knowledge-graph engine, code-review swarm, release flight control, AST security sentinel scanner, TDD/mutation matrix, time-travel debugger, architecture blast-radius, profiler/flamegraph. These were synthetic mock endpoints violating the product boundary ("no fake cloud billing, no AST security red-team scanners, no incident war rooms, no benchmark leaderboards"). Real engines kept: auto-heal pipeline (105), SSO/RBAC (102, incl. `security_audit_logs`), semantic brain (106), session ingestion (107), auto-scaling (97), consensus gates (101).

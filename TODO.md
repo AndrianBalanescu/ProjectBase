@@ -1,5 +1,19 @@
 # TODO — ProjectBase
 
+## Cycle 92 (build/validation)
+
+- [x] **Deploy-script validation matrix completed (PB-10551, commits ee7f58c + 1140382).** Closed the surfaces cycle 91 left unvalidated:
+  - **backup.sh PASS** (scratch :8125): superuser auth -> snapshot -> download -> unzip -t verify -> prune; 276K archive with data.db/auxiliary.db/storage.
+  - **restore.sh PASS both modes**: online native restore (app restarted healthy, probe record survived) + offline extract with rollback copy (probe survived on fresh boot).
+  - **deploy-demo.sh PASS** (scratch compose on :8127): full deploy, health + seed verification.
+  - **reset-demo.sh FAIL -> FIXED (P1)**: wiped `$(pwd)/pb_data` while docker-compose.yml binds `./app/pb_data` — the wipe was a silent no-op (canary record survived "reset", 6->7 project accumulation, stray root-owned dir). Proven by canary test pre/post fix; fixed path + docs.
+  - **install-systemd.sh PASS**: --print-unit and --dry-run render correct paths/port/hardening; live unit consistent (uses direct ExecStart + PB_MCP_TEST_BYPASS env, template unchanged).
+  - **Makefile PASS**: all 7 targets reference real files; start.sh + serve-firstboot.sh exist.
+  - **3 QA suites now green**: welcome modal (all true, 0 errors), export modal (FIXED stale selector: Export lives behind header kebab menu since header cleanup — suite now opens dropdown and clicks "Export Issues" for real), ICS export (7 events, valid calendar, download fired).
+  - **flomaster engine bug filed upstream** (flomaxer/flomaster#9): supervisor.inspect_verdict stale-artifact corroboration + log-token false positives (TODO line 64).
+  - **iBrowse audit follow-up (1140382)**: a11y labels for filter input/selects, inactive-tab contrast 3.67:1 -> 4.5+ (zinc-500 -> zinc-600, 8 components); "occluded" nav criticals disproven by real click probe (Stats renders, Agents navigates, 0 page errors). Known advisory (not fixed, cosmetic): 2 critical CSP/Permissions-Policy header recommendations, 2 small 14px icon buttons, Stripe-secret localStorage finding is a false positive (project data cache string matching a secret-shape heuristic, no keys shipped).
+  - **Verification:** full pytest **531 passed / 0 failed** (267s, re-run post-a11y); frontend_guard ALL VERIFIED; iBrowse PASS (0 console errors, 0 network failures across 56 requests, mustache clean, nav click-tested).
+
 ## Cycle 91 (build/de-bloat)
 
 - [x] **Roadmap Phase 1 "Clean Ballast Hooks" shipped (v1.41.0, PR #32 merged, squash 2d98052).** Removed the synthetic engine wave violating product boundaries: 12 hooks (112-123, ~11.5k lines — fake USD billing, eval leaderboards, sandbox orchestrator, incident war-rooms, knowledge-graph, code-review swarm, release flight control, AST security sentinel, TDD/mutation, time-travel debugger, blast-radius, profiler/flamegraph), 92 synthetic MCP tools (233 -> 137 incl. compact one-line list_projects entry, schema/dispatch 3-way verified), 350 dead browser api.js methods (4,044 -> 392 lines), 138 OpenAPI paths (340 -> 202), 12 migrations, 12 test files, 5 dead QA scripts. Real engines kept: auto-heal, SSO/RBAC, semantic brain, session ingestion, autoscale, consensus gates. Version bumped 1.40.0 -> 1.41.0 across VERSION, health/version routes, openapi, header badge; CHANGELOG entry; AGENTS.md hooks map/data-model/test-counts synced (494 across 39).

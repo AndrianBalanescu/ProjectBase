@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "ProjectBase API",
-    "version": "1.41.0",
+    "version": "1.41.1",
     "description": "High-performance, ultra-lightweight Plane & Linear alternative for multi-project Kanban, sprint cycles, and autonomous AI agent orchestration.",
     "contact": {
       "name": "Andrian Balanescu",
@@ -826,7 +826,7 @@
                   "properties": {
                     "version": {
                       "type": "string",
-                      "example": "1.41.0"
+                      "example": "1.41.1"
                     },
                     "service": {
                       "type": "string",
