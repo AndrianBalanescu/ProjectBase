@@ -17,6 +17,45 @@
 
 Free and open source.
 
+## 🚀 Quick Start
+
+**Run the binary directly** (Linux/macOS, no dependencies):
+
+```bash
+git clone https://github.com/AndrianBalanescu/ProjectBase
+cd ProjectBase
+./scripts/install.sh                      # downloads the PocketBase 0.39.11 binary
+ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='use-a-long-random-password' ./scripts/bootstrap.sh
+# → http://localhost:8120
+```
+
+**Or with Docker:**
+
+```bash
+docker compose up -d                      # builds the image, serves on :8120
+# data persists in ./app/pb_data
+```
+
+**Or with Docker + automatic HTTPS** (for a public demo domain):
+
+```bash
+./scripts/deploy-demo.sh --domain demo.example.com --email you@example.com --password 'use-a-long-random-password'
+```
+
+Then sign in at `http://localhost:8120` with the credentials you set. For the
+AI-agent surface, point any MCP client at `scripts/mcp_server.py` (FastMCP:
+`list_projects`, `create_issue`, `move_issue`, `add_comment`, ...).
+
+## 🛠️ Make targets & tests
+
+| Command | What it does |
+|---|---|
+| `make start` | Run the server locally on :8120 |
+| `make test` | Full pytest suite (unit + static drift guards) |
+| `make docker-build` / `make docker-up` | Build and run the container stack |
+| `./scripts/build_css.sh` | Recompile Tailwind CSS after editing templates |
+| `python3 scripts/bench/bench.py` | Reproducible cold-start / RAM / query benchmark |
+
 ## 🐣 First Boot (fresh deployments)
 
 On a brand-new data directory, the container/systemd entrypoint applies the
