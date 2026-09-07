@@ -21,7 +21,8 @@ manually, but the CI safety net is down until the account billing is fixed.
 invoice or raise the limit) so Actions runners start again. This requires a
 real payment on the human's account — not delegated to an agent.
 
-> **Cycle 83 (2026-09-07): still active.** Every CI run on ProjectBase since
-> cycle 35 fails in <10s with the same annotation (jobs never start). Local
-> gates (pytest 624 passed on merged main, real-browser QA, iBrowse audit)
-> remain the effective verification path; PRs #27/#28/#29 were merged manually.
+> **Cycle 89 (2026-09-07): still active.** Confirmed again on release commit
+> 3aa0c7d (v1.40.0 saved-views release): both jobs fail in <10s with the same
+> billing annotation. Local gates remain the CI (pytest 656/1→fixed to 656/0
+> after AGENTS.md version drift fix; frontend_guard ALL VERIFIED; iBrowse QA
+> on the live instance). Merging still works manually.
