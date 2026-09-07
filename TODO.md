@@ -2,7 +2,7 @@
 
 ## Cycle 92 (build/validation)
 
-- [x] **Deploy-script validation matrix completed (PB-10551, commits ee7f58c + 1140382).** Closed the surfaces cycle 91 left unvalidated:
+- [x] **Deploy-script validation matrix completed (PB-10551, commits ee7f58c, 1140382, be04a5c, 014a659).** Closed the surfaces cycle 91 left unvalidated:
   - **backup.sh PASS** (scratch :8125): superuser auth -> snapshot -> download -> unzip -t verify -> prune; 276K archive with data.db/auxiliary.db/storage.
   - **restore.sh PASS both modes**: online native restore (app restarted healthy, probe record survived) + offline extract with rollback copy (probe survived on fresh boot).
   - **deploy-demo.sh PASS** (scratch compose on :8127): full deploy, health + seed verification.
@@ -12,7 +12,7 @@
   - **3 QA suites now green**: welcome modal (all true, 0 errors), export modal (FIXED stale selector: Export lives behind header kebab menu since header cleanup — suite now opens dropdown and clicks "Export Issues" for real), ICS export (7 events, valid calendar, download fired).
   - **flomaster engine bug filed upstream** (flomaxer/flomaster#9): supervisor.inspect_verdict stale-artifact corroboration + log-token false positives (TODO line 64).
   - **iBrowse audit follow-up (1140382)**: a11y labels for filter input/selects, inactive-tab contrast 3.67:1 -> 4.5+ (zinc-500 -> zinc-600, 8 components); "occluded" nav criticals disproven by real click probe (Stats renders, Agents navigates, 0 page errors). Known advisory (not fixed, cosmetic): 2 critical CSP/Permissions-Policy header recommendations, 2 small 14px icon buttons, Stripe-secret localStorage finding is a false positive (project data cache string matching a secret-shape heuristic, no keys shipped).
-  - **Verification:** full pytest **531 passed / 0 failed** (267s, re-run post-a11y); frontend_guard ALL VERIFIED; iBrowse PASS (0 console errors, 0 network failures across 56 requests, mustache clean, nav click-tested).
+  - **Verification:** full pytest **531 passed / 0 failed** (267s post-a11y run + final clean re-run after AGENTS.md version-claim sync; first re-run had 1 transient URL-error batch on live-instance tests + the AGENTS.md drift caught by the guard, both resolved); frontend_guard ALL VERIFIED; iBrowse PASS (0 console errors, 0 network failures across 56 requests, mustache clean, nav click-tested).
 
 ## Cycle 91 (build/de-bloat)
 
