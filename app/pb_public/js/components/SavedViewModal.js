@@ -98,7 +98,7 @@ const SavedViewModalComponent = {
           <button
             @click="submit"
             class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-colors"
-          >Save View</button>
+          >Save this view</button>
         </div>
       </div>
     </div>

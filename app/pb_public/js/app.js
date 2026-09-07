@@ -478,7 +478,16 @@ const App = {
         ]);
 
         this.projects = projs;
-        this.issues = iss;
+        // Normalize labels at the data source: legacy rows may carry labels as a
+        // JSON string, which crashes label iteration downstream (ListView/Kanban
+        // usedLabels, includes filters). Parse once here, never per component.
+        this.issues = (iss || []).map(i => {
+          if (typeof i.labels === 'string') {
+            try { i.labels = JSON.parse(i.labels); } catch (e) { i.labels = []; }
+            if (!Array.isArray(i.labels)) i.labels = [];
+          }
+          return i;
+        });
         this.cycles = cycs;
         this.milestones = mls;
         this.labels = lbls;
