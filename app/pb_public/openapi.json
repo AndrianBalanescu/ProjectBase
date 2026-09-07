@@ -14020,6 +14020,37 @@
           }
         }
       }
+    },
+    "/projectbase/export/ics": {
+      "get": {
+        "tags": [
+          "Export"
+        ],
+        "summary": "Export Calendar (ICS)",
+        "description": "Subscribe a project's calendar from Google Calendar, Apple Calendar, or Thunderbird. Returns an RFC 5545 text/calendar document with one VEVENT per dated item: issues with a due_date (all-day), cycles spanning start_date..end_date, and milestones with a target_date (all-day). UIDs are stable so calendar clients dedupe across refreshes.",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "required": "True",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Project record id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK \u2014 text/calendar attachment"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
     }
   }
 }

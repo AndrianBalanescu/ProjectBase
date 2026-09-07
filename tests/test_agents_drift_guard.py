@@ -106,6 +106,24 @@ class TestAgentsMapMatchesTree(unittest.TestCase):
                 f"AGENTS.md tests/ map is missing {fname}; add it so agents see the suite",
             )
 
+    def test_agents_version_matches_version_file(self):
+        """The 'Live app ... (vX.Y.Z)' claim equals the VERSION file.
+
+        Regression (cycle-81 inspect P2): AGENTS.md said v1.38.0 while VERSION
+        was 1.39.0 and the live instance served 1.39.0 code — the version
+        string had no guard, so it silently rotted while releases shipped.
+        """
+        with open(os.path.join(ROOT, "VERSION"), "r", encoding="utf-8") as fh:
+            version = fh.read().strip()
+        m = re.search(r"Live app: `http://[^`]+` \(v([^)]+)\)", AGENTS)
+        self.assertIsNotNone(m, "AGENTS.md missing 'Live app: ... (vX.Y.Z)' claim")
+        self.assertEqual(
+            m.group(1),
+            version,
+            f"AGENTS.md says v{m.group(1)} but VERSION is {version}; "
+            "update AGENTS.md's Live app line on release",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

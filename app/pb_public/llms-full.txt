@@ -96,6 +96,14 @@ curl -s http://localhost:8120/api/projectbase/search \
 # Returns { query, count, results:[{ id, identifier, title, status, priority,
 #   project_id, project_name, project_identifier, project_color }] }.
 
+### Calendar feed (RFC 5545 ICS, auth-gated):
+# One VEVENT per issue due_date, cycle start_date..end_date, and milestone
+# target_date. Stable UIDs (<kind>-<record_id>@projectbase) so calendar
+# clients dedupe across refreshes. Subscribe from Google/Apple/Thunderbird:
+curl -s "http://localhost:8120/api/projectbase/export/ics?project=<PROJECT_ID>" \
+  -H "Authorization: <POCKETBASE_TOKEN>"
+# Returns text/calendar with BEGIN:VCALENDAR / VEVENT blocks (CRLF line endings).
+
 ### Notification Channel Settings (admin/manager only, runtime-editable):
 # Read current Discord/Telegram/generic-webhook config (DB first, env fallback):
 curl -s http://localhost:8120/api/projectbase/notification-settings \

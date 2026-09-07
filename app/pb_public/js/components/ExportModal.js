@@ -1,5 +1,7 @@
 // pb_public/js/components/ExportModal.js
 // Minimalist Flat-file exporter modal supporting Dark and Light themes.
+// Formats: CSV | JSON | ICS (cycle 81, PB-10533) — ICS is an RFC 5545
+// calendar feed (issues due dates, cycles, milestones) for calendar clients.
 
 const ExportModalComponent = {
   props: ['isOpen', 'projects', 'currentProject'],
@@ -7,7 +9,7 @@ const ExportModalComponent = {
   data() {
     return {
       projectId: '',
-      format: 'csv', // 'csv' | 'json'
+      format: 'csv', // 'csv' | 'json' | 'ics'
       exporting: false,
       error: '',
       result: null
@@ -60,17 +62,22 @@ const ExportModalComponent = {
         const proj = this.selectedProject || {};
         const base = (proj.name || 'project').replace(/[^\w\-]+/g, '_');
         const isJson = this.format === 'json';
-        const blob = isJson ? new Blob([text], { type: 'application/json' }) : new Blob([text], { type: 'text/csv' });
+        const isIcs = this.format === 'ics';
+        const mime = isJson ? 'application/json' : (isIcs ? 'text/calendar' : 'text/csv');
+        const ext = isJson ? 'json' : (isIcs ? 'ics' : 'csv');
+        const blob = new Blob([text], { type: mime });
         const dlUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = dlUrl;
-        a.download = base + '-issues.' + (isJson ? 'json' : 'csv');
+        a.download = base + (isIcs ? '-calendar.' : '-issues.') + ext;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(dlUrl);
-        const rows = isJson ? null : (text.trim() ? text.trim().split('\n').length - 1 : 0);
-        this.result = { count: isJson ? null : rows, format: this.format, project: proj.name || '' };
+        const rows = isJson ? null : (isIcs
+          ? (text.match(/BEGIN:VEVENT/g) || []).length
+          : (text.trim() ? text.trim().split('\n').length - 1 : 0));
+        this.result = { count: rows, format: this.format, project: proj.name || '' };
         this.$emit('exported', this.result);
       } catch (err) {
         this.error = 'Export failed: ' + String((err && err.message) || err);
@@ -111,6 +118,11 @@ const ExportModalComponent = {
               class="px-3 py-1 rounded-md text-xs font-medium transition-colors"
               :class="format==='json' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
             >JSON</button>
+            <button
+              @click="format='ics'"
+              class="px-3 py-1 rounded-md text-xs font-medium transition-colors"
+              :class="format==='ics' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'"
+            >ICS</button>
           </div>
 
           <!-- Source Project -->
@@ -130,13 +142,16 @@ const ExportModalComponent = {
           </div>
           <div v-if="result" class="px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-300 text-xs">
             Exported {{ result.format.toUpperCase() }} for <strong>{{ result.project }}</strong>.
-            <template v-if="result.count !== null">{{ result.count }} row(s) included.</template>
+            <template v-if="result.count !== null">{{ result.format === 'ics' ? result.count + ' event(s) included.' : result.count + ' row(s) included.' }}</template>
           </div>
 
           <p class="text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
             Exports mirror the importer columns (title, description, status, priority,
             assignee, dates, estimate, labels, source_key) plus custom fields, so a
             downloaded file can be re-imported into ProjectBase or another tool.
+            ICS is an RFC 5545 calendar feed (issue due dates, cycles, milestones)
+            you can import or subscribe to from Google Calendar, Apple Calendar,
+            or Thunderbird.
           </p>
         </div>
 
