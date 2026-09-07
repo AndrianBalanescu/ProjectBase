@@ -246,6 +246,10 @@ const API = {
     return await pb.collection('saved_views').create(data);
   },
 
+  async updateSavedView(id, data) {
+    return await pb.collection('saved_views').update(id, data);
+  },
+
   async deleteSavedView(id) {
     return await pb.collection('saved_views').delete(id);
   },
