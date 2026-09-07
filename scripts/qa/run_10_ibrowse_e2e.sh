@@ -29,7 +29,7 @@ declare -a GOALS=(
   "$LOGIN Switch to the Docs view. Verify the Scalar API documentation UI renders and the OpenAPI specification loads properly. Report if the interactive API docs are functional."
   "$LOGIN Switch to the Milestones view. Verify the roadmap milestones list renders with target dates, progress bars, and linked issues. Report the milestones shown."
   "$LOGIN On the Kanban board, click on any visible issue card to open the Issue Drawer. Verify the slide-out drawer displays title, description, status dropdown, priority dropdown, assignee, and comments section. Report drawer contents."
-  "$LOGIN Click the '+ New Issue' button in the top bar. Verify the creation modal opens with inputs for Title, Description, Priority, Assignee, and Project selector. Do NOT submit. Close or dismiss the modal. Report form fields."
+  "$LOGIN Click the '+ New Issue' button in the top bar. Verify the creation modal opens with inputs for Title, Description, Priority, Assignee, and Project selector. If a 'Labels' multi-select is visible, click it, confirm the label options (feature, bug, core, realtime, agent) with colored dots render, select one, and confirm the selected chip shows inside the field. Do NOT submit. Close or dismiss the modal. Report form fields and any errors."
   "$LOGIN Inspect the top header bar: verify brand logo/name, project selector dropdown, search bar, all view buttons (Board, List, Cycles, Projects, Stats, Docs, Milestones), and user avatar are visible. Press Ctrl+K (or Cmd+K) to open the Command Palette. Report findings."
 )
 

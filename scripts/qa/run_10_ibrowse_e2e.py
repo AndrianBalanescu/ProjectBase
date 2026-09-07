@@ -59,7 +59,7 @@ TESTS = [
     {
         "id": 9,
         "name": "09_new_issue_modal",
-        "goal": f"{LOGIN} Click the '+ New Issue' button in the top bar. Verify the creation modal opens with inputs for Title, Description, Priority, Assignee, and Project selector. Do NOT submit. Close or dismiss the modal. Report form fields.",
+        "goal": f"{LOGIN} Click the '+ New Issue' button in the top bar. Verify the creation modal opens with inputs for Title, Description, Priority, Assignee, and Project selector. If a 'Labels' multi-select is visible, click it, confirm the label options (feature, bug, core, realtime, agent) with colored dots render, select one, and confirm the selected chip shows inside the field. Do NOT submit. Close or dismiss the modal. Report form fields and any errors.",
     },
     {
         "id": 10,
