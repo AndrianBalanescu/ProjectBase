@@ -152,10 +152,11 @@ const App = {
       isWelcomeOpen: false,
       isShortcutsOpen: false,
 
-      // Filters (URL-synced: shared as ?q=&priority=&cycle= hash params)
+      // Filters (URL-synced: shared as ?q=&priority=&cycle=&label= hash params)
       filterQuery: '',
       filterPriority: '',
       filterCycle: '',
+      filterLabel: '',
 
       // URL-synced UI state: selected cycle tab in Cycles view (?cycle=)
       // and drawer width override in px (?w=, session-only; localStorage still wins after a manual resize)
@@ -203,6 +204,7 @@ const App = {
     filterQuery() { this.syncRoute(); },
     filterPriority() { this.syncRoute(); },
     filterCycle() { this.syncRoute(); },
+    filterLabel() { this.syncRoute(); },
     selectedCycleId() { this.syncRoute(); },
     drawerWidthOverride() { this.syncRoute(); },
     currentView() { this.syncRoute(); }
@@ -682,10 +684,12 @@ const App = {
       const q = (params.get('q') || '').slice(0, 200);
       const priority = params.get('priority') || '';
       const cycle = params.get('cycle') || '';
+      const label = (params.get('label') || '').slice(0, 64);
       const validPriorities = ['urgent', 'high', 'medium', 'low', 'none'];
       this.filterQuery = q;
       this.filterPriority = validPriorities.includes(priority) ? priority : '';
       this.filterCycle = cycle;
+      this.filterLabel = label;
       this.selectedCycleId = cycle || null;
       const w = parseInt(params.get('w') || '', 10);
       // Same clamp range as the IssueDrawer drag handle (360-1280px).
@@ -780,6 +784,7 @@ const App = {
       const params = new URLSearchParams();
       if (this.filterQuery) params.set('q', this.filterQuery);
       if (this.filterPriority) params.set('priority', this.filterPriority);
+      if (this.filterLabel) params.set('label', this.filterLabel);
       // cycle= doubles as the board/list cycle filter and the Cycles view tab.
       const cycleId = this.currentView === 'cycles' ? this.selectedCycleId : this.filterCycle;
       if (cycleId) params.set('cycle', cycleId);

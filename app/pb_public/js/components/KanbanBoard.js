@@ -2,12 +2,13 @@
 // Minimalist, high-density Kanban Board supporting Dark/Light themes, dual Task & Live Agent Session cards.
 
 const KanbanBoardComponent = {
-  props: ['issues', 'projects', 'currentProject', 'cycles', 'labels', 'filterQuery', 'filterPriority', 'filterCycle', 'selectedIssueIds', 'agents', 'sessions'],
-  emits: ['open-issue', 'create-issue', 'update-issue', 'delete-issue', 'open-shortcuts-modal', 'toggle-issue-selection', 'range-select-issue', 'update:filterQuery', 'update:filterPriority', 'update:filterCycle', 'open-session', 'change-view'],
+  props: ['issues', 'projects', 'currentProject', 'cycles', 'labels', 'filterQuery', 'filterPriority', 'filterCycle', 'filterLabel', 'selectedIssueIds', 'agents', 'sessions'],
+  emits: ['open-issue', 'create-issue', 'update-issue', 'delete-issue', 'open-shortcuts-modal', 'toggle-issue-selection', 'range-select-issue', 'update:filterQuery', 'update:filterPriority', 'update:filterCycle', 'update:filterLabel', 'open-session', 'change-view'],
   data() {
     return {
       boardMode: 'all', // 'all' | 'issues' | 'sessions'
       agentFilter: '',
+      labelFilter: '',
       columns: [
         { key: 'backlog', name: 'Backlog', color: '#71717a', icon: 'circle-dot' },
         { key: 'todo', name: 'Todo', color: '#a1a1aa', icon: 'circle' },
@@ -36,12 +37,17 @@ const KanbanBoardComponent = {
       get() { return this.filterCycle; },
       set(v) { this.$emit('update:filterCycle', v); }
     },
+    labelModel: {
+      get() { return this.filterLabel; },
+      set(v) { this.$emit('update:filterLabel', v); }
+    },
     activeFilterCount() {
       let count = 0;
       if (this.filterQuery) count++;
       if (this.filterPriority) count++;
       if (this.filterCycle) count++;
       if (this.agentFilter) count++;
+      if (this.filterLabel) count++;
       return count;
     },
     filteredIssues() {
@@ -57,6 +63,7 @@ const KanbanBoardComponent = {
         if (this.filterPriority && issue.priority !== this.filterPriority) return false;
         if (this.filterCycle && issue.cycle !== this.filterCycle) return false;
         if (this.agentFilter && !(issue.assignee || '').toLowerCase().includes(this.agentFilter.toLowerCase())) return false;
+        if (this.filterLabel && !(issue.labels || []).includes(this.filterLabel)) return false;
         return true;
       });
     },
@@ -104,6 +111,32 @@ const KanbanBoardComponent = {
       this.priorityModel = '';
       this.cycleModel = '';
       this.agentFilter = '';
+      this.labelModel = '';
+    },
+    // Project-scoped label definitions from the labels collection, sorted by name.
+    knownLabels() {
+      const defs = (this.labels || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      if (this.currentProject) {
+        return defs.filter(l => !l.project || l.project === this.currentProject.id);
+      }
+      return defs;
+    },
+    // In-use label names across visible issues (fallback when no labels are defined yet).
+    usedLabels() {
+      const counts = {};
+      (this.issues || []).forEach(i => (i.labels || []).forEach(l => { counts[l] = (counts[l] || 0) + 1; }));
+      return Object.keys(counts).sort((a, b) => a.localeCompare(b));
+    },
+    // Stable deterministic fallback color for labels with no definition (hash of the name).
+    fallbackLabelColor(name) {
+      let h = 0;
+      for (let i = 0; i < (name || '').length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+      const hues = [212, 262, 292, 340, 12, 32, 145, 172];
+      return 'hsl(' + hues[h % hues.length] + ', 62%, 55%)';
+    },
+    labelColor(name) {
+      const def = (this.labels || []).find(l => l.name === name);
+      return (def && def.color) || this.fallbackLabelColor(name);
     },
     findAgent(name) {
       if (!name || !this.agents) return null;
@@ -395,6 +428,17 @@ const KanbanBoardComponent = {
             <option v-for="c in cycles" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
 
+          <!-- Label Filter -->
+          <select
+            v-if="knownLabels.length > 0 || usedLabels.length > 0"
+            v-model="labelModel"
+            class="px-2 py-1 rounded-md bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600"
+          >
+            <option value="">All Labels</option>
+            <option v-for="l in knownLabels" :key="'def-' + l.id" :value="l.name">{{ l.name }}</option>
+            <option v-for="l in usedLabels.filter(n => !knownLabels.some(d => d.name === n))" :key="'use-' + l" :value="l">{{ l }}</option>
+          </select>
+
           <!-- Clear Filters -->
           <button
             v-if="activeFilterCount > 0"
@@ -641,7 +685,9 @@ const KanbanBoardComponent = {
                   <span
                     v-for="lbl in (issue.labels || []).slice(0, 2)"
                     :key="lbl"
-                    class="px-1 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700/60 text-[9px] truncate max-w-[60px]"
+                    class="px-1 py-0.5 rounded text-[9px] truncate max-w-[60px] border"
+                    :style="{ backgroundColor: labelColor(lbl) + '26', borderColor: labelColor(lbl) + '59', color: labelColor(lbl) }"
+                    :title="lbl"
                   >{{ lbl }}</span>
                 </div>
 

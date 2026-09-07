@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased] - Cycle 86
+### Added
+- **Labels table-stakes completion:** reusable Multiselect label picker in the New Issue modal (project-scoped, from the `labels` collection); colored label chips on Kanban cards and List rows (collection color with deterministic fallback); one-click label quick-picks in the Issue Drawer; "All Labels" filter on board + list with URL-synced `?label=` deep links.
+### Fixed
+- **Labels REST validation parity:** direct issue create/update now validate `labels` exactly like bulk-update (array of non-empty strings ≤64 chars) via `20_issue_hooks.pb.js`; PB 0.39 jsvm surfaces the json field to record hooks as char-code arrays, so the hooks normalize it before validating and re-set the decoded value.
+- `llms.txt` documents the labels endpoints (`8b.`) for agent discovery; `docs/research/FEATURE_MATRIX.md` labels row updated with the real surface.
+
 ## [1.39.0] - 2026-09-06 - Cycles 43-65
 ### Added
 - **Portfolio overview:** cross-project ProjectsView mode with aggregate stats cards, top-milestones by progress, recent issues feed, and inline cross-project search; Header nav entry + route guard with drift-guard tests (`a6bce8a`).
