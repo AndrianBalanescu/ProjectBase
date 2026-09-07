@@ -27,6 +27,12 @@ SUPERUSER_PASSWORD = os.environ.get("PB_SUPERUSER_PASSWORD", "superdev123")
 
 AUTHENTIC_PROJECT_IDENTIFIERS = {"PB", "HOME", "LOAD", "IBR", "OMNI", "MEM"}
 
+# Junk observability alert rules created by auth-guard probes
+# (metric_name 'x' via POST /alerts/configure) accumulate one per suite run
+# and starve the evaluate window's fetch cap. See cycle 83.
+JUNK_ALERT_METRICS = {"x"}
+ALERT_CUSTOM_NAME_PREFIX = "Custom Alert Rule"
+
 TEST_ISSUE_EXACT_TITLES = {
     "Architecture Spec",
     "Backend API",
@@ -185,6 +191,34 @@ def find_fixtures(token, authentic_ids):
     return matches
 
 
+def find_junk_alert_rules(token):
+    """Find junk observability alert rules (auth-guard probe leftovers)."""
+    junk = []
+    page = 1
+    while True:
+        status, body = _request(
+            "GET",
+            f"/api/collections/observability_alert_configs/records?perPage={_PAGE_SIZE}&page={page}",
+            token=token,
+        )
+        if status != 200:
+            break
+        items = body.get("items", [])
+        for rec in items:
+            metric = (rec.get("metric_name") or "").strip().lower()
+            name = rec.get("name") or ""
+            if metric in JUNK_ALERT_METRICS or (
+                name == ALERT_CUSTOM_NAME_PREFIX and metric not in ("error_rate_pct", "p95_latency_ms", "failure_count", "dlq_queue_size")
+            ):
+                junk.append(rec)
+        if len(items) < _PAGE_SIZE:
+            break
+        page += 1
+        if page > 50:
+            break
+    return junk
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--apply", action="store_true", help="delete matches (default: report only)")
@@ -194,19 +228,21 @@ def main(argv=None):
     token = _superuser_token()
     authentic_ids, test_projects = find_test_projects(token)
     matches = find_fixtures(token, authentic_ids)
+    junk_alerts = find_junk_alert_rules(token)
 
     if args.json:
         print(json.dumps({
             "matches": len(matches) + len(test_projects),
             "issues": len(matches),
             "projects": len(test_projects),
+            "junk_alert_rules": len(junk_alerts),
             "prefixes": list(FIXTURE_TITLE_PREFIXES),
             "dry_run": not args.apply,
         }))
         return 0
 
-    print(f"found {len(matches)} fixture issues, {len(test_projects)} test projects")
-    if not matches and not test_projects:
+    print(f"found {len(matches)} fixture issues, {len(test_projects)} test projects, {len(junk_alerts)} junk alert rules")
+    if not matches and not test_projects and not junk_alerts:
         print("clean: no test fixtures in the database.")
         return 0
 
@@ -219,8 +255,10 @@ def main(argv=None):
         _request("DELETE", f"/api/collections/issues/records/{item['id']}", token=token)
     for proj in test_projects:
         _request("DELETE", f"/api/collections/projects/records/{proj['id']}", token=token)
+    for rec in junk_alerts:
+        _request("DELETE", f"/api/collections/observability_alert_configs/records/{rec['id']}", token=token)
 
-    print(f"deleted {len(matches)} issues and {len(test_projects)} test projects.")
+    print(f"deleted {len(matches)} issues and {len(test_projects)} test projects and {len(junk_alerts)} junk alert rules.")
     return 0
 
 
