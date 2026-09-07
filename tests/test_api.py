@@ -123,6 +123,23 @@ def test_health_endpoint():
     assert body["service"] == "ProjectBase"
 
 
+def test_record_list_endpoint_liveness():
+    """The plain PocketBase record-list endpoint must actually serve records.
+
+    /health is a custom route; it stays 200 even when the jsvm runtime is
+    poisoned (cycle-84: every /api/collections/*/records request returned
+    PocketBase's generic 400 'Something went wrong while processing your
+    request' while /health, /version and auth kept working - cured only by a
+    process restart). Assert a real record collection lists cleanly.
+    """
+    status, body = _get_authed("/api/collections/issues/records?perPage=1")
+    assert status == 200, (
+        f"issues record list returned {status}: {body} - jsvm runtime likely "
+        f"poisoned, restart the projectbase service"
+    )
+    assert "items" in body
+
+
 def test_stats_endpoint():
     status, body = _get_authed("/api/projectbase/stats")
     assert status == 200, f"stats requires auth (seeded superuser): {status} {body}"
