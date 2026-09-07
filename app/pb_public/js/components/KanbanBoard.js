@@ -18,7 +18,9 @@ const KanbanBoardComponent = {
       ],
       quickAddColumn: null,
       quickAddTitle: '',
-      sortables: []
+      sortables: [],
+      dragInProgress: false,
+      sortableRefreshPending: false
     };
   },
   computed: {
@@ -69,10 +71,28 @@ const KanbanBoardComponent = {
     this.$nextTick(() => {
       this.initSortable();
     });
+    // Destroyed-instance dragover guard (cycle 79): Sortable's destroy()
+    // unbinds element listeners, but events already dispatched on the document
+    // (native HTML5 dragover / touch fallback) can still reach a destroyed
+    // instance whose `el` is null, crashing `F(t.lastElementChild)` inside
+    // sortable.min.js on every drag frame. Swallow events for dead instances
+    // here instead of patching the vendored bundle.
+    if (window.Sortable && window.Sortable.prototype && !window.Sortable.prototype.__pbDragGuarded) {
+      const proto = window.Sortable.prototype;
+      const origHandleEvent = proto.handleEvent;
+      proto.handleEvent = function (evt) {
+        if (!this.el) return; // destroyed instance: ignore stale drag events
+        return origHandleEvent.call(this, evt);
+      };
+      window.Sortable.prototype.__pbDragGuarded = true;
+    }
   },
   updated() {
     this.$nextTick(() => {
       this.initSortable();
+      // New cards render <i data-lucide> placeholders (incl. touch-grip);
+      // replace them after every board rerender.
+      if (window.lucide) window.lucide.createIcons();
     });
   },
   beforeUnmount() {
@@ -169,6 +189,16 @@ const KanbanBoardComponent = {
         .reduce((sum, i) => sum + (Number(i.estimate) || 0), 0);
     },
     initSortable() {
+      // Root-cause guard (cycle 79): board rerenders (agent-session polls, SSE
+      // ticks) used to destroy and recreate every Sortable on `updated()`. An
+      // in-flight drag then kept firing dragover on the destroyed instance
+      // whose `el` was nulled, crashing `F(t.lastElementChild)` inside
+      // sortable.min.js (pre-existing bug this cycle finally pinned down).
+      // Defer re-init until the drag finishes instead.
+      if (this.dragInProgress) {
+        this.sortableRefreshPending = true;
+        return;
+      }
       this.destroySortable();
       this.columns.forEach(col => {
         const el = document.getElementById('kanban-col-' + col.key);
@@ -181,7 +211,22 @@ const KanbanBoardComponent = {
           chosenClass: 'sortable-chosen',
           dragClass: 'sortable-drag',
           handle: '.kanban-card-drag-handle',
+          // Mobile/touch (cycle 79): long-press delay avoids scroll-vs-drag
+          // ambiguity on phones; fallbackTolerance lets the drag survive small
+          // finger jitter so the gesture registers as a drag, not a tap.
+          delayOnTouchOnly: true,
+          delay: 180,
+          touchStartThreshold: 6,
+          fallbackTolerance: 4,
+          onStart: () => {
+            this.dragInProgress = true;
+          },
           onEnd: (evt) => {
+            this.dragInProgress = false;
+            if (this.sortableRefreshPending) {
+              this.sortableRefreshPending = false;
+              this.$nextTick(() => this.initSortable());
+            }
             const itemEl = evt.item;
             const issueId = itemEl.getAttribute('data-issue-id');
             const toColKey = evt.to.getAttribute('data-col-key');
@@ -560,6 +605,12 @@ const KanbanBoardComponent = {
               <div class="text-xs font-medium text-zinc-900 dark:text-zinc-100 leading-snug line-clamp-2 mb-1.5 group-hover:text-zinc-950 dark:group-hover:text-white">
                 {{ issue.title }}
               </div>
+
+              <!-- Touch drag affordance (cycle 79): cards are dragged by
+                   long-press on touch devices; a subtle grip appears while
+                   pressed so users see the card is draggable. Hidden on
+                   desktop hover UIs to keep the minimalist look. -->
+              <i data-lucide="grip-vertical" class="touch-grip"></i>
 
               <!-- Subtasks Progress Bar -->
               <div v-if="getSubtaskProgress(issue)" class="mb-1.5 space-y-0.5">
