@@ -1,11 +1,12 @@
 # Changelog
 
-## [Unreleased] - Cycle 87
+## [1.40.0] - 2026-09-07 - Cycle 89
 ### Added
-- **Saved views (per-user named filter states):** new `saved_views` collection (migration 54, owner-forced + owner-only list/view/update rules, admin-gated delete); `36_saved_views.pb.js` hook validates name (≤64 chars, unique per owner+project+view), view enum (board|list), and a whitelisted query string (only `q`/`priority`/`cycle`/`label` keys with length caps). Board and list toolbars gain a "Save view" button (visible with active filters) and a "Views" dropdown to apply/switch/delete saved states; applying navigates the existing hash router with the stored query params. SavedViewModal for naming; `llms.txt` documents the endpoints for agents.
+- **Saved views (shipped as PR #31, merged):** per-user named board/list filter states — `saved_views` collection, "Save view" toolbar button, "Views" apply/switch/delete dropdown, URL-hash navigation on apply. Version bumped 1.39.0 → 1.40.0 across VERSION, `/api/projectbase/health` + version routes, openapi.json, header badge.
 
 ### Fixed
-- PocketBase order-of-evaluation pitfall: `createRule` must not inspect `@request.body.owner` (rules run before `onRecordCreateRequest` hooks, so a spoofed owner is now safely overwritten by the hook instead of leaking a rejection). Owner forcing lives solely in the hook.
+- PocketBase order-of-evaluation pitfall: `createRule` must not inspect `@request.body.owner` (rules run before `onRecordCreateRequest` hooks, so a spoofed owner is safely overwritten by the hook instead of leaking a rejection).
+
 
 ## [1.39.0] - 2026-09-06 - Cycles 43-65
 ### Added (Cycle 86)
