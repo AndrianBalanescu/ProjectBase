@@ -478,16 +478,9 @@ const App = {
         ]);
 
         this.projects = projs;
-        // Normalize labels at the data source: legacy rows may carry labels as a
-        // JSON string, which crashes label iteration downstream (ListView/Kanban
-        // usedLabels, includes filters). Parse once here, never per component.
-        this.issues = (iss || []).map(i => {
-          if (typeof i.labels === 'string') {
-            try { i.labels = JSON.parse(i.labels); } catch (e) { i.labels = []; }
-            if (!Array.isArray(i.labels)) i.labels = [];
-          }
-          return i;
-        });
+        // Labels normalization now lives at the API layer (api.js
+        // normalizeIssueArrays) — kept simple here, no per-component parsing.
+        this.issues = iss || [];
         this.cycles = cycs;
         this.milestones = mls;
         this.labels = lbls;
@@ -556,15 +549,15 @@ const App = {
             // Only add if belongs to current project or in All Projects mode
             if (!this.currentProject || record.project === this.currentProject.id) {
               const exists = this.issues.find(i => i.id === record.id);
-              if (!exists) this.issues.unshift(record);
+              if (!exists) this.issues.unshift(API.normalizeIssue(record));
             }
           } else if (action === 'update') {
             const idx = this.issues.findIndex(i => i.id === record.id);
             if (idx !== -1) {
-              this.issues[idx] = { ...this.issues[idx], ...record };
+              this.issues[idx] = { ...this.issues[idx], ...API.normalizeIssue(record) };
             }
             if (this.selectedIssue && this.selectedIssue.id === record.id) {
-              this.selectedIssue = { ...this.selectedIssue, ...record };
+              this.selectedIssue = { ...this.selectedIssue, ...API.normalizeIssue(record) };
             }
           } else if (action === 'delete') {
             this.issues = this.issues.filter(i => i.id !== record.id);
@@ -1093,6 +1086,12 @@ const App = {
         for (const key of Object.keys(patch)) {
           for (const issue of this.issues) {
             if (this.selectedIssueIds.has(issue.id)) {
+              if (key === 'labels') {
+                // Mirror the API-layer normalization: bulk patches set labels
+                // directly on local records, bypassing api.js entry points.
+                issue[key] = API.normalizeIssue({ labels: patch[key] }).labels;
+                continue;
+              }
               if (key === 'custom_fields') {
                 let cf = issue[key];
                 if (typeof cf === 'string') { try { cf = JSON.parse(cf); } catch (e) { cf = {}; } }

@@ -1,4 +1,4 @@
-<!-- auto; hash=98b5572f33db9594 -->
+<!-- auto; hash=4efafac67d6326a0 -->
 # projectbase/ (2 src, 10 meta)
 meta: HUMAN_REQUIRED.md
 meta: CANDIDATES.md

@@ -5,9 +5,28 @@ const pb = new PocketBase(window.location.origin);
 // Disable auto-cancellation to allow rapid concurrent UI actions
 pb.autoCancellation(false);
 
+// Normalize an issue's array-typed fields (labels) to actual arrays at the
+// data source. Legacy rows (and any future writer bug) can persist a scalar
+// on a PocketBase json field; `|| []` downstream only catches null/undefined,
+// so a string survives it and TypeError-blanks List/Kanban rendering
+// (cycle 94 regression: (i.labels || []).forEach is not a function).
+function normalizeIssueArrays(issue) {
+  if (!issue) return issue;
+  if (typeof issue.labels !== 'string') {
+    if (!Array.isArray(issue.labels)) issue.labels = [];
+    return issue;
+  }
+  try { issue.labels = JSON.parse(issue.labels); } catch (e) { issue.labels = []; }
+  if (!Array.isArray(issue.labels)) issue.labels = [];
+  return issue;
+}
+
 const API = {
   client: pb,
   subscribers: new Set(),
+
+  // Public alias for callers outside this module (app.js realtime ingestion).
+  normalizeIssue: normalizeIssueArrays,
 
   // Real-time SSE subscription
   initRealtime(onEvent) {
@@ -102,23 +121,26 @@ const API = {
   // Issues
   async getIssues(projectId = null) {
     const filter = projectId ? `project = "${projectId}"` : '1=1';
-    return await pb.collection('issues').getFullList({
+    const items = await pb.collection('issues').getFullList({
       filter,
       sort: 'order,-created',
       expand: 'project,cycle,milestone'
     });
+    return items.map(normalizeIssueArrays);
   },
 
   async createIssue(data) {
-    return await pb.collection('issues').create(data, {
+    const issue = await pb.collection('issues').create(data, {
       expand: 'project,cycle,milestone'
     });
+    return normalizeIssueArrays(issue);
   },
 
   async updateIssue(id, data) {
-    return await pb.collection('issues').update(id, data, {
+    const issue = await pb.collection('issues').update(id, data, {
       expand: 'project,cycle,milestone'
     });
+    return normalizeIssueArrays(issue);
   },
 
   async deleteIssue(id) {

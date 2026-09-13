@@ -19,6 +19,7 @@ Live tests run against PROJECTBASE_URL (default http://127.0.0.1:8120).
 
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 
@@ -166,7 +167,56 @@ def test_labels_collection_crud_shape():
     assert st3 == 204, f"label delete failed: {st3}"
 
 
-# --- Static wiring: the UI surface ------------------------------------------
+# --- Cycle 94 regression: non-array labels rows crash List/Kanban ----------
+
+def test_migration_repairs_nonarray_labels_rows():
+    """Migration 55 must exist and repair legacy scalar labels rows to [].
+
+    Regression background: four pre-guard rows (created 2026-09-07 07:39 UTC,
+    before the cycle-86 hook rewrite was live) persisted labels as the raw
+    string 'not-an-array'. `(issue.labels || []).forEach` survives null via
+    the coalescer but crashes on a string, TypeError-blanking the whole
+    List view (caught by scripts/qa/verify_listview_sorting.js). After the
+    migration runs against the live DB, no issue row may carry a non-array
+    labels value.
+    """
+    mig = os.path.join(REPO_ROOT, "app", "pb_migrations",
+                       "1710000055_fix_nonarray_labels_rows.js")
+    assert os.path.exists(mig), "repair migration file missing"
+
+    st, body = _request(
+        "GET", "/api/collections/issues/records?perPage=200&fields=id,labels",
+        headers=_hdr())
+    assert st == 200, f"issues list failed: {st} {body}"
+    bad = [i["id"] for i in body.get("items", [])
+           if i.get("labels") is not None and not isinstance(i["labels"], list)]
+    assert not bad, f"non-array labels rows still present: {bad}"
+
+
+class TestLabelsApiLayerNormalization:
+    """The api.js data-source layer must coerce labels to an array before
+    any view iterates it, so a single bad row can never blank a view."""
+
+    def test_api_js_has_normalizer(self):
+        src = _read("app/pb_public/js/api.js")
+        assert "normalizeIssueArrays" in src, "api.js missing normalizer"
+
+    def test_get_issues_applies_normalizer(self):
+        src = _read("app/pb_public/js/api.js")
+        m = re.search(r"async getIssues\(.*?\n  \},", src, re.S)
+        assert m, "getIssues not found in api.js"
+        assert "normalizeIssueArrays" in m.group(0)
+
+    def test_realtime_ingestion_normalizes(self):
+        src = _read("app/pb_public/js/app.js")
+        assert "API.normalizeIssue(record)" in src, \
+            "realtime ingestion must route records through API.normalizeIssue"
+
+    def test_issue_hooks_reject_scalar_labels(self):
+        src = _read("app/pb_hooks/20_issue_hooks.pb.js")
+        assert src.count("labels must be an array") == 2, \
+            "create+update hooks must both reject non-array labels"
+
 
 def _read(rel):
     with open(os.path.join(REPO_ROOT, rel), encoding="utf-8") as fh:
