@@ -478,10 +478,13 @@ const App = {
         ]);
 
         this.projects = projs;
+        // getIssues returns a paginated PocketBase list; callers always want the
+        // plain item array. Normalize here so no component ever sees the envelope.
+        const issArr = Array.isArray(iss) ? iss : ((iss && iss.items) || []);
         // Normalize labels at the data source: legacy rows may carry labels as a
         // JSON string, which crashes label iteration downstream (ListView/Kanban
         // usedLabels, includes filters). Parse once here, never per component.
-        this.issues = (iss || []).map(i => {
+        this.issues = issArr.map(i => {
           if (typeof i.labels === 'string') {
             try { i.labels = JSON.parse(i.labels); } catch (e) { i.labels = []; }
             if (!Array.isArray(i.labels)) i.labels = [];
@@ -517,7 +520,15 @@ const App = {
 
     async loadIssues() {
       try {
-        this.issues = await API.getIssues(this.currentProject ? this.currentProject.id : null, 1, 500);
+        const iss = await API.getIssues(this.currentProject ? this.currentProject.id : null, 1, 500);
+        const arr = Array.isArray(iss) ? iss : ((iss && iss.items) || []);
+        arr.forEach(i => {
+          if (typeof i.labels === 'string') {
+            try { i.labels = JSON.parse(i.labels); } catch (e) { i.labels = []; }
+            if (!Array.isArray(i.labels)) i.labels = [];
+          }
+        });
+        this.issues = arr;
         this.cycles = await API.getCycles(this.currentProject ? this.currentProject.id : null);
         this.milestones = await API.getMilestones(this.currentProject ? this.currentProject.id : null);
         writeDataCache(this);

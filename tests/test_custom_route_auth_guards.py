@@ -1,20 +1,19 @@
-"""Cycle 74 hardening — custom-route auth guards.
+"""Custom-route auth guards.
 
 Every mutating custom route (POST/PUT/PATCH/DELETE under /api/projectbase/*)
 must reject anonymous callers with 401 and accept an authenticated superuser.
-This file pins that contract so future engine hooks cannot silently regress.
+This file pins that contract so future hooks cannot silently regress.
 
 Intentionally public routes (documented in the hooks):
   - GET  /api/projectbase/health (30_custom_routes)
   - POST /api/projectbase/health (30_custom_routes: liveness, no data access)
-  - GET  /api/projectbase/sdk/languages, /sdk/templates/{lang}, /docs/recipes,
-         /docs/spec (100_sdk_observability_engine: public developer docs)
+  - GET  /api/projectbase/version, /stats is authed, docs/openapi are public
 
 Intentionally NOT in the guarded list:
-  - POST /api/projectbase/webhooks/git (96_git_workspace_engine): universal
-    CI/GitHub/GitLab receiver. Auth = e.auth OR valid X-Hub-Signature-256
-    HMAC over the raw body keyed by PROJECTBASE_GIT_WEBHOOK_SECRET env
-    (fail-closed when unset). Contract E2E: tests/test_git_webhook_hmac.py.
+  - POST /api/projectbase/webhooks/git (45_github_importer CI receiver):
+    auth = e.auth OR valid X-Hub-Signature-256 HMAC over the raw body keyed
+    by PROJECTBASE_GIT_WEBHOOK_SECRET env (fail-closed when unset).
+    Contract E2E: tests/test_git_webhook_hmac.py.
 """
 
 import json
@@ -28,7 +27,6 @@ BASE_URL = os.environ.get("PROJECTBASE_URL", "http://127.0.0.1:8120")
 SUPERUSER_EMAIL = os.environ.get("PROJECTBASE_EMAIL", "f@flow.com")
 SUPERUSER_PASSWORD = os.environ.get("PROJECTBASE_PASSWORD", "superdev123")
 
-
 def _request(method, path, body=None, headers=None):
     url = f"{BASE_URL}{path}"
     data = json.dumps(body).encode("utf-8") if body is not None else None
@@ -39,16 +37,15 @@ def _request(method, path, body=None, headers=None):
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             raw = resp.read().decode("utf-8")
-            if (method == "GET" and path.startswith("/api/projectbase/sdk")) or "/docs/" in path:
-                return resp.status, raw
-            return resp.status, json.loads(raw) if raw.strip() else {}
+            return resp.status, (json.loads(raw) if raw.strip() else {})
     except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8")
+        raw = e.read().decode("utf-8", "replace")
         try:
             return e.code, json.loads(raw)
-        except Exception:
-            return e.code, {"error": raw}
-
+        except json.JSONDecodeError:
+            return e.code, raw
+    except urllib.error.URLError as e:
+        pytest.fail(f"Request to {method} {path} failed: {e.reason}")
 
 def _super_token():
     status, res = _request(
@@ -61,40 +58,30 @@ def _super_token():
     return res["token"]
 
 
-# One representative mutating route per engine hook. The guard pattern is
-# identical across hooks; these samples catch regressions per file.
+# One representative mutating route per surviving hook file. The guard pattern
+# is identical across hooks; these samples catch regressions per file.
+# Engine hooks (91-111) were stripped to the engine-experiments branch; their
+# route samples were removed with them. If an engine returns, re-add a sample.
 GUARDED_ROUTE_SAMPLES = [
-    ("POST", "/api/projectbase/tenants", {"name": "guard-probe-74"}),
-    ("POST", "/api/projectbase/tenants/nonexistent74/members", {"user": "x", "role": "admin"}),
-    ("PATCH", "/api/projectbase/tenants/nonexistent74", {"name": "x"}),
-    ("DELETE", "/api/projectbase/tenants/nonexistent74/members/x", None),
-    ("POST", "/api/projectbase/observability/alerts/configure", {"metric_name": "x"}),
-    ("DELETE", "/api/projectbase/observability/alerts/nonexistent74", None),
-    ("POST", "/api/projectbase/auto-heal/policies", {"name": "x"}),
-    ("POST", "/api/projectbase/auto-heal/trigger", {}),
-    ("POST", "/api/projectbase/sessions/ingest", {"agent_name": "x"}),
-    ("POST", "/api/projectbase/sessions/heartbeat", {"pid": 1}),
-    ("POST", "/api/projectbase/sessions/complete", {"status": "done"}),
-    ("POST", "/api/projectbase/merges/propose", {"issue": "x"}),
-    ("POST", "/api/projectbase/dag/decompose", {"issue": "x"}),
+    # 30_custom_routes.pb.js
+    ("POST", "/api/projectbase/quick-task", {"title": "guard-probe"}),
+    ("PUT", "/api/projectbase/notification-settings", {"telegram_chat_id": "x"}),
+    # 31_bulk_actions.pb.js
+    ("POST", "/api/projectbase/issues/bulk-update", {"ids": ["x"], "data": {}}),
+    ("POST", "/api/projectbase/issues/bulk-delete", {"ids": ["x"]}),
+    # 32_issue_relations.pb.js
+    ("POST", "/api/projectbase/issues/nonexistent74/relations", {"type": "blocks", "target": "x"}),
+    ("DELETE", "/api/projectbase/issues/nonexistent74/relations", {"type": "blocks", "target": "x"}),
+    # 40_importers.pb.js
+    ("POST", "/api/projectbase/import/csv", {"content": "a,b\n1,2", "project": "x"}),
+    # 70_ai_assist.pb.js
+    ("POST", "/api/projectbase/ai-assist", {"action": "x"}),
+    # 80_agent_triggers.pb.js
+    ("POST", "/api/projectbase/dispatch-agent", {"issue": "x"}),
+    # 90_agents.pb.js
     ("POST", "/api/projectbase/agents/sync", {}),
-    ("POST", "/api/projectbase/mcp", {"jsonrpc": "2.0", "method": "tools/list", "id": 1}),
-    ("POST", "/api/projectbase/webhooks/endpoints", {"name": "x"}),
-    ("POST", "/api/projectbase/webhooks/dispatch", {"event": "x"}),
-    ("POST", "/api/projectbase/cluster/nodes/register", {"node_id": "x"}),
-    ("POST", "/api/projectbase/agents/autoscale", {"name": "x"}),
-    ("POST", "/api/projectbase/git/artifacts", {"name": "x"}),
-    ("POST", "/api/projectbase/semantic/review", {"title": "x"}),
-    ("POST", "/api/projectbase/sessions/nonexistent74/branch", {"name": "x"}),
-    ("POST", "/api/projectbase/consensus/gates", {"name": "x"}),
-    ("POST", "/api/projectbase/automations/rules", {"name": "x"}),
-    ("POST", "/api/projectbase/leases/acquire", {"issue_id": "x"}),
-    ("POST", "/api/projectbase/semantic/policies", {"name": "x"}),
-    ("POST", "/api/projectbase/sso/providers", {"name": "x"}),
-    ("POST", "/api/projectbase/rbac/roles", {"name": "x"}),
-    ("POST", "/api/projectbase/rbac/assign", {"role": "x"}),
-    ("POST", "/api/projectbase/rbac/tokens/create", {"name": "x"}),
-    ("POST", "/api/projectbase/automations/trigger", {"event": "x"}),
+    # 55_notifications.pb.js
+    ("POST", "/api/projectbase/notifications/read-all", {}),
 ]
 
 
@@ -107,46 +94,38 @@ def test_mutating_route_rejects_anonymous(method, path, body):
     )
 
 
-@pytest.mark.parametrize("method,path,body", GUARDED_ROUTE_SAMPLES[:8])
+@pytest.mark.parametrize("method,path,body", GUARDED_ROUTE_SAMPLES)
 def test_mutating_route_accepts_authenticated(method, path, body):
-    """With a superuser token the same routes reach business logic (not 401/403)."""
+    """With a superuser token the same routes reach business logic (not 401/403).
+
+    Nonexistent IDs must yield a NOT-FOUND (or validation 400) rather than an
+    auth failure: proves the guard ran before handler logic.
+    """
     token = _super_token()
     status, resp = _request(method, path, body, headers={"Authorization": token})
     assert status not in (401, 403), (
         f"{method} {path} rejected an authenticated superuser: {status} {str(resp)[:120]}"
     )
-    # alerts/configure actually persists a rule; delete it so repeated suite
-    # runs don't accumulate junk rules that starve the evaluate window.
-    if path.endswith("/observability/alerts/configure"):
-        rule_id = (resp or {}).get("alert_config", {}).get("id")
-        if rule_id:
-            _request("DELETE", f"/api/projectbase/observability/alerts/{rule_id}", headers={"Authorization": token})
 
 
-def test_public_developer_docs_stay_open():
-    """Documented public reads (SDK/docs) must remain reachable without auth."""
-    for path in ("/api/projectbase/sdk/languages", "/api/projectbase/docs/recipes", "/api/projectbase/docs/spec"):
-        status, _ = _request("GET", path)
-        assert status == 200, f"public docs route {path} returned {status}"
-
-
-def test_health_endpoint_stays_public():
+def test_public_health_stays_open():
+    """Liveness probes must remain reachable without auth."""
+    status, body = _request("GET", "/api/projectbase/health")
+    assert status == 200
+    assert body.get("status") == "healthy"
     status, body = _request("POST", "/api/projectbase/health", {})
     assert status == 200
     assert body.get("status") == "healthy"
 
 
-def test_session_syncer_contract_authed_ingest():
-    """The session syncer's ingest call must succeed with credentials (syncer
-    authenticates via PROJECTBASE_TOKEN / PROJECTBASE_EMAIL+PASSWORD)."""
-    token = _super_token()
-    payload = {
-        "agent_name": "guard-regression-74",
-        "machine": "pytest",
-        "session_key": "guard-regression-74-1",
-        "status": "completed",
-        "message": "auth contract probe",
-    }
-    status, body = _request("POST", "/api/projectbase/sessions/ingest", payload,
-                            headers={"Authorization": token})
-    assert status in (200, 201), f"authed ingest failed: {status} {str(body)[:150]}"
+def test_stats_requires_auth():
+    """Stats aggregates user data; anonymous access must be denied."""
+    status, _ = _request("GET", "/api/projectbase/stats")
+    assert status == 401
+
+
+def test_version_and_docs_stay_public():
+    """Version and developer docs must remain reachable without auth."""
+    for path in ("/api/projectbase/version", "/api/openapi.json"):
+        status, _ = _request("GET", path)
+        assert status == 200, f"public route {path} returned {status}"

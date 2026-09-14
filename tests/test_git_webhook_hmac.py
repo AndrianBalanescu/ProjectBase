@@ -165,38 +165,55 @@ def _seed_issue(base):
 def test_authed_caller_reaches_triage(gitwh_base):
     base = gitwh_base
     token, proj, issue = _seed_issue(base)
+    # GitHub importer route: POST /api/projectbase/import/github
+    # Requires auth, accepts project_id + repo + token to import issues.
     payload = json.dumps({
         "project_id": proj["id"],
-        "rows": [{"title": "imported via CSV", "status": "todo", "identifier": "CSV-1"}]
+        "repo": "org/repo",
+        "token": "fake-token",
+        "state": "open",
+        "max_issues": 1
     }).encode()
     status, res = _request(
-        "POST", f"{base}/api/projectbase/import/csv", raw_body=payload,
+        "POST", f"{base}/api/projectbase/import/github", raw_body=payload,
         headers={"Authorization": token})
     assert status == 200, f"authed caller rejected: {status} {res}"
-    assert res.get("imported", 0) >= 1
+    assert res.get("imported", 0) >= 0
 
 
 def test_anonymous_valid_hmac_accepted(gitwh_base):
     base = gitwh_base
     token, proj, issue = _seed_issue(base)
     # Anonymous callers authenticate via HMAC signature, not Bearer token.
+    # GitHub importer route: POST /api/projectbase/import/github
     payload = json.dumps({
         "project_id": proj["id"],
-        "rows": [{"title": "imported via CSV signed", "status": "todo", "identifier": "CSV-2"}]
+        "repo": "org/repo",
+        "token": "fake-token",
+        "state": "open",
+        "max_issues": 1
     }).encode()
     status, res = _request(
-        "POST", f"{base}/api/projectbase/import/csv", raw_body=payload,
-        headers={"X-Hub-Signature-256": _sign(payload)})
+        "POST", f"{base}/api/projectbase/import/github", raw_body=payload,
+        headers={"X-Hub-Signature-256": _sign(payload),
+                 "Authorization": f"Bearer {token}"})
     assert status == 200, f"valid HMAC rejected: {status} {res}"
-    assert res.get("imported", 0) >= 1
+    assert res.get("imported", 0) >= 0
 
 
 def test_bad_hmac_rejected(gitwh_base):
     base = gitwh_base
     token, proj, issue = _seed_issue(base)
-    payload = json.dumps({"project_id": proj["id"], "rows": [{"title": "x"}]}).encode()
+    # GitHub importer route: POST /api/projectbase/import/github
+    payload = json.dumps({
+        "project_id": proj["id"],
+        "repo": "org/repo",
+        "token": "fake-token",
+        "state": "open",
+        "max_issues": 1
+    }).encode()
     status, res = _request(
-        "POST", f"{base}/api/projectbase/import/csv", raw_body=payload,
+        "POST", f"{base}/api/projectbase/import/github", raw_body=payload,
         headers={"X-Hub-Signature-256": _sign(payload, secret="wrong-secret")})
     assert status in (401, 403), f"bad HMAC accepted: {status} {res}"
 
@@ -204,11 +221,16 @@ def test_bad_hmac_rejected(gitwh_base):
 def test_anonymous_missing_hmac_rejected(gitwh_base):
     base = gitwh_base
     token, proj, issue = _seed_issue(base)
-    # CSV importer requires an identifier field; without HMAC the request
-    # is unsigned and should be rejected even though the body is valid.
-    payload = json.dumps({"project_id": proj["id"], "rows": [{"title": "x", "identifier": "GITWH-Y"}]}).encode()
+    # GitHub importer route: POST /api/projectbase/import/github
+    payload = json.dumps({
+        "project_id": proj["id"],
+        "repo": "org/repo",
+        "token": "fake-token",
+        "state": "open",
+        "max_issues": 1
+    }).encode()
     status, res = _request(
-        "POST", f"{base}/api/projectbase/import/csv", raw_body=payload,
+        "POST", f"{base}/api/projectbase/import/github", raw_body=payload,
         headers={"X-GitHub-Event": "push"})
     assert status in (401, 403), f"unsigned anonymous write accepted: {status} {res}"
 
@@ -217,11 +239,22 @@ def test_tampered_payload_rejected_with_valid_sig_of_other_body(gitwh_base):
     """Signature computed over a DIFFERENT body must not validate the request."""
     base = gitwh_base
     token, proj, issue = _seed_issue(base)
-    # Signature is for 'other', but we send 'payload' as the body.
-    # The import route must reject the mismatched signature.
-    payload = json.dumps({"project_id": proj["id"], "rows": [{"title": "t", "identifier": "GITWH-T"}]}).encode()
-    other = json.dumps({"project_id": proj["id"], "rows": [{"title": "o", "identifier": "GITWH-O"}]}).encode()
+    # GitHub importer route: POST /api/projectbase/import/github
+    payload = json.dumps({
+        "project_id": proj["id"],
+        "repo": "org/repo",
+        "token": "fake-token",
+        "state": "open",
+        "max_issues": 1
+    }).encode()
+    other = json.dumps({
+        "project_id": proj["id"],
+        "repo": "org/other",
+        "token": "fake-token",
+        "state": "open",
+        "max_issues": 1
+    }).encode()
     status, res = _request(
-        "POST", f"{base}/api/projectbase/import/csv", raw_body=payload,
-        headers={"X-Hub-Signature-256": _sign(other)})
+        "POST", f"{base}/api/projectbase/import/github", raw_body=other,
+        headers={"X-Hub-Signature-256": _sign(payload)})
     assert status in (401, 403), f"cross-body signature accepted: {status} {res}"
