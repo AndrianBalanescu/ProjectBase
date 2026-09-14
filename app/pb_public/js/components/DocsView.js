@@ -4,7 +4,7 @@
 const DocsViewComponent = {
   data() {
     return {
-      activeTab: 'guide', // 'guide', 'pb_features', 'mcp', 'tester', 'rest', 'projects'
+      activeTab: 'guide', // 'guide', 'pb_features', 'tester', 'rest', 'projects'
       copiedSnippet: null,
       testEndpoint: '/api/projectbase/stats',
       testMethod: 'GET',
@@ -41,22 +41,6 @@ const DocsViewComponent = {
     }
   },
   computed: {
-    mcpJsonSnippet() {
-      return JSON.stringify({
-        mcpServers: {
-          projectbase: {
-            command: "uv",
-            args: [
-              "run",
-              "/data/projects/projectbase/scripts/mcp_server.py"
-            ],
-            env: {
-              PROJECTBASE_URL: window.location.origin
-            }
-          }
-        }
-      }, null, 2);
-    }
   },
   template: `
     <div class="h-[calc(100vh-3.5rem)] overflow-y-auto p-4 bg-zinc-50 dark:bg-[#09090b] select-none">
@@ -111,13 +95,6 @@ const DocsViewComponent = {
             :class="activeTab === 'pb_features' ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'"
           >
             ⚡ Native Capabilities
-          </button>
-          <button
-            @click="activeTab = 'mcp'"
-            class="px-2.5 py-1 rounded-md font-medium transition-colors"
-            :class="activeTab === 'mcp' ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'"
-          >
-            🔌 FastMCP Setup
           </button>
           <button
             @click="activeTab = 'tester'"
@@ -232,28 +209,7 @@ const DocsViewComponent = {
           </div>
         </div>
 
-        <!-- 2. FastMCP Setup Tab -->
-        <div v-show="activeTab === 'mcp'" class="space-y-4 animate-in fade-in duration-150">
-          <div class="p-4 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-2xs space-y-3">
-            <div class="flex items-center justify-between">
-              <div>
-                <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">FastMCP Claude / Cursor Configuration</h3>
-                <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Add to your Claude Desktop config or Cursor MCP settings</p>
-              </div>
-              <button
-                @click="copyCode(mcpJsonSnippet, 'mcp')"
-                class="px-2.5 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-xs text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700/60 flex items-center space-x-1 transition-colors"
-              >
-                <i data-lucide="copy" class="w-3.5 h-3.5 text-zinc-400"></i>
-                <span>{{ copiedSnippet === 'mcp' ? 'Copied!' : 'Copy JSON' }}</span>
-              </button>
-            </div>
-
-            <pre class="p-3.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-800 dark:text-zinc-200 font-mono overflow-x-auto"><code>{{ mcpJsonSnippet }}</code></pre>
-          </div>
-        </div>
-
-        <!-- 3. Live API Tester Tab -->
+        <!-- 2. Live API Tester Tab -->
         <div v-show="activeTab === 'tester'" class="space-y-4 animate-in fade-in duration-150">
           <div class="p-4 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 shadow-2xs space-y-3">
             <h3 class="text-sm font-bold text-zinc-900 dark:text-zinc-100">Interactive Endpoint Tester</h3>
