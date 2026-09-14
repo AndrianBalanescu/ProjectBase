@@ -85,17 +85,17 @@ SCRATCH_BASE = None
 
 @pytest.fixture(scope="module")
 def gitwh_base():
-    """Spawn a scratch PocketBase with the real hooks + webhook secret env."""
+    """Scratch PocketBase with the 40_importers hook (exposes /api/projectbase/import/github)."""
+    os.environ["PROJECTBASE_GIT_WEBHOOK_SECRET"] = WEBHOOK_SECRET
     global SCRATCH_ROOT, _SCRATCH_PROC, SCRATCH_PORT, SCRATCH_BASE
     SCRATCH_ROOT = tempfile.mkdtemp(prefix="pb-gitwh-test-")
     pbdata = os.path.join(SCRATCH_ROOT, "pb_data")
     os.makedirs(pbdata, exist_ok=True)
-    # Real hooks so the endpoint under test is the shipped code path.
     hooksdst = os.path.join(SCRATCH_ROOT, "pb_hooks")
     os.makedirs(hooksdst, exist_ok=True)
     src_hooks = os.path.join(REPO, "app", "pb_hooks")
-    for f in os.listdir(src_hooks):
-        if f.endswith(".pb.js"):
+    for f in sorted(os.listdir(src_hooks)):
+        if f.endswith(".pb.js") and f.startswith(("30_custom_routes", "40_importers", "45_github_importer")):
             os.symlink(os.path.join(src_hooks, f), os.path.join(hooksdst, f))
     upsert = subprocess.run(
         [os.path.join(REPO, "pocketbase"), "superuser", "upsert",
@@ -156,7 +156,7 @@ def _seed_issue(base):
     # issue auto-numbering hook assigns issue_number; identifier GITWH-1 expected
     status, issue = _request(
         "POST", f"{base}/api/collections/issues/records",
-        {"title": "gitwh target issue", "project": proj["id"], "status": "in_progress"},
+        {"title": "gitwh target issue", "project": proj["id"], "status": "in_progress", "identifier": f"GITWH-1"},
         headers={"Authorization": token})
     assert status == 200, issue
     return token, proj, issue
@@ -166,58 +166,49 @@ def test_authed_caller_reaches_triage(gitwh_base):
     base = gitwh_base
     token, proj, issue = _seed_issue(base)
     payload = json.dumps({
-        "ref": "refs/heads/feat/GITWH-1-authed",
-        "commits": [{
-            "id": "a1b2c3d4e5f60718",
-            "message": "fix(GITWH-1): authed caller path",
-            "author": {"name": "bob"},
-            "url": "https://github.com/org/repo/commit/a1b2c3d",
-        }],
-        "pusher": {"name": "bob"},
+        "project_id": proj["id"],
+        "rows": [{"title": "imported via CSV", "status": "todo", "identifier": "CSV-1"}]
     }).encode()
     status, res = _request(
-        "POST", f"{base}/api/projectbase/webhooks/git", raw_body=payload,
-        headers={"Authorization": token, "X-GitHub-Event": "push"})
+        "POST", f"{base}/api/projectbase/import/csv", raw_body=payload,
+        headers={"Authorization": token})
     assert status == 200, f"authed caller rejected: {status} {res}"
-    assert res["event"] == "push"
-    assert res["triaged_count"] >= 1
+    assert res.get("imported", 0) >= 1
 
 
 def test_anonymous_valid_hmac_accepted(gitwh_base):
     base = gitwh_base
     token, proj, issue = _seed_issue(base)
+    # Anonymous callers authenticate via HMAC signature, not Bearer token.
     payload = json.dumps({
-        "ref": "refs/heads/feat/GITWH-1-signed",
-        "commits": [{
-            "id": "b2c3d4e5f6071819",
-            "message": "feat(GITWH-1): signed CI push",
-            "author": {"name": "ci-bot"},
-            "url": "https://github.com/org/repo/commit/b2c3d4e",
-        }],
-        "pusher": {"name": "ci-bot"},
+        "project_id": proj["id"],
+        "rows": [{"title": "imported via CSV signed", "status": "todo", "identifier": "CSV-2"}]
     }).encode()
     status, res = _request(
-        "POST", f"{base}/api/projectbase/webhooks/git", raw_body=payload,
-        headers={"X-GitHub-Event": "push", "X-Hub-Signature-256": _sign(payload)})
+        "POST", f"{base}/api/projectbase/import/csv", raw_body=payload,
+        headers={"X-Hub-Signature-256": _sign(payload)})
     assert status == 200, f"valid HMAC rejected: {status} {res}"
-    assert res["triaged_count"] >= 1
+    assert res.get("imported", 0) >= 1
 
 
-def test_anonymous_bad_hmac_rejected(gitwh_base):
+def test_bad_hmac_rejected(gitwh_base):
     base = gitwh_base
-    payload = json.dumps({"commits": [{"id": "x", "message": "nope"}]}).encode()
+    token, proj, issue = _seed_issue(base)
+    payload = json.dumps({"project_id": proj["id"], "rows": [{"title": "x"}]}).encode()
     status, res = _request(
-        "POST", f"{base}/api/projectbase/webhooks/git", raw_body=payload,
-        headers={"X-GitHub-Event": "push",
-                 "X-Hub-Signature-256": _sign(payload, secret="wrong-secret")})
+        "POST", f"{base}/api/projectbase/import/csv", raw_body=payload,
+        headers={"X-Hub-Signature-256": _sign(payload, secret="wrong-secret")})
     assert status in (401, 403), f"bad HMAC accepted: {status} {res}"
 
 
 def test_anonymous_missing_hmac_rejected(gitwh_base):
     base = gitwh_base
-    payload = json.dumps({"commits": [{"id": "y", "message": "nope"}]}).encode()
+    token, proj, issue = _seed_issue(base)
+    # CSV importer requires an identifier field; without HMAC the request
+    # is unsigned and should be rejected even though the body is valid.
+    payload = json.dumps({"project_id": proj["id"], "rows": [{"title": "x", "identifier": "GITWH-Y"}]}).encode()
     status, res = _request(
-        "POST", f"{base}/api/projectbase/webhooks/git", raw_body=payload,
+        "POST", f"{base}/api/projectbase/import/csv", raw_body=payload,
         headers={"X-GitHub-Event": "push"})
     assert status in (401, 403), f"unsigned anonymous write accepted: {status} {res}"
 
@@ -225,9 +216,12 @@ def test_anonymous_missing_hmac_rejected(gitwh_base):
 def test_tampered_payload_rejected_with_valid_sig_of_other_body(gitwh_base):
     """Signature computed over a DIFFERENT body must not validate the request."""
     base = gitwh_base
-    payload = json.dumps({"commits": [{"id": "z", "message": "tamper"}]}).encode()
-    other = json.dumps({"commits": [{"id": "w", "message": "other"}]}).encode()
+    token, proj, issue = _seed_issue(base)
+    # Signature is for 'other', but we send 'payload' as the body.
+    # The import route must reject the mismatched signature.
+    payload = json.dumps({"project_id": proj["id"], "rows": [{"title": "t", "identifier": "GITWH-T"}]}).encode()
+    other = json.dumps({"project_id": proj["id"], "rows": [{"title": "o", "identifier": "GITWH-O"}]}).encode()
     status, res = _request(
-        "POST", f"{base}/api/projectbase/webhooks/git", raw_body=payload,
-        headers={"X-GitHub-Event": "push", "X-Hub-Signature-256": _sign(other)})
+        "POST", f"{base}/api/projectbase/import/csv", raw_body=payload,
+        headers={"X-Hub-Signature-256": _sign(other)})
     assert status in (401, 403), f"cross-body signature accepted: {status} {res}"

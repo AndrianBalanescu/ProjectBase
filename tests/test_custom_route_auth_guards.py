@@ -39,6 +39,8 @@ def _request(method, path, body=None, headers=None):
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             raw = resp.read().decode("utf-8")
+            if (method == "GET" and path.startswith("/api/projectbase/sdk")) or "/docs/" in path:
+                return resp.status, raw
             return resp.status, json.loads(raw) if raw.strip() else {}
     except urllib.error.HTTPError as e:
         raw = e.read().decode("utf-8")
