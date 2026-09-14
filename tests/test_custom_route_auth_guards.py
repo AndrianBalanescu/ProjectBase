@@ -74,10 +74,6 @@ GUARDED_ROUTE_SAMPLES = [
     ("DELETE", "/api/projectbase/issues/nonexistent74/relations", {"type": "blocks", "target": "x"}),
     # 40_importers.pb.js
     ("POST", "/api/projectbase/import/csv", {"content": "a,b\n1,2", "project": "x"}),
-    # 70_ai_assist.pb.js
-    ("POST", "/api/projectbase/ai-assist", {"action": "x"}),
-    # 80_agent_triggers.pb.js
-    ("POST", "/api/projectbase/dispatch-agent", {"issue": "x"}),
     # 90_agents.pb.js
     ("POST", "/api/projectbase/agents/sync", {}),
     # 55_notifications.pb.js

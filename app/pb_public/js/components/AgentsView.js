@@ -1,5 +1,5 @@
 // pb_public/js/components/AgentsView.js
-// ProjectBase — Lean, Fast AI Agent Console & Live Execution Stream.
+// ProjectBase — Lean, Fast Sessions Console & Live Execution Stream.
 // Focus: Real-time agent session stream, live PID/diff inspection, and direct prompt dispatch.
 
 const AgentsViewComponent = {
@@ -11,10 +11,6 @@ const AgentsViewComponent = {
       search: '',
       filterStatus: 'all',
       activeTab: 'chat',
-      quickPrompt: '',
-      isDispatching: false,
-      dispatchSuccess: null,
-      dispatchError: null,
       chatLog: {},
       liveStreamActive: true,
       pollTimer: null,
@@ -237,70 +233,6 @@ const AgentsViewComponent = {
       if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
       return Math.floor(diff / 86400) + 'd ago';
     },
-    fmtTokens(n) {
-      if (!n) return '0';
-      if (n < 1000) return String(n);
-      if (n < 1000000) return (n / 1000).toFixed(1) + 'k';
-      return (n / 1000000).toFixed(1) + 'M';
-    },
-    async quickDispatch(agentName) {
-      if (!this.quickPrompt.trim()) return;
-      this.isDispatching = true;
-      this.dispatchSuccess = null;
-      this.dispatchError = null;
-      try {
-        const target = agentName || (this.activeAgent ? this.activeAgent.name : 'flomaster');
-        const sid = this.selectedSession ? (this.selectedSession.session_id || this.selectedSession.id) : null;
-        
-        const res = await API.dispatchAgent(target, {
-          prompt: this.quickPrompt.trim(),
-          session_id: sid
-        });
-
-        const turnSid = sid || (res && res.session_id) || 'active';
-        if (!this.chatLog[turnSid]) {
-          this.chatLog[turnSid] = [...this.chatTurns];
-        }
-        this.chatLog[turnSid].push({
-          role: 'user',
-          content: this.quickPrompt.trim(),
-          created_at: new Date().toISOString()
-        });
-        if (res && res.response) {
-          this.chatLog[turnSid].push({
-            role: 'assistant',
-            content: res.response,
-            created_at: new Date().toISOString()
-          });
-        }
-
-        if (this.selectedSession && this.selectedSession.chat) {
-          this.selectedSession.chat.push({
-            role: 'user',
-            content: this.quickPrompt.trim(),
-            created_at: new Date().toISOString()
-          });
-          if (res && res.response) {
-            this.selectedSession.chat.push({
-              role: 'assistant',
-              content: res.response,
-              created_at: new Date().toISOString()
-            });
-          }
-        }
-
-        this.dispatchSuccess = `Dispatched to ${target}`;
-        this.quickPrompt = '';
-        setTimeout(() => { this.dispatchSuccess = null; }, 3000);
-        this.$emit('sync-agents');
-      } catch (e) {
-        console.error('Dispatch failed', e);
-        this.dispatchError = e.message || 'Dispatch failed';
-        setTimeout(() => { this.dispatchError = null; }, 4000);
-      } finally {
-        this.isDispatching = false;
-      }
-    },
     createTaskFromSession(session) {
       if (!session) return;
       this.$emit('open-new-issue', {
@@ -321,7 +253,7 @@ const AgentsViewComponent = {
         <div class="p-2.5 border-b border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/50">
           <div class="flex items-center space-x-2">
             <span class="text-sm">🤖</span>
-            <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-200">Agent Team</span>
+            <span class="text-xs font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-200">Sessions</span>
           </div>
           <div class="flex items-center gap-1.5">
             <span class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/60 text-[10px] font-mono text-zinc-700 dark:text-zinc-300 font-semibold">
@@ -330,7 +262,7 @@ const AgentsViewComponent = {
             <button
               @click="$emit('sync-agents')"
               class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
-              title="Rescan Agents"
+              title="Rescan Sessions"
             >
               <i data-lucide="refresh-cw" class="w-3 h-3"></i>
             </button>
@@ -341,7 +273,7 @@ const AgentsViewComponent = {
           <input
             v-model="search"
             type="text"
-            placeholder="Filter agents..."
+            placeholder="Filter sessions..."
             class="w-full px-2.5 py-1 text-xs rounded-md bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-600"
           />
         </div>
@@ -354,7 +286,7 @@ const AgentsViewComponent = {
           >
             <div class="flex items-center space-x-2 min-w-0">
               <span class="text-sm shrink-0">🌐</span>
-              <span class="truncate">All Agents</span>
+              <span class="truncate">All Sessions</span>
             </div>
             <span class="font-mono text-[10px] bg-zinc-200/80 dark:bg-zinc-700/60 px-1.5 py-0.5 rounded">{{ totalSessions }}</span>
           </button>
@@ -510,10 +442,6 @@ const AgentsViewComponent = {
               <span class="text-zinc-400 dark:text-zinc-500">MODEL</span>
               <span class="text-zinc-700 dark:text-zinc-200 font-semibold">{{ selectedSession.model }}</span>
             </span>
-            <span class="flex items-center gap-1">
-              <span class="text-zinc-400 dark:text-zinc-500">TOKENS</span>
-              <span class="text-zinc-700 dark:text-zinc-200 font-semibold">{{ fmtTokens((selectedSession.tokens_in || 0) + (selectedSession.tokens_out || 0)) }}</span>
-            </span>
             <span v-if="selectedSession.git_commit_after" class="flex items-center gap-1">
               <span class="text-zinc-400 dark:text-zinc-500">GIT</span>
               <span class="text-zinc-700 dark:text-zinc-200 font-semibold">{{ selectedSession.git_commit_after.slice(0, 7) }}</span>
@@ -612,7 +540,6 @@ const AgentsViewComponent = {
           </div>
         </div>
 
-        <!-- TAB 2: Terminal Output & Logs -->
         <div v-else-if="activeTab === 'terminal'" class="flex-1 flex flex-col min-h-0 bg-[#09090b] text-zinc-200 p-3 font-mono text-xs overflow-y-auto">
           <div v-if="!selectedSession || !selectedSession.log_tail" class="text-zinc-500 italic p-6 text-center">
             No terminal stdout/stderr captured yet for this session.
@@ -620,7 +547,6 @@ const AgentsViewComponent = {
           <pre v-else class="whitespace-pre-wrap leading-relaxed text-zinc-300">{{ selectedSession.log_tail }}</pre>
         </div>
 
-        <!-- TAB 3: Git Diff -->
         <div v-else-if="activeTab === 'diff'" class="flex-1 flex flex-col min-h-0 bg-white dark:bg-zinc-950 p-3 overflow-y-auto font-mono text-xs">
           <div v-if="!selectedSession || (!selectedSession.git_diff_raw && (!selectedSession.files_touched || !selectedSession.files_touched.length))" class="text-zinc-400 italic p-6 text-center">
             No git file modifications recorded for this session.
@@ -636,7 +562,6 @@ const AgentsViewComponent = {
           </div>
         </div>
 
-        <!-- TAB 4: Telemetry & Ephemeral Sandboxes -->
         <div v-else-if="activeTab === 'runs'" class="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50/50 dark:bg-zinc-950/30 text-xs">
           <!-- Autonomous Ephemeral Sandboxes & Dev Environments -->
           <div v-if="selectedSession" class="space-y-4">
@@ -648,10 +573,6 @@ const AgentsViewComponent = {
               <div class="p-3 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800">
                 <div class="text-[10px] text-zinc-400 font-semibold uppercase">Model</div>
                 <div class="text-sm font-mono font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 truncate">{{ selectedSession.model || '—' }}</div>
-              </div>
-              <div class="p-3 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800">
-                <div class="text-[10px] text-zinc-400 font-semibold uppercase">Tokens</div>
-                <div class="text-sm font-mono font-bold text-zinc-800 dark:text-zinc-200 mt-0.5">{{ fmtTokens(selectedSession.tokens_spent || 0) }}</div>
               </div>
               <div class="p-3 rounded-xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800">
                 <div class="text-[10px] text-zinc-400 font-semibold uppercase">Duration</div>
@@ -670,29 +591,6 @@ const AgentsViewComponent = {
             </div>
           </div>
           <div v-else class="py-16 text-center text-zinc-400 italic">
-            Select a session run to inspect telemetry.
-          </div>
-        </div>
-
-<!-- Interactive Dispatch Bar -->
-        <div class="p-2.5 border-t border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/70 dark:bg-zinc-900/50">
-          <div class="flex items-end space-x-2">
-            <textarea
-              v-model="quickPrompt"
-              @keydown.enter.exact.prevent="quickDispatch(activeAgent ? activeAgent.name : 'flomaster')"
-              rows="1"
-              :placeholder="selectedSession ? ('Send follow-up prompt to ' + (selectedSession.agent_name || selectedSession.short_name) + '…') : 'Dispatch task to agent swarm…'"
-              class="flex-1 px-3 py-2 text-xs rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-zinc-400 resize-none"
-            ></textarea>
-            <button
-              @click="quickDispatch(activeAgent ? activeAgent.name : 'flomaster')"
-              :disabled="isDispatching || !quickPrompt.trim()"
-              class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold transition-all flex items-center space-x-1.5 shrink-0"
-            >
-              <i data-lucide="send" class="w-3.5 h-3.5"></i>
-              <span>{{ isDispatching ? 'Sending…' : 'Send' }}</span>
-            </button>
-          </div>
           <div v-if="dispatchSuccess" class="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono mt-1">✓ {{ dispatchSuccess }}</div>
           <div v-if="dispatchError" class="text-[10px] text-rose-600 dark:text-rose-400 font-mono mt-1">✕ {{ dispatchError }}</div>
         </div>

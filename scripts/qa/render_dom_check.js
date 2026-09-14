@@ -561,14 +561,16 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
           });
           creates.push({ status: r.status, id: ((await r.json()).id || null) });
         }
-        return { token: !!token, proj: proj ? proj.id : null, creates };
+        return { token: !!token, proj: proj ? proj.id : null, projectKey: proj ? proj.identifier.toLowerCase() : null, creates };
       }, applyTitle);
       const applyIds = (applyDbg.creates || []).map(c => c.id);
       range.applyDbg = applyDbg;
       // Ensure the app is on the board BEFORE reload: the reload restores the
       // route from the hash, and the range suite's list section leaves the app
       // on #/pb/list where no board cards exist.
-      await page.evaluate(() => { location.hash = '#/pb/board'; });
+      await page.evaluate((projectKey) => {
+        location.hash = projectKey ? '#/' + projectKey + '/board' : '#/pb/board';
+      }, applyDbg.projectKey);
       await page.waitForTimeout(400);
       // Reload so loadIssues deterministically includes the raw-fetch-created
       // issues (realtime SSE may have dropped by this point in the suite).
@@ -601,7 +603,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
         const applyStatus = page.locator('#bulk-actions-bar label:has-text("Status") select, [class*="bottom-5"] label:has-text("Status") select').first();
         await applyStatus.selectOption('todo');
         await page.waitForTimeout(800);
-        range.applyMovedAll = await page.evaluate(async (ids) => {
+        range.applyMovedAll = await pollUntil(async (ids) => {
           let token = null;
           for (const k of ['pb_auth', 'pocketbase_auth']) {
             try { token = JSON.parse(localStorage.getItem(k)).token; if (token) break; } catch (e) {}
@@ -613,7 +615,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
             if (r.status !== 200 || (await r.json()).status !== 'todo') { ok = false; break; }
           }
           return ok;
-        }, applyIds);
+        }, applyIds, 8000);
         await page.keyboard.press('Escape');
         await page.waitForTimeout(300);
         range.applyBarCleared = await page.evaluate(() => !document.querySelector('.fixed.bottom-5.left-1\\/2'));
@@ -791,13 +793,30 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     // blocks relation through the real UI shows the row + kanban lock badge,
     // and cleanup removes the temp edge/issue. ----
     relations.checked = true;
-    const probeId = 'tplfu0fuewyl1or';
+    const probeId = await page.evaluate(async () => {
+      let token = null;
+      for (const key of ['pb_auth', 'pocketbase_auth']) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (raw) token = JSON.parse(raw).token;
+        } catch (e) { /* ignore */ }
+        if (token) break;
+      }
+      const headers = token ? { Authorization: token } : {};
+      const res = await fetch('/api/collections/issues/records?page=1&perPage=1', { headers });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.items && data.items[0] ? data.items[0].id : null;
+    });
     const tmpTitle = 'Rel QA target ' + Date.now();
     // 1. Create a temp target issue in the probe's project (authed page ctx).
     // The PocketBase SDK stores its token in localStorage; raw fetch calls are
     // anonymous unless we forward it as the Authorization header.
     let tmpIdHolder = null;
     try {
+    if (!probeId) {
+      relations.skipped = 'No issue exists for relationship QA';
+    } else {
     const tmp = await page.evaluate(async ({ probeId, tmpTitle }) => {
       let token = null;
       try {
@@ -894,6 +913,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       }, tmpTitle, 10000);
     } else {
       relations.error = tmp.error || 'temp issue create failed';
+    }
     }
     } finally {
       // Crash-safe cleanup: always remove the temp issue if it was created.
@@ -1364,34 +1384,8 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     failures.push('custom-field picker E2E not exercised');
   }
 
-  if (timeline && timeline.checked) {
-    if (timeline.error) failures.push('timeline E2E setup error: ' + timeline.error);
-    if (timeline.viewMounted === false) failures.push('timeline view did not mount (no day grid)');
-    if (timeline.barShown === false) failures.push('timeline did not render a bar for the temp dated issue');
-    if (timeline.barOpensDrawer === false) failures.push('clicking a timeline issue bar did not open the drawer');
-    if (timeline.shortcutWorks === false) failures.push('keyboard 4 did not switch to the timeline view');
-  } else if (!timeline.checked) {
-    failures.push('timeline E2E not exercised');
-  }
-  if (portfolio && portfolio.checked) {
-    if (portfolio.error) failures.push('portfolio E2E setup error: ' + portfolio.error);
-    if (portfolio.viewMounted === false) failures.push('portfolio view did not mount');
-    if (portfolio.projectRowShown === false) failures.push('portfolio did not render project progress rows');
-    if (portfolio.shortcutWorks === false) failures.push('keyboard 9 did not switch to the portfolio view');
-    const rt = portfolio.realtime || {};
-    if (rt.created && rt.created !== 'created') failures.push(`portfolio realtime: could not create probe issue (${rt.created})`);
-    if (rt.before !== null && rt.incremented === false) {
-      failures.push(`portfolio realtime KPI did not increment (before=${rt.before}, after=${rt.after}) — auto-refresh on create failed`);
-    }
-  } else if (!portfolio.checked) {
-    failures.push('portfolio E2E not exercised');
-  }
-  if (deepLink && deepLink.checked) {
-    if (deepLink.error) failures.push('deep-link E2E error: ' + deepLink.error);
-    if (deepLink.landedOnPortfolio === false) failures.push('deep link #/pb/portfolio did not land on portfolio after login');
-  } else if (!deepLink.checked) {
-    failures.push('deep-link E2E not exercised');
-  }
+  // Timeline and Portfolio were deliberately removed from the lean core.
+  // Legacy hash redirects are covered by static routing tests.
   if (exportModal && exportModal.checked) {
     if (exportModal.error) failures.push('export modal E2E error: ' + exportModal.error);
     if (exportModal.headerButtonMissing) failures.push('export modal header button not found');
@@ -1429,23 +1423,8 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   } else if (!importModal || !importModal.checked) {
     failures.push('import modal E2E not exercised');
   }
-  if (dispatchQA && dispatchQA.checked) {
-    if (dispatchQA.error) failures.push('agent dispatch E2E error: ' + dispatchQA.error);
-    if (dispatchQA.triggerMissing) failures.push('agent dispatch Trigger Agent button not found in drawer');
-    if (dispatchQA.customVisible === false) failures.push('Custom Agent row did not render in dispatch dropdown');
-    if (dispatchQA.promptEditor === false) failures.push('custom instruction prompt editor missing in dispatch dropdown');
-    if (dispatchQA.counterHasLength === false) failures.push('prompt char counter did not update after typing');
-  } else if (!dispatchQA || !dispatchQA.checked) {
-    failures.push('agent dispatch E2E not exercised');
-  }
-  if (docsQA && docsQA.checked) {
-    if (docsQA.error) failures.push('docs surface E2E error: ' + docsQA.error);
-    if (docsQA.snippetFound === false) failures.push('MCP snippet not found in Docs view');
-    if (docsQA.noPlaceholder === false) failures.push('MCP snippet leaks an unresolved ${...} placeholder');
-    if (docsQA.hasOriginUrl === false) failures.push('MCP snippet PROJECTBASE_URL is not a concrete http origin');
-  } else if (!docsQA || !docsQA.checked) {
-    failures.push('docs surface E2E not exercised');
-  }
+  if (dispatchQA && dispatchQA.triggerMissing === false) failures.push('removed agent dispatch control is still visible');
+  if (docsQA && docsQA.tabOpened === true) failures.push('removed in-app Docs tab is still reachable');
 
   console.log(JSON.stringify({ checks, routing, resize, urlState, relations, focusMode, bulk, range, customField, timeline, portfolio, deepLink, exportModal, notifSettings, importModal, dispatchQA, docsQA, failures, all4xx }, null, 1));
   console.log(failures.length === 0 ? 'RENDER QA: PASS' : 'RENDER QA: FAIL');

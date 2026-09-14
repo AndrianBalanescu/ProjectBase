@@ -4,13 +4,6 @@
 const CyclesViewComponent = {
   props: ['cycles', 'issues', 'projects', 'currentProject', 'selectedCycleId'],
   emits: ['open-issue', 'open-new-cycle', 'update-cycle', 'delete-cycle', 'update:selectedCycleId'],
-  data() {
-    return {
-      aiSummary: '',
-      aiSummaryLoading: false,
-      aiSummaryError: ''
-    };
-  },
   computed: {
     activeCycle() {
       return this.cycles.find(c => c.status === 'active') || (this.cycles.length > 0 ? this.cycles[0] : null);
@@ -123,54 +116,7 @@ ${grid}<polyline points="${idealPts}" fill="none" stroke="#a1a1aa" stroke-width=
       const e = end ? new Date(end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Ongoing';
       return `${s} – ${e}`;
     },
-    renderCycleSummary() {
-      if (!this.aiSummary) return '<p class="text-zinc-400 italic text-xs">No summary yet. Generate one to see sprint insights.</p>';
-      if (window.marked && window.DOMPurify) {
-        return window.DOMPurify.sanitize(window.marked.parse(this.aiSummary));
-      }
-      return this.aiSummary.replace(/\n/g, '<br>');
-    },
-    async generateCycleSummary() {
-      if (!this.currentCycle) return;
-      if (this.aiSummaryLoading) return;
-      const list = this.cycleIssues;
-      this.aiSummary = '';
-      this.aiSummaryError = '';
-      this.aiSummaryLoading = true;
-      try {
-        const headers = { 'Content-Type': 'application/json' };
-        if (typeof pb !== 'undefined' && pb.authStore && pb.authStore.token) {
-          headers['Authorization'] = pb.authStore.token;
-        }
-        const issuesPayload = list.map(i => ({
-          identifier: i.identifier || '',
-          title: i.title || '',
-          status: i.status || '',
-          priority: i.priority || '',
-          estimate: i.estimate || null
-        }));
-        const res = await fetch('/api/projectbase/ai-assist', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            action: 'summarize_cycle',
-            title: this.currentCycle.name,
-            description: this.currentCycle.description || '',
-            issues: issuesPayload
-          })
-        });
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-          throw new Error(data.error || 'Failed to generate cycle summary');
-        }
-        this.aiSummary = data.summary || 'No summary returned.';
-      } catch (err) {
-        console.error('Cycle summary error:', err);
-        this.aiSummaryError = err.message || 'Failed to generate summary.';
-      } finally {
-        this.aiSummaryLoading = false;
-      }
-    }
+
   },
   template: `
     <div class="h-[calc(100vh-3.5rem)] overflow-y-auto p-4 bg-zinc-50 dark:bg-[#09090b] select-none">
@@ -339,64 +285,6 @@ ${grid}<polyline points="${idealPts}" fill="none" stroke="#a1a1aa" stroke-width=
                 </div>
               </div>
 
-              <!-- AI Cycle Summary -->
-              <div class="pt-3 border-t border-zinc-200 dark:border-zinc-800">
-                <div class="flex items-center justify-between mb-2">
-                  <h4 class="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center space-x-1.5">
-                    <i data-lucide="sparkles" class="w-3.5 h-3.5 text-zinc-500"></i>
-                    <span>AI Sprint Summary</span>
-                  </h4>
-                  <button
-                    @click="generateCycleSummary"
-                    :disabled="aiSummaryLoading"
-                    class="flex items-center space-x-1 px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-medium border border-zinc-200 dark:border-zinc-700/60 transition-colors disabled:opacity-40"
-                  >
-                    <i data-lucide="wand-2" class="w-3 h-3"></i>
-                    <span>{{ aiSummaryLoading ? 'Generating…' : 'Generate' }}</span>
-                  </button>
-                </div>
-
-                <div v-if="aiSummaryLoading" class="flex items-center space-x-2 text-xs text-zinc-400 py-2">
-                  <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i>
-                  <span>Analyzing sprint issues…</span>
-                </div>
-
-                <div v-else-if="aiSummaryError" class="p-2.5 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/40 text-red-700 dark:text-red-300 text-xs">
-                  {{ aiSummaryError }}
-                </div>
-
-                <div v-else class="text-xs text-zinc-800 dark:text-zinc-200 markdown-body select-text" v-html="renderCycleSummary()"></div>
-              </div>
-
-              <!-- Cycle Issues List -->
-              <div class="space-y-2 pt-3 border-t border-zinc-200 dark:border-zinc-800 select-text">
-                <h4 class="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Issues in this Cycle</h4>
-
-                <div class="space-y-1">
-                  <div
-                    v-for="issue in cycleIssues"
-                    :key="issue.id"
-                    @click="$emit('open-issue', issue)"
-                    class="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-900/40 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between cursor-pointer transition-colors"
-                  >
-                    <div class="flex items-center space-x-2 min-w-0">
-                      <span class="font-mono text-xs text-zinc-500 font-semibold">{{ issue.identifier }}</span>
-                      <span class="text-xs text-zinc-800 dark:text-zinc-200 truncate font-medium">{{ issue.title }}</span>
-                    </div>
-
-                    <div class="flex items-center space-x-2 shrink-0">
-                      <span class="px-1.5 py-0.5 rounded text-[10px] font-medium" :class="issue.status === 'done' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'">
-                        {{ issue.status }}
-                      </span>
-                      <span v-if="issue.estimate" class="text-[10px] font-mono text-zinc-400">{{ issue.estimate }} pts</span>
-                    </div>
-                  </div>
-
-                  <div v-if="cycleIssues.length === 0" class="py-6 text-center text-zinc-400 text-xs">
-                    No issues assigned to this cycle yet.
-                  </div>
-                </div>
-              </div>
 
             </div>
           </div>

@@ -142,8 +142,7 @@
         @delete-saved-view="removeSavedView"
       ></kanban-board>
 
-      <!-- 2. List View -->
-      <list-view 
+      <list-view
         v-else-if="currentView === 'list'"
         :issues="issues"
         :projects="projects"
@@ -169,8 +168,7 @@
         @select-all-visible="selectAllVisibleIssues"
       ></list-view>
 
-      <!-- 3. Cycles / Sprints View -->
-      <cycles-view 
+      <cycles-view
         v-else-if="currentView === 'cycles'"
         :cycles="cycles"
         :issues="issues"
@@ -181,19 +179,7 @@
         @open-new-cycle="isCycleModalOpen = true"
       ></cycles-view>
 
-      <!-- 3b. Timeline / Gantt View -->
-      <timeline-view
-        v-else-if="currentView === 'timeline'"
-        :issues="issues"
-        :cycles="cycles"
-        :milestones="milestones"
-        :projects="projects"
-        :current-project="currentProject"
-        @open-issue="openIssue"
-      ></timeline-view>
-
-      <!-- 4. Projects Overview -->
-      <projects-view 
+      <projects-view
         v-else-if="currentView === 'projects'"
         :projects="projects"
         :issues="issues"
@@ -203,15 +189,19 @@
         @toggle-favorite="handleToggleFavorite"
       ></projects-view>
 
-      <!-- 5. Analytics View -->
-      <stats-view 
-        v-else-if="currentView === 'stats'"
+      <milestones-view
+        v-else-if="currentView === 'milestones'"
+        :milestones="milestones"
         :issues="issues"
         :projects="projects"
-        :cycles="cycles"
-      ></stats-view>
+        :current-project="currentProject"
+        @open-issue="openIssue"
+        @create-milestone="handleCreateMilestone"
+        @update-milestone="handleUpdateMilestone"
+        @delete-milestone="handleDeleteMilestone"
+        @update-project="handleSaveProject"
+      ></milestones-view>
 
-      <!-- 5b. Agent Team View -->
       <agents-view
         v-else-if="currentView === 'agents'"
         :agents="agents"
@@ -222,21 +212,6 @@
         @sync-agents="handleSyncAgents"
         @open-new-issue="openNewIssue"
       ></agents-view>
-
-      <!-- 6. Docs & API View -->
-      <docs-view 
-        v-else-if="currentView === 'docs'"
-      ></docs-view>
-
-      <!-- 7. Portfolio Dashboard View -->
-      <portfolio-view
-        v-else-if="currentView === 'portfolio'"
-        :projects="projects"
-        :issues="issues"
-        :milestones="milestones"
-        :realtime-tick="realtimeTick"
-        @select-project="selectProject"
-      ></portfolio-view>
     </main>
 
     <!-- Bulk Actions Bar (board/list multi-select) -->
@@ -539,12 +514,11 @@
   <script src="/js/components/ListView.js"></script>
   <script src="/js/components/CyclesView.js"></script>
   <script src="/js/components/MilestonesView.js"></script>
-  <script src="/js/components/TimelineView.js"></script>
+
   <script src="/js/components/ProjectsView.js"></script>
-  <script src="/js/components/StatsView.js"></script>
+
   <script src="/js/components/AgentsView.js"></script>
-  <script src="/js/components/PortfolioView.js"></script>
-  <script src="/js/components/DocsView.js"></script>
+
   <script src="/js/components/IssueDrawer.js"></script>
   <script src="/js/components/CommandPalette.js"></script>
   <script src="/js/components/NewIssueModal.js"></script>

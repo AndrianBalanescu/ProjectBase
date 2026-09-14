@@ -179,7 +179,6 @@ curl -s -X POST http://localhost:8120/api/projectbase/notifications/read-all \
 # (flomaster | hermes | windmill | custom; prompt max 8000 chars). The issue is
 # marked in_progress, assigned to the target agent (custom → "Custom Agent"),
 # and forwarded to a configured Windmill/agent webhook when present.
-curl -s -X POST http://localhost:8120/api/projectbase/dispatch-agent \
   -H "Content-Type: application/json" -H "Authorization: <USER_TOKEN>" \
   -d '{"issue_id":"<ISSUE_ID>","agent_target":"custom","prompt":"Break this issue into subtasks and propose a milestone"}'
 # Returns { success, message, issue:{ id, identifier, status, assignee }, dispatched_external }.

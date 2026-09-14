@@ -334,8 +334,6 @@ DOCUMENTED_CUSTOM_ROUTES = [
     "/projectbase/export/json",
     "/projectbase/notifications/read-all",
     "/projectbase/notification-settings",
-    "/projectbase/ai-assist",
-    "/projectbase/dispatch-agent",
     "/projectbase/mcp",
     "/projectbase/leases",
     "/projectbase/leases/acquire",
@@ -381,16 +379,10 @@ def test_llms_full_txt_no_env_placeholders():
         assert "${" not in fh.read(), "llms-full.txt source contains an env placeholder"
 
 def test_docs_surface_no_env_placeholders():
-    """Docs surface (openapi.json + DocsView MCP snippet) must stay concrete."""
+    """Canonical OpenAPI docs must stay concrete and copy-paste safe."""
     status, body = _get("/openapi.json")
     assert status == 200
     assert "${" not in body, "served openapi.json leaks an env placeholder"
-    src = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "app", "pb_public", "js", "components", "DocsView.js")
-    with open(src, encoding="utf-8") as fh:
-        src_text = fh.read()
-    assert "${PROJECTBASE_URL" not in src_text, "DocsView.js MCP snippet leaks a placeholder"
 
 
 def test_docs_page_served():
@@ -481,26 +473,7 @@ def test_superuser_bootstrap_credential():
 # Adversarial fuzzing
 # ---------------------------------------------------------------------------
 
-def test_fuzz_ai_assist_malformed_json():
-    status, body = _request("POST", "/api/projectbase/ai-assist",
-                            b"{not valid json!!",
-                            headers={"Authorization": _superuser_token()})
-    assert status != 500, f"malformed JSON crashed endpoint: {status} {body}"
-    assert 400 <= status < 500
 
-
-def test_fuzz_ai_assist_missing_fields():
-    status, body = _request("POST", "/api/projectbase/ai-assist", {},
-                            headers={"Authorization": _superuser_token()})
-    assert status != 500, f"empty payload crashed endpoint: {status} {body}"
-
-
-def test_fuzz_ai_assist_oversized_title():
-    status, body = _request(
-        "POST", "/api/projectbase/ai-assist",
-        {"action": "generate_subtasks", "title": "A" * 200_000},
-        headers={"Authorization": _superuser_token()}, timeout=30)
-    assert status != 500, f"oversized title crashed endpoint: {status} {body}"
 
 
 def test_fuzz_unknown_collection_404():
@@ -524,24 +497,7 @@ def test_stats_requires_authentication():
     assert status == 401
 
 
-def test_ai_assist_requires_authentication():
-    status, _ = _request("POST", "/api/projectbase/ai-assist",
-                         {"action": "generate_subtasks", "title": "x"})
-    assert status == 401
 
-
-def test_ai_assist_generate_subtasks():
-    status, body = _request(
-        "POST", "/api/projectbase/ai-assist",
-        {"action": "generate_subtasks", "title": "Test CI Task"},
-        headers={"Authorization": _superuser_token()}, timeout=60)
-    assert status == 200
-    assert body.get("success") is True
-
-
-# ---------------------------------------------------------------------------
-# CSV importer (cycle 2)
-# ---------------------------------------------------------------------------
 
 def test_importer_requires_authentication():
     status, _ = _request("POST", "/api/projectbase/import/csv",
@@ -1883,114 +1839,6 @@ def _first_project_id():
     return body["items"][0]["id"]
 
 
-def test_dispatch_agent_rejects_corrupted_json():
-    """Malformed JSON must be a 400, not a 500 leaking internals."""
-    status, body = _request(
-        "POST", "/api/projectbase/dispatch-agent", b"{broken",
-        headers={"Authorization": _superuser_token()})
-    assert status == 400, f"corrupted JSON should be 400, got {status} {body}"
-
-
-def test_dispatch_agent_missing_issue_404():
-    """A nonexistent issue id must yield 404, never a raw SQL leak."""
-    status, body = _authed_json("POST", "/api/projectbase/dispatch-agent",
-                                {"issue_id": "zzzzzzzzzzzzzz"})
-    assert status == 404
-    assert "not found" in str(body).lower() or "not found" in str(body.get("error", "")).lower()
-
-
-def test_dispatch_agent_rejects_unknown_target():
-    """agent_target must be allowlisted; arbitrary strings are rejected."""
-    iid = _first_issue_id()
-    status, body = _authed_json("POST", "/api/projectbase/dispatch-agent",
-                                {"issue_id": iid, "agent_target": "evil"})
-    assert status == 400
-    assert "agent_target" in str(body)
-
-
-def test_dispatch_agent_rejects_oversized_prompt():
-    iid = _first_issue_id()
-    status, body = _authed_json("POST", "/api/projectbase/dispatch-agent",
-                                {"issue_id": iid, "prompt": "A" * 9000})
-    assert status == 400
-
-
-def test_dispatch_agent_happy_path():
-    """A valid dispatch must succeed (P1 regression: audit comment creation
-    previously failed on required comments.body, breaking dispatch)."""
-    # Dispatch on a throwaway issue so demo data is never mutated; deleting
-    # the issue cascades its audit comment away too.
-    pid = _first_project_id()
-    status, created = _authed_json(
-        "POST", "/api/collections/issues/records",
-        {"title": "cycle24 dispatch regression", "project": pid, "status": "todo"})
-    assert status == 200, f"failed to create throwaway issue: {status} {created}"
-    iid = created["id"]
-    try:
-        status, body = _authed_json("POST", "/api/projectbase/dispatch-agent",
-                                    {"issue_id": iid, "agent_target": "flomaster"})
-        assert status == 200, f"dispatch should succeed after schema fix: {status} {body}"
-        assert body.get("success") is True
-        # The dispatch must assign the human-facing agent name for the target
-        # (regression: flomaster must map to "Flomaster Agent", not a generic
-        # fallback that would make the audit trail ambiguous).
-        assert body.get("issue", {}).get("assignee") == "Flomaster Agent"
-    finally:
-        _request("DELETE", f"/api/collections/issues/records/{iid}",
-                 headers={"Authorization": _superuser_token()})
-
-
-def test_dispatch_agent_webhook_payload_reads_title_description():
-    """P1 regression: the external Windmill/generic-webhook payload referenced
-    `title`/`desc` that were never assigned from the issue, so every external
-    dispatch sent `undefined` for the issue title/description. Guard that the
-    hook reads both fields off the issue before building either payload, and
-    maps each allowed agent_target to a distinct, human-facing agent name."""
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    hook = open(os.path.join(root, "app", "pb_hooks", "80_agent_triggers.pb.js")).read()
-    # Strip // line comments so a commented-out assignment (a plausible
-    # regression) can't satisfy the guard.
-    code = "\n".join(l.split("//", 1)[0] for l in hook.splitlines())
-    # The payloads must reference locally-defined title/desc, not bare
-    # (undeclared) identifiers that serialize to "undefined".
-    assert 'let title = issue.get("title")' in code, "hook must read issue title before building webhook payload"
-    assert 'let desc = issue.get("description")' in code, "hook must read issue description before building webhook payload"
-    # Every allowed target must resolve to a distinct agent name so an external
-    # dispatch's audit trail is not collapsed to a single generic fallback.
-    for target in ("flomaster", "hermes", "windmill", "custom"):
-        assert f"{target}:" in code, f"agent_target '{target}' must be mapped to a distinct agent name"
-
-
-def test_dispatch_agent_custom_target_with_prompt():
-    """The `custom` target must accept an 8000-char prompt, mark the issue
-    in_progress, assign the distinct "Custom Agent" name, and echo the prompt
-    back in the audit comment. This closes the loop on the charter's
-    autonomous-dispatch moat: the frontend now exposes a Custom Agent control
-    that sends `agent_target=custom` + a prompt, but the backend previously
-    had the target only reachable via raw API."""
-    pid = _first_project_id()
-    status, created = _authed_json(
-        "POST", "/api/collections/issues/records",
-        {"title": "cycle39 custom dispatch", "project": pid, "status": "todo"})
-    assert status == 200, f"failed to create throwaway issue: {status} {created}"
-    iid = created["id"]
-    prompt = "Triage this issue: estimate the effort, suggest a milestone, and propose subtasks."
-    try:
-        status, body = _authed_json("POST", "/api/projectbase/dispatch-agent",
-                                    {"issue_id": iid, "agent_target": "custom", "prompt": prompt})
-        assert status == 200, f"custom dispatch should succeed: {status} {body}"
-        assert body.get("success") is True
-        assert body.get("issue", {}).get("assignee") == "Custom Agent"
-        # A prompt is forwarded for the custom agent; the audit trail should
-        # record the instructions so a human can see what was dispatched.
-        comments = _get_authed(f"/api/collections/comments/records?filter=issue='{iid}'&perPage=50")[1]
-        assert comments.get("items"), "dispatch must leave an audit comment"
-        joined = " ".join(c.get("content", "") for c in comments["items"])
-        assert "Custom Agent" in joined
-        assert "propose subtasks" in joined
-    finally:
-        _request("DELETE", f"/api/collections/issues/records/{iid}",
-                 headers={"Authorization": _superuser_token()})
 
 
 def test_quick_task_corrupted_json_400():
@@ -2068,66 +1916,6 @@ def test_issue_creation_writes_created_activity():
         # Activity rows cascade-delete with the issue (relation cascadeDelete).
 
 
-def test_mcp_server_dispatch_agent_tool():
-    """The FastMCP `dispatch_agent` tool must claim an issue end-to-end.
-
-    Cycle-46 modernization: the MCP server is the agent-facing moat, but it
-    exposed 16 tools while the charter's signature autonomous-dispatch endpoint
-    (`POST /api/projectbase/dispatch-agent`) was only reachable via raw REST.
-    This guards the added `dispatch_agent` tool: it resolves an identifier to a
-    record id, POSTs the right payload, and returns the claimed-issue summary
-    (in_progress + agent assignee) without mutating demo data.
-
-    The module itself needs `fastmcp`; rather than require that dependency in
-    the test env, we compile the tool's source with a stub FastMCP and call it
-    through the same module globals the real server uses."""
-    mcp_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                            "scripts", "mcp_server.py")
-    assert os.path.isfile(mcp_path), f"missing expected MCP server {mcp_path}"
-    with open(mcp_path, encoding="utf-8") as fh:
-        src = fh.read()
-
-    # Stub the fastmcp dependency: the tool function body only uses the
-    # stdlib helpers in this module, so a no-op decorator is sufficient.
-    import types as _types
-    stub = _types.ModuleType("fastmcp")
-    stub.FastMCP = lambda name: _types.SimpleNamespace(
-        tool=lambda *a, **k: (a[0] if a else (lambda f: f)))
-    import sys as _sys
-    _sys.modules["fastmcp"] = stub
-
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("mcp_server", mcp_path)
-    mcp_mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mcp_mod)
-    # Point the module at this live instance with the protocol credentials.
-    mcp_mod.BASE_URL = BASE_URL
-    mcp_mod.AUTH_EMAIL = SUPERUSER_EMAIL
-    mcp_mod.AUTH_PASSWORD = SUPERUSER_PASSWORD
-    mcp_mod.AUTH_TOKEN = ""
-
-    pid = _first_project_id()
-    status, created = _authed_json(
-        "POST", "/api/collections/issues/records",
-        {"title": "cycle46 mcp dispatch tool", "project": pid, "status": "todo"})
-    assert status == 200, f"failed to create throwaway issue: {status} {created}"
-    iid = created["id"]
-    identifier = created.get("identifier")
-    try:
-        result = mcp_mod.dispatch_agent(identifier, agent_target="flomaster",
-                                        prompt="MCP tool smoke test")
-        assert result.get("success") is True
-        assert result.get("issue", {}).get("id") == iid
-        assert result.get("issue", {}).get("status") == "in_progress"
-        assert result.get("issue", {}).get("assignee") == "Flomaster Agent"
-        # Audit comment must exist so humans/agents can trace the claim.
-        comments = _get_authed(f"/api/collections/comments/records?filter=issue='{iid}'&perPage=50")[1]
-        assert comments.get("items"), "MCP dispatch must leave an audit comment"
-        joined = " ".join(c.get("content", "") for c in comments["items"])
-        assert "Autonomous Task Claimed" in joined
-    finally:
-        _request("DELETE", f"/api/collections/issues/records/{iid}",
-                 headers={"Authorization": _superuser_token()})
 
 def test_mcp_server_cycle_and_milestone_tools():
     """The FastMCP server must expose cycle + milestone tools so agents can
@@ -2189,11 +1977,6 @@ def test_mcp_server_cycle_and_milestone_tools():
     mprog = mcp_mod.get_milestone_progress(m_first["id"])
     assert "milestone" in mprog and "total" in mprog and "done" in mprog
     assert mprog["done"] <= mprog["total"]
-
-def test_ai_assist_corrupted_json_400():
-    status, body = _request("POST", "/api/projectbase/ai-assist", b"{bad",
-                            headers={"Authorization": _superuser_token()})
-    assert status == 400
 
 
 def test_import_csv_corrupted_json_400():
@@ -2758,233 +2541,20 @@ def test_realtime_handles_cycles_and_comments():
         "IssueDrawer must reload comments when commentRefreshKey changes"
     )
 
-def test_portfolio_view_wired_and_precached():
-    """The Portfolio Dashboard (v1.1, cycle 20) must be wired through the
-    index.html asset list, the app.js component map, both hash viewMaps, and
-    the Service Worker precache, so offline boot and route navigation work."""
-    import re as _re
+def test_removed_views_redirect_without_shipping_duplicate_assets():
+    """Legacy hashes stay safe while removed duplicate views stay removed."""
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     index = open(os.path.join(root, "app", "pb_public", "index.html")).read()
     app_js = open(os.path.join(root, "app", "pb_public", "js", "app.js")).read()
     sw = open(os.path.join(root, "app", "pb_public", "sw.js")).read()
 
-    # index.html includes the component and renders it under the portfolio view.
-    assert "js/components/PortfolioView.js" in index, (
-        "index.html must include PortfolioView.js"
-    )
-    assert "currentView === 'portfolio'" in index, (
-        "index.html must gate the portfolio view on currentView"
-    )
-    # app.js registers the component, maps the route, and adds the 9 shortcut.
-    assert "'portfolio-view': PortfolioViewComponent" in app_js, (
-        "app.js must register the portfolio-view component"
-    )
-    assert "portfolio: 'portfolio'" in app_js, (
-        "app.js viewMaps must include the portfolio route"
-    )
-    assert "this.currentView = 'portfolio'" in app_js, (
-        "app.js must support switching to the portfolio view"
-    )
-    # SW precache must cover the new asset (drift guard).
-    assert "'./js/components/PortfolioView.js'" in sw, (
-        "Service Worker must precache PortfolioView.js"
-    )
-    # The live-served asset must exist (200).
-    st, body = _get("/js/components/PortfolioView.js")
-    assert st == 200, f"PortfolioView.js not served: {st}"
-    assert "Portfolio Dashboard" in body, "PortfolioView.js must define the view"
-
-
-def test_portfolio_realtime_tick_wiring():
-    """The Portfolio Dashboard must refetch its workspace snapshot on realtime
-    issue/milestone/project/cycle events. The shell bumps a `realtimeTick`, and
-    the view watches it (debounced) to call refresh(). This drift-guard keeps
-    the realtime path wired end to end (app.js -> index.html -> PortfolioView)."""
-    import re as _re
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    index = open(os.path.join(root, "app", "pb_public", "index.html")).read()
-    app_js = open(os.path.join(root, "app", "pb_public", "js", "app.js")).read()
-    pf = open(os.path.join(root, "app", "pb_public", "js", "components", "PortfolioView.js")).read()
-
-    # index.html passes the tick down to the portfolio view.
-    assert ":realtime-tick=\"realtimeTick\"" in index, (
-        "index.html must bind realtime-tick to the shell's realtimeTick"
-    )
-    # app.js declares the tick and bumps it on workspace-scoped events.
-    assert "realtimeTick: 0" in app_js, (
-        "app.js must initialize realtimeTick"
-    )
-    assert _re.search(r"realtimeTick\+\+", app_js), (
-        "app.js must bump realtimeTick on a realtime event"
-    )
-    # Optimistic (SSE-independent) bumps: the shell updates its issues prop
-    # in place on create/update/delete (PB-56: it does not depend on SSE), so
-    # the tick must also be bumped in those handlers for snapshot views to
-    # refetch even when the SSE event is missed. This is the path render QA
-    # exercises (a UI create bumps the tick and the portfolio KPI increments).
-    for handler in ("handleCreateIssue", "handleUpdateIssue", "handleDeleteIssue"):
-        assert _re.search(handler + r"[\s\S]{0,900}?realtimeTick\+\+", app_js), (
-            f"app.js must bump realtimeTick in {handler} (optimistic, SSE-independent)"
-        )
-    # PortfolioView accepts the prop, watches it (debounced), and refetches.
-    assert "'realtimeTick'" in pf or "realtimeTick" in pf, (
-        "PortfolioView must declare the realtimeTick prop"
-    )
-    assert "realtimeTick()" in pf, (
-        "PortfolioView must watch realtimeTick"
-    )
-    assert "this.refresh()" in pf, (
-        "PortfolioView must call refresh() from the realtime watcher"
-    )
-    assert "refreshTimer" in pf, (
-        "PortfolioView must debounce the realtime refetch"
-    )
-    # Resilient (SSE-independent) path: the shell updates its issues/milestones
-    # props optimistically on create/update/delete (PB-56), so the view must
-    # watch those props too and route both paths through a shared debounced
-    # refresh. This keeps the portfolio live even when the SSE event is missed.
-    assert "issues() { this.scheduleRefresh(); }" in pf, (
-        "PortfolioView must watch the issues prop and schedule a refresh"
-    )
-    assert "milestones() { this.scheduleRefresh(); }" in pf, (
-        "PortfolioView must watch the milestones prop and schedule a refresh"
-    )
-    assert "scheduleRefresh()" in pf and "realtimeTick()" in pf, (
-        "PortfolioView must route both realtimeTick and prop changes through scheduleRefresh"
-    )
-
-def test_ai_cycle_summary_wired_in_cycles_view():
-    """The Cycles & Sprints view must wire the AI Sprint Summary panel to the
-    existing /api/projectbase/ai-assist summarize_cycle action (cycle 28).
-    The backend action and its OpenAPI entry already existed; this drift-guard
-    pins the frontend UI that exposes it (panel, Generate button, auth header,
-    issues payload, markdown rendering)."""
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    cycles = open(os.path.join(root, "app", "pb_public", "js", "components", "CyclesView.js")).read()
-
-    # Panel state + Generate handler exist.
-    assert "aiSummary" in cycles, "CyclesView must track the AI summary text"
-    assert "aiSummaryLoading" in cycles, "CyclesView must track the loading state"
-    assert "generateCycleSummary" in cycles, "CyclesView must define generateCycleSummary()"
-    assert "AI Sprint Summary" in cycles, "CyclesView template must render the AI Sprint Summary panel"
-    assert "Generate" in cycles, "AI Sprint Summary panel must expose a Generate button"
-
-    # The handler must call the ai-assist route with summarize_cycle and auth.
-    assert "'/api/projectbase/ai-assist'" in cycles, (
-        "generateCycleSummary must POST to /api/projectbase/ai-assist"
-    )
-    assert "summarize_cycle" in cycles, (
-        "generateCycleSummary must request the summarize_cycle action"
-    )
-    assert "Authorization" in cycles, (
-        "generateCycleSummary must send the PocketBase auth token"
-    )
-    # The summary must be rendered as sanitized markdown (marked + DOMPurify),
-    # matching the IssueDrawer description rendering convention.
-    assert "renderCycleSummary" in cycles, "CyclesView must render the summary"
-    assert "DOMPurify.sanitize" in cycles, (
-        "renderCycleSummary must sanitize markdown output"
-    )
-
-def test_ai_assist_summarize_cycle_fallback():
-    """summarize_cycle must return a non-empty rule-based summary when the LLM
-    gateway is offline/unauthenticated (cycle 28). The endpoint never returns
-    an empty result: with no model it computes achievements, WIP/blockers and
-    velocity from the issues payload."""
-    status, body = _request(
-        "POST", "/api/projectbase/ai-assist",
-        {"action": "summarize_cycle",
-         "title": "Fallback Sprint",
-         "issues": [
-             {"identifier": "PB-1", "title": "Done task", "status": "done", "priority": "high", "estimate": 3},
-             {"identifier": "PB-2", "title": "WIP task", "status": "in_progress", "priority": "medium", "estimate": 2},
-             {"identifier": "PB-3", "title": "Todo task", "status": "todo", "priority": "low", "estimate": 1}
-         ]},
-        headers={"Authorization": _superuser_token()}, timeout=60)
-    assert status == 200, f"summarize_cycle failed: {status} {body}"
-    assert body.get("success") is True
-    result = body.get("result") or ""
-    assert result.strip(), "summarize_cycle returned an empty result (LLM offline fallback missing)"
-    # The summary (LLM or rule-based fallback) must surface the cycle facts a
-    # human can act on; a summary that omits a listed task is a failure.
-    assert "Done task" in result, "summary must reference done work (achievements)"
-    assert "WIP task" in result, "summary must reference in-progress work"
-    assert "Todo task" in result, "summary must reference backlog work"
-
-def test_burndown_and_velocity_wired_in_cycles_view():
-    """Phase 2 (Core Polish) drift-guard: the Cycles & Sprints view must render
-    a precise burndown (ideal linear line vs actual remaining story points
-    derived from completion timestamps, as an inline SVG) and a velocity trend
-    from completed cycles' delivered points. The view recomputes the chart
-    whenever the selected cycle changes, and degrades gracefully when the
-    cycle lacks dates or estimates."""
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    cycles = open(os.path.join(root, "app", "pb_public", "js", "components", "CyclesView.js")).read()
-
-    # Burndown computation + chart wiring (computed property, not method).
-    assert "burndownChart()" in cycles, "CyclesView must define the burndownChart computed"
-    assert "burndownSvg" in cycles, "CyclesView must define the burndownSvg chart"
-    assert "<svg" in cycles and "polyline" in cycles, (
-        "burndownSvg must render an inline SVG with polylines"
-    )
-    assert "ideal" in cycles, "burndown chart must render the ideal line"
-
-    # Precise actuals: completion derived from issue timestamps (done_at/updated).
-    assert "done_at" in cycles and "updated" in cycles, (
-        "burndown actuals must use issue completion timestamps"
-    )
-    # Graceful degradation without dates or estimates.
-    assert "start and end dates" in cycles
-    assert "story-point estimates" in cycles
-
-    # Velocity trend from completed cycles.
-    assert "velocityData()" in cycles, (
-        "CyclesView must compute a velocity trend from completed cycles"
-    )
-    assert "Velocity Trend" in cycles, "CyclesView template must render the Velocity Trend panel"
-    assert "completed" in cycles, "velocity must count only completed cycles"
-
-    # Template renders both panels with a legend.
-    assert "Burndown" in cycles, "CyclesView template must render the Burndown panel"
-    assert "v-html" in cycles, "burndown chart must render via v-html"
-
-    # The live-served asset must carry the new wiring (no stale bundle).
-    st, body = _get("/js/components/CyclesView.js")
-    assert st == 200, f"CyclesView.js not served: {st}"
-    assert "burndownChart()" in body, "served CyclesView.js must include burndown computed"
-
-def test_global_search_wired_in_command_palette():
-    """The Cmd+K omnibox must wire global cross-project search to the
-    /api/projectbase/search route. This drift-guard pins the frontend surface:
-    the searchIssues API call, the debounced global search watcher, the global
-    results merge into the results list, and the cross-project selection path."""
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    cp = open(os.path.join(root, "app", "pb_public", "js", "components", "CommandPalette.js")).read()
-    app_js = open(os.path.join(root, "app", "pb_public", "js", "app.js")).read()
-    index = open(os.path.join(root, "app", "pb_public", "index.html")).read()
-
-    # CommandPalette must call the search route via the API client.
-    assert "searchIssues" in cp, "CommandPalette must call API.searchIssues()"
-    assert "scheduleGlobalSearch" in cp, "CommandPalette must debounce the global search"
-    assert "globalResults" in cp, "CommandPalette must track global search results"
-    # The results list must merge global results and emit a distinct event so
-    # cross-project issues can be opened.
-    assert "select-global-issue" in cp, "CommandPalette must emit select-global-issue"
-
-    # api.js must expose searchIssues hitting the /api/projectbase/search route.
-    api_js = open(os.path.join(root, "app", "pb_public", "js", "api.js")).read()
-    assert "async searchIssues" in api_js, "api.js must define searchIssues()"
-    assert "/api/projectbase/search" in api_js, "api.js must call the /api/projectbase/search route"
-
-    # app.js must handle select-global-issue by opening the cross-project issue.
-    assert "openGlobalIssue" in app_js, "app.js must define openGlobalIssue()"
-    # index.html must wire the select-global-issue event.
-    assert "select-global-issue" in index, "index.html must bind @select-global-issue"
-
-    # The live-served asset must exist and define the search wiring.
-    st, body = _get("/js/components/CommandPalette.js")
-    assert st == 200, f"CommandPalette.js not served: {st}"
-    assert "searchIssues" in body, "served CommandPalette.js must reference searchIssues"
-
-
-
+    for asset in ("TimelineView.js", "PortfolioView.js", "StatsView.js", "DocsView.js"):
+        assert asset not in index
+        assert asset not in sw
+    assert "legacyViewMap" in app_js
+    for legacy in ("timeline", "portfolio", "stats"):
+        assert legacy in app_js
+    assert "const suffix = parts.slice" in app_js
+    assert "const query = params.toString()" in app_js
+    assert "...suffix" in app_js
+    assert "new URL('docs', document.baseURI)" in app_js

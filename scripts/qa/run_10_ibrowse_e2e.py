@@ -38,13 +38,13 @@ TESTS = [
     },
     {
         "id": 5,
-        "name": "05_stats_view",
-        "goal": f"{LOGIN} Switch to the Stats view. Verify completion rates, issue status breakdowns, and workspace statistics cards render with non-zero values. Report key stats.",
+        "name": "05_roadmap_view",
+        "goal": f"{LOGIN} Open Roadmap from the primary navigation. Verify milestones render without blank content and milestone interactions remain usable.",
     },
     {
         "id": 6,
-        "name": "06_docs_view",
-        "goal": f"{LOGIN} Switch to the Docs view. Verify the Scalar API documentation UI renders and the OpenAPI specification loads properly. Report if the interactive API docs are functional.",
+        "name": "06_sessions_and_api_docs",
+        "goal": f"{LOGIN} Open Sessions and verify execution runs render. Then open API Docs and verify it loads /docs in a separate tab, not an SPA Docs view.",
     },
     {
         "id": 7,
@@ -64,7 +64,7 @@ TESTS = [
     {
         "id": 10,
         "name": "10_header_and_command_palette",
-        "goal": f"{LOGIN} Inspect the top header bar: verify brand logo/name, project selector dropdown, search bar, all view buttons (Board, List, Cycles, Projects, Stats, Docs, Milestones), and user avatar are visible. Press Ctrl+K (or Cmd+K) to open the Command Palette. Report findings.",
+        "goal": f"{LOGIN} Inspect the top header bar: verify brand logo/name, project selector dropdown, search bar, the primary view buttons in exact order (Board, List, Cycles, Roadmap, Projects), plus clear Sessions access and an external API Docs link, and user avatar are visible. Press Ctrl+K (or Cmd+K) to open the Command Palette. Report findings.",
     },
 ]
 

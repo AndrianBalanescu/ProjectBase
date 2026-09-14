@@ -158,12 +158,6 @@ const KanbanBoardComponent = {
       const a = this.findAgent(name);
       return a ? a.avatar : null;
     },
-    fmtTokens(n) {
-      if (!n) return '0';
-      if (n < 1000) return String(n);
-      if (n < 1000000) return (n / 1000).toFixed(1) + 'k';
-      return (n / 1000000).toFixed(1) + 'M';
-    },
     isSelected(issue) {
       return !!(this.selectedIssueIds && this.selectedIssueIds.has(issue.id));
     },
@@ -638,9 +632,6 @@ const KanbanBoardComponent = {
                 <div class="flex items-center space-x-1 shrink-0">
                   <span v-if="session.git_commit" class="px-1 rounded bg-white/60 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
                     🌿 {{ session.git_commit.slice(0, 7) }}
-                  </span>
-                  <span v-if="session.tokens">
-                    ⚡ {{ fmtTokens(session.tokens) }}
                   </span>
                 </div>
               </div>

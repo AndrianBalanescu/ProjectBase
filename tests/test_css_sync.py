@@ -152,3 +152,35 @@ class TestCompiledCssCoversTemplates(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSpaNavigationCleanup(unittest.TestCase):
+    """Removed SPA views must stay absent and legacy hashes must redirect safely."""
+
+    def test_primary_navigation_and_external_docs_are_strict(self):
+        header = open(os.path.join(PB_PUBLIC, "js", "components", "Header.js"), encoding="utf-8").read()
+        ordered = ["label: 'Board'", "label: 'List'", "label: 'Cycles'", "label: 'Roadmap'", "label: 'Projects'"]
+        positions = [header.index(label) for label in ordered]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("<span>Sessions</span>", header)
+        self.assertIn('href="/docs"', header)
+        self.assertIn('target="_blank"', header)
+        for removed in ("Timeline", "Portfolio", ">Stats<", "change-view', 'docs"):
+            self.assertNotIn(removed, header)
+
+    def test_removed_views_have_no_assets_or_mounts(self):
+        index = open(os.path.join(PB_PUBLIC, "index.html"), encoding="utf-8").read()
+        sw = open(os.path.join(PB_PUBLIC, "sw.js"), encoding="utf-8").read()
+        app = open(os.path.join(PB_PUBLIC, "js", "app.js"), encoding="utf-8").read()
+        for name in ("TimelineView", "PortfolioView", "StatsView", "DocsView"):
+            self.assertFalse(os.path.exists(os.path.join(PB_PUBLIC, "js", "components", name + ".js")))
+            self.assertNotIn(name, index + sw + app)
+        for tag in ("timeline-view", "portfolio-view", "stats-view", "docs-view"):
+            self.assertNotIn(tag, index + app)
+
+    def test_legacy_routes_redirect_without_blank_views(self):
+        app = open(os.path.join(PB_PUBLIC, "js", "app.js"), encoding="utf-8").read()
+        self.assertIn("timeline: 'milestones'", app)
+        self.assertIn("portfolio: 'projects'", app)
+        self.assertIn("stats: 'board'", app)
+        self.assertIn("new URL('docs', document.baseURI)", app)

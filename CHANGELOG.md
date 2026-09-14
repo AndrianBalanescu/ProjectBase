@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.0] - 2026-09-14
+
+### Changed
+- Reduced the product to Board, List, Cycles, Roadmap, Projects, issue drawer,
+  and real execution Sessions.
+- Removed duplicate Timeline, Portfolio, Stats, and in-app Docs views; API docs
+  remain available at `/docs`.
+- Removed built-in AI writing and agent-dispatch orchestration endpoints.
+- Retired author-specific fresh-install seed data and added a generic starter
+  workspace without modifying existing installations.
+- Added public project governance, security, support, contribution, and
+  third-party dependency documentation.
+- Pinned CI inputs and verified PocketBase downloads with SHA-256 checksums.
+
 ## [1.41.1] - 2026-09-07 - Cycle 92
 ### Fixed
 - **reset-demo.sh wiped the wrong directory (P1):** the demo-reset script deleted `$(pwd)/pb_data` while docker-compose.yml binds `./app/pb_data`, so "reset" was a silent no-op: demo data accumulated across resets and a stray root-owned `pb_data/` appeared at the repo root. Wipe path now matches the bind mount; proven with a canary record that survived before the fix and is gone after it.

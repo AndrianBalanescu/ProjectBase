@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "ProjectBase API",
-    "version": "1.41.1",
+    "version": "0.2.0",
     "description": "High-performance, ultra-lightweight Plane & Linear alternative for multi-project Kanban, sprint cycles, and autonomous AI agent orchestration.",
     "contact": {
       "name": "Andrian Balanescu",
@@ -826,7 +826,7 @@
                   "properties": {
                     "version": {
                       "type": "string",
-                      "example": "1.41.1"
+                      "example": "0.2.0"
                     },
                     "service": {
                       "type": "string",
@@ -1307,183 +1307,6 @@
           },
           "401": {
             "description": "Authentication required"
-          }
-        }
-      }
-    },
-    "/projectbase/ai-assist": {
-      "post": {
-        "tags": [
-          "AI Assist"
-        ],
-        "summary": "AI Copilot Assistance",
-        "description": "Generate subtasks, polish an issue description, or summarize a sprint cycle using a configured LLM. Falls back to deterministic heuristics when the LLM is unreachable.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "action"
-                ],
-                "properties": {
-                  "action": {
-                    "type": "string",
-                    "enum": [
-                      "generate_subtasks",
-                      "polish_description",
-                      "summarize_cycle"
-                    ]
-                  },
-                  "title": {
-                    "type": "string"
-                  },
-                  "description": {
-                    "type": "string"
-                  },
-                  "issues": {
-                    "type": "array",
-                    "description": "Required for summarize_cycle",
-                    "items": {
-                      "type": "object"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "AI result",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "action": {
-                      "type": "string"
-                    },
-                    "used_llm": {
-                      "type": "boolean"
-                    },
-                    "subtasks": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "description": {
-                      "type": "string"
-                    },
-                    "result": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Title or description required (for subtasks/polish)"
-          },
-          "401": {
-            "description": "Authentication required"
-          }
-        }
-      }
-    },
-    "/projectbase/dispatch-agent": {
-      "post": {
-        "tags": [
-          "Agent Dispatch"
-        ],
-        "summary": "Dispatch an Autonomous Agent",
-        "description": "Mark an issue in_progress, assign it to the target agent, and optionally forward the task to a configured Windmill/agent webhook. Returns the updated issue state and whether it was dispatched externally.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "issue_id"
-                ],
-                "properties": {
-                  "issue_id": {
-                    "type": "string",
-                    "description": "Issue record id (10-20 alphanumeric chars)"
-                  },
-                  "agent_target": {
-                    "type": "string",
-                    "enum": [
-                      "flomaster",
-                      "hermes",
-                      "windmill",
-                      "custom"
-                    ],
-                    "default": "flomaster"
-                  },
-                  "prompt": {
-                    "type": "string",
-                    "maxLength": 8000
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Dispatch result",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "issue": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "identifier": {
-                          "type": "string"
-                        },
-                        "status": {
-                          "type": "string"
-                        },
-                        "assignee": {
-                          "type": "string"
-                        }
-                      }
-                    },
-                    "dispatched_external": {
-                      "type": "boolean"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Missing/invalid issue_id, invalid agent_target, or prompt >8000 chars"
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "404": {
-            "description": "Issue not found"
           }
         }
       }

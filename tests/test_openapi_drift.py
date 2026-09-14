@@ -79,5 +79,14 @@ class TestOpenApiDrift(unittest.TestCase):
         self.assertIn("info", self.spec)
 
 
+    def test_docs_use_the_canonical_openapi(self):
+        docs_index = os.path.join(ROOT, "app", "pb_public", "docs", "index.html")
+        with open(docs_index, "r", encoding="utf-8") as fh:
+            source = fh.read()
+        self.assertIn('data-url="/openapi.json"', source)
+        self.assertFalse(os.path.exists(os.path.join(
+            ROOT, "app", "pb_public", "docs", "openapi.json"
+        )))
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Verify tag matches VERSION
+        shell: bash
+        run: |
+          test "${GITHUB_REF_NAME}" = "v$(tr -d '[:space:]' < VERSION)"
+
+      - name: Run tests
+        run: |
+          python -m pip install pytest
+          python -m pytest -q tests/
+
+      - name: Build and smoke-test image
+        run: |
+          docker build -t projectbase:${GITHUB_REF_NAME} .
+          cid=$(docker run -d -p 127.0.0.1:18120:8120 projectbase:${GITHUB_REF_NAME})
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:18120/api/projectbase/health && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:18120/api/projectbase/health
+
+      - name: Create source artifact and checksum
+        run: |
+          git archive --format=tar.gz --prefix="projectbase-${GITHUB_REF_NAME}/" \
+            -o "projectbase-${GITHUB_REF_NAME}.tar.gz" HEAD
+          sha256sum "projectbase-${GITHUB_REF_NAME}.tar.gz" > SHA256SUMS
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            "projectbase-${GITHUB_REF_NAME}.tar.gz" SHA256SUMS \
+            --generate-notes --title "ProjectBase ${GITHUB_REF_NAME}"

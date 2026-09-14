@@ -77,12 +77,8 @@ const App = {
     'list-view': ListViewComponent,
     'cycles-view': CyclesViewComponent,
     'milestones-view': MilestonesViewComponent,
-    'timeline-view': TimelineViewComponent,
     'projects-view': ProjectsViewComponent,
-    'stats-view': StatsViewComponent,
     'agents-view': AgentsViewComponent,
-    'docs-view': DocsViewComponent,
-    'portfolio-view': PortfolioViewComponent,
     'issue-drawer': IssueDrawerComponent,
     'command-palette': CommandPaletteComponent,
     'new-issue-modal': NewIssueModalComponent,
@@ -102,7 +98,7 @@ const App = {
     const cache = readDataCache();
     return {
       theme: 'dark',
-      currentView: 'board', // 'board', 'list', 'cycles', 'timeline', 'projects', 'stats', 'portfolio'
+      currentView: 'board', // 'board', 'list', 'cycles', 'milestones', 'projects', 'agents'
       authReady: false,
       isAuthenticated: false,
       authMode: 'login', // 'login' | 'signup'
@@ -135,7 +131,7 @@ const App = {
       bulkCustomChecked: false, // checkbox value to apply
       realtimeConnected: true,
       // Bumped on any realtime issue/milestone/project/cycle event so views
-      // that aggregate a workspace snapshot (PortfolioView) can refetch.
+      // that aggregate workspace snapshots can refetch.
       realtimeTick: 0,
       isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
       
@@ -781,7 +777,24 @@ const App = {
       this.applyHashQueryState(params);
       if (!hash) return;
       const parts = hash.split('/').filter(Boolean);
-      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', timeline: 'timeline', projects: 'projects', stats: 'stats', docs: 'docs', milestones: 'milestones', portfolio: 'portfolio', agents: 'agents' };
+      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', projects: 'projects', milestones: 'milestones', agents: 'agents' };
+      const legacyViewMap = { timeline: 'milestones', portfolio: 'projects', stats: 'board' };
+      const routeView = parts.length >= 2 ? parts[1] : parts[0];
+      if (routeView === 'docs') {
+        window.location.replace(new URL('docs', document.baseURI).toString());
+        return;
+      }
+      if (legacyViewMap[routeView]) {
+        const hasProjectPrefix = parts.length >= 2;
+        const projectPrefix = hasProjectPrefix
+          ? parts[0]
+          : (this.currentProject ? this.currentProject.identifier.toLowerCase() : '@');
+        const suffix = parts.slice(hasProjectPrefix ? 2 : 1);
+        const query = params.toString();
+        const target = ['#', projectPrefix, legacyViewMap[routeView], ...suffix].join('/');
+        window.location.replace(target + (query ? `?${query}` : ''));
+        return;
+      }
 
       // parts[0] may be a project identifier or a view name (if no project prefix)
       if (parts.length >= 2 && viewMap[parts[1]]) {
@@ -848,7 +861,7 @@ const App = {
     syncRoute() {
       if (this.isInitialRouting || !this.isAuthenticated) return;
       const proj = this.currentProject ? this.currentProject.identifier.toLowerCase() : '';
-      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', timeline: 'timeline', projects: 'projects', stats: 'stats', docs: 'docs', milestones: 'milestones', portfolio: 'portfolio', agents: 'agents' };
+      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', projects: 'projects', milestones: 'milestones', agents: 'agents' };
       const v = viewMap[this.currentView] || 'board';
       let hash = proj ? `#/${proj}/${v}` : `#/${v}`;
       if (this.currentView === 'agents' && this.activeAgentName) {
@@ -927,7 +940,7 @@ const App = {
           if (!exists) this.issues.unshift(created);
         }
         // Optimistic (non-SSE) update path: bump the tick so snapshot views
-        // (PortfolioView) refetch even when the SSE event is missed (PB-56).
+        // refetch even when the SSE event is missed (PB-56).
         this.realtimeTick++;
         this.pendingNewIssue = null;
         this.showToast(`Created issue ${created.identifier}`, 'success');

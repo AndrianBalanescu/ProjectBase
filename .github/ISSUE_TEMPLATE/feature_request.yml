@@ -1,0 +1,51 @@
+name: Feature request
+description: Propose a small change within ProjectBase's existing scope
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ProjectBase intentionally stays lean. It is a self-hosted project tracker, not a general business platform. Requests for monetization, subscriptions, billing, paid tiers, unrelated scanners, incident war rooms, benchmark leaderboards, or broad platform expansion are out of scope.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: I searched existing issues and the roadmap for this request.
+          required: true
+        - label: This improves core project tracking, self-hosting, accessibility, reliability, interoperability, or local agent execution.
+          required: true
+        - label: This does not add monetization, subscriptions, billing, paid tiers, or an unrelated product area.
+          required: true
+        - label: I understand that maintainers may decline useful ideas to avoid feature creep and maintenance burden.
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe the user problem and who experiences it. Do not start with a preferred implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Current workaround
+      description: Explain how users handle this today, if at all.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Smallest useful change
+      description: Propose the narrowest solution that fits the existing product and lightweight architecture.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and maintenance cost
+      description: What alternatives did you consider, and what ongoing complexity would this add?
+    validations:
+      required: true

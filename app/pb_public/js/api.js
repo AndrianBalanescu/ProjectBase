@@ -318,24 +318,13 @@ const API = {
     return data;
   },
 
-  // Agents & Autonomous Dispatch
+  // Sessions
   async getAgents() {
     const res = await fetch('/api/projectbase/agents', {
       headers: this._authHeaders()
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to load agents');
-    return data;
-  },
-
-  async dispatchAgent(target, payload = {}) {
-    const res = await fetch('/api/projectbase/dispatch-agent', {
-      method: 'POST',
-      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ target, ...payload })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || 'Agent dispatch failed');
     return data;
   },
 

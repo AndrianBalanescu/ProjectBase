@@ -78,7 +78,7 @@ const HeaderComponent = {
             ⚡
           </div>
           <span class="text-sm font-semibold tracking-tight hidden min-[480px]:inline">ProjectBase</span>
-          <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700/50 select-none hidden min-[480px]:inline">v1.41.1</span>
+          <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700/50 select-none hidden min-[480px]:inline">v0.2.0</span>
         </div>
 
         <div class="h-4 w-px bg-zinc-200 dark:bg-zinc-800 hidden min-[480px]:block"></div>
@@ -145,94 +145,26 @@ const HeaderComponent = {
       <!-- Center: View Switcher Tabs (Minimalist Strip) -->
       <div class="hidden md:flex items-center flex-1 min-w-0 justify-center px-2">
         <div class="flex items-center bg-zinc-100 dark:bg-zinc-900/80 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-xs overflow-x-auto scrollbar-none">
-          <button
-            @click="$emit('change-view', 'board')"
+          <button v-for="view in [
+              { id: 'board', label: 'Board', icon: 'kanban' },
+              { id: 'list', label: 'List', icon: 'list' },
+              { id: 'cycles', label: 'Cycles', icon: 'refresh-cw' },
+              { id: 'milestones', label: 'Roadmap', icon: 'flag' },
+              { id: 'projects', label: 'Projects', icon: 'folder-kanban' }
+            ]" :key="view.id"
+            @click="$emit('change-view', view.id)"
             class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all font-medium"
-            :class="currentView === 'board' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
-          >
-            <i data-lucide="kanban" class="w-3.5 h-3.5"></i>
-            <span>Board</span>
-          </button>
-          <button
-            @click="$emit('change-view', 'list')"
-            class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all font-medium"
-            :class="currentView === 'list' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
-          >
-            <i data-lucide="list-todo" class="w-3.5 h-3.5"></i>
-            <span>List</span>
-          </button>
-          <button
-            @click="$emit('change-view', 'cycles')"
-            class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all font-medium"
-            :class="currentView === 'cycles' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
-          >
-            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-            <span>Cycles</span>
-          </button>
-          <button
-            @click="$emit('change-view', 'timeline')"
-            class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all font-medium"
-            :class="currentView === 'timeline' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
-            title="Timeline Schedule"
-          >
-            <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
-            <span>Timeline</span>
-          </button>
-          <button
-            @click="$emit('change-view', 'milestones')"
-            class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all font-medium"
-            :class="currentView === 'milestones' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
-          >
-            <i data-lucide="milestone" class="w-3.5 h-3.5"></i>
-            <span>Roadmap</span>
-          </button>
-          <button
-            @click="$emit('change-view', 'projects')"
-            class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all font-medium"
-            :class="currentView === 'projects' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
-          >
-            <i data-lucide="folder" class="w-3.5 h-3.5"></i>
-            <span>Projects</span>
-          </button>
-          <button
-            @click="$emit('change-view', 'stats')"
-            class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all font-medium"
-            :class="currentView === 'stats' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
-          >
-            <i data-lucide="bar-chart-3" class="w-3.5 h-3.5"></i>
-            <span>Stats</span>
-          </button>
-          <button
-            @click="$emit('change-view', 'agents')"
-            class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all font-medium"
-            :class="currentView === 'agents' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
-            title="AI Agents & Live Sessions"
-          >
-            <i data-lucide="bot" class="w-3.5 h-3.5"></i>
-            <span>Agents</span>
-          </button>
-          <button
-            @click="$emit('change-view', 'portfolio')"
-            class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all font-medium"
-            :class="currentView === 'portfolio' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
-            title="Portfolio Dashboard"
-          >
-            <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i>
-            <span>Portfolio</span>
-          </button>
-          <button
-            @click="$emit('change-view', 'docs')"
-            class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all font-medium"
-            :class="currentView === 'docs' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'"
-          >
-            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
-            <span>Docs</span>
+            :class="currentView === view.id ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'">
+            <i :data-lucide="view.icon" class="w-3.5 h-3.5"></i><span>{{ view.label }}</span>
           </button>
         </div>
       </div>
 
       <!-- Right: Search, Theme Toggle, Actions, Live Status -->
       <div class="flex items-center space-x-1.5 flex-shrink-0">
+        <button @click="$emit('change-view', 'agents')" class="hidden lg:flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800" :class="currentView === 'agents' ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white' : ''"><i data-lucide="activity" class="w-3.5 h-3.5"></i><span>Sessions</span></button>
+        <a href="/docs" target="_blank" rel="noopener noreferrer" class="hidden xl:flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"><i data-lucide="book-open" class="w-3.5 h-3.5"></i><span>API Docs</span></a>
+
         <!-- Omnibar Search Trigger -->
         <button
           @click="$emit('open-omnibar')"

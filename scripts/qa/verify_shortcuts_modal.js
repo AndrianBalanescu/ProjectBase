@@ -104,7 +104,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     results.closedViaEscape = !(await modalVisible());
 
     // 5. Reopen via toolbar (?) button
-    const qBtn = page.locator('header button[title*="Keyboard shortcuts"], button[title*="Keyboard shortcuts"]').first();
+    const qBtn = page.locator('button[title*="Keyboard shortcuts"]:visible').first();
     results.toolbarButtonPresent = await qBtn.count() > 0;
     if (results.toolbarButtonPresent) {
       await qBtn.click();

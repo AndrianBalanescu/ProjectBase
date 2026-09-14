@@ -403,91 +403,12 @@ const IssueDrawerComponent = {
       const a = (this.agents || []).find(x => x.name === agent);
       return a ? a.avatar : null;
     },
-    async dispatchAgent(target = 'flomaster', prompt) {
-      if (!this.issue) return;
-      try {
-        const body = { issue_id: this.issue.id, agent_target: target };
-        if (prompt && String(prompt).trim()) body.prompt = String(prompt).trim().slice(0, 8000);
-        const res = await fetch('/api/projectbase/dispatch-agent', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body)
-        });
-        const data = await res.json();
-        if (!res.ok || !data.success) throw new Error(data.error || 'Dispatch failed');
-        this.editStatus = 'in_progress';
-        this.editAssignee = data.issue.assignee;
-        this.agentPrompt = '';
-        await this.loadComments();
-      } catch (err) {
-        console.error('Agent dispatch failed:', err);
-      }
-    },
-    async generateAiSubtasks() {
-      if (!this.editTitle) return;
-      this.aiLoadingSubtasks = true;
-      try {
-        const res = await fetch('/api/projectbase/ai-assist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'subtasks',
-            title: this.editTitle,
-            description: this.editDesc
-          })
-        });
-        const data = await res.json();
-        if (Array.isArray(data.subtasks)) {
-          const newItems = data.subtasks.map(t => ({
-            id: 'st_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-            title: t,
-            done: false
-          }));
-          this.subtasks = [...this.subtasks, ...newItems];
-          this.saveChanges();
-        }
-      } catch (err) {
-        console.error('AI subtasks error:', err);
-      } finally {
-        this.aiLoadingSubtasks = false;
-      }
-    },
-    async polishAiDescription() {
-      if (!this.editTitle) return;
-      this.aiLoadingDesc = true;
-      try {
-        const res = await fetch('/api/projectbase/ai-assist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'description',
-            title: this.editTitle,
-            description: this.editDesc
-          })
-        });
-        const data = await res.json();
-        if (data.description) {
-          this.editDesc = data.description;
-          this.descTab = 'rich';
-          this.saveChanges();
-        }
-      } catch (err) {
-        console.error('AI description polish error:', err);
-      } finally {
-        this.aiLoadingDesc = false;
-      }
-    },
+    async dispatchAgent() { return; },
+    async generateAiSubtasks() { return; },
+    async polishAiDescription() { return; },
     copyIdentifier() {
       if (!this.issue) return;
       navigator.clipboard.writeText(this.issue.identifier || this.issue.id);
-      this.copiedBadge = true;
-      setTimeout(() => { this.copiedBadge = false; }, 2000);
-    },
-    copyAgentCurl() {
-      if (!this.issue) return;
-      const origin = window.location.origin;
-      const cmd = `curl -X POST "${origin}/api/projectbase/dispatch-agent" -H "Content-Type: application/json" -d '{"issue_id":"${this.issue.id}","agent_target":"flomaster"}'`;
-      navigator.clipboard.writeText(cmd);
       this.copiedBadge = true;
       setTimeout(() => { this.copiedBadge = false; }, 2000);
     },
@@ -635,8 +556,8 @@ const IssueDrawerComponent = {
               <i :data-lucide="isFullscreen ? 'minimize-2' : 'maximize-2'" class="w-4 h-4"></i>
             </button>
 
-            <!-- Agent Dispatch Dropdown -->
-            <div class="relative">
+            <!-- Agent dispatch removed from the lean core. -->
+            <div v-if="false" class="relative">
               <button
                 type="button"
                 @click="isAgentDropdownOpen = !isAgentDropdownOpen"
@@ -921,6 +842,7 @@ const IssueDrawerComponent = {
                   <span>Focus</span>
                 </button>
                 <button
+                  v-if="false"
                   @click="polishAiDescription"
                   :disabled="aiLoadingDesc"
                   class="px-2 py-1 rounded text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700/60 flex items-center space-x-1 transition-colors"
@@ -966,6 +888,7 @@ const IssueDrawerComponent = {
                 </span>
               </div>
               <button
+                v-if="false"
                 @click="generateAiSubtasks"
                 :disabled="aiLoadingSubtasks"
                 class="px-2 py-0.5 text-xs text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded border border-zinc-200 dark:border-zinc-700/60 flex items-center space-x-1 transition-colors"

@@ -1,4 +1,4 @@
-FROM alpine:latest
+FROM alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce
 
 WORKDIR /app
 
@@ -6,7 +6,9 @@ RUN apk add --no-cache ca-certificates curl bash unzip python3 py3-pip
 
 # Download official PocketBase binary
 ARG PB_VERSION=0.39.11
+ARG PB_SHA256=08b9fcda0d5fd42cb315dc15a36dfa121c993855bd635f01d347c31b4328ec34
 RUN curl -sL "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip" -o pb.zip && \
+    echo "${PB_SHA256}  pb.zip" | sha256sum -c - && \
     unzip -o pb.zip pocketbase && \
     chmod +x pocketbase && \
     rm pb.zip

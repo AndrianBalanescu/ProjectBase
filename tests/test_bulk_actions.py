@@ -471,18 +471,9 @@ def test_bulk_update_start_date_allowed_and_validated():
     finally:
         _delete_issue(issue["id"])
 
-def test_timeline_view_registered_in_frontend():
-    """TimelineView is wired into the app shell: component file, script include,
-    app.js registration + route mapping, header nav, and command palette."""
-    assert "TimelineViewComponent" in _read("app/pb_public/js/components/TimelineView.js")
-    assert "TimelineView.js" in _read("app/pb_public/index.html")
-    assert "timeline-view" in _read("app/pb_public/index.html")
-    app_src = _read("app/pb_public/js/app.js")
-    assert "'timeline-view': TimelineViewComponent" in app_src
-    assert "timeline: 'timeline'" in app_src
-    header_src = _read("app/pb_public/js/components/Header.js")
-    assert "'timeline'" in header_src and "Timeline" in header_src
-    assert "act_timeline" in _read("app/pb_public/js/components/CommandPalette.js")
+def test_schedule_fields_survive_timeline_view_removal():
+    """Dates remain editable data even though the duplicate Gantt view is gone."""
+    assert "TimelineView.js" not in _read("app/pb_public/index.html")
     assert "start_date" in _read("app/pb_public/js/components/NewIssueModal.js")
     assert "start_date" in _read("app/pb_public/js/components/IssueDrawer.js")
     assert "start_date" in _read("app/pb_hooks/31_bulk_actions.pb.js")

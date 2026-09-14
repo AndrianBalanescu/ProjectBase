@@ -27,11 +27,8 @@ const CommandPaletteComponent = {
         { type: 'action', id: 'act_board', title: 'Switch to Board View', subtitle: 'View Kanban Board', action: () => this.$emit('change-view', 'board'), icon: 'kanban' },
         { type: 'action', id: 'act_list', title: 'Switch to List View', subtitle: 'View tabular task list', action: () => this.$emit('change-view', 'list'), icon: 'list-todo' },
         { type: 'action', id: 'act_cycles', title: 'Switch to Cycles View', subtitle: 'View Sprints & Velocity', action: () => this.$emit('change-view', 'cycles'), icon: 'refresh-cw' },
-        { type: 'action', id: 'act_milestones', title: 'Switch to Milestones View', subtitle: 'View North Star Roadmap', action: () => this.$emit('change-view', 'milestones'), icon: 'milestone' },
-        { type: 'action', id: 'act_stats', title: 'Switch to Stats / Analytics', subtitle: 'View Workspace Insights', action: () => this.$emit('change-view', 'stats'), icon: 'bar-chart-3' },
-        { type: 'action', id: 'act_agents', title: 'Switch to Agents Cockpit', subtitle: 'Autonomous Task Orchestration', action: () => this.$emit('change-view', 'agents'), icon: 'bot' },
-        { type: 'action', id: 'act_portfolio', title: 'Switch to Portfolio View', subtitle: 'Multi-Project Health & Rollups', action: () => this.$emit('change-view', 'portfolio'), icon: 'layers' },
-        { type: 'action', id: 'act_timeline', title: 'Switch to Timeline View', subtitle: 'Gantt Roadmap & Schedules', action: () => this.$emit('change-view', 'timeline'), icon: 'calendar' },
+        { type: 'action', id: 'act_milestones', title: 'Open Roadmap', subtitle: 'View milestones and outcomes', action: () => this.$emit('change-view', 'milestones'), icon: 'flag' },
+        { type: 'action', id: 'act_agents', title: 'Open Sessions', subtitle: 'Live execution runs', action: () => this.$emit('change-view', 'agents'), icon: 'activity' },
         { type: 'action', id: 'act_welcome', title: 'Open Welcome Guide', subtitle: 'Get started checklist', action: () => this.$emit('open-welcome'), icon: 'help-circle' },
         { type: 'action', id: 'act_shortcuts', title: 'Keyboard Shortcuts', subtitle: 'Shortcut: ? · all key bindings', action: () => this.$emit('open-shortcuts'), icon: 'keyboard' }
       ];

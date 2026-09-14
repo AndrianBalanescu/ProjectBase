@@ -1,6 +1,6 @@
 # ProjectBase — Agent Rules & Technical Map
 
-ProjectBase = ultra-lightweight open-source Plane/Linear alternative. High-performance task manager & workspace for humans and autonomous AI agents. **MIT, 100% FOSS, self-hostable. Never add monetization, subscriptions, Stripe, or paid tiers.** ~50 MB RAM, single binary, zero-build frontend, real-time SSE, SQLite. Live app: `http://127.0.0.1:8120` (v1.41.1).
+ProjectBase = ultra-lightweight open-source Plane/Linear alternative. High-performance task manager & workspace for humans and autonomous AI agents. **MIT, 100% FOSS, self-hostable. Never add monetization, subscriptions, Stripe, or paid tiers.** ~50 MB RAM, single binary, zero-build frontend, real-time SSE, SQLite. Live app: `http://127.0.0.1:8120` (v0.2.0).
 
 ## 🛑 STRICT PRODUCT BOUNDARIES (NO FEATURE CREEP)
 - **What ProjectBase IS:** A clean, fast, beautiful Linear/Plane alternative — Kanban Board, List View, Cycles (sprints), Milestones (roadmap), Projects, and resizable Markdown Issue Drawer. Real local agent sessions are ingested cleanly as execution runs without forcing agents into secretarial ticket updates.
@@ -11,7 +11,7 @@ ProjectBase = ultra-lightweight open-source Plane/Linear alternative. High-perfo
 - **Backend:** PocketBase **0.39.11** single binary `./pocketbase` at repo root. Serve with `./pocketbase serve --dir pb_data --hooksDir app/pb_hooks --migrationsDir app/pb_migrations --http 127.0.0.1:8120`. Note: PB data dir is `pb_data/` at root for local run, but Docker mounts `./app/pb_data` — keep both consistent.
 - **Frontend:** Zero-build **Vue 3 UMD** + static Tailwind. All served straight from `app/pb_public/`. No `node_modules`, no bundler.
 - **Styling:** Tailwind is **compiled to static CSS** via `scripts/build_css.sh` → `app/pb_public/css/style.css`. After editing templates/classes, rerun it. Do NOT add a runtime Tailwind CDN.
-- **Tests:** `pytest tests/` (run via `uv run --with pytest pytest tests/` or a user-local pytest install (e.g. `~/.local/bin/pytest` via `pip install --user pytest`)). Tests run against the live instance (default `PROJECTBASE_URL=http://127.0.0.1:8120`, superuser `f@flow.com` / `superdev123`). 295 tests across 20 files.
+- **Tests:** `pytest tests/` (run via `uv run --with pytest pytest tests/` or a user-local pytest install (e.g. `~/.local/bin/pytest` via `pip install --user pytest`)). Tests run against the live instance (default `PROJECTBASE_URL=http://127.0.0.1:8120`, superuser `f@flow.com` / `superdev123`). 285 tests across 22 files.
 - **Docker:** `docker compose up` — builds `Dockerfile`, mounts `app/` subdirs, exposes 8120.
 - **Deploy:** `deploy/projectbase.service` (systemd) + `deploy/Caddyfile`. Helper scripts: `scripts/install-systemd.sh`, `scripts/backup.sh`, `scripts/restore.sh`, `scripts/deploy-demo.sh`, `scripts/reset-demo.sh`.
 
@@ -27,7 +27,7 @@ app/
     js/api.js           <- API client (PocketBase + custom routes + realtime)
     js/app.js           <- root Vue instance: auth gate, hash router, loadAllData, realtime, keyboard
     js/components/      <- Vue components: KanbanBoard, ListView, IssueDrawer, Header, NewIssueModal,
-                           ProjectsView, CyclesView, MilestonesView, StatsView, DocsView, MarketplaceView,
+                           ProjectsView, CyclesView, MilestonesView, AgentsView,
                            MilkdownEditor (WYSIWYG), SearchableSelect, Multiselect, CommandPalette,
                            CustomFieldsModal, ImportModal, ProjectModal, CycleModal
     vendor/             <- vendored FOSS bundles: vue.global.prod.js, tailwindcss.js, pocketbase.umd.js,
@@ -45,7 +45,6 @@ app/
     40_importers.pb.js / 41_linear_importer.pb.js / 42_plane_importer.pb.js / 45_github_importer.pb.js  <- CSV + Linear + Plane + GitHub importers
     50_cron_automation.pb.js   <- scheduled automations
     55_notifications.pb.js / 60_notifications.pb.js  <- Telegram/Discord/webhook + in-app inbox
-    70_ai_assist.pb.js / 80_agent_triggers.pb.js      <- AI-assisted actions + agent dispatch
     90_agents.pb.js            <- agent sessions listing + sync (90_agents is the last hook; engine hooks 91-111 stripped, live on engine-experiments branch)
   pb_migrations/       <- numbered schema + seed migrations (17100000xx). Add NEW number for changes.
   pb_data/             <- runtime SQLite data. NEVER commit.
@@ -53,7 +52,7 @@ docs/                  <- research, ROADMAP, TODO, architecture, COMPETITORS, FE
 scripts/               <- start.sh, build_css.sh, backup.sh, restore.sh, install-systemd.sh, deploy-demo.sh,
                           reset-demo.sh, bump_version.sh, typegen.sh, flow-cli (CLI wrapper), pb-cli,
                           mcp_server.py, pb_autonomous_runner.py, pb-autonomous-daemon.sh, install.sh, qa/, bench/
-tests/                 <- 295 tests across 20 files (test_agents_drift_guard.py, test_api.py, test_autonomous_runner_sync.py, test_benchmarks.py, test_bulk_actions.py, test_css_sync.py, test_custom_route_auth_guards.py, test_deploy_consistency.py, test_export_ics.py, test_fixture_hygiene.py, test_foss_schema.py, test_git_webhook_hmac.py, test_issue_relations.py, test_kanban_touch_dnd.py, test_labels_ui.py, test_listview_sort_logic.py, test_openapi_drift.py, test_saved_views.py, test_secret_scan.py, test_selfhosting.py)
+tests/                 <- 285 tests across 22 files (test_agents_drift_guard.py, test_api.py, test_autonomous_runner_sync.py, test_benchmarks.py, test_bulk_actions.py, test_css_sync.py, test_custom_route_auth_guards.py, test_deploy_consistency.py, test_export_ics.py, test_fixture_hygiene.py, test_foss_schema.py, test_git_webhook_hmac.py, test_issue_relations.py, test_kanban_touch_dnd.py, test_labels_ui.py, test_listview_sort_logic.py, test_openapi_drift.py, test_public_seed.py, test_saved_views.py, test_secret_scan.py, test_supply_chain.py, test_selfhosting.py)
 deploy/                <- projectbase.service, Caddyfile
 .github/workflows/ci.yml  <- CI (seeds superuser, runs tests)
 ```
@@ -64,7 +63,7 @@ deploy/                <- projectbase.service, Caddyfile
 
 ## 4. Custom API & MCP
 
-- Custom routes in `app/pb_hooks/30_custom_routes.pb.js`, `103_workflow_automations_engine.pb.js`, `104_multi_tenant_quota_engine.pb.js`, `106_semantic_brain_engine.pb.js`: `/api/projectbase/health`, `/version`, `/stats`, `/semantic/review`, `/semantic/rerank`, `/semantic/metrics`, `/semantic/embeddings/reindex`.
+- Core custom routes live in `app/pb_hooks/30_custom_routes.pb.js` and the focused import/export, relations, notification, saved-view, and session hooks. Public discovery endpoints include `/api/projectbase/health`, `/version`, `/docs`, and `/openapi.json`.
 - **Route auth contract:** every mutating `/api/projectbase/*` custom route requires an authenticated principal, except `POST /api/projectbase/health` (public liveness), public SDK/doc reads, and `POST /api/projectbase/webhooks/git` (CI receiver: auth OR `X-Hub-Signature-256` HMAC over the raw body keyed by `PROJECTBASE_GIT_WEBHOOK_SECRET`, fail-closed when unset). Pinned by `tests/test_custom_route_auth_guards.py` + `tests/test_git_webhook_hmac.py`.
 - **FastMCP server:** `scripts/mcp_server.py` (optional tools for projectbase programmatic queries).
 - API docs: `app/pb_public/openapi.json` + `docs/` (Scalar UI at `app/pb_public/docs/`).
