@@ -100,9 +100,9 @@ const API = {
   },
 
   // Issues
-  async getIssues(projectId = null) {
+  async getIssues(projectId = null, page = 1, perPage = 100) {
     const filter = projectId ? `project = "${projectId}"` : '1=1';
-    return await pb.collection('issues').getFullList({
+    return await pb.collection('issues').getList(page, perPage, {
       filter,
       sort: 'order,-created',
       expand: 'project,cycle,milestone'

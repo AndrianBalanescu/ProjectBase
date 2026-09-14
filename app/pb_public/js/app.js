@@ -468,7 +468,7 @@ const App = {
       try {
         const [projs, iss, cycs, mls, lbls, notifs, agents, savedViews] = await Promise.all([
           API.getProjects(),
-          API.getIssues(this.currentProject ? this.currentProject.id : null),
+          API.getIssues(this.currentProject ? this.currentProject.id : null, 1, 500),
           API.getCycles(this.currentProject ? this.currentProject.id : null),
           API.getMilestones(this.currentProject ? this.currentProject.id : null),
           API.getLabels(this.currentProject ? this.currentProject.id : null),
@@ -517,7 +517,7 @@ const App = {
 
     async loadIssues() {
       try {
-        this.issues = await API.getIssues(this.currentProject ? this.currentProject.id : null);
+        this.issues = await API.getIssues(this.currentProject ? this.currentProject.id : null, 1, 500);
         this.cycles = await API.getCycles(this.currentProject ? this.currentProject.id : null);
         this.milestones = await API.getMilestones(this.currentProject ? this.currentProject.id : null);
         writeDataCache(this);
@@ -542,18 +542,21 @@ const App = {
     },
 
     setupRealtime() {
+      let tickTimer = null;
+      const flush = () => {
+        if (tickTimer) return;
+        tickTimer = setTimeout(() => { tickTimer = null; this.realtimeTick++; }, 400);
+      };
       API.initRealtime((collection, event) => {
         const { action, record } = event;
-        
+
         if (collection === 'notifications') {
-          // In-app notifications: refresh the inbox + unread badge live.
           this.loadNotifications();
           return;
         }
 
         if (collection === 'issues') {
           if (action === 'create') {
-            // Only add if belongs to current project or in All Projects mode
             if (!this.currentProject || record.project === this.currentProject.id) {
               const exists = this.issues.find(i => i.id === record.id);
               if (!exists) this.issues.unshift(record);
@@ -568,17 +571,12 @@ const App = {
             }
           } else if (action === 'delete') {
             this.issues = this.issues.filter(i => i.id !== record.id);
-            if (this.selectedIssueIds.has(record.id)) {
-              this.selectedIssueIds.delete(record.id);
-            }
-            if (this.lastSelectedIssueId === record.id) {
-              this.lastSelectedIssueId = null;
-            }
-            if (this.selectedIssue && this.selectedIssue.id === record.id) {
-              this.selectedIssue = null;
-            }
+            if (this.selectedIssueIds.has(record.id)) this.selectedIssueIds.delete(record.id);
+            if (this.lastSelectedIssueId === record.id) this.lastSelectedIssueId = null;
+            if (this.selectedIssue && this.selectedIssue.id === record.id) this.selectedIssue = null;
           }
-        } else 
+          flush();
+        } else
         if (collection === 'milestones') {
           if (action === 'create') {
             this.milestones.push(record);
@@ -588,6 +586,7 @@ const App = {
           } else if (action === 'delete') {
             this.milestones = this.milestones.filter(m => m.id !== record.id);
           }
+          flush();
         }
 
         if (collection === 'projects') {
@@ -596,20 +595,16 @@ const App = {
           } else if (action === 'update') {
             const idx = this.projects.findIndex(p => p.id === record.id);
             if (idx !== -1) this.projects[idx] = record;
-            if (this.currentProject && this.currentProject.id === record.id) {
-              this.currentProject = record;
-            }
+            if (this.currentProject && this.currentProject.id === record.id) this.currentProject = record;
           } else if (action === 'delete') {
             this.projects = this.projects.filter(p => p.id !== record.id);
-            if (this.currentProject && this.currentProject.id === record.id) {
-              this.currentProject = this.projects[0] || null;
-            }
+            if (this.currentProject && this.currentProject.id === record.id) this.currentProject = this.projects[0] || null;
           }
+          flush();
         }
 
         if (collection === 'cycles') {
           if (action === 'create') {
-            // Only add if it belongs to the current project (or All Projects).
             if (!this.currentProject || record.project === this.currentProject.id) {
               const exists = this.cycles.find(c => c.id === record.id);
               if (!exists) this.cycles.push(record);
@@ -621,20 +616,11 @@ const App = {
             this.cycles = this.cycles.filter(c => c.id !== record.id);
             if (this.selectedCycleId === record.id) this.selectedCycleId = null;
           }
+          flush();
         }
 
         if (collection === 'comments') {
-          // A comment was created/updated/deleted. Bump the refresh key so the
-          // open IssueDrawer reloads its thread live (it filters by issue id).
           this.commentRefreshKey++;
-        }
-
-        // Any change to the workspace-scoped collections (issues, milestones,
-        // projects, cycles) bumps the tick so snapshot-aggregating views
-        // (PortfolioView) refetch their cross-project data in realtime.
-        if (collection === 'issues' || collection === 'milestones' ||
-            collection === 'projects' || collection === 'cycles') {
-          this.realtimeTick++;
         }
       });
     },

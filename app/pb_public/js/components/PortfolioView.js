@@ -36,7 +36,7 @@ const PortfolioViewComponent = {
       try {
         const [projRes, issRes, msRes] = await Promise.all([
           API.getProjects().catch(() => this.projects || []),
-          API.getIssues(null).catch(() => this.issues || []),
+          API.getIssues(null, 1, 500).catch(() => this.issues || []),
           API.getMilestones(null).catch(() => this.milestones || [])
         ]);
         this.allProjects = Array.isArray(projRes) ? projRes : (projRes?.items || this.projects || []);
