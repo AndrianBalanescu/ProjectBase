@@ -58,8 +58,13 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   const all4xx = [];
   page.on('console', (m) => {
     if (m.type() === 'error') {
+      const sourceUrl = (m.location && m.location().url) || '';
       // Designed fallback: app tries users auth first, then _superusers.
       if (m.text().includes('users/auth-with-password')) return;
+      // Chromium reports an SSE teardown during hash navigation/reload as a
+      // console-level ERR_CONNECTION_RESET even though requestfailed correctly
+      // identifies the same /api/realtime stream as expected lifecycle noise.
+      if ((m.text().includes('ERR_CONNECTION_RESET') || m.text().includes('ERR_NETWORK_CHANGED')) && sourceUrl.includes('/api/realtime')) return;
       if (m.text().includes('ERR_CERT_VERIFIER_CHANGED') || m.text().includes('fonts.googleapis.com') || m.text().includes('fonts.gstatic.com')) return;
       consoleErrors.push(m.text().slice(0, 200));
     }
@@ -140,6 +145,17 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     await page.locator('input[placeholder="Password"]').fill(qaPassword);
     await page.locator('button:has-text("Sign in")').first().click();
     await page.waitForTimeout(3500);
+    // Resolve a real issue from the installation under test. Never depend on an
+    // ID from a developer database because fresh installs intentionally create
+    // new PocketBase record IDs.
+    const probeIssueId = await pollUntil(() => {
+      const card = document.querySelector('[data-issue-id]');
+      const id = card && card.getAttribute('data-issue-id');
+      if (id) localStorage.setItem('__qaProbeIssueId', id);
+      else localStorage.removeItem('__qaProbeIssueId');
+      return localStorage.getItem('__qaProbeIssueId');
+    }, null, 15000);
+    if (!probeIssueId) throw new Error('QA requires at least one issue after sign-in');
     // Version badge: the header must show the current version (vX.Y.Z) and it
     // must match the VERSION file so the UI never drifts from the release.
     checks.headerBadge = await page.evaluate(() => {
@@ -204,7 +220,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       return ti && ti.value.trim().length > 0;
     });
     // A plain view hash (no issue segment) must close any stale drawer too.
-    await page.evaluate(() => { location.hash = '#/pb/board/issue/tplfu0fuewyl1or'; });
+    await page.evaluate(() => { location.hash = '#/pb/board/issue/' + localStorage.getItem('__qaProbeIssueId'); });
     await page.waitForTimeout(2500);
     routing.issueOpened = await page.evaluate(() => {
       const drawer = document.querySelector('.slide-in-from-right');
@@ -223,7 +239,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     // persists across reload, and double-click resets to the 768px default. ----
 
     await page.evaluate(() => { localStorage.removeItem('pb.drawer.width'); });
-    await page.evaluate(() => { location.hash = '#/pb/board/issue/tplfu0fuewyl1or'; });
+    await page.evaluate(() => { location.hash = '#/pb/board/issue/' + localStorage.getItem('__qaProbeIssueId'); });
     await page.waitForTimeout(2500);
     const handle = page.locator('.slide-in-from-right > .cursor-col-resize').first();
     if (await handle.count()) {
@@ -253,7 +269,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
         // Reload: the saved width must survive a fresh mount.
         await page.reload({ waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(3000);
-        await page.evaluate(() => { location.hash = '#/pb/board/issue/tplfu0fuewyl1or'; });
+        await page.evaluate(() => { location.hash = '#/pb/board/issue/' + localStorage.getItem('__qaProbeIssueId'); });
         await page.waitForTimeout(2000);
         resize.survivesReload = await page.evaluate(() => {
           const d = document.querySelector('.slide-in-from-right');
@@ -279,7 +295,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     // ---- Description focus mode (cycle 5): the Focus button in the drawer
     // opens a distraction-free fullscreen editor, and Done/Esc closes it. ----
     try {
-      await page.evaluate(() => { location.hash = '#/pb/board/issue/tplfu0fuewyl1or'; });
+      await page.evaluate(() => { location.hash = '#/pb/board/issue/' + localStorage.getItem('__qaProbeIssueId'); });
       await page.waitForTimeout(2500);
       const focusBtn = page.locator('button:has-text("Focus")').first();
       if (await focusBtn.count()) {
@@ -374,7 +390,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       // 5. ?w= must widen the drawer for the session WITHOUT persisting to
       // localStorage (session-only override).
       await page.evaluate(() => { localStorage.removeItem('pb.drawer.width'); });
-      await page.evaluate(() => { location.hash = '#/pb/board/issue/tplfu0fuewyl1or?w=1100'; });
+      await page.evaluate(() => { location.hash = '#/pb/board/issue/' + localStorage.getItem('__qaProbeIssueId') + '?w=1100'; });
       await page.waitForTimeout(2500);
       urlState.wOverridesWidth = await page.evaluate(() => {
         const d = document.querySelector('.slide-in-from-right');
@@ -681,7 +697,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
         })();
         const headers = { 'Content-Type': 'application/json' };
         if (token) headers.Authorization = token;
-        const probeRes = await fetch('/api/collections/issues/records/tplfu0fuewyl1or', { headers });
+        const probeRes = await fetch('/api/collections/issues/records/' + localStorage.getItem('__qaProbeIssueId'), { headers });
         if (!probeRes.ok) return { error: 'probe fetch ' + probeRes.status };
         const probe = await probeRes.json();
         const projId = probe.project;
@@ -1236,7 +1252,7 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   try {
     // Open the drawer for a real issue already in the app's dataset (the same
     // probe id the relations + resize QA blocks use, which demonstrably loads).
-    await page.evaluate(() => { location.hash = '#/pb/board/issue/tplfu0fuewyl1or'; });
+    await page.evaluate(() => { location.hash = '#/pb/board/issue/' + localStorage.getItem('__qaProbeIssueId'); });
     await page.waitForTimeout(2500);
     const trigger = page.locator('button[title="Dispatch this issue to an autonomous agent"]').first();
     if (await trigger.count()) {
