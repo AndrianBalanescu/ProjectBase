@@ -1,7 +1,7 @@
 {
   "generated_by": "scripts/sync_docs.sh",
   "note": "Read-only mirror of curated repository markdown. Do not edit here; run the script.",
-  "count": 14,
+  "count": 17,
   "files": [
     {"file": "README.md", "title": "README", "group": "Project", "source": "README.md", "bytes": 6936},
     {"file": "CHANGELOG.md", "title": "Changelog", "group": "Project", "source": "CHANGELOG.md", "bytes": 107123},
@@ -16,6 +16,9 @@
     {"file": "docs_TODO.md", "title": "Task Queue & Stabilization", "group": "Docs", "source": "docs/TODO.md", "bytes": 3567},
     {"file": "docs_BENCHMARKS.md", "title": "Benchmarks", "group": "Docs", "source": "docs/BENCHMARKS.md", "bytes": 5241},
     {"file": "docs_RESTORING_VIEWS.md", "title": "Restoring Views", "group": "Docs", "source": "docs/RESTORING_VIEWS.md", "bytes": 3809},
-    {"file": "docs_architecture-audit-and-competitive-landscape.md", "title": "Architecture & Landscape", "group": "Docs", "source": "docs/architecture-audit-and-competitive-landscape.md", "bytes": 5967}
+    {"file": "docs_architecture-audit-and-competitive-landscape.md", "title": "Architecture & Landscape", "group": "Docs", "source": "docs/architecture-audit-and-competitive-landscape.md", "bytes": 5967},
+    {"file": "research_COMPETITORS.md", "title": "Competitors", "group": "Research", "source": "research/COMPETITORS.md", "bytes": 1983},
+    {"file": "research_FEATURE_MATRIX.md", "title": "Feature Matrix", "group": "Research", "source": "research/FEATURE_MATRIX.md", "bytes": 1787},
+    {"file": "THIRD_PARTY_NOTICES.md", "title": "Third-Party Notices", "group": "Project", "source": "THIRD_PARTY_NOTICES.md", "bytes": 2309}
   ]
 }

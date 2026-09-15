@@ -37,7 +37,16 @@ SOURCES=(
   "docs/BENCHMARKS.md"
   "docs/RESTORING_VIEWS.md"
   "docs/architecture-audit-and-competitive-landscape.md"
+  "research/COMPETITORS.md"
+  "research/FEATURE_MATRIX.md"
+  "THIRD_PARTY_NOTICES.md"
 )
+
+# Deliberately NOT published (kept out on purpose, not by accident):
+#   INDEX.md                     - auto-generated folder hash (no human value)
+#   TODO.md (root, cycle notes)  - superseded by docs/TODO.md; internal churn
+#   .flow/, .agents/, prism-out/ - scratch/agent workspace, not product docs
+#   .github/pull_request_template.md, .pytest_cache/README.md - noise
 
 # Friendly titles; fall back to the file's own first H1, then the path.
 title_for() {
@@ -51,6 +60,9 @@ title_for() {
     docs/BENCHMARKS.md) echo "Benchmarks" ;;
     docs/RESTORING_VIEWS.md) echo "Restoring Views" ;;
     docs/architecture-audit-and-competitive-landscape.md) echo "Architecture & Landscape" ;;
+    research/COMPETITORS.md) echo "Competitors" ;;
+    research/FEATURE_MATRIX.md) echo "Feature Matrix" ;;
+    THIRD_PARTY_NOTICES.md) echo "Third-Party Notices" ;;
     *) echo "$rel" ;;
   esac
 }
@@ -58,6 +70,7 @@ title_for() {
 group_for() {
   case "$1" in
     docs/*) echo "Docs" ;;
+    research/*) echo "Research" ;;
     *) echo "Project" ;;
   esac
 }
