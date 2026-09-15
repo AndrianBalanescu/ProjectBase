@@ -687,16 +687,17 @@ const App = {
         } else if (e.key === '3') {
           this.currentView = 'cycles';
         } else if (e.key === '4') {
-          this.currentView = 'timeline';
+          this.currentView = 'milestones';
         } else if (e.key === '5') {
           this.currentView = 'projects';
         } else if (e.key === '6') {
-          this.currentView = 'stats';
-        } else if (e.key === '7') {
-          this.currentView = 'docs';
-        } else if (e.key === '8' || e.key === '9') {
-          this.currentView = 'portfolio';
+          this.currentView = 'agents';
         }
+        // NOTE: no shortcuts for views that do not exist. Keys 7/8/9 used to
+        // target the removed stats/docs/portfolio views and rendered a blank
+        // main area (debloat leftover). If you re-add a view, wire its key
+        // here, the ShortcutsModal list, the CommandPalette, the Header nav,
+        // and the applyRoute viewMap together (see tests/test_shell_consistency.py).
       });
     },
 

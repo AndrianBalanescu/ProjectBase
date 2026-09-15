@@ -28,6 +28,7 @@ const CommandPaletteComponent = {
         { type: 'action', id: 'act_list', title: 'Switch to List View', subtitle: 'View tabular task list', action: () => this.$emit('change-view', 'list'), icon: 'list-todo' },
         { type: 'action', id: 'act_cycles', title: 'Switch to Cycles View', subtitle: 'View Sprints & Velocity', action: () => this.$emit('change-view', 'cycles'), icon: 'refresh-cw' },
         { type: 'action', id: 'act_milestones', title: 'Open Roadmap', subtitle: 'View milestones and outcomes', action: () => this.$emit('change-view', 'milestones'), icon: 'flag' },
+        { type: 'action', id: 'act_projects', title: 'Switch to Projects View', subtitle: 'All projects and portfolios', action: () => this.$emit('change-view', 'projects'), icon: 'folder-kanban' },
         { type: 'action', id: 'act_agents', title: 'Open Sessions', subtitle: 'Live execution runs', action: () => this.$emit('change-view', 'agents'), icon: 'activity' },
         { type: 'action', id: 'act_welcome', title: 'Open Welcome Guide', subtitle: 'Get started checklist', action: () => this.$emit('open-welcome'), icon: 'help-circle' },
         { type: 'action', id: 'act_shortcuts', title: 'Keyboard Shortcuts', subtitle: 'Shortcut: ? · all key bindings', action: () => this.$emit('open-shortcuts'), icon: 'keyboard' }
