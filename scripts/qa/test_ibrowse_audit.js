@@ -55,6 +55,7 @@ const EXE = process.env.QA_CHROME || '/home/ubuntu/.cache/ms-playwright/chromium
     sessionChatLoaded: false,
     sessionChatInputPresent: false,
     sessionTerminalLoaded: false,
+    timelineBars: 0,
     viewsTested: []
   };
 
@@ -178,6 +179,41 @@ const EXE = process.env.QA_CHROME || '/home/ubuntu/.cache/ms-playwright/chromium
     await page.waitForTimeout(1000);
     audit.viewsTested.push('Milestones View (#/pb/milestones)');
 
+    // 9. Test Timeline View (restored Gantt) — must render bars, not blank.
+    await page.goto(BASE + '/#/pb/timeline', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1200);
+    const timelineCheck = await page.evaluate(() => {
+      const main = document.querySelector('main');
+      if (!main) return { bars: 0, textLen: 0 };
+      return {
+        bars: main.querySelectorAll('[style*="left"], [style*="width"]').length,
+        textLen: main.innerText.trim().length,
+      };
+    });
+    audit.timelineBars = timelineCheck.bars;
+    if (timelineCheck.bars < 1 || timelineCheck.textLen < 40) {
+      pageErrors.push(`Timeline view rendered blank (bars=${timelineCheck.bars})`);
+    }
+    audit.viewsTested.push(`Timeline View (#/pb/timeline: ${timelineCheck.bars} bars)`);
+
+    // 10. Test Projects View
+    await page.goto(BASE + '/#/pb/projects', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1000);
+    const projectsTextLen = await page.evaluate(
+      () => (document.querySelector('main')?.innerText || '').trim().length);
+    if (projectsTextLen < 40) pageErrors.push('Projects view rendered blank');
+    audit.viewsTested.push('Projects View (#/pb/projects)');
+
+    // 11. Legacy hashes must redirect to a live view, never blank.
+    for (const legacy of ['portfolio', 'stats']) {
+      await page.goto(BASE + `/#/pb/${legacy}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(900);
+      const len = await page.evaluate(
+        () => (document.querySelector('main')?.innerText || '').trim().length);
+      if (len < 40) pageErrors.push(`Legacy route ${legacy} rendered blank`);
+    }
+    audit.viewsTested.push('Legacy redirects (#/pb/portfolio, #/pb/stats)');
+
   } catch (err) {
     pageErrors.push(`Audit Execution Error: ${err.message}`);
   } finally {
@@ -196,6 +232,7 @@ const EXE = process.env.QA_CHROME || '/home/ubuntu/.cache/ms-playwright/chromium
   console.log(`- Issues Rendered on Board:      ${audit.issuesRendered}`);
   console.log(`- Live Sessions on Board:        ${audit.sessionsRenderedOnBoard}`);
   console.log(`- Agents Console Verified:       ${audit.agentsViewTested ? '✅ PASS' : '❌ FAIL'}`);
+  console.log(`- Timeline View (restored):      ${audit.timelineBars >= 1 ? '✅ PASS (' + audit.timelineBars + ' bars)' : '❌ FAIL'}`);
   console.log(`- Session Chat Stream Verified:  ${audit.sessionChatLoaded ? '✅ PASS' : '❌ FAIL'}`);
   console.log(`- Session Chat Input Present:    ${audit.sessionChatInputPresent ? '✅ PASS' : '❌ FAIL'}`);
   console.log(`- Session Logs / Output Loaded:  ${audit.sessionTerminalLoaded ? '✅ PASS' : '⚠️ NONE'}`);
