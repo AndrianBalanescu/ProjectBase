@@ -50,7 +50,7 @@ app/
     (engine hooks 91-111 stripped; preserved on the engine-experiments branch + archive/* tags)
   pb_migrations/       <- numbered schema + seed migrations (17100000xx). Add NEW number for changes.
   pb_data/             <- runtime SQLite data. NEVER commit.
-docs/                  <- research, ROADMAP, TODO, architecture, COMPETITORS, FEATURE_MATRIX
+docs/                  <- research, ROADMAP, TODO, architecture, COMPETITORS, FEATURE_MATRIX, RESTORING_VIEWS.md
 scripts/               <- start.sh, build_css.sh, backup.sh, restore.sh, install-systemd.sh, deploy-demo.sh,
                           reset-demo.sh, bump_version.sh, typegen.sh, flow-cli (CLI wrapper), pb-cli,
                           mcp_server.py, pb_autonomous_runner.py, pb-autonomous-daemon.sh, install.sh, qa/, bench/
