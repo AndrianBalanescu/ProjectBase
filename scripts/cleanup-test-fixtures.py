@@ -55,6 +55,7 @@ TEST_ISSUE_EXACT_TITLES = {
 }
 
 FIXTURE_TITLE_PREFIXES = (
+    "guard-probe",  # auth-guard suite probe (test_custom_route_auth_guards)
     "Export CustomFields ",
     "Export Fixture ",
     "Search Identifier Probe ",

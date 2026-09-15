@@ -29,7 +29,14 @@ SUPERUSER_PASSWORD = os.environ.get("PROJECTBASE_PASSWORD", "superdev123")
 
 def _request(method, path, body=None, headers=None):
     url = f"{BASE_URL}{path}"
-    data = json.dumps(body).encode("utf-8") if body is not None else None
+    if isinstance(body, (bytes, bytearray)):
+        # Raw (possibly invalid) JSON body: for routes whose guard chain only
+        # rejects at the JSON-parse step, e.g. notification-settings PUT,
+        # where any VALID body is applied field-by-field and would zero out
+        # the live singleton row.
+        data = bytes(body)
+    else:
+        data = json.dumps(body).encode("utf-8") if body is not None else None
     hdrs = {"Content-Type": "application/json"}
     if headers:
         hdrs.update(headers)
@@ -62,10 +69,21 @@ def _super_token():
 # is identical across hooks; these samples catch regressions per file.
 # Engine hooks (91-111) were stripped to the engine-experiments branch; their
 # route samples were removed with them. If an engine returns, re-add a sample.
+#
+# CRITICAL: sample bodies must be VALIDATION-REJECTABLE, never business-valid.
+# The authenticated variant of each sample runs with a superuser token, so a
+# body that passes validation performs a REAL write against the live dogfood
+# instance. History: {"title": "guard-probe"} leaked a junk issue per run
+# (36 accumulated) and {"telegram_chat_id": "x"} clobbered the live
+# notification_settings singleton. Keep bodies reaching the 400/404 path.
 GUARDED_ROUTE_SAMPLES = [
-    # 30_custom_routes.pb.js
-    ("POST", "/api/projectbase/quick-task", {"title": "guard-probe"}),
-    ("PUT", "/api/projectbase/notification-settings", {"telegram_chat_id": "x"}),
+    # 30_custom_routes.pb.js. quick-task: "" fails title validation -> 400,
+    # zero writes. notification-settings PUT: a VALID body is applied via
+    # clamp() over every field and would blank the live singleton (that bug
+    # set telegram_chat_id="x" in the dogfood DB), so the zero-write guard
+    # check here is the malformed-JSON 400 instead.
+    ("POST", "/api/projectbase/quick-task", {"title": ""}),
+    ("PUT", "/api/projectbase/notification-settings", b'{"telegram_chat_id": x}'),
     # 31_bulk_actions.pb.js
     ("POST", "/api/projectbase/issues/bulk-update", {"ids": ["x"], "data": {}}),
     ("POST", "/api/projectbase/issues/bulk-delete", {"ids": ["x"]}),
