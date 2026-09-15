@@ -3,7 +3,7 @@
   "info": {
     "title": "ProjectBase API",
     "version": "0.2.0",
-    "description": "High-performance, ultra-lightweight Plane & Linear alternative for multi-project Kanban, sprint cycles, and autonomous AI agent orchestration.",
+    "description": "High-performance, ultra-lightweight Plane & Linear alternative for multi-project Kanban, cycles, milestones, and local execution-session visibility.",
     "contact": {
       "name": "Andrian Balanescu",
       "url": "https://github.com/AndrianBalanescu/projectbase"
@@ -1886,8 +1886,8 @@
         "tags": [
           "Agent Sessions"
         ],
-        "summary": "Send Message To Agent Session",
-        "description": "Appends an operator turn to an execution run's transcript and returns the assistant reply. Live replies come from the configured OmniRoute gateway; without one the message is queued and reported truthfully.",
+        "summary": "Ask The Execution Copilot About A Session",
+        "description": "Appends an operator question to an execution run's transcript and returns an execution-copilot reply. This does not send input to or control the underlying runtime process. Optional attachment ids reference protected, caller-owned session files; bounded image/text payloads may be supplied ephemerally for copilot analysis.",
         "parameters": [
           {
             "name": "id",
@@ -1913,6 +1913,25 @@
                     "type": "string",
                     "maxLength": 8000,
                     "example": "Summarise the failing test and propose a fix"
+                  },
+                  "attachments": {
+                    "type": "array",
+                    "maxItems": 5,
+                    "items": { "type": "string" },
+                    "description": "Protected session_attachments record ids owned by the caller and bound to this session"
+                  },
+                  "attachment_payloads": {
+                    "type": "array",
+                    "maxItems": 5,
+                    "description": "Ephemeral bounded content for copilot analysis. Images are data URLs up to 6,000,000 characters; text is capped at 102,400 characters. Payload bytes are not persisted in the transcript.",
+                    "items": {
+                      "type": "object",
+                      "required": ["kind", "data"],
+                      "properties": {
+                        "kind": { "type": "string", "enum": ["image", "text"] },
+                        "data": { "type": "string" }
+                      }
+                    }
                   }
                 }
               }

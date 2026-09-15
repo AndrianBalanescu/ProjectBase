@@ -1,5 +1,6 @@
 """Session copilot attachment storage and UI contract."""
 
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -44,3 +45,18 @@ def test_smart_composer_wires_picker_paste_chips_and_cleanup():
         "await file.text()",
     ]:
         assert token in view or token in api
+
+
+def test_openapi_documents_copilot_attachment_contract():
+    spec = json.loads((ROOT / "app/pb_public/openapi.json").read_text())
+    operation = spec["paths"]["/projectbase/sessions/{id}/chat"]["post"]
+    assert "does not send input to or control" in operation["description"]
+    props = operation["requestBody"]["content"]["application/json"]["schema"]["properties"]
+    assert props["attachments"]["maxItems"] == 5
+    assert props["attachment_payloads"]["maxItems"] == 5
+    assert set(props["attachment_payloads"]["items"]["properties"]["kind"]["enum"]) == {"image", "text"}
+
+
+def test_agents_map_lists_attachment_collection():
+    agents = (ROOT / "AGENTS.md").read_text()
+    assert "`agent_sessions` · `session_attachments` · `session_audits`" in agents
