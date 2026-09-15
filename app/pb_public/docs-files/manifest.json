@@ -1,7 +1,7 @@
 {
   "generated_by": "scripts/sync_docs.sh",
   "note": "Read-only mirror of curated repository markdown. Do not edit here; run the script.",
-  "count": 17,
+  "count": 20,
   "files": [
     {"file": "README.md", "title": "README", "group": "Project", "source": "README.md", "bytes": 6936},
     {"file": "CHANGELOG.md", "title": "Changelog", "group": "Project", "source": "CHANGELOG.md", "bytes": 107123},
@@ -19,6 +19,9 @@
     {"file": "docs_architecture-audit-and-competitive-landscape.md", "title": "Architecture & Landscape", "group": "Docs", "source": "docs/architecture-audit-and-competitive-landscape.md", "bytes": 5967},
     {"file": "research_COMPETITORS.md", "title": "Competitors", "group": "Research", "source": "research/COMPETITORS.md", "bytes": 1983},
     {"file": "research_FEATURE_MATRIX.md", "title": "Feature Matrix", "group": "Research", "source": "research/FEATURE_MATRIX.md", "bytes": 1787},
-    {"file": "THIRD_PARTY_NOTICES.md", "title": "Third-Party Notices", "group": "Project", "source": "THIRD_PARTY_NOTICES.md", "bytes": 2309}
+    {"file": "THIRD_PARTY_NOTICES.md", "title": "Third-Party Notices", "group": "Project", "source": "THIRD_PARTY_NOTICES.md", "bytes": 2309},
+    {"file": "TODO.md", "title": "Work Log (root TODO.md)", "group": "Project", "source": "TODO.md", "bytes": 26053},
+    {"file": ".github_pull_request_template.md", "title": "Pull Request Template", "group": "Project", "source": ".github/pull_request_template.md", "bytes": 1362},
+    {"file": ".agents_skills_ibrowse-test_SKILL.md", "title": "iBrowse Test Skill", "group": "Agent", "source": ".agents/skills/ibrowse-test/SKILL.md", "bytes": 5370}
   ]
 }

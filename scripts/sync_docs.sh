@@ -40,13 +40,19 @@ SOURCES=(
   "research/COMPETITORS.md"
   "research/FEATURE_MATRIX.md"
   "THIRD_PARTY_NOTICES.md"
+  "TODO.md"
+  ".github/pull_request_template.md"
+  ".agents/skills/ibrowse-test/SKILL.md"
 )
 
 # Deliberately NOT published (kept out on purpose, not by accident):
-#   INDEX.md                     - auto-generated folder hash (no human value)
-#   TODO.md (root, cycle notes)  - superseded by docs/TODO.md; internal churn
-#   .flow/, .agents/, prism-out/ - scratch/agent workspace, not product docs
-#   .github/pull_request_template.md, .pytest_cache/README.md - noise
+#   INDEX.md                     - auto-generated on every file add; its hash
+#                                  line drifts constantly, which would churn the
+#                                  mirror on unrelated commits. Say the word and
+#                                  it gets added too.
+#   .flow/, prism-out/           - agent scratch workspaces (untracked output)
+#   .pytest_cache/README.md      - tool cache noise
+# Everything tracked by git under the repo (other than INDEX.md) is published.
 
 # Friendly titles; fall back to the file's own first H1, then the path.
 title_for() {
@@ -63,6 +69,9 @@ title_for() {
     research/COMPETITORS.md) echo "Competitors" ;;
     research/FEATURE_MATRIX.md) echo "Feature Matrix" ;;
     THIRD_PARTY_NOTICES.md) echo "Third-Party Notices" ;;
+    TODO.md) echo "Work Log (root TODO.md)" ;;
+    .github/pull_request_template.md) echo "Pull Request Template" ;;
+    .agents/skills/ibrowse-test/SKILL.md) echo "iBrowse Test Skill" ;;
     *) echo "$rel" ;;
   esac
 }
@@ -71,6 +80,7 @@ group_for() {
   case "$1" in
     docs/*) echo "Docs" ;;
     research/*) echo "Research" ;;
+    .agents/*) echo "Agent" ;;
     *) echo "Project" ;;
   esac
 }
