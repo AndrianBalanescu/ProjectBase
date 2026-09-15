@@ -42,4 +42,4 @@
 - [x] #P2 done **NEXT_DEV_TASK "Fix the idle-kill observer lie" closed**
   - Referent (1) flomaster idle-kill contract: PR #7 merged (confirmed by cycle-68 inspect notes).
   - Referent (2) iBrowse false-negative observer: worker/audio capture traps (iBrowse 2d7a0f1) + inspector settle window (cf915ef); `bun test src/__tests__/health-trap-observer.test.ts` = 7 pass / 0 fail; iBrowse main == origin/main.
-- [x] #P2 note **Broken `~/.local/bin/pytest` symlink (achiles deprecation debris)** — points to removed `/home/ubuntu/dev/achiles/.venv/bin/pytest`; use `uv run --with pytest pytest tests/` (AGENTS.md-canonical) until relinked.
+- [x] #P2 note **`~/.local/bin/pytest` relinked (was achiles deprecation debris)** — the symlink now resolves to a working pytest (`pytest 9.1.1`); `~/.local/bin/pytest tests/ -q` is verified in this repo. `uv run --with pytest pytest tests/` remains the AGENTS.md-canonical alternative.
