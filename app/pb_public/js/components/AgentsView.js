@@ -617,7 +617,12 @@ const AgentsViewComponent = {
         if (!(window.API && window.API.sendSessionMessage)) {
           throw new Error('Chat API unavailable');
         }
-        const res = await window.API.sendSessionMessage(target, text || 'Please inspect the attached files.', sentAttachments.map(a => a.id));
+        const res = await window.API.sendSessionMessage(
+          target,
+          text || 'Please inspect the attached files.',
+          sentAttachments.map(a => a.id),
+          sentAttachments.map(a => a.inline).filter(Boolean)
+        );
         if (res && Array.isArray(res.turns) && res.turns.length > 0) {
           this.chatLog = Object.assign({}, this.chatLog, { [sid]: res.turns });
         } else if (res && res.response) {
@@ -992,9 +997,9 @@ const AgentsViewComponent = {
                   <!-- Text content (Markdown Rendered with Code Highlight Styling) -->
                   <div v-if="turn.content" class="chat-markdown markdown-body text-xs leading-relaxed select-text" :class="turn.role === 'user' ? 'text-white' : 'text-zinc-800 dark:text-zinc-100'" v-html="renderMarkdown(turn.content)"></div>
                   <div v-if="turn.attachments && turn.attachments.length" class="mt-2 flex flex-wrap gap-1.5">
-                    <a v-for="item in turn.attachments" :key="item.id || item.url" :href="item.url" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] border" :class="turn.role === 'user' ? 'border-indigo-300/40 bg-indigo-500/30 text-white' : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200'">
+                    <span v-for="item in turn.attachments" :key="item.id || item.name" class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] border" :class="turn.role === 'user' ? 'border-indigo-300/40 bg-indigo-500/30 text-white' : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200'">
                       <i data-lucide="paperclip" class="w-3 h-3"></i><span class="max-w-44 truncate">{{ item.name }}</span>
-                    </a>
+                    </span>
                   </div>
 
                   <div v-if="turn.test_verdict" class="mt-2 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 font-mono text-[11px] flex items-center justify-between">

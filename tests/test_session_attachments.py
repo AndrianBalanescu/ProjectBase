@@ -10,6 +10,7 @@ def test_attachment_migration_is_bounded_and_owner_scoped():
     assert 'name: "session_attachments"' in src
     assert 'maxSelect: 1' in src
     assert 'maxSize: 10485760' in src
+    assert 'protected: true' in src
     assert 'owner = @request.auth.id' in src
     assert 'session_id' in src
     assert 'image/png' in src and 'application/pdf' in src
@@ -21,6 +22,10 @@ def test_session_chat_validates_attachment_ownership_and_count():
     assert 'att.getString("owner") !== e.auth.id' in src
     assert 'att.getString("session_id") !== sessionId' in src
     assert 'attachments: attachments' in src
+    assert 'attachment_payloads' in src
+    assert 'type: "image_url"' in src
+    assert 'payload.data.length <= 6000000' in src
+    assert 'payload.data.length <= 102400' in src
 
 
 def test_smart_composer_wires_picker_paste_chips_and_cleanup():
@@ -34,5 +39,8 @@ def test_smart_composer_wires_picker_paste_chips_and_cleanup():
         'exceeds 10 MB',
         'uploadSessionAttachment',
         'deleteSessionAttachment',
+        'pb.files.getToken()',
+        "reader.readAsDataURL(file)",
+        "await file.text()",
     ]:
         assert token in view or token in api

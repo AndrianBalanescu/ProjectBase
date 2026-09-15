@@ -103,8 +103,12 @@ routerAdd("POST", "/api/projectbase/sessions/{id}/chat", (e) => {
         }
 
         const requestedAttachments = Array.isArray(body.attachments) ? body.attachments : []
+        const rawPayloads = Array.isArray(body.attachment_payloads) ? body.attachment_payloads : []
         if (requestedAttachments.length > 5) {
             return e.json(400, { error: "At most 5 attachments are allowed" })
+        }
+        if (rawPayloads.length > 5) {
+            return e.json(400, { error: "At most 5 attachment payloads are allowed" })
         }
 
         const rawId = String(e.request.pathValue("id") || "").trim()
@@ -154,8 +158,7 @@ routerAdd("POST", "/api/projectbase/sessions/{id}/chat", (e) => {
             const fileName = att.getString("file")
             attachments.push({
                 id: att.id,
-                name: fileName,
-                url: "/api/files/" + att.collection().id + "/" + att.id + "/" + fileName
+                name: fileName
             })
         }
 
@@ -219,6 +222,18 @@ routerAdd("POST", "/api/projectbase/sessions/{id}/chat", (e) => {
         let gatewayReached = false
         if (apiKey) {
             try {
+                const userContent = []
+                userContent.push({ type: "text", text: message + (attachments.length
+                    ? "\n\nAttached files: " + attachments.map(a => a.name).join(", ")
+                    : "") })
+                for (const payload of rawPayloads) {
+                    if (!payload || typeof payload !== "object") continue
+                    if (payload.kind === "image" && typeof payload.data === "string" && /^data:image\/(png|jpeg|gif|webp);base64,/.test(payload.data) && payload.data.length <= 6000000) {
+                        userContent.push({ type: "image_url", image_url: { url: payload.data } })
+                    } else if (payload.kind === "text" && typeof payload.data === "string" && payload.data.length <= 102400) {
+                        userContent[0].text += "\n\nAttached text:\n```\n" + payload.data + "\n```"
+                    }
+                }
                 const sysPrompt =
                     "You are the execution copilot inside ProjectBase, an open-source " +
                     "Linear/Plane-style workspace. You are replying inside a live agent " +
@@ -239,12 +254,7 @@ routerAdd("POST", "/api/projectbase/sessions/{id}/chat", (e) => {
                         model: model,
                         messages: [
                             { role: "system", content: sysPrompt },
-                            {
-                                role: "user",
-                                content: message + (attachments.length
-                                    ? "\n\nAttached files:\n" + attachments.map(a => "- " + a.name + " (" + a.url + ")").join("\n")
-                                    : "")
-                            }
+                            { role: "user", content: userContent.length > 1 ? userContent : userContent[0].text }
                         ],
                         max_tokens: 1200,
                         temperature: 0.3

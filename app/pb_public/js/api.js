@@ -378,11 +378,11 @@ const API = {
 
   // Append an operator turn to a live execution run and get the reply back.
   // The run is a record id or its session_id; the server resolves either.
-  async sendSessionMessage(id, message, attachments = []) {
+  async sendSessionMessage(id, message, attachments = [], attachmentPayloads = []) {
     const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/chat`, {
       method: 'POST',
       headers: this._authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ message, attachments })
+      body: JSON.stringify({ message, attachments, attachment_payloads: attachmentPayloads })
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to send message');
@@ -397,12 +397,25 @@ const API = {
     form.append('session_id', sessionId);
     form.append('file', file, file.name);
     const record = await pb.collection('session_attachments').create(form);
+    const token = await pb.files.getToken();
+    let inline = null;
+    if (file.type && file.type.startsWith('image/') && file.size <= 4 * 1024 * 1024) {
+      inline = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve({ kind: 'image', data: reader.result });
+        reader.onerror = () => reject(new Error(`Could not read ${file.name}`));
+        reader.readAsDataURL(file);
+      });
+    } else if (['text/plain', 'text/markdown', 'application/json', 'text/csv'].includes(file.type) && file.size <= 100 * 1024) {
+      inline = { kind: 'text', data: await file.text() };
+    }
     return {
       id: record.id,
       name: record.file,
       size: file.size,
       type: file.type || 'application/octet-stream',
-      url: pb.files.getURL(record, record.file),
+      url: pb.files.getURL(record, record.file, { token }),
+      inline,
     };
   },
 

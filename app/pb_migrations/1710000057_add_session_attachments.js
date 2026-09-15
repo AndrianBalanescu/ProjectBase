@@ -13,6 +13,7 @@ migrate((app) => {
         required: true,
         maxSelect: 1,
         maxSize: 10485760,
+        protected: true,
         mimeTypes: [
             "image/png", "image/jpeg", "image/gif", "image/webp",
             "text/plain", "text/markdown", "application/json",
