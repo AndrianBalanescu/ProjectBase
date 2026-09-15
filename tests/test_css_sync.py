@@ -159,28 +159,37 @@ class TestSpaNavigationCleanup(unittest.TestCase):
 
     def test_primary_navigation_and_external_docs_are_strict(self):
         header = open(os.path.join(PB_PUBLIC, "js", "components", "Header.js"), encoding="utf-8").read()
-        ordered = ["label: 'Board'", "label: 'List'", "label: 'Cycles'", "label: 'Roadmap'", "label: 'Projects'"]
+        ordered = ["label: 'Board'", "label: 'List'", "label: 'Cycles'", "label: 'Timeline'", "label: 'Roadmap'", "label: 'Projects'"]
         positions = [header.index(label) for label in ordered]
         self.assertEqual(positions, sorted(positions))
         self.assertIn("<span>Sessions</span>", header)
         self.assertIn('href="/docs"', header)
         self.assertIn('target="_blank"', header)
-        for removed in ("Timeline", "Portfolio", ">Stats<", "change-view', 'docs"):
+        for removed in ("Portfolio", ">Stats<", "change-view', 'docs"):
             self.assertNotIn(removed, header)
 
     def test_removed_views_have_no_assets_or_mounts(self):
+        """TimelineView is intentionally restored; Portfolio/Stats/Docs stay gone."""
         index = open(os.path.join(PB_PUBLIC, "index.html"), encoding="utf-8").read()
         sw = open(os.path.join(PB_PUBLIC, "sw.js"), encoding="utf-8").read()
         app = open(os.path.join(PB_PUBLIC, "js", "app.js"), encoding="utf-8").read()
-        for name in ("TimelineView", "PortfolioView", "StatsView", "DocsView"):
+        for name in ("PortfolioView", "StatsView", "DocsView"):
             self.assertFalse(os.path.exists(os.path.join(PB_PUBLIC, "js", "components", name + ".js")))
             self.assertNotIn(name, index + sw + app)
-        for tag in ("timeline-view", "portfolio-view", "stats-view", "docs-view"):
+        for tag in ("portfolio-view", "stats-view", "docs-view"):
             self.assertNotIn(tag, index + app)
+        # The restored view must be fully wired: asset shipped, mounted,
+        # precached, deep-linkable.
+        self.assertTrue(os.path.exists(os.path.join(PB_PUBLIC, "js", "components", "TimelineView.js")))
+        for surface in (index, sw, app):
+            self.assertIn("TimelineView", surface)
+        self.assertIn("timeline-view", index)
+        self.assertIn("timeline: 'timeline'", app)
 
     def test_legacy_routes_redirect_without_blank_views(self):
         app = open(os.path.join(PB_PUBLIC, "js", "app.js"), encoding="utf-8").read()
-        self.assertIn("timeline: 'milestones'", app)
+        # timeline is a live view again; portfolio/stats/docs stay remapped.
         self.assertIn("portfolio: 'projects'", app)
         self.assertIn("stats: 'board'", app)
+        self.assertNotIn("timeline: 'milestones'", app)
         self.assertIn("new URL('docs', document.baseURI)", app)

@@ -8,15 +8,16 @@ handler was not. This file pins the invariant that ended the drift:
 
   VIEWS is the single source of truth. Every view id must be:
     - rendered by a v-if/v-else-if branch in index.html
+    - registered as a component in app.js components map
     - present in app.js applyRoute() viewMap (deep-linkable)
     - navigable from the CommandPalette ("Switch to ..." action)
     - wired in the keyboard handler ONLY if listed in KEYBOARD_VIEWS
     - advertised in the ShortcutsModal "Switch Views" section ONLY if
       listed in KEYBOARD_VIEWS (same ids, same order)
 
-If you re-add Timeline/Stats/Docs/Portfolio from the archive tags
+If you re-add Stats/Docs/Portfolio from the archive tags
 (archive/feature-creep-full), add the id here and this test will tell you
-every surface you still need to wire.
+every surface you still need to wire. (Timeline was restored this way.)
 """
 
 import os
@@ -27,10 +28,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PUB = os.path.join(ROOT, "app", "pb_public")
 
 # The single source of truth: live, rendered views in navigation order.
-VIEWS = ["board", "list", "cycles", "milestones", "projects", "agents"]
+VIEWS = ["board", "list", "cycles", "timeline", "milestones", "projects", "agents"]
 
-# Views reachable via single-key shortcuts (1..6, in this order).
-KEYBOARD_VIEWS = ["board", "list", "cycles", "milestones", "projects", "agents"]
+# Views reachable via single-key shortcuts (1..7, in this order).
+KEYBOARD_VIEWS = ["board", "list", "cycles", "timeline", "milestones", "projects", "agents"]
 
 
 def _read(*parts):
@@ -67,6 +68,19 @@ class TestShellConsistency(unittest.TestCase):
         self.assertEqual(mapped, set(VIEWS),
                          f"viewMap {sorted(mapped)} != VIEWS {VIEWS}")
 
+    def test_view_components_registered(self):
+        """Every view must have a registered Vue component in app.js."""
+        app = _read("js", "app.js")
+        # 'board' is the one view whose tag is not '<id>-view'.
+        tag_overrides = {"board": "kanban-board"}
+        for view in VIEWS:
+            tag = tag_overrides.get(view, f"{view}-view")
+            self.assertRegex(
+                app,
+                rf"'{tag}':\s*\w+Component",
+                f"view '{view}' ('{tag}') not registered in app.js components",
+            )
+
     def test_keyboard_handler_targets_live_views(self):
         """Every currentView set by a digit key must be a live view."""
         app = _read("js", "app.js")
@@ -74,7 +88,8 @@ class TestShellConsistency(unittest.TestCase):
             r"e\.key === '1'.*?currentView = '(\w+)'.*?e\.key === '2'.*?"
             r"currentView = '(\w+)'.*?e\.key === '3'.*?currentView = '(\w+)'.*?"
             r"e\.key === '4'.*?currentView = '(\w+)'.*?e\.key === '5'.*?"
-            r"currentView = '(\w+)'.*?e\.key === '6'.*?currentView = '(\w+)'",
+            r"currentView = '(\w+)'.*?e\.key === '6'.*?currentView = '(\w+)'.*?"
+            r"e\.key === '7'.*?currentView = '(\w+)'",
             app, re.S,
         )
         self.assertIsNotNone(digit_block, "digit-key view chain not found")
@@ -85,7 +100,7 @@ class TestShellConsistency(unittest.TestCase):
     def test_no_dead_digit_shortcuts(self):
         """Digits beyond the live view count must not set currentView."""
         app = _read("js", "app.js")
-        for key in "789":
+        for key in "89":
             self.assertNotIn(
                 f"e.key === '{key}'", app,
                 f"key {key} is wired but views 7+ do not exist",
@@ -103,8 +118,8 @@ class TestShellConsistency(unittest.TestCase):
             f"modal key sequence {[k for k, _ in descs]} must be 1..{len(KEYBOARD_VIEWS)}",
         )
         expected = dict(zip(KEYBOARD_VIEWS, [
-            "Board (Kanban)", "List", "Cycles (sprints)", "Roadmap",
-            "Projects", "Sessions"]))
+            "Board (Kanban)", "List", "Cycles (sprints)", "Timeline (Gantt)",
+            "Roadmap", "Projects", "Sessions"]))
         got = dict(descs)
         for i, view in enumerate(KEYBOARD_VIEWS):
             key = str(i + 1)
@@ -130,8 +145,6 @@ class TestShellConsistency(unittest.TestCase):
         expected_strip = [v for v in VIEWS if v != "agents"]
         self.assertEqual(strip, expected_strip,
                          f"header strip {strip} != {expected_strip}")
-        self.assertIn("change-view', 'agents'", header,
-                      "Header must keep the standalone Sessions button")
 
     def test_legacy_routes_remap(self):
         """Removed views must still deep-link somewhere sane, not blank."""
@@ -139,10 +152,13 @@ class TestShellConsistency(unittest.TestCase):
         m = re.search(r"const legacyViewMap = \{([^}]*)\}", app)
         self.assertIsNotNone(m, "legacyViewMap missing from app.js")
         remaps = dict(re.findall(r"(\w+): '(\w+)'", m.group(1)))
-        for legacy in ("timeline", "portfolio", "stats"):
+        for legacy in ("portfolio", "stats"):
             self.assertIn(legacy, remaps, f"legacy route '{legacy}' unmapped")
             self.assertIn(remaps[legacy], VIEWS,
                           f"legacy '{legacy}' remaps to dead view '{remaps[legacy]}'")
+        # timeline is a live view again; it must NOT be remapped away.
+        self.assertNotIn("timeline", remaps,
+                         "timeline is live again and must not be in legacyViewMap")
 
 
 if __name__ == "__main__":

@@ -472,8 +472,8 @@ def test_bulk_update_start_date_allowed_and_validated():
         _delete_issue(issue["id"])
 
 def test_schedule_fields_survive_timeline_view_removal():
-    """Dates remain editable data even though the duplicate Gantt view is gone."""
-    assert "TimelineView.js" not in _read("app/pb_public/index.html")
+    """Dates remain editable data and the Timeline view renders them."""
+    assert "TimelineView.js" in _read("app/pb_public/index.html")
     assert "start_date" in _read("app/pb_public/js/components/NewIssueModal.js")
     assert "start_date" in _read("app/pb_public/js/components/IssueDrawer.js")
     assert "start_date" in _read("app/pb_hooks/31_bulk_actions.pb.js")

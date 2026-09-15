@@ -2543,13 +2543,17 @@ def test_realtime_handles_cycles_and_comments():
     )
 
 def test_removed_views_redirect_without_shipping_duplicate_assets():
-    """Legacy hashes stay safe while removed duplicate views stay removed."""
+    """Legacy hashes stay safe while removed duplicate views stay removed.
+
+    TimelineView was restored from the archive (its data model never left),
+    so only Portfolio/Stats/Docs assets must stay absent."""
+
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     index = open(os.path.join(root, "app", "pb_public", "index.html")).read()
     app_js = open(os.path.join(root, "app", "pb_public", "js", "app.js")).read()
     sw = open(os.path.join(root, "app", "pb_public", "sw.js")).read()
 
-    for asset in ("TimelineView.js", "PortfolioView.js", "StatsView.js", "DocsView.js"):
+    for asset in ("PortfolioView.js", "StatsView.js", "DocsView.js"):
         assert asset not in index
         assert asset not in sw
     assert "legacyViewMap" in app_js

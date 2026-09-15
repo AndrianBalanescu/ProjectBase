@@ -33,9 +33,10 @@ const ShortcutsModalComponent = {
             { keys: ['1'], desc: 'Board (Kanban)' },
             { keys: ['2'], desc: 'List' },
             { keys: ['3'], desc: 'Cycles (sprints)' },
-            { keys: ['4'], desc: 'Roadmap' },
-            { keys: ['5'], desc: 'Projects' },
-            { keys: ['6'], desc: 'Sessions' }
+            { keys: ['4'], desc: 'Timeline (Gantt)' },
+            { keys: ['5'], desc: 'Roadmap' },
+            { keys: ['6'], desc: 'Projects' },
+            { keys: ['7'], desc: 'Sessions' }
           ]
         }
       ];

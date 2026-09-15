@@ -149,6 +149,7 @@ const HeaderComponent = {
               { id: 'board', label: 'Board', icon: 'kanban' },
               { id: 'list', label: 'List', icon: 'list' },
               { id: 'cycles', label: 'Cycles', icon: 'refresh-cw' },
+              { id: 'timeline', label: 'Timeline', icon: 'calendar' },
               { id: 'milestones', label: 'Roadmap', icon: 'flag' },
               { id: 'projects', label: 'Projects', icon: 'folder-kanban' }
             ]" :key="view.id"

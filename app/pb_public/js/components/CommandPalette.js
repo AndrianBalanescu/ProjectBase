@@ -27,6 +27,7 @@ const CommandPaletteComponent = {
         { type: 'action', id: 'act_board', title: 'Switch to Board View', subtitle: 'View Kanban Board', action: () => this.$emit('change-view', 'board'), icon: 'kanban' },
         { type: 'action', id: 'act_list', title: 'Switch to List View', subtitle: 'View tabular task list', action: () => this.$emit('change-view', 'list'), icon: 'list-todo' },
         { type: 'action', id: 'act_cycles', title: 'Switch to Cycles View', subtitle: 'View Sprints & Velocity', action: () => this.$emit('change-view', 'cycles'), icon: 'refresh-cw' },
+        { type: 'action', id: 'act_timeline', title: 'Open Timeline', subtitle: 'Gantt schedule of cycles, milestones and issues', action: () => this.$emit('change-view', 'timeline'), icon: 'calendar' },
         { type: 'action', id: 'act_milestones', title: 'Open Roadmap', subtitle: 'View milestones and outcomes', action: () => this.$emit('change-view', 'milestones'), icon: 'flag' },
         { type: 'action', id: 'act_projects', title: 'Switch to Projects View', subtitle: 'All projects and portfolios', action: () => this.$emit('change-view', 'projects'), icon: 'folder-kanban' },
         { type: 'action', id: 'act_agents', title: 'Open Sessions', subtitle: 'Live execution runs', action: () => this.$emit('change-view', 'agents'), icon: 'activity' },

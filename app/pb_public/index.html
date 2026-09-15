@@ -202,6 +202,16 @@
         @update-project="handleSaveProject"
       ></milestones-view>
 
+      <timeline-view
+        v-else-if="currentView === 'timeline'"
+        :issues="issues"
+        :cycles="cycles"
+        :milestones="milestones"
+        :projects="projects"
+        :current-project="currentProject"
+        @open-issue="openIssue"
+      ></timeline-view>
+
       <agents-view
         v-else-if="currentView === 'agents'"
         :agents="agents"
@@ -514,6 +524,7 @@
   <script src="/js/components/ListView.js"></script>
   <script src="/js/components/CyclesView.js"></script>
   <script src="/js/components/MilestonesView.js"></script>
+  <script src="/js/components/TimelineView.js"></script>
 
   <script src="/js/components/ProjectsView.js"></script>
 

@@ -77,6 +77,7 @@ const App = {
     'list-view': ListViewComponent,
     'cycles-view': CyclesViewComponent,
     'milestones-view': MilestonesViewComponent,
+    'timeline-view': TimelineViewComponent,
     'projects-view': ProjectsViewComponent,
     'agents-view': AgentsViewComponent,
     'issue-drawer': IssueDrawerComponent,
@@ -687,13 +688,15 @@ const App = {
         } else if (e.key === '3') {
           this.currentView = 'cycles';
         } else if (e.key === '4') {
-          this.currentView = 'milestones';
+          this.currentView = 'timeline';
         } else if (e.key === '5') {
-          this.currentView = 'projects';
+          this.currentView = 'milestones';
         } else if (e.key === '6') {
+          this.currentView = 'projects';
+        } else if (e.key === '7') {
           this.currentView = 'agents';
         }
-        // NOTE: no shortcuts for views that do not exist. Keys 7/8/9 used to
+        // NOTE: no shortcuts for views that do not exist. Keys 8/9 used to
         // target the removed stats/docs/portfolio views and rendered a blank
         // main area (debloat leftover). If you re-add a view, wire its key
         // here, the ShortcutsModal list, the CommandPalette, the Header nav,
@@ -778,8 +781,8 @@ const App = {
       this.applyHashQueryState(params);
       if (!hash) return;
       const parts = hash.split('/').filter(Boolean);
-      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', projects: 'projects', milestones: 'milestones', agents: 'agents' };
-      const legacyViewMap = { timeline: 'milestones', portfolio: 'projects', stats: 'board' };
+      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', timeline: 'timeline', projects: 'projects', milestones: 'milestones', agents: 'agents' };
+      const legacyViewMap = { portfolio: 'projects', stats: 'board' };
       const routeView = parts.length >= 2 ? parts[1] : parts[0];
       if (routeView === 'docs') {
         window.location.replace(new URL('docs', document.baseURI).toString());
@@ -862,7 +865,7 @@ const App = {
     syncRoute() {
       if (this.isInitialRouting || !this.isAuthenticated) return;
       const proj = this.currentProject ? this.currentProject.identifier.toLowerCase() : '';
-      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', projects: 'projects', milestones: 'milestones', agents: 'agents' };
+      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', timeline: 'timeline', projects: 'projects', milestones: 'milestones', agents: 'agents' };
       const v = viewMap[this.currentView] || 'board';
       let hash = proj ? `#/${proj}/${v}` : `#/${v}`;
       if (this.currentView === 'agents' && this.activeAgentName) {

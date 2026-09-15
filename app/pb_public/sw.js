@@ -13,7 +13,7 @@
  * air-gapped LAN / Raspberry Pi — no CDN round-trips, no network requirement.
  */
 
-const CACHE_NAME = 'projectbase-shell-v10';
+const CACHE_NAME = 'projectbase-shell-v11';
 
 // The complete app shell. Keep in sync with index.html's asset list.
 const PRECACHE_PATHS = [
@@ -43,6 +43,7 @@ const PRECACHE_PATHS = [
   './js/components/ListView.js',
   './js/components/CyclesView.js',
   './js/components/MilestonesView.js',
+  './js/components/TimelineView.js',
   './js/components/ProjectsView.js',
   './js/components/AgentsView.js',
   './js/components/IssueDrawer.js',

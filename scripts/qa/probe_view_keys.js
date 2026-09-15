@@ -38,22 +38,41 @@ const { chromium } = require('playwright');
 
   const results = [];
   await page.keyboard.press('1'); await page.waitForTimeout(800); // start from board
-  results.push(await pressKey('4')); // Roadmap (milestones)
-  results.push(await pressKey('5')); // Projects
-  results.push(await pressKey('6')); // Sessions (agents)
-  results.push(await pressKey('7')); // no-op: stays Sessions, never blank
+  results.push(await pressKey('4')); // Timeline (Gantt)
+  results.push(await pressKey('5')); // Roadmap (milestones)
+  results.push(await pressKey('6')); // Projects
+  results.push(await pressKey('7')); // Sessions (agents)
+  results.push(await pressKey('8')); // no-op: stays Sessions, never blank
+
+  // Timeline-specific assertions: the restored Gantt view must render bars.
+  await page.keyboard.press('4');
+  await page.waitForTimeout(1200);
+  const timeline = await page.evaluate(() => {
+    const main = document.querySelector('main');
+    const html = main.innerHTML;
+    return {
+      rendered: /timeline|gantt/i.test(main.className + html),
+      barLike: main.querySelectorAll('[style*="left"], [style*="width"]').length,
+      textSample: main.innerText.trim().slice(0, 80).replace(/\s+/g, ' '),
+      height: main.getBoundingClientRect().height,
+    };
+  });
 
   const overflow = await page.evaluate(() => {
     const d = document.documentElement;
     return d.scrollWidth - d.clientWidth;
   });
 
-  console.log(JSON.stringify({ results, overflow, errors }, null, 1));
+  console.log(JSON.stringify({ results, timeline, overflow, errors }, null, 1));
   await browser.close();
   const bad = results.filter(r => r.textLen < 40);
+  if (!timeline.rendered || timeline.barLike < 1) {
+    console.error('PROBE FAIL: Timeline view did not render bars', JSON.stringify(timeline));
+    process.exit(1);
+  }
   if (bad.length || errors.length || overflow > 0) {
     console.error('PROBE FAIL: blank/dead views:', JSON.stringify(bad));
     process.exit(1);
   }
-  console.log('PROBE PASS: keys 4/5/6 land on live views, 7 is a no-op, 0 overflow, 0 errors');
+  console.log('PROBE PASS: keys 4-7 land on live views, 8 is a no-op, Timeline renders ' + timeline.barLike + ' bars, 0 overflow, 0 errors');
 })().catch(e => { console.error(e); process.exit(1); });
