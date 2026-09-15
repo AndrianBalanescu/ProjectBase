@@ -41,11 +41,9 @@ migrate((app) => {
 
     const listRule = "owner = @request.auth.id"
     const viewRule = "owner = @request.auth.id"
-    // NOTE: PocketBase evaluates createRule BEFORE onRecordCreateRequest hooks,
-    // so the rule must not inspect @request.body.owner (a client spoofing owner
-    // would be rejected here before the hook can force owner = auth id).
-    // The hook (36_saved_views.pb.js) is authoritative for owner forcing.
-    const createRule = "@request.auth.id != ''"
+    // Reject owner spoofing before hooks run while still allowing the normal
+    // owner-omitted request. The hook then fills owner with the caller id.
+    const createRule = "@request.auth.id != '' && (@request.body.owner = '' || @request.body.owner = @request.auth.id)"
     const updateRule = "owner = @request.auth.id"
     const deleteRule = "owner = @request.auth.id || @request.auth.role = 'admin'"
 
