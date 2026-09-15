@@ -2553,7 +2553,7 @@ def test_removed_views_redirect_without_shipping_duplicate_assets():
     app_js = open(os.path.join(root, "app", "pb_public", "js", "app.js")).read()
     sw = open(os.path.join(root, "app", "pb_public", "sw.js")).read()
 
-    for asset in ("PortfolioView.js", "StatsView.js", "DocsView.js"):
+    for asset in ("PortfolioView.js", "StatsView.js"):
         assert asset not in index
         assert asset not in sw
     assert "legacyViewMap" in app_js

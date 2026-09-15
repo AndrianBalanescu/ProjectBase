@@ -222,6 +222,10 @@
         @sync-agents="handleSyncAgents"
         @open-new-issue="openNewIssue"
       ></agents-view>
+
+      <docs-view
+        v-else-if="currentView === 'docs'"
+      ></docs-view>
     </main>
 
     <!-- Bulk Actions Bar (board/list multi-select) -->
@@ -529,6 +533,7 @@
   <script src="/js/components/ProjectsView.js"></script>
 
   <script src="/js/components/AgentsView.js"></script>
+  <script src="/js/components/DocsView.js"></script>
 
   <script src="/js/components/IssueDrawer.js"></script>
   <script src="/js/components/CommandPalette.js"></script>

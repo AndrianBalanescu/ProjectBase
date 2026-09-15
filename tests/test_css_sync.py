@@ -159,24 +159,24 @@ class TestSpaNavigationCleanup(unittest.TestCase):
 
     def test_primary_navigation_and_external_docs_are_strict(self):
         header = open(os.path.join(PB_PUBLIC, "js", "components", "Header.js"), encoding="utf-8").read()
-        ordered = ["label: 'Board'", "label: 'List'", "label: 'Cycles'", "label: 'Timeline'", "label: 'Roadmap'", "label: 'Projects'"]
+        ordered = ["label: 'Board'", "label: 'List'", "label: 'Cycles'", "label: 'Timeline'", "label: 'Roadmap'", "label: 'Projects'", "label: 'Docs'"]
         positions = [header.index(label) for label in ordered]
         self.assertEqual(positions, sorted(positions))
         self.assertIn("<span>Sessions</span>", header)
         self.assertIn('href="/docs"', header)
         self.assertIn('target="_blank"', header)
-        for removed in ("Portfolio", ">Stats<", "change-view', 'docs"):
+        for removed in ("Portfolio", ">Stats<"):
             self.assertNotIn(removed, header)
 
     def test_removed_views_have_no_assets_or_mounts(self):
-        """TimelineView is intentionally restored; Portfolio/Stats/Docs stay gone."""
+        """Timeline + Docs are restored; Portfolio/Stats stay gone."""
         index = open(os.path.join(PB_PUBLIC, "index.html"), encoding="utf-8").read()
         sw = open(os.path.join(PB_PUBLIC, "sw.js"), encoding="utf-8").read()
         app = open(os.path.join(PB_PUBLIC, "js", "app.js"), encoding="utf-8").read()
-        for name in ("PortfolioView", "StatsView", "DocsView"):
+        for name in ("PortfolioView", "StatsView"):
             self.assertFalse(os.path.exists(os.path.join(PB_PUBLIC, "js", "components", name + ".js")))
             self.assertNotIn(name, index + sw + app)
-        for tag in ("portfolio-view", "stats-view", "docs-view"):
+        for tag in ("portfolio-view", "stats-view"):
             self.assertNotIn(tag, index + app)
         # The restored view must be fully wired: asset shipped, mounted,
         # precached, deep-linkable.
@@ -185,6 +185,10 @@ class TestSpaNavigationCleanup(unittest.TestCase):
             self.assertIn("TimelineView", surface)
         self.assertIn("timeline-view", index)
         self.assertIn("timeline: 'timeline'", app)
+        # Restored Docs view must be wired too.
+        self.assertTrue(os.path.exists(os.path.join(PB_PUBLIC, "js", "components", "DocsView.js")))
+        self.assertIn("docs-view", index)
+        self.assertIn("docs: 'docs'", app)
 
     def test_legacy_routes_redirect_without_blank_views(self):
         app = open(os.path.join(PB_PUBLIC, "js", "app.js"), encoding="utf-8").read()

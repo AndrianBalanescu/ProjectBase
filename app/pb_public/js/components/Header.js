@@ -151,7 +151,8 @@ const HeaderComponent = {
               { id: 'cycles', label: 'Cycles', icon: 'refresh-cw' },
               { id: 'timeline', label: 'Timeline', icon: 'calendar' },
               { id: 'milestones', label: 'Roadmap', icon: 'flag' },
-              { id: 'projects', label: 'Projects', icon: 'folder-kanban' }
+              { id: 'projects', label: 'Projects', icon: 'folder-kanban' },
+              { id: 'docs', label: 'Docs', icon: 'book-open' }
             ]" :key="view.id"
             @click="$emit('change-view', view.id)"
             class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all font-medium"

@@ -80,6 +80,7 @@ const App = {
     'timeline-view': TimelineViewComponent,
     'projects-view': ProjectsViewComponent,
     'agents-view': AgentsViewComponent,
+    'docs-view': DocsViewComponent,
     'issue-drawer': IssueDrawerComponent,
     'command-palette': CommandPaletteComponent,
     'new-issue-modal': NewIssueModalComponent,
@@ -695,10 +696,11 @@ const App = {
           this.currentView = 'projects';
         } else if (e.key === '7') {
           this.currentView = 'agents';
+        } else if (e.key === '8') {
+          this.currentView = 'docs';
         }
-        // NOTE: no shortcuts for views that do not exist. Keys 8/9 used to
-        // target the removed stats/docs/portfolio views and rendered a blank
-        // main area (debloat leftover). If you re-add a view, wire its key
+        // NOTE: no shortcut for key 9 (no ninth view). If you re-add a view,
+        // wire its key
         // here, the ShortcutsModal list, the CommandPalette, the Header nav,
         // and the applyRoute viewMap together (see tests/test_shell_consistency.py).
       });
@@ -781,10 +783,14 @@ const App = {
       this.applyHashQueryState(params);
       if (!hash) return;
       const parts = hash.split('/').filter(Boolean);
-      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', timeline: 'timeline', projects: 'projects', milestones: 'milestones', agents: 'agents' };
+      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', timeline: 'timeline', projects: 'projects', milestones: 'milestones', agents: 'agents', docs: 'docs' };
       const legacyViewMap = { portfolio: 'projects', stats: 'board' };
       const routeView = parts.length >= 2 ? parts[1] : parts[0];
-      if (routeView === 'docs') {
+      // The in-app Docs view owns #/pb/docs. The Scalar API browser keeps its
+      // own top-level path and is reachable from the Header link; only the
+      // legacy '#/pb/docs' hash used to bounce there, and that behavior is
+      // gone now that a real view answers to the name.
+      if (routeView === 'apidocs') {
         window.location.replace(new URL('docs', document.baseURI).toString());
         return;
       }
@@ -865,7 +871,7 @@ const App = {
     syncRoute() {
       if (this.isInitialRouting || !this.isAuthenticated) return;
       const proj = this.currentProject ? this.currentProject.identifier.toLowerCase() : '';
-      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', timeline: 'timeline', projects: 'projects', milestones: 'milestones', agents: 'agents' };
+      const viewMap = { board: 'board', list: 'list', cycles: 'cycles', timeline: 'timeline', projects: 'projects', milestones: 'milestones', agents: 'agents', docs: 'docs' };
       const v = viewMap[this.currentView] || 'board';
       let hash = proj ? `#/${proj}/${v}` : `#/${v}`;
       if (this.currentView === 'agents' && this.activeAgentName) {

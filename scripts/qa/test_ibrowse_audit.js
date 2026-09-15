@@ -214,6 +214,22 @@ const EXE = process.env.QA_CHROME || '/home/ubuntu/.cache/ms-playwright/chromium
     }
     audit.viewsTested.push('Legacy redirects (#/pb/portfolio, #/pb/stats)');
 
+    // 12. Test Docs view (read-only repo markdown mirror).
+    await page.goto(BASE + '/#/pb/docs', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    const docsCheck = await page.evaluate(() => {
+      const main = document.querySelector('main');
+      if (!main) return { listed: 0, rendered: 0 };
+      return {
+        listed: main.querySelectorAll('aside button').length,
+        rendered: (main.querySelector('article')?.innerText || '').trim().length,
+      };
+    });
+    if (docsCheck.listed < 1 || docsCheck.rendered < 40) {
+      pageErrors.push(`Docs view incomplete (listed=${docsCheck.listed}, rendered=${docsCheck.rendered})`);
+    }
+    audit.viewsTested.push(`Docs View (#/pb/docs: ${docsCheck.listed} files)`);
+
   } catch (err) {
     pageErrors.push(`Audit Execution Error: ${err.message}`);
   } finally {

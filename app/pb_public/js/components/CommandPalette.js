@@ -31,6 +31,7 @@ const CommandPaletteComponent = {
         { type: 'action', id: 'act_milestones', title: 'Open Roadmap', subtitle: 'View milestones and outcomes', action: () => this.$emit('change-view', 'milestones'), icon: 'flag' },
         { type: 'action', id: 'act_projects', title: 'Switch to Projects View', subtitle: 'All projects and portfolios', action: () => this.$emit('change-view', 'projects'), icon: 'folder-kanban' },
         { type: 'action', id: 'act_agents', title: 'Open Sessions', subtitle: 'Live execution runs', action: () => this.$emit('change-view', 'agents'), icon: 'activity' },
+        { type: 'action', id: 'act_docs', title: 'Open Docs', subtitle: 'Repository markdown, read-only', action: () => this.$emit('change-view', 'docs'), icon: 'book-open' },
         { type: 'action', id: 'act_welcome', title: 'Open Welcome Guide', subtitle: 'Get started checklist', action: () => this.$emit('open-welcome'), icon: 'help-circle' },
         { type: 'action', id: 'act_shortcuts', title: 'Keyboard Shortcuts', subtitle: 'Shortcut: ? · all key bindings', action: () => this.$emit('open-shortcuts'), icon: 'keyboard' }
       ];

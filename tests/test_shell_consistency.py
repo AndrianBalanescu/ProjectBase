@@ -28,10 +28,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PUB = os.path.join(ROOT, "app", "pb_public")
 
 # The single source of truth: live, rendered views in navigation order.
-VIEWS = ["board", "list", "cycles", "timeline", "milestones", "projects", "agents"]
+VIEWS = ["board", "list", "cycles", "timeline", "milestones", "projects", "agents", "docs"]
 
 # Views reachable via single-key shortcuts (1..7, in this order).
-KEYBOARD_VIEWS = ["board", "list", "cycles", "timeline", "milestones", "projects", "agents"]
+KEYBOARD_VIEWS = ["board", "list", "cycles", "timeline", "milestones", "projects", "agents", "docs"]
 
 
 def _read(*parts):
@@ -89,7 +89,8 @@ class TestShellConsistency(unittest.TestCase):
             r"currentView = '(\w+)'.*?e\.key === '3'.*?currentView = '(\w+)'.*?"
             r"e\.key === '4'.*?currentView = '(\w+)'.*?e\.key === '5'.*?"
             r"currentView = '(\w+)'.*?e\.key === '6'.*?currentView = '(\w+)'.*?"
-            r"e\.key === '7'.*?currentView = '(\w+)'",
+            r"e\.key === '7'.*?currentView = '(\w+)'.*?e\.key === '8'.*?"
+            r"currentView = '(\w+)'",
             app, re.S,
         )
         self.assertIsNotNone(digit_block, "digit-key view chain not found")
@@ -100,7 +101,7 @@ class TestShellConsistency(unittest.TestCase):
     def test_no_dead_digit_shortcuts(self):
         """Digits beyond the live view count must not set currentView."""
         app = _read("js", "app.js")
-        for key in "89":
+        for key in "9":
             self.assertNotIn(
                 f"e.key === '{key}'", app,
                 f"key {key} is wired but views 7+ do not exist",
@@ -119,7 +120,7 @@ class TestShellConsistency(unittest.TestCase):
         )
         expected = dict(zip(KEYBOARD_VIEWS, [
             "Board (Kanban)", "List", "Cycles (sprints)", "Timeline (Gantt)",
-            "Roadmap", "Projects", "Sessions"]))
+            "Roadmap", "Projects", "Sessions", "Docs"]))
         got = dict(descs)
         for i, view in enumerate(KEYBOARD_VIEWS):
             key = str(i + 1)
