@@ -2545,8 +2545,9 @@ def test_realtime_handles_cycles_and_comments():
 def test_removed_views_redirect_without_shipping_duplicate_assets():
     """Legacy hashes stay safe while removed duplicate views stay removed.
 
-    TimelineView was restored from the archive (its data model never left),
-    so only Portfolio/Stats/Docs assets must stay absent."""
+    TimelineView was restored from the archive (its data model never left) and
+    the Docs view is now live (app/pb_public/js/components/DocsView.js), so only
+    the Portfolio/Stats views must stay absent."""
 
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     index = open(os.path.join(root, "app", "pb_public", "index.html")).read()
