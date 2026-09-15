@@ -11,7 +11,7 @@
     {"file": "GOVERNANCE.md", "title": "GOVERNANCE.md", "group": "Project", "source": "GOVERNANCE.md", "bytes": 2604},
     {"file": "CHARTER.md", "title": "CHARTER.md", "group": "Project", "source": "CHARTER.md", "bytes": 3575},
     {"file": "CODE_OF_CONDUCT.md", "title": "CODE_OF_CONDUCT.md", "group": "Project", "source": "CODE_OF_CONDUCT.md", "bytes": 1761},
-    {"file": "AGENTS.md", "title": "Agent Guide (AGENTS.md)", "group": "Project", "source": "AGENTS.md", "bytes": 11096},
+    {"file": "AGENTS.md", "title": "Agent Guide (AGENTS.md)", "group": "Project", "source": "AGENTS.md", "bytes": 11125},
     {"file": "docs_ROADMAP.md", "title": "Roadmap", "group": "Docs", "source": "docs/ROADMAP.md", "bytes": 1652},
     {"file": "docs_TODO.md", "title": "Task Queue & Stabilization", "group": "Docs", "source": "docs/TODO.md", "bytes": 3567},
     {"file": "docs_BENCHMARKS.md", "title": "Benchmarks", "group": "Docs", "source": "docs/BENCHMARKS.md", "bytes": 5241},

@@ -74,13 +74,24 @@ const DocsViewComponent = {
     async loadManifest() {
       this.loadingList = true;
       this.error = null;
+      let res;
       try {
-        const res = await fetch('/docs-files/manifest.json', { cache: 'no-cache' });
-        if (!res.ok) throw new Error('manifest HTTP ' + res.status);
+        res = await fetch('/docs-files/manifest.json', { cache: 'no-cache' });
+      } catch (e) {
+        // Network failure: the honest cause is connectivity or an uncached
+        // first visit, NOT a missing sync. Do not blame the build script.
+        this.error = 'Could not reach the server. If you are offline, open the Docs view once while online to cache it.';
+        this.loadingList = false;
+        return;
+      }
+      try {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         this.manifest = await res.json();
         if (this.files.length && !this.active) this.active = this.files[0];
       } catch (e) {
-        this.error = 'Could not load the documentation manifest. Run scripts/sync_docs.sh.';
+        // The server answered, so the manifest really is missing: this is the
+        // case that the sync script fixes.
+        this.error = 'Documentation manifest missing (HTTP ' + res.status + '). Run scripts/sync_docs.sh.';
       } finally {
         this.loadingList = false;
       }
@@ -89,12 +100,19 @@ const DocsViewComponent = {
       this.loadingDoc = true;
       this.error = null;
       this.content = '';
+      let res;
       try {
-        const res = await fetch('/docs-files/' + encodeURIComponent(file.file), { cache: 'no-cache' });
+        res = await fetch('/docs-files/' + encodeURIComponent(file.file), { cache: 'no-cache' });
+      } catch (e) {
+        this.error = 'Could not reach the server for ' + (file.source || file.file) + '. You may be offline and this document is not cached yet.';
+        this.loadingDoc = false;
+        return;
+      }
+      try {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         this.content = await res.text();
       } catch (e) {
-        this.error = 'Could not load ' + (file.source || file.file) + '.';
+        this.error = 'Could not load ' + (file.source || file.file) + ' (HTTP ' + res.status + ').';
       } finally {
         this.loadingDoc = false;
       }

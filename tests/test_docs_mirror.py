@@ -95,6 +95,41 @@ class TestDocsMirror(unittest.TestCase):
         # It must fetch static assets instead.
         self.assertIn("fetch(", code)
 
+    def test_offline_failure_does_not_blame_the_sync_script(self):
+        """A network failure must not be reported as a missing manifest.
+
+        If fetch() rejects (offline / uncached first visit) the honest cause is
+        connectivity. Blaming scripts/sync_docs.sh there would send users to a
+        build step that cannot fix an offline device.
+        """
+        view = open(os.path.join(ROOT, "app", "pb_public", "js", "components", "DocsView.js"),
+                    encoding="utf-8").read()
+        # The "Run scripts/sync_docs.sh" hint must live in the HTTP-error branch,
+        # which runs only after a response arrived (res.ok === false).
+        self.assertIn("if (!res.ok)", view)
+        http_branch = view.split("if (!res.ok)")[1][:700]
+        self.assertIn("sync_docs.sh", http_branch)
+        # And the offline message must not mention the script.
+        offline_start = view.find("Could not reach the server")
+        self.assertGreater(offline_start, -1, "offline message missing")
+        offline_msg = view[offline_start:offline_start + 400]
+        self.assertNotIn("sync_docs.sh", offline_msg)
+
+    def test_docs_manifest_is_precached_by_service_worker(self):
+        """The file list must survive offline: precache the manifest in the SW.
+
+        Without this, an offline user sees an empty Docs list (the manifest fetch
+        is a static asset, never navigated to, so it is only cached if precached
+        or previously visited).
+        """
+        sw = open(os.path.join(ROOT, "app", "pb_public", "sw.js"), encoding="utf-8").read()
+        self.assertIn("'./docs-files/manifest.json'", sw)
+        # The DocsView component itself must also be precached (offline view).
+        self.assertIn("'./js/components/DocsView.js'", sw)
+        # And the SW must expose a versioned cache name so deploys can bump it.
+        self.assertRegex(sw, r"CACHE_NAME\s*=\s*'projectbase-shell-v\d+'")
+
+
 
 if __name__ == "__main__":
     unittest.main()
