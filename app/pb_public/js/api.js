@@ -378,15 +378,36 @@ const API = {
 
   // Append an operator turn to a live execution run and get the reply back.
   // The run is a record id or its session_id; the server resolves either.
-  async sendSessionMessage(id, message) {
+  async sendSessionMessage(id, message, attachments = []) {
     const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/chat`, {
       method: 'POST',
       headers: this._authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ message })
+      body: JSON.stringify({ message, attachments })
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Failed to send message');
     return data;
+  },
+
+  async uploadSessionAttachment(sessionId, file) {
+    const owner = pb.authStore.record && pb.authStore.record.id;
+    if (!owner) throw new Error('Authentication required');
+    const form = new FormData();
+    form.append('owner', owner);
+    form.append('session_id', sessionId);
+    form.append('file', file, file.name);
+    const record = await pb.collection('session_attachments').create(form);
+    return {
+      id: record.id,
+      name: record.file,
+      size: file.size,
+      type: file.type || 'application/octet-stream',
+      url: pb.files.getURL(record, record.file),
+    };
+  },
+
+  async deleteSessionAttachment(id) {
+    return pb.collection('session_attachments').delete(id);
   },
 
   // ==========================================

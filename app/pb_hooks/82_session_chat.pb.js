@@ -102,6 +102,11 @@ routerAdd("POST", "/api/projectbase/sessions/{id}/chat", (e) => {
             return e.json(400, { error: "'message' must be at most 8000 characters" })
         }
 
+        const requestedAttachments = Array.isArray(body.attachments) ? body.attachments : []
+        if (requestedAttachments.length > 5) {
+            return e.json(400, { error: "At most 5 attachments are allowed" })
+        }
+
         const rawId = String(e.request.pathValue("id") || "").trim()
         if (!rawId) {
             return e.json(400, { error: "Missing session id" })
@@ -135,6 +140,25 @@ routerAdd("POST", "/api/projectbase/sessions/{id}/chat", (e) => {
 
         const sessionId = sessionRec.getString("session_id") || sessionRec.id
 
+        // Resolve only files owned by the caller and attached to this exact run.
+        // The gateway receives sanitized names/types/URLs, never arbitrary paths.
+        const attachments = []
+        for (const rawAttachmentId of requestedAttachments) {
+            const attachmentId = String(rawAttachmentId || "").trim()
+            if (!attachmentId) continue
+            let att = null
+            try { att = e.app.findRecordById("session_attachments", attachmentId) } catch (aErr) {}
+            if (!att || att.getString("owner") !== e.auth.id || att.getString("session_id") !== sessionId) {
+                return e.json(400, { error: "Invalid session attachment" })
+            }
+            const fileName = att.getString("file")
+            attachments.push({
+                id: att.id,
+                name: fileName,
+                url: "/api/files/" + att.collection().id + "/" + att.id + "/" + fileName
+            })
+        }
+
         // --- Append the operator turn ---------------------------------------
         let meta = {}
         try {
@@ -146,7 +170,7 @@ routerAdd("POST", "/api/projectbase/sessions/{id}/chat", (e) => {
 
         let chatHistory = Array.isArray(meta.chat) ? meta.chat.slice() : []
         const nowIso = new Date().toISOString()
-        chatHistory.push({ role: "user", content: message, created_at: nowIso })
+        chatHistory.push({ role: "user", content: message, attachments: attachments, created_at: nowIso })
 
         // --- Resolve the gateway --------------------------------------------
         let apiKey = ""
@@ -215,7 +239,12 @@ routerAdd("POST", "/api/projectbase/sessions/{id}/chat", (e) => {
                         model: model,
                         messages: [
                             { role: "system", content: sysPrompt },
-                            { role: "user", content: message }
+                            {
+                                role: "user",
+                                content: message + (attachments.length
+                                    ? "\n\nAttached files:\n" + attachments.map(a => "- " + a.name + " (" + a.url + ")").join("\n")
+                                    : "")
+                            }
                         ],
                         max_tokens: 1200,
                         temperature: 0.3

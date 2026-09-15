@@ -38,6 +38,9 @@ const AgentsViewComponent = {
       composerOpen: null,
       mentionQuery: '',
       lastRefreshAt: new Date().toISOString(),
+      attachments: [],
+      isUploading: false,
+      attachmentError: null,
       promptShortcuts: [
         { id: 'summary', label: 'Summarize', icon: 'sparkles', text: 'Summarize this run: objective, progress, blockers, and next action.' },
         { id: 'changes', label: 'Review changes', icon: 'git-diff', text: 'Review @changes from this run. Highlight risk, missing tests, and the most important next check.' },
@@ -438,6 +441,7 @@ const AgentsViewComponent = {
       }
       this.selectedSessionId = s.id || s.session_id;
       this.chatDraft = '';
+      await this.clearPendingAttachments();
       this.sendError = null;
       // Invalidate cached transcript so the computed re-reads fresh state.
       const sid = s.session_id || s.id;
@@ -525,6 +529,61 @@ const AgentsViewComponent = {
     toggleComposerMenu(name) {
       this.composerOpen = this.composerOpen === name ? null : name;
     },
+    openAttachmentPicker() {
+      if (!this.isUploading && this.$refs.attachmentInput) this.$refs.attachmentInput.click();
+    },
+    async onAttachmentPick(e) {
+      await this.addAttachments(Array.from((e.target && e.target.files) || []));
+      if (e.target) e.target.value = '';
+    },
+    async onComposerPaste(e) {
+      const files = Array.from((e.clipboardData && e.clipboardData.files) || []);
+      if (!files.length) return;
+      e.preventDefault();
+      await this.addAttachments(files.map((file, i) => {
+        if (file.name && file.name !== 'image.png') return file;
+        return new File([file], `screenshot-${Date.now()}-${i + 1}.png`, { type: file.type || 'image/png' });
+      }));
+    },
+    async addAttachments(files) {
+      const allowed = ['image/png','image/jpeg','image/gif','image/webp','text/plain','text/markdown','application/json','application/pdf','text/csv','application/zip'];
+      const remaining = Math.max(0, 5 - this.attachments.length);
+      const queue = files.slice(0, remaining);
+      if (!queue.length) {
+        this.attachmentError = 'Up to 5 attachments per message.';
+        return;
+      }
+      this.isUploading = true;
+      this.attachmentError = null;
+      const sid = this.selectedSessionKey;
+      try {
+        for (const file of queue) {
+          if (file.size > 10 * 1024 * 1024) throw new Error(`${file.name} exceeds 10 MB`);
+          if (!allowed.includes(file.type)) throw new Error(`${file.name} has an unsupported file type`);
+          const uploaded = await window.API.uploadSessionAttachment(sid, file);
+          this.attachments.push(uploaded);
+        }
+      } catch (err) {
+        this.attachmentError = (err && err.message) || 'Attachment upload failed';
+      } finally {
+        this.isUploading = false;
+      }
+    },
+    async removeAttachment(item) {
+      try { await window.API.deleteSessionAttachment(item.id); } catch (e) {}
+      this.attachments = this.attachments.filter(a => a.id !== item.id);
+    },
+    async clearPendingAttachments() {
+      const pending = this.attachments.slice();
+      this.attachments = [];
+      await Promise.all(pending.map(item => window.API && window.API.deleteSessionAttachment ? window.API.deleteSessionAttachment(item.id).catch(() => {}) : Promise.resolve()));
+    },
+    fmtBytes(size) {
+      if (!size) return '0 B';
+      if (size < 1024) return `${size} B`;
+      if (size < 1048576) return `${Math.round(size / 1024)} KB`;
+      return `${(size / 1048576).toFixed(1)} MB`;
+    },
 
     // --- Chat dispatch -----------------------------------------------------
     /**
@@ -533,7 +592,7 @@ const AgentsViewComponent = {
      */
     async sendMessage() {
       const text = (this.chatDraft || '').trim();
-      if (!text || this.isSending) return;
+      if ((!text && !this.attachments.length) || this.isSending || this.isUploading) return;
       const s = this.selectedSession;
       if (!s) return;
       const sid = s.session_id || s.id;
@@ -543,19 +602,22 @@ const AgentsViewComponent = {
       this.sendError = null;
 
       // Optimistic user turn so the console feels live during the round trip.
+      const sentAttachments = this.attachments.slice();
       const optimistic = (this.chatTurns || []).concat([{
         role: 'user',
-        content: text,
+        content: text || 'Shared attachments',
+        attachments: sentAttachments,
         created_at: new Date().toISOString(),
       }]);
       this.chatLog = Object.assign({}, this.chatLog, { [sid]: optimistic });
       this.chatDraft = '';
+      this.attachments = [];
 
       try {
         if (!(window.API && window.API.sendSessionMessage)) {
           throw new Error('Chat API unavailable');
         }
-        const res = await window.API.sendSessionMessage(target, text);
+        const res = await window.API.sendSessionMessage(target, text || 'Please inspect the attached files.', sentAttachments.map(a => a.id));
         if (res && Array.isArray(res.turns) && res.turns.length > 0) {
           this.chatLog = Object.assign({}, this.chatLog, { [sid]: res.turns });
         } else if (res && res.response) {
@@ -577,6 +639,7 @@ const AgentsViewComponent = {
         this.sendError = (e && e.message) || 'Failed to send message';
         // Restore the draft so the user does not lose their text.
         this.chatDraft = text;
+        this.attachments = sentAttachments;
         this.chatLog = Object.assign({}, this.chatLog, { [sid]: optimistic.slice(0, -1) });
       } finally {
         this.isSending = false;
@@ -928,6 +991,11 @@ const AgentsViewComponent = {
 
                   <!-- Text content (Markdown Rendered with Code Highlight Styling) -->
                   <div v-if="turn.content" class="chat-markdown markdown-body text-xs leading-relaxed select-text" :class="turn.role === 'user' ? 'text-white' : 'text-zinc-800 dark:text-zinc-100'" v-html="renderMarkdown(turn.content)"></div>
+                  <div v-if="turn.attachments && turn.attachments.length" class="mt-2 flex flex-wrap gap-1.5">
+                    <a v-for="item in turn.attachments" :key="item.id || item.url" :href="item.url" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] border" :class="turn.role === 'user' ? 'border-indigo-300/40 bg-indigo-500/30 text-white' : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200'">
+                      <i data-lucide="paperclip" class="w-3 h-3"></i><span class="max-w-44 truncate">{{ item.name }}</span>
+                    </a>
+                  </div>
 
                   <div v-if="turn.test_verdict" class="mt-2 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 font-mono text-[11px] flex items-center justify-between">
                     <span>🧪 Tests Passed: {{ turn.test_verdict.passed || 0 }}/{{ turn.test_verdict.total || 0 }}</span>
@@ -963,13 +1031,21 @@ const AgentsViewComponent = {
                 </template>
               </div>
               <div class="rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 focus-within:ring-1 focus-within:ring-indigo-500/60 overflow-hidden">
-                <textarea ref="chatInput" v-model="chatDraft" @input="onComposerInput" @keydown="onChatKeydown" :disabled="isSending" maxlength="8000" rows="2" placeholder="Ask about this run… Type @ to reference context" aria-label="Ask the execution copilot about this run" class="w-full px-3 pt-2.5 pb-1 text-xs bg-transparent text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none resize-none min-h-[54px] max-h-32 select-text disabled:opacity-60"></textarea>
+                <div v-if="attachments.length" class="flex gap-1.5 px-2 pt-2 overflow-x-auto">
+                  <div v-for="item in attachments" :key="item.id" class="shrink-0 inline-flex items-center gap-1.5 max-w-56 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1">
+                    <i :data-lucide="item.type && item.type.startsWith('image/') ? 'image' : 'file'" class="w-3.5 h-3.5 text-indigo-500 shrink-0"></i>
+                    <span class="min-w-0"><span class="block truncate text-[10px] text-zinc-700 dark:text-zinc-200">{{ item.name }}</span><span class="block text-[9px] text-zinc-400">{{ fmtBytes(item.size) }}</span></span>
+                    <button type="button" @click="removeAttachment(item)" class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400" :aria-label="'Remove ' + item.name"><i data-lucide="x" class="w-3 h-3"></i></button>
+                  </div>
+                </div>
+                <textarea ref="chatInput" v-model="chatDraft" @input="onComposerInput" @paste="onComposerPaste" @keydown="onChatKeydown" :disabled="isSending" maxlength="8000" rows="2" placeholder="Ask about this run… paste a screenshot or type @" aria-label="Ask the execution copilot about this run" class="w-full px-3 pt-2.5 pb-1 text-xs bg-transparent text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none resize-none min-h-[54px] max-h-32 select-text disabled:opacity-60"></textarea>
                 <div class="flex items-center justify-between px-2 pb-2 gap-2">
-                  <div class="flex items-center gap-1"><button type="button" @click="toggleComposerMenu('mentions')" class="h-7 px-2 inline-flex items-center gap-1 rounded-lg text-[10px] text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800" aria-label="Reference run context"><i data-lucide="at-sign" class="w-3.5 h-3.5"></i>Context</button><button type="button" @click="toggleComposerMenu('prompts')" class="h-7 px-2 inline-flex items-center gap-1 rounded-lg text-[10px] text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800" aria-label="Open prompt shortcuts"><i data-lucide="zap" class="w-3.5 h-3.5"></i>Prompts</button><span class="hidden sm:inline text-[9px] text-zinc-400 ml-1">Enter send · Shift+Enter newline</span></div>
-                  <button @click="sendMessage" :disabled="isSending || !chatDraft.trim()" class="h-8 px-3 shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors" :aria-label="isSending ? 'Asking execution copilot' : 'Ask execution copilot'"><i :data-lucide="isSending ? 'loader' : 'arrow-up'" class="w-3.5 h-3.5" :class="isSending ? 'animate-spin' : ''"></i><span>{{ isSending ? 'Asking' : 'Ask' }}</span></button>
+                  <div class="flex items-center gap-1"><input ref="attachmentInput" type="file" multiple class="hidden" accept="image/png,image/jpeg,image/gif,image/webp,text/plain,text/markdown,application/json,application/pdf,text/csv,application/zip" @change="onAttachmentPick"><button type="button" @click="openAttachmentPicker" :disabled="isUploading" class="h-7 px-2 inline-flex items-center gap-1 rounded-lg text-[10px] text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800 disabled:opacity-40" aria-label="Attach screenshots or files"><i :data-lucide="isUploading ? 'loader' : 'paperclip'" class="w-3.5 h-3.5" :class="isUploading ? 'animate-spin' : ''"></i><span class="hidden sm:inline">Attach</span></button><button type="button" @click="toggleComposerMenu('mentions')" class="h-7 px-2 inline-flex items-center gap-1 rounded-lg text-[10px] text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800" aria-label="Reference run context"><i data-lucide="at-sign" class="w-3.5 h-3.5"></i>Context</button><button type="button" @click="toggleComposerMenu('prompts')" class="h-7 px-2 inline-flex items-center gap-1 rounded-lg text-[10px] text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800" aria-label="Open prompt shortcuts"><i data-lucide="zap" class="w-3.5 h-3.5"></i>Prompts</button></div>
+                  <button @click="sendMessage" :disabled="isSending || isUploading || (!chatDraft.trim() && !attachments.length)" class="h-8 px-3 shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors" :aria-label="isSending ? 'Asking execution copilot' : 'Ask execution copilot'"><i :data-lucide="isSending ? 'loader' : 'arrow-up'" class="w-3.5 h-3.5" :class="isSending ? 'animate-spin' : ''"></i><span>{{ isSending ? 'Asking' : 'Ask' }}</span></button>
                 </div>
               </div>
               <div v-if="sendError" class="text-[10px] text-red-600 dark:text-red-400 font-mono mt-1" role="alert">✗ {{ sendError }}</div>
+              <div v-else-if="attachmentError" class="text-[10px] text-red-600 dark:text-red-400 font-mono mt-1" role="alert">✗ {{ attachmentError }}</div>
               <div v-else-if="sessionSuccessMsg" class="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono mt-1">✓ {{ sessionSuccessMsg }}</div>
               <p class="sr-only" aria-live="polite">{{ sessionSuccessMsg || sendError || '' }}</p>
             </div>
