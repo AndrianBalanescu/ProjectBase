@@ -73,20 +73,18 @@ Add to ~/.cursor/mcp.json or ~/.flomaster/config.json:
    - List:   GET  /api/collections/notifications/records?sort=-created
    - Read:   PATCH /api/collections/notifications/records/<ID> {"read":true}
    - Read all: POST /api/projectbase/notifications/read-all
-12. Git Workspace, Code Patches & Webhook Auto-Triage (Epic 13):
-   - List artifacts: GET  /api/projectbase/git/artifacts?issue_id=<ID>&type=branch|commit|pull_request|patch|ci_run
-   - Link artifact:  POST /api/projectbase/git/artifacts {"issue_id":"<ID>","artifact_type":"branch"|"pull_request"|"commit","identifier":"...","url":"...","status":"open"|"merged"}
-   - Stage patch:    POST /api/projectbase/git/patch {"issue_id":"<ID>","patch_content":"diff --git...","title":"..."}
-   - Get patch:      GET  /api/projectbase/git/patch/<ID>
-   - Git Webhook:    POST /api/projectbase/webhooks/git (GitHub/GitLab push, PR, workflow_run)
-   - Git Status:     GET  /api/projectbase/git/status?project_id=<ID>
-13. Workload Orchestration, Autoscaling & Workflow Self-Healing (Epic 14):
-   - Workload Metrics: GET  /api/projectbase/agents/workload?project_id=<ID> (queue saturation, persona queues, active leases)
-   - Dynamic Autoscale: POST /api/projectbase/agents/autoscale {"project_id":"<ID>","min_workers":1,"max_workers":10,"apply":true}
-   - Reserve Capacity: POST /api/projectbase/agents/capacity/reserve {"persona":"backend","worker_id":"w-1","slots":2,"ttl_seconds":1800}
-   - Release Capacity: POST /api/projectbase/agents/capacity/release {"reservation_id":"RES-ABC"}
-   - Self-Heal Scan:   POST /api/projectbase/workflow/self-heal {"project_id":"<ID>","auto_fix":true}
-   - Live Benchmarks:  GET  /api/projectbase/benchmarks/live (p50/p95 latency probe, QPS rating)
+12. Git Webhook Auto-Triage (CI-driven issue ingestion):
+   - GitHub import: POST /api/projectbase/import/github {"project_id":"<ID>","repo":"org/name","token":"...","state":"open","max_issues":50}
+     Authenticate with a Bearer token OR an X-Hub-Signature-256 HMAC over the raw body
+     (keyed by PROJECTBASE_GIT_WEBHOOK_SECRET; fail-closed when unset). Returns {"imported":N,...}.
+13. Agent Sessions (live execution runs — the Sessions console):
+   - List runs: GET /api/projectbase/agents → { agents, sessions } (PID, branch, files touched, transcript, tool calls)
+   - Detail:    GET /api/projectbase/sessions/<SESSION_ID> (record id or session_id). Transcript lives at metadata.chat.
+   - Chat:      POST /api/projectbase/sessions/<SESSION_ID>/chat {"message":"..."} (≤8000 chars)
+     Appends the operator turn to metadata.chat and returns the assistant reply plus the full
+     transcript. Replies come from the configured OmniRoute gateway; without one the message is
+     queued and the response reports {"gateway_reached": false} rather than inventing an answer.
+   - Sync:      POST /api/projectbase/agents/sync (rescan local agent stores)
 13b. Saved Views (per-user named filter states for board/list):
    - List:   GET    /api/collections/saved_views/records (owner = caller; never shared)
    - Create: POST   /api/collections/saved_views/records {"name":"High prio bugs","query":"priority=high&label=bug","view":"board","project":"<ID>|''"}

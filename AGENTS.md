@@ -11,7 +11,7 @@ ProjectBase = ultra-lightweight open-source Plane/Linear alternative. High-perfo
 - **Backend:** PocketBase **0.39.11** single binary `./pocketbase` at repo root. Serve with `./pocketbase serve --dir pb_data --hooksDir app/pb_hooks --migrationsDir app/pb_migrations --http 127.0.0.1:8120`. Note: PB data dir is `pb_data/` at root for local run, but Docker mounts `./app/pb_data` — keep both consistent.
 - **Frontend:** Zero-build **Vue 3 UMD** + static Tailwind. All served straight from `app/pb_public/`. No `node_modules`, no bundler.
 - **Styling:** Tailwind is **compiled to static CSS** via `scripts/build_css.sh` → `app/pb_public/css/style.css`. After editing templates/classes, rerun it. Do NOT add a runtime Tailwind CDN.
-- **Tests:** `pytest tests/` (run via `uv run --with pytest pytest tests/` or a user-local pytest install (e.g. `~/.local/bin/pytest` via `pip install --user pytest`)). Tests run against the live instance (default `PROJECTBASE_URL=http://127.0.0.1:8120`, superuser `f@flow.com` / `superdev123`). 285 tests across 22 files.
+- **Tests:** `pytest tests/` (run via `uv run --with pytest pytest tests/` or a user-local pytest install (e.g. `~/.local/bin/pytest` via `pip install --user pytest`)). Tests run against the live instance (default `PROJECTBASE_URL=http://127.0.0.1:8120`, superuser `f@flow.com` / `superdev123`). 293 tests across 23 files.
 - **Docker:** `docker compose up` — builds `Dockerfile`, mounts `app/` subdirs, exposes 8120.
 - **Deploy:** `deploy/projectbase.service` (systemd) + `deploy/Caddyfile`. Helper scripts: `scripts/install-systemd.sh`, `scripts/backup.sh`, `scripts/restore.sh`, `scripts/deploy-demo.sh`, `scripts/reset-demo.sh`.
 
@@ -45,14 +45,16 @@ app/
     40_importers.pb.js / 41_linear_importer.pb.js / 42_plane_importer.pb.js / 45_github_importer.pb.js  <- CSV + Linear + Plane + GitHub importers
     50_cron_automation.pb.js   <- scheduled automations
     55_notifications.pb.js / 60_notifications.pb.js  <- Telegram/Discord/webhook + in-app inbox
-    90_agents.pb.js            <- agent sessions listing + sync (90_agents is the last hook; engine hooks 91-111 stripped, live on engine-experiments branch)
+    90_agents.pb.js            <- agent sessions listing + sync
+    82_session_chat.pb.js      <- per-run session detail + operator chat route (Sessions console chat box)
+    (engine hooks 91-111 stripped; preserved on the engine-experiments branch + archive/* tags)
   pb_migrations/       <- numbered schema + seed migrations (17100000xx). Add NEW number for changes.
   pb_data/             <- runtime SQLite data. NEVER commit.
 docs/                  <- research, ROADMAP, TODO, architecture, COMPETITORS, FEATURE_MATRIX
 scripts/               <- start.sh, build_css.sh, backup.sh, restore.sh, install-systemd.sh, deploy-demo.sh,
                           reset-demo.sh, bump_version.sh, typegen.sh, flow-cli (CLI wrapper), pb-cli,
                           mcp_server.py, pb_autonomous_runner.py, pb-autonomous-daemon.sh, install.sh, qa/, bench/
-tests/                 <- 285 tests across 22 files (test_agents_drift_guard.py, test_api.py, test_autonomous_runner_sync.py, test_benchmarks.py, test_bulk_actions.py, test_css_sync.py, test_custom_route_auth_guards.py, test_deploy_consistency.py, test_export_ics.py, test_fixture_hygiene.py, test_foss_schema.py, test_git_webhook_hmac.py, test_issue_relations.py, test_kanban_touch_dnd.py, test_labels_ui.py, test_listview_sort_logic.py, test_openapi_drift.py, test_public_seed.py, test_saved_views.py, test_secret_scan.py, test_supply_chain.py, test_selfhosting.py)
+tests/                 <- 293 tests across 23 files (test_agents_drift_guard.py, test_api.py, test_autonomous_runner_sync.py, test_benchmarks.py, test_bulk_actions.py, test_css_sync.py, test_custom_route_auth_guards.py, test_deploy_consistency.py, test_export_ics.py, test_fixture_hygiene.py, test_foss_schema.py, test_git_webhook_hmac.py, test_issue_relations.py, test_kanban_touch_dnd.py, test_labels_ui.py, test_listview_sort_logic.py, test_openapi_drift.py, test_public_seed.py, test_saved_views.py, test_secret_scan.py, test_session_chat.py, test_supply_chain.py, test_selfhosting.py)
 deploy/                <- projectbase.service, Caddyfile
 .github/workflows/ci.yml  <- CI (seeds superuser, runs tests)
 ```

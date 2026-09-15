@@ -53,6 +53,7 @@ const EXE = process.env.QA_CHROME || '/home/ubuntu/.cache/ms-playwright/chromium
     agentsViewTested: false,
     sessionClicksTested: false,
     sessionChatLoaded: false,
+    sessionChatInputPresent: false,
     sessionTerminalLoaded: false,
     viewsTested: []
   };
@@ -115,7 +116,7 @@ const EXE = process.env.QA_CHROME || '/home/ubuntu/.cache/ms-playwright/chromium
     await page.goto(BASE + '/#/pb/agents', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(2000);
     const agentsViewCheck = await page.evaluate(() => {
-      const sessionItems = document.querySelectorAll('aside:nth-of-type(2) [class*="cursor-pointer"]');
+      const sessionItems = document.querySelectorAll('[data-qa="session-list"] [class*="cursor-pointer"]');
       return {
         sessionsListed: sessionItems.length
       };
@@ -124,17 +125,26 @@ const EXE = process.env.QA_CHROME || '/home/ubuntu/.cache/ms-playwright/chromium
     if (agentsViewCheck.sessionsListed > 0) {
       audit.agentsViewTested = true;
       // Click the first session item to load stream
-      await page.click('aside:nth-of-type(2) [class*="cursor-pointer"]:first-child');
+      await page.click('[data-qa="session-list"] [class*="cursor-pointer"]:first-child');
       await page.waitForTimeout(1000);
       
       const sessionContent = await page.evaluate(() => {
-        const bubbles = document.querySelectorAll('.whitespace-pre-wrap');
+        // Transcript bubbles are rendered as .chat-markdown (the component's
+        // markdown container). The old selector looked for .whitespace-pre-wrap,
+        // a class the console never used, so this check failed on a healthy UI.
+        const bubbles = document.querySelectorAll('.chat-markdown');
         const hasText = Array.from(bubbles).some(b => b.textContent.trim().length > 10);
-        return { hasText, bubbleCount: bubbles.length };
+        // The chat box is the point of the console: assert it is really there.
+        const ta = document.querySelector('textarea');
+        const hasInput = !!ta;
+        const hasSend = !![...document.querySelectorAll('button')]
+          .find(b => /Send/.test(b.textContent));
+        return { hasText, bubbleCount: bubbles.length, hasInput, hasSend };
       });
 
       audit.sessionClicksTested = true;
       audit.sessionChatLoaded = sessionContent.hasText;
+      audit.sessionChatInputPresent = sessionContent.hasInput && sessionContent.hasSend;
 
       // Click Terminal Logs tab
       const termBtn = page.locator("button:has-text('Logs / Output')");
@@ -187,6 +197,7 @@ const EXE = process.env.QA_CHROME || '/home/ubuntu/.cache/ms-playwright/chromium
   console.log(`- Live Sessions on Board:        ${audit.sessionsRenderedOnBoard}`);
   console.log(`- Agents Console Verified:       ${audit.agentsViewTested ? '✅ PASS' : '❌ FAIL'}`);
   console.log(`- Session Chat Stream Verified:  ${audit.sessionChatLoaded ? '✅ PASS' : '❌ FAIL'}`);
+  console.log(`- Session Chat Input Present:    ${audit.sessionChatInputPresent ? '✅ PASS' : '❌ FAIL'}`);
   console.log(`- Session Logs / Output Loaded:  ${audit.sessionTerminalLoaded ? '✅ PASS' : '⚠️ NONE'}`);
   console.log(`- Console Errors:                ${consoleErrors.length}`);
   console.log(`- Page Exceptions:               ${pageErrors.length}`);
@@ -206,7 +217,7 @@ const EXE = process.env.QA_CHROME || '/home/ubuntu/.cache/ms-playwright/chromium
     networkErrors.forEach(e => console.log('  -', e));
   }
 
-  const passed = audit.appMounted && audit.zeroMustaches && audit.agentsViewTested && audit.sessionChatLoaded && consoleErrors.length === 0 && pageErrors.length === 0;
+  const passed = audit.appMounted && audit.zeroMustaches && audit.agentsViewTested && audit.sessionChatLoaded && audit.sessionChatInputPresent && consoleErrors.length === 0 && pageErrors.length === 0;
   console.log('\n==================================================');
   console.log(`VERDICT: ${passed ? '✅ PASSED — ALL CHECKS CLEAN' : '❌ VETO / FAILED'}`);
   console.log('==================================================\n');

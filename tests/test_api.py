@@ -314,37 +314,28 @@ def test_notification_dispatcher_inlines_dispatch_helpers():
 
 
 # Every /api/projectbase/* custom route implemented in app/pb_hooks/*.pb.js
-# must be documented in openapi.json. Keep this list in sync when routes change
-# so agents discover the full surface (importers, AI assist, dispatch, etc.).
-DOCUMENTED_CUSTOM_ROUTES = [
-    "/projectbase/health",
-    "/projectbase/version",
-    "/projectbase/stats",
-    "/projectbase/search",
-    "/projectbase/quick-task",
-    "/projectbase/projects/{id}/custom-fields",
-    "/projectbase/projects/{id}/custom-fields/validate",
-    "/projectbase/issues/{id}/relations",
-    "/projectbase/issues/bulk-update",
-    "/projectbase/issues/bulk-delete",
-    "/projectbase/import/csv",
-    "/projectbase/import/github",
-    "/projectbase/import/linear",
-    "/projectbase/import/plane",
-    "/projectbase/export/csv",
-    "/projectbase/export/json",
-    "/projectbase/notifications/read-all",
-    "/projectbase/notification-settings",
-    "/projectbase/mcp",
-    "/projectbase/leases",
-    "/projectbase/leases/acquire",
-    "/projectbase/leases/renew",
-    "/projectbase/leases/release",
-    "/projectbase/telemetry",
-    "/projectbase/webhooks",
-    "/projectbase/webhooks/{id}",
-    "/projectbase/webhooks/{id}/test",
-]
+# must be documented in openapi.json so agents can discover the full surface.
+# This list is DERIVED from the hooks source rather than hand-maintained: a
+# hand-written registry silently rots when a route is deleted (cycles 92-93
+# dropped the engine hooks but left 172 phantom paths in the spec and 9 dead
+# entries here, so the test passed while documenting routes that 404'd).
+def _implemented_custom_routes():
+    import re
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    hooks_dir = os.path.join(root, "app", "pb_hooks")
+    router_add = re.compile(r'routerAdd\(\s*"([A-Z]+)"\s*,\s*"([^"]+)"', re.MULTILINE)
+    routes = set()
+    for fname in sorted(os.listdir(hooks_dir)):
+        if not fname.endswith(".pb.js"):
+            continue
+        src = open(os.path.join(hooks_dir, fname), encoding="utf-8").read()
+        for _method, path in router_add.findall(src):
+            if path.startswith("/api/projectbase/"):
+                routes.add(path[len("/api"):])
+    return sorted(routes)
+
+
+DOCUMENTED_CUSTOM_ROUTES = _implemented_custom_routes()
 
 
 def test_openapi_spec_valid():

@@ -376,6 +376,19 @@ const API = {
     return data;
   },
 
+  // Append an operator turn to a live execution run and get the reply back.
+  // The run is a record id or its session_id; the server resolves either.
+  async sendSessionMessage(id, message) {
+    const res = await fetch(`/api/projectbase/sessions/${encodeURIComponent(id)}/chat`, {
+      method: 'POST',
+      headers: this._authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ message })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to send message');
+    return data;
+  },
+
   // ==========================================
   // ==========================================
 

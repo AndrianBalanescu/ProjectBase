@@ -76,6 +76,8 @@ GUARDED_ROUTE_SAMPLES = [
     ("POST", "/api/projectbase/import/csv", {"content": "a,b\n1,2", "project": "x"}),
     # 90_agents.pb.js
     ("POST", "/api/projectbase/agents/sync", {}),
+    # 82_session_chat.pb.js
+    ("POST", "/api/projectbase/sessions/nonexistent74/chat", {"message": "guard-probe"}),
     # 55_notifications.pb.js
     ("POST", "/api/projectbase/notifications/read-all", {}),
 ]
