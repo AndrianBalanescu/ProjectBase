@@ -1923,11 +1923,12 @@
                   "attachment_payloads": {
                     "type": "array",
                     "maxItems": 5,
-                    "description": "Ephemeral bounded content for copilot analysis. Images are data URLs up to 6,000,000 characters; text is capped at 102,400 characters. Payload bytes are not persisted in the transcript.",
+                    "description": "Ephemeral bounded content for copilot analysis. Every payload id must match a validated attachment id in this request. Images are data URLs up to 6,000,000 characters; text is capped at 102,400 characters. Payload bytes are not persisted in the transcript.",
                     "items": {
                       "type": "object",
-                      "required": ["kind", "data"],
+                      "required": ["id", "kind", "data"],
                       "properties": {
+                        "id": { "type": "string", "description": "Matching session_attachments record id" },
                         "kind": { "type": "string", "enum": ["image", "text"] },
                         "data": { "type": "string" }
                       }

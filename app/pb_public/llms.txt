@@ -80,7 +80,7 @@ Add to ~/.cursor/mcp.json or ~/.flomaster/config.json:
 13. Agent Sessions (live execution runs — the Sessions console):
    - List runs: GET /api/projectbase/agents → { agents, sessions } (PID, branch, files touched, transcript, tool calls)
    - Detail:    GET /api/projectbase/sessions/<SESSION_ID> (record id or session_id). Transcript lives at metadata.chat.
-   - Copilot:   POST /api/projectbase/sessions/<SESSION_ID>/chat {"message":"...","attachments":["<ID>"],"attachment_payloads":[{"kind":"image|text","data":"..."}]} (≤8000 chars, ≤5 protected caller-owned files). This discusses captured run evidence; it does not control or message the underlying agent process.
+   - Copilot:   POST /api/projectbase/sessions/<SESSION_ID>/chat {"message":"...","attachments":["<ID>"],"attachment_payloads":[{"kind":"image|text","id":"<matching ID>","data":"..."}]} (≤8000 chars, ≤5 protected caller-owned files). This discusses captured run evidence; it does not control or message the underlying agent process.
      Appends the operator turn to metadata.chat and returns the assistant reply plus the full
      transcript. Replies come from the configured OmniRoute gateway; without one the message is
      queued and the response reports {"gateway_reached": false} rather than inventing an answer.

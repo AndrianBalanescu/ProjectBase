@@ -621,7 +621,7 @@ const AgentsViewComponent = {
           target,
           text || 'Please inspect the attached files.',
           sentAttachments.map(a => a.id),
-          sentAttachments.map(a => a.inline).filter(Boolean)
+          sentAttachments.filter(a => a.inline).map(a => Object.assign({ id: a.id }, a.inline))
         );
         if (res && Array.isArray(res.turns) && res.turns.length > 0) {
           this.chatLog = Object.assign({}, this.chatLog, { [sid]: res.turns });

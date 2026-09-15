@@ -147,6 +147,7 @@ routerAdd("POST", "/api/projectbase/sessions/{id}/chat", (e) => {
         // Resolve only files owned by the caller and attached to this exact run.
         // The gateway receives sanitized names/types/URLs, never arbitrary paths.
         const attachments = []
+        const attachmentIds = {}
         for (const rawAttachmentId of requestedAttachments) {
             const attachmentId = String(rawAttachmentId || "").trim()
             if (!attachmentId) continue
@@ -160,6 +161,13 @@ routerAdd("POST", "/api/projectbase/sessions/{id}/chat", (e) => {
                 id: att.id,
                 name: fileName
             })
+            attachmentIds[att.id] = true
+        }
+
+        for (const payload of rawPayloads) {
+            if (!payload || typeof payload !== "object" || !attachmentIds[String(payload.id || "")]) {
+                return e.json(400, { error: "Attachment payload must match a validated session attachment" })
+            }
         }
 
         // --- Append the operator turn ---------------------------------------

@@ -27,6 +27,7 @@ def test_session_chat_validates_attachment_ownership_and_count():
     assert 'type: "image_url"' in src
     assert 'payload.data.length <= 6000000' in src
     assert 'payload.data.length <= 102400' in src
+    assert 'Attachment payload must match a validated session attachment' in src
 
 
 def test_smart_composer_wires_picker_paste_chips_and_cleanup():
@@ -43,6 +44,7 @@ def test_smart_composer_wires_picker_paste_chips_and_cleanup():
         'pb.files.getToken()',
         "reader.readAsDataURL(file)",
         "await file.text()",
+        "Object.assign({ id: a.id }, a.inline)",
     ]:
         assert token in view or token in api
 
