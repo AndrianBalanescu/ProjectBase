@@ -1,4 +1,4 @@
-<!-- auto; hash=b5d14cf41dc483c6 -->
+<!-- auto; hash=969194f90383387a -->
 # projectbase/ (2 src, 13 meta)
 meta: CONTRIBUTING.md
 meta: GOVERNANCE.md
