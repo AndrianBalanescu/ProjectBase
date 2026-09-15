@@ -42,7 +42,10 @@ const results = {
   const mkPage = (opts) => browser.newPage(opts);
   const wire = (page) => {
     page.on('console', (m) => {
-      if (m.type() === 'error' && !m.text().includes('users/auth-with-password')) {
+      const sourceUrl = (m.location && m.location().url) || '';
+      const expectedAuthFallback = m.text().includes('users/auth-with-password')
+        || sourceUrl.includes('/api/collections/users/auth-with-password');
+      if (m.type() === 'error' && !expectedAuthFallback) {
         results.consoleErrors.push(m.text().slice(0, 200));
       }
     });

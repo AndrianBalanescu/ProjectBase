@@ -28,8 +28,9 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   const failedReqs = [];
   page.on('console', (m) => {
     if (m.type() === 'error') {
+      const sourceUrl = (m.location && m.location().url) || '';
       // Designed fallback: app tries users auth first, then _superusers.
-      if (m.text().includes('users/auth-with-password')) return;
+      if (m.text().includes('users/auth-with-password') || sourceUrl.includes('/api/collections/users/auth-with-password')) return;
       consoleErrors.push(m.text().slice(0, 200));
     }
   });
@@ -39,8 +40,9 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   });
   page.on('response', (r) => {
     if (r.url().startsWith(BASE) && r.status() >= 400) {
-      // 401 on the users-auth fallback is designed behavior.
-      if (r.status() === 401 && r.url().includes('users/auth-with-password')) return;
+      // PocketBase may return 400 or 401 for the designed users-auth fallback
+      // before the app retries the _superusers collection.
+      if ([400, 401].includes(r.status()) && r.url().includes('/api/collections/users/auth-with-password')) return;
       failedReqs.push(`${r.request().method()} ${r.url()} -> ${r.status()}`);
     }
   });
