@@ -35,6 +35,15 @@ const AgentsViewComponent = {
       chatDraft: '',
       isSending: false,
       sendError: null,
+      composerOpen: null,
+      mentionQuery: '',
+      lastRefreshAt: new Date().toISOString(),
+      promptShortcuts: [
+        { id: 'summary', label: 'Summarize', icon: 'sparkles', text: 'Summarize this run: objective, progress, blockers, and next action.' },
+        { id: 'changes', label: 'Review changes', icon: 'git-diff', text: 'Review @changes from this run. Highlight risk, missing tests, and the most important next check.' },
+        { id: 'tests', label: 'Check tests', icon: 'flask-conical', text: 'Inspect @tests and explain what passed, what failed, and what remains unverified.' },
+        { id: 'next', label: 'Next step', icon: 'arrow-right', text: 'Based on @context, recommend the single highest-value next action.' },
+      ],
     };
   },
   computed: {
@@ -100,6 +109,41 @@ const AgentsViewComponent = {
     },
     leftStyle() {
       return { width: this.leftWidth + 'px' };
+    },
+    contextFacts() {
+      const s = this.selectedSession;
+      if (!s) return [];
+      const facts = [];
+      const add = (icon, label, value, mono) => { if (value !== null && value !== undefined && value !== '') facts.push({ icon, label, value, mono: !!mono }); };
+      add('cpu', 'Runtime', s.runtime || s.agent || 'unknown');
+      add('box', 'Model', s.model || 'unknown');
+      add('hash', 'PID', s.pid > 0 ? s.pid : null, true);
+      add('folder', 'Workspace', this.shortPath(s.working_dir || s.workdir || ''), true);
+      add('git-branch', 'Branch', s.git_branch || 'main', true);
+      add('braces', 'Tokens', this.tokenCount(s) ? this.fmtTokens(this.tokenCount(s)) : null, true);
+      add('files', 'Files', (s.files_touched || []).length || null, true);
+      add('message-square', 'Turns', s.message_count || this.chatTurns.length || null, true);
+      return facts;
+    },
+    referenceOptions() {
+      const s = this.selectedSession || {};
+      const options = [
+        { key: 'context', label: 'Run context', detail: 'runtime, model, branch, workspace' },
+        { key: 'changes', label: 'Git changes', detail: `${this.diffStats.added} added · ${this.diffStats.removed} removed` },
+        { key: 'tests', label: 'Test verdict', detail: s.test_verdict ? (s.test_verdict.status || 'available') : 'not captured' },
+        { key: 'output', label: 'Recent output', detail: s.log_tail ? 'captured' : 'not captured' },
+      ];
+      for (const file of (s.files_touched || []).slice(0, 12)) {
+        options.push({ key: file, label: this.shortPath(file), detail: file, file: true });
+      }
+      const q = (this.mentionQuery || '').toLowerCase();
+      return q ? options.filter(o => (`${o.key} ${o.label} ${o.detail}`).toLowerCase().includes(q)) : options;
+    },
+    refreshAge() {
+      const d = new Date(this.lastRefreshAt);
+      if (Number.isNaN(d.getTime())) return 'just now';
+      const sec = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+      return sec < 5 ? 'just now' : `${sec}s ago`;
     },
     chatTurns() {
       const s = this.selectedSession;
@@ -451,7 +495,35 @@ const AgentsViewComponent = {
       });
     },
     loadAgentSessions() {
+      this.lastRefreshAt = new Date().toISOString();
       this.$emit('sync-agents');
+    },
+
+    usePromptShortcut(item) {
+      this.chatDraft = item.text;
+      this.composerOpen = null;
+      this.$nextTick(() => this.$refs.chatInput && this.$refs.chatInput.focus());
+    },
+    insertReference(item) {
+      const value = `@${item.key}`;
+      const draft = this.chatDraft || '';
+      const match = draft.match(/(^|\s)@([^\s@]*)$/);
+      this.chatDraft = match ? draft.slice(0, match.index) + match[1] + value + ' ' : `${draft}${draft && !draft.endsWith(' ') ? ' ' : ''}${value} `;
+      this.composerOpen = null;
+      this.mentionQuery = '';
+      this.$nextTick(() => this.$refs.chatInput && this.$refs.chatInput.focus());
+    },
+    onComposerInput() {
+      const match = (this.chatDraft || '').match(/(^|\s)@([^\s@]*)$/);
+      if (match) {
+        this.mentionQuery = match[2] || '';
+        this.composerOpen = 'mentions';
+      } else if (this.composerOpen === 'mentions') {
+        this.composerOpen = null;
+      }
+    },
+    toggleComposerMenu(name) {
+      this.composerOpen = this.composerOpen === name ? null : name;
     },
 
     // --- Chat dispatch -----------------------------------------------------
@@ -496,8 +568,8 @@ const AgentsViewComponent = {
           });
         }
         this.sessionSuccessMsg = res && res.gateway_reached === false
-          ? 'Message queued (no LLM gateway configured)'
-          : 'Message sent';
+          ? 'Saved to this run (copilot unavailable)'
+          : 'Copilot response added';
         setTimeout(() => { this.sessionSuccessMsg = null; }, 3000);
         this.$emit('sync-agents');
       } catch (e) {
@@ -539,9 +611,9 @@ const AgentsViewComponent = {
           </div>
           <div class="flex items-center gap-0.5 shrink-0">
             <button
-              @click="$emit('sync-agents')"
+              @click="loadAgentSessions"
               class="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
-              title="Rescan sessions"
+              aria-label="Refresh sessions"
             >
               <i data-lucide="refresh-cw" class="w-3 h-3"></i>
             </button>
@@ -698,7 +770,7 @@ const AgentsViewComponent = {
                 </h2>
                 <span v-if="selectedSession && (selectedSession.status === 'running' || selectedSession.is_active)" class="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold flex items-center gap-1 font-mono shrink-0">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  LIVE RUNNING
+                  RUNNING
                 </span>
               </div>
               <p class="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono truncate" v-if="selectedSession">
@@ -758,37 +830,21 @@ const AgentsViewComponent = {
 
         <!-- TAB 1: Chat Stream -->
         <div v-if="activeTab === 'chat'" class="flex-1 flex flex-col min-h-0">
-          <div v-if="selectedSession" class="flex items-center gap-3 px-3 py-1.5 border-b border-zinc-200 dark:border-zinc-800/60 bg-zinc-50/40 dark:bg-zinc-900/30 text-[10px] font-mono text-zinc-500 dark:text-zinc-400 flex-wrap shrink-0">
-            <span v-if="selectedSession.pid" class="flex items-center gap-1">
-              <span class="text-zinc-400 dark:text-zinc-500">PID</span>
-              <span class="text-zinc-700 dark:text-zinc-200 font-semibold">{{ selectedSession.pid }}</span>
-            </span>
-            <span v-if="selectedSession.model" class="flex items-center gap-1">
-              <span class="text-zinc-400 dark:text-zinc-500">MODEL</span>
-              <span class="text-zinc-700 dark:text-zinc-200 font-semibold">{{ selectedSession.model }}</span>
-            </span>
-            <span v-if="tokenCount(selectedSession)" class="flex items-center gap-1">
-              <span class="text-zinc-400 dark:text-zinc-500">TOKENS</span>
-              <span class="text-zinc-700 dark:text-zinc-200 font-semibold">{{ fmtTokens(tokenCount(selectedSession)) }}</span>
-            </span>
-            <span v-if="selectedSession.git_commit_after" class="flex items-center gap-1">
-              <span class="text-zinc-400 dark:text-zinc-500">GIT</span>
-              <span class="text-zinc-700 dark:text-zinc-200 font-semibold">{{ selectedSession.git_commit_after.slice(0, 7) }}</span>
-            </span>
-            <span v-if="selectedSession.files_touched && selectedSession.files_touched.length" class="flex items-center gap-1.5 min-w-0">
-              <span class="text-zinc-400 dark:text-zinc-500 shrink-0">FILES</span>
-              <span class="flex items-center gap-1 flex-wrap min-w-0">
-                <span v-for="f in (selectedSession.files_touched || []).slice(0, 3)" :key="f" class="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 text-[9px] truncate max-w-[140px]" :title="f">{{ shortPath(f) }}</span>
-                <span v-if="selectedSession.files_touched.length > 3" class="text-zinc-400">+{{ selectedSession.files_touched.length - 3 }}</span>
-              </span>
-            </span>
+          <div v-if="selectedSession" class="px-2.5 py-2 border-b border-zinc-200 dark:border-zinc-800/60 bg-zinc-50/40 dark:bg-zinc-900/30 shrink-0" aria-label="Session context">
+            <div class="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+              <div v-for="fact in contextFacts" :key="fact.label" class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-2 py-1" :title="fact.label + ': ' + fact.value">
+                <i :data-lucide="fact.icon" class="w-3 h-3 text-zinc-400"></i>
+                <span class="text-[9px] uppercase tracking-wide text-zinc-400">{{ fact.label }}</span>
+                <span class="text-[10px] text-zinc-700 dark:text-zinc-200 max-w-36 truncate" :class="fact.mono ? 'font-mono' : ''">{{ fact.value }}</span>
+              </div>
+            </div>
           </div>
 
           <!-- Transcript -->
           <div class="flex-1 overflow-y-auto p-3 space-y-3 bg-zinc-50/50 dark:bg-zinc-950/30 min-h-0">
             <div v-if="!selectedSession" class="flex flex-col items-center justify-center h-full text-zinc-400 italic text-sm gap-2">
               <span class="text-3xl">🧠</span>
-              <span>Select an execution run to inspect its live stream.</span>
+              <span>Select an execution run to inspect its activity.</span>
             </div>
 
             <div v-else-if="chatTurns.length === 0" class="flex flex-col items-center justify-center h-full text-zinc-400 italic text-sm gap-2">
@@ -887,32 +943,36 @@ const AgentsViewComponent = {
             </div>
           </div>
 
-          <!-- Chat input: append an operator turn to this run -->
-          <div class="border-t border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-[#121215] p-2 shrink-0">
+          <!-- Execution copilot: discusses captured evidence; it does not control the runtime. -->
+          <div class="border-t border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-[#121215] p-2.5 shrink-0 relative">
             <div v-if="!selectedSession" class="text-[11px] text-zinc-400 italic text-center py-1">
-              Select a run to chat with it.
+              Select a run to inspect its evidence.
             </div>
-            <div v-else class="flex items-end gap-2">
-              <textarea
-                v-model="chatDraft"
-                @keydown="onChatKeydown"
-                :disabled="isSending"
-                rows="1"
-                placeholder="Message this run…  (Enter to send · Shift+Enter for newline)"
-                class="flex-1 px-2.5 py-2 text-xs rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-indigo-400 dark:focus:border-indigo-600 resize-none max-h-32 disabled:opacity-60"
-              ></textarea>
-              <button
-                @click="sendMessage"
-                :disabled="isSending || !chatDraft.trim()"
-                class="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors flex items-center gap-1.5 shrink-0"
-                title="Send message to this run"
-              >
-                <i :data-lucide="isSending ? 'loader' : 'send'" class="w-3.5 h-3.5" :class="isSending ? 'animate-spin' : ''"></i>
-                <span>{{ isSending ? 'Sending' : 'Send' }}</span>
-              </button>
+            <div v-else>
+              <div class="flex items-center justify-between gap-2 mb-1.5">
+                <div class="flex items-center gap-1.5 min-w-0"><span class="inline-flex items-center gap-1 text-[10px] font-semibold text-zinc-700 dark:text-zinc-200"><i data-lucide="sparkles" class="w-3 h-3 text-indigo-500"></i>Execution copilot</span><span class="text-[9px] text-zinc-400 truncate">discusses this run · does not control it</span></div>
+                <span class="text-[9px] text-zinc-400 font-mono">{{ chatDraft.length }}/8000</span>
+              </div>
+              <div v-if="composerOpen" class="absolute left-2.5 right-2.5 bottom-[98px] z-20 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-2xl overflow-hidden max-h-56 overflow-y-auto">
+                <template v-if="composerOpen === 'mentions'">
+                  <button v-for="item in referenceOptions" :key="item.key" type="button" @click="insertReference(item)" class="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800 focus:outline-none focus:bg-zinc-100 dark:focus:bg-zinc-800"><i :data-lucide="item.file ? 'file-code-2' : 'at-sign'" class="w-3.5 h-3.5 text-indigo-500 shrink-0"></i><span class="min-w-0"><span class="block text-[11px] font-medium text-zinc-800 dark:text-zinc-100 truncate">@{{ item.key }}</span><span class="block text-[9px] text-zinc-400 truncate">{{ item.detail }}</span></span></button>
+                  <div v-if="!referenceOptions.length" class="px-3 py-3 text-[10px] text-zinc-400">No matching run context.</div>
+                </template>
+                <template v-else>
+                  <button v-for="item in promptShortcuts" :key="item.id" type="button" @click="usePromptShortcut(item)" class="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800 focus:outline-none focus:bg-zinc-100 dark:focus:bg-zinc-800"><i :data-lucide="item.icon" class="w-3.5 h-3.5 text-indigo-500 shrink-0"></i><span class="text-[11px] text-zinc-700 dark:text-zinc-200">{{ item.label }}</span></button>
+                </template>
+              </div>
+              <div class="rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 focus-within:ring-1 focus-within:ring-indigo-500/60 overflow-hidden">
+                <textarea ref="chatInput" v-model="chatDraft" @input="onComposerInput" @keydown="onChatKeydown" :disabled="isSending" maxlength="8000" rows="2" placeholder="Ask about this run… Type @ to reference context" aria-label="Ask the execution copilot about this run" class="w-full px-3 pt-2.5 pb-1 text-xs bg-transparent text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none resize-none min-h-[54px] max-h-32 select-text disabled:opacity-60"></textarea>
+                <div class="flex items-center justify-between px-2 pb-2 gap-2">
+                  <div class="flex items-center gap-1"><button type="button" @click="toggleComposerMenu('mentions')" class="h-7 px-2 inline-flex items-center gap-1 rounded-lg text-[10px] text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800" aria-label="Reference run context"><i data-lucide="at-sign" class="w-3.5 h-3.5"></i>Context</button><button type="button" @click="toggleComposerMenu('prompts')" class="h-7 px-2 inline-flex items-center gap-1 rounded-lg text-[10px] text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-800" aria-label="Open prompt shortcuts"><i data-lucide="zap" class="w-3.5 h-3.5"></i>Prompts</button><span class="hidden sm:inline text-[9px] text-zinc-400 ml-1">Enter send · Shift+Enter newline</span></div>
+                  <button @click="sendMessage" :disabled="isSending || !chatDraft.trim()" class="h-8 px-3 shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors" :aria-label="isSending ? 'Asking execution copilot' : 'Ask execution copilot'"><i :data-lucide="isSending ? 'loader' : 'arrow-up'" class="w-3.5 h-3.5" :class="isSending ? 'animate-spin' : ''"></i><span>{{ isSending ? 'Asking' : 'Ask' }}</span></button>
+                </div>
+              </div>
+              <div v-if="sendError" class="text-[10px] text-red-600 dark:text-red-400 font-mono mt-1" role="alert">✗ {{ sendError }}</div>
+              <div v-else-if="sessionSuccessMsg" class="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono mt-1">✓ {{ sessionSuccessMsg }}</div>
+              <p class="sr-only" aria-live="polite">{{ sessionSuccessMsg || sendError || '' }}</p>
             </div>
-            <div v-if="sendError" class="text-[10px] text-red-600 dark:text-red-400 font-mono mt-1">✗ {{ sendError }}</div>
-            <div v-else-if="sessionSuccessMsg" class="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono mt-1">✓ {{ sessionSuccessMsg }}</div>
           </div>
         </div>
 

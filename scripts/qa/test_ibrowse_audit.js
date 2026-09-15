@@ -139,7 +139,7 @@ const EXE = process.env.QA_CHROME || '/home/ubuntu/.cache/ms-playwright/chromium
         const ta = document.querySelector('textarea');
         const hasInput = !!ta;
         const hasSend = !![...document.querySelectorAll('button')]
-          .find(b => /Send/.test(b.textContent));
+          .find(b => /Ask/.test(b.textContent));
         return { hasText, bubbleCount: bubbles.length, hasInput, hasSend };
       });
 
