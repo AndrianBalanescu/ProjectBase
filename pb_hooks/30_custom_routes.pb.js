@@ -24,6 +24,9 @@ routerAdd("GET", "/api/openapi.json", (e) => {
 
 routerAdd("GET", "/api/projectbase/stats", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let projects = e.app.findRecordsByFilter("projects", "1=1", "-created", 100, 0)
         let issues = e.app.findRecordsByFilter("issues", "1=1", "-created", 1000, 0)
         let cycles = e.app.findRecordsByFilter("cycles", "1=1", "-created", 100, 0)
@@ -80,6 +83,9 @@ routerAdd("GET", "/api/projectbase/stats", (e) => {
 
 routerAdd("POST", "/api/projectbase/quick-task", (e) => {
     try {
+        if (!e.auth || !e.auth.id) {
+            return e.unauthorizedError("Authentication required")
+        }
         let body = e.requestInfo().body
         if (!body.title) {
             return e.json(400, { error: "Missing required 'title' field" })
