@@ -554,7 +554,11 @@ const App = {
       let tickTimer = null;
       const flush = () => {
         if (tickTimer) return;
-        tickTimer = setTimeout(() => { tickTimer = null; this.realtimeTick++; }, 400);
+        tickTimer = setTimeout(() => {
+          tickTimer = null;
+          this.realtimeTick++;
+          writeDataCache(this);
+        }, 400);
       };
       API.initRealtime((collection, event) => {
         const { action, record } = event;

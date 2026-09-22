@@ -203,23 +203,10 @@ routerAdd("GET", "/api/projectbase/agents", (e) => {
             }
         }
 
-        // Persist fresh bridge live_activity into the DB record so the
-        // /api/projectbase/sessions list + detail endpoints can also serve it
-        // (agents.json is ephemeral; DB is the authoritative long-term store).
-        try {
-            for (const s of bridgeSessions) {
-                const sid = s.session_id || s.id;
-                if (!sid || !Array.isArray(s.live_activity) || s.live_activity.length === 0) continue;
-                try {
-                    const rec = e.app.findFirstRecordByFilter("agent_sessions", "session_id = {:sid} || id = {:sid}", { sid: sid });
-                    if (!rec) continue;
-                    const existingMeta = rec.get("metadata") || {};
-                    if (Array.isArray(existingMeta.live_activity) && existingMeta.live_activity.length >= s.live_activity.length) continue;
-                    rec.set("metadata", Object.assign({}, existingMeta, { live_activity: s.live_activity }));
-                    e.app.save(rec);
-                } catch (x) { /* non-fatal */ }
-            }
-        } catch (x) { /* non-fatal */ }
+        // Persisting bridge live_activity into the DB is deferred off the GET read path to keep
+        // /api/projectbase/agents strictly read-only and latency-free.
+        // Background syncers or the agent_bridge process handle persistence to the DB.
+        // (Removed: e.app.save() loop was causing 600ms read latency + DB contention)
 
         // Merge: Live bridge sessions first, then non-duplicate DB sessions
         const seenIds = new Set();
