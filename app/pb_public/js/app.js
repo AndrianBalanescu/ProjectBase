@@ -830,7 +830,20 @@ const App = {
           this.activeAgentName = null;
         }
         if (parts[2] === 'issue' && parts[3]) {
-          const issue = this.issues.find(i => i.id === parts[3]);
+          let issue = this.issues.find(i => i.id === parts[3]);
+          if (!issue) {
+            // Cross-project deep link: the issue belongs to the route's project,
+            // which is not in the current scoped snapshot. Fetch it directly
+            // instead of silently closing the drawer (QA 'real issue deep link'
+            // regression, Sept 2026). A 404 stays a silent stale-link close.
+            try {
+              issue = await API.getIssue(parts[3]);
+            } catch (e) {
+              const status = e && (e.status || (e.response && e.response.status));
+              if (status !== 404) console.error('Issue deep link fetch failed:', e);
+              issue = null;
+            }
+          }
           // Never show a stale drawer: close it when the route's issue
           // doesn't exist (deleted or broken shared link).
           this.selectedIssue = issue || null;

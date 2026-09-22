@@ -160,6 +160,14 @@ const API = {
     return headers;
   },
 
+  // Single issue by id (used by cross-project deep links where the route's
+  // issue is not in the current project-scoped snapshot).
+  async getIssue(issueId) {
+    return await pb.collection('issues').getOne(issueId, {
+      expand: 'project,cycle,milestone'
+    });
+  },
+
   async getIssueRelations(issueId) {
     const res = await fetch(`/api/projectbase/issues/${issueId}/relations`, {
       headers: this._authHeaders()

@@ -209,7 +209,10 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.waitForTimeout(400);
     // Open a real issue first so a stale drawer could exist, then navigate
-    // to a bogus issue id in the same project.
+    // to a bogus issue id in the same project. The router fetches the route's
+    // issue by id when it is missing from the scoped snapshot, so this probe
+    // deliberately produces one whitelisted 404 (silent stale-link close).
+    ignoredCleanupUrls.add(BASE + '/api/collections/issues/records/nonexistentid12345?expand=project%2Ccycle%2Cmilestone');
     await page.evaluate(() => { location.hash = '#/pb/board/issue/nonexistentid12345'; });
     await page.waitForTimeout(2500);
     routing.checked = true;
@@ -688,6 +691,9 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
     try {
       // 1. Setup: read the probe project, back up its defs, install an "effort"
       //    number def, and create a temp issue carrying unrelated custom values.
+      //    Deterministic anchor: always run against the 'pb' project (the QA
+      //    suite's canonical board, #/pb/board is what the card lookup renders),
+      //    not whatever project the ambient probe card happens to live in.
       const cfSetup = await page.evaluate(async (title) => {
         const token = (() => {
           for (const k of ['pb_auth', 'pocketbase_auth']) {
@@ -697,13 +703,17 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
         })();
         const headers = { 'Content-Type': 'application/json' };
         if (token) headers.Authorization = token;
-        const probeRes = await fetch('/api/collections/issues/records/' + localStorage.getItem('__qaProbeIssueId'), { headers });
-        if (!probeRes.ok) return { error: 'probe fetch ' + probeRes.status };
-        const probe = await probeRes.json();
-        const projId = probe.project;
-        const projRes = await fetch('/api/collections/projects/records/' + projId, { headers });
-        if (!projRes.ok) return { error: 'project fetch ' + projRes.status };
-        const proj = await projRes.json();
+        // The suite's card lookup renders '#/pb/board', so the temp issue must
+        // live in the PB project or it is invisible there (Sept 2026 audit:
+        // probe card had drifted to MEM, cf card was created in PB and not
+        // found, and the leftover card + effort def broke the next run).
+        const allProjects = await fetch('/api/collections/projects/records', { headers });
+        if (!allProjects.ok) return { error: 'project fetch ' + allProjects.status };
+        const all = (await allProjects.json()).items || [];
+        const pbProj = all.find((p) => (p.identifier || '').toUpperCase() === 'PB');
+        if (!pbProj) return { error: 'no PB project' };
+        const projId = pbProj.id;
+        const proj = pbProj;
         const prevDefs = proj.custom_field_defs || [];
         // Install just an "effort" number field (merge not replace is tested via
         // the issue's custom_fields below; the defs only need 'effort' present).
@@ -787,6 +797,10 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
       }, cfProbeId);
     }
     if (cfProjectId && cfPrevDefs !== null) {
+      // Restore prior defs; verify, and fall back to an empty def list so a
+      // failed restore can never leak an "effort" field into the next run
+      // (Sept 2026 audit: a leaked effort def + leftover CFPrb card broke the
+      // next suite run with 'custom-field E2E could not find its temp card').
       await page.evaluate(async ({ projectId, prevDefs }) => {
         let token = null;
         for (const k of ['pb_auth', 'pocketbase_auth']) {
@@ -794,10 +808,12 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
         }
         const headers = { 'Content-Type': 'application/json' };
         if (token) headers.Authorization = token;
+        const put = (fields) => fetch('/api/projectbase/projects/' + projectId + '/custom-fields', {
+          method: 'PUT', headers, body: JSON.stringify({ fields })
+        });
         try {
-          await fetch('/api/projectbase/projects/' + projectId + '/custom-fields', {
-            method: 'PUT', headers, body: JSON.stringify({ fields: prevDefs })
-          });
+          const restoreRes = await put(prevDefs);
+          if (!restoreRes.ok) await put([]);
         } catch (e) { /* best effort */ }
       }, { projectId: cfProjectId, prevDefs: cfPrevDefs });
     }
@@ -1299,9 +1315,12 @@ const EXE = process.env.QA_CHROME || require('child_process').execSync(
   // The browser's network logger emits a GENERIC "Failed to load resource ... 400"
   // console error without naming the URL. If every 4xx was the whitelisted auth
   // fallback, those console lines are just its echo — drop them.
-  const onlyWhitelisted = all4xx.length > 0 && all4xx.every((u) => u.includes('/api/collections/users/auth-with-password'));
+  const onlyWhitelisted = all4xx.length > 0 && all4xx.every(
+    (u) => u.includes('/api/collections/users/auth-with-password') ||
+           u.includes('/api/collections/issues/records/nonexistentid12345')
+  );
   const realConsoleErrors = onlyWhitelisted
-    ? consoleErrors.filter((t) => !/status of 400/.test(t))
+    ? consoleErrors.filter((t) => !/status of 400/.test(t) && !/status of 404/.test(t))
     : consoleErrors;
   if (realConsoleErrors.length) failures.push(`console errors: ${realConsoleErrors.slice(0, 3)}`);
   if (pageErrors.length) failures.push(`page errors: ${pageErrors.slice(0, 3)}`);
