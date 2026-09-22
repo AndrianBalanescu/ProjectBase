@@ -30,6 +30,28 @@ ProjectBase is MIT-licensed, free and open source. There is no hosted service, p
 
 See the [roadmap](docs/ROADMAP.md) for direction. A roadmap is not a delivery promise.
 
+## App Gallery & Main Views
+
+| Kanban Board & Agent Runs | Resizable Issue Drawer |
+| :---: | :---: |
+| ![Kanban Board](docs/screenshots/01-kanban-board.png) | ![Issue Drawer](docs/screenshots/12-issue-drawer-detail.png) |
+
+| List View | Timeline / Gantt View |
+| :---: | :---: |
+| ![List View](docs/screenshots/02-list-view.png) | ![Timeline View](docs/screenshots/04-timeline-view.png) |
+
+| Sprint Cycles & Burndown | North Star Milestones |
+| :---: | :---: |
+| ![Cycles View](docs/screenshots/03-cycles-view.png) | ![Milestones View](docs/screenshots/05-milestones-view.png) |
+
+| Projects Overview | Autonomous Agent Sessions |
+| :---: | :---: |
+| ![Projects View](docs/screenshots/06-projects-view.png) | ![Agents View](docs/screenshots/07-agents-sessions-view.png) |
+
+| Built-in Markdown Docs Viewer | Command Palette & Shortcuts |
+| :---: | :---: |
+| ![Docs Viewer](docs/screenshots/08-docs-viewer.png) | ![Shortcuts Modal](docs/screenshots/11-shortcuts-guide-modal.png) |
+
 ## Install with Docker
 
 Requirements: Git and Docker with Compose v2. The checked-in Dockerfile currently downloads the Linux `amd64` PocketBase binary, so this image build supports **x86_64/amd64 hosts only**.
